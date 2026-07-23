@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -92,9 +93,20 @@ export default function PanelPage() {
           gap: "0.5rem",
         }}
       >
-        <h1 style={{ fontSize: "1.3rem", marginBottom: "1rem" }}>
-          <span style={{ color: "var(--lgs-azul)" }}>LGS</span>{" "}
-          <span style={{ color: "var(--lgs-magenta)" }}>Kids</span>
+        <h1
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "1.3rem",
+            marginBottom: "1rem",
+          }}
+        >
+          <Image src="/logo.jpg" alt="" width={40} height={36} style={{ height: "auto" }} />
+          <span>
+            <span style={{ color: "var(--lgs-azul)" }}>LGS</span>{" "}
+            <span style={{ color: "var(--lgs-magenta)" }}>Kids</span>
+          </span>
         </h1>
         {opciones.map((item) => (
           <div
