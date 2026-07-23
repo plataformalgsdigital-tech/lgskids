@@ -29,8 +29,18 @@ del salón, nunca de una acción del estudiante.
   no intente compilar argon2/pg).
 - Comandos nuevos: `pnpm seed` (países, roles, permisos, admin — exige
   SEED_ADMIN_PASSWORD), `pnpm migrate:dev|deploy`, `pnpm worker:dev`.
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 4
-  (`catalog`: campaña → curso → nivel → lección → cuestionario).
+- **Fase 4 (`catalog`) completada**: migración `20260724000000_catalog`
+  (campaña, curso, nivel, lección, cuestionario). Crear campaña genera EN
+  UNA TRANSACCIÓN los cursos Junior+Youngster con 4 niveles c/u, 4
+  lecciones por nivel (cuestionario de práctica c/u) y un Level Up por
+  nivel: 2/8/32/40 filas. Estado de campaña SIEMPRE derivado por fecha
+  (nunca almacenado). Fechas de campaña/curso son DATE puro leído con
+  `::text` (pg parsearía DATE a medianoche local). Permisos nuevos:
+  `catalogo.gestionar` (admin, coordinador) y `catalogo.ver` (+ guía).
+  UI: /panel/campanias (+ detalle). `final_curso` no tiene endpoint de
+  edición a propósito.
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 5
+  (`people` y `contracts`).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 

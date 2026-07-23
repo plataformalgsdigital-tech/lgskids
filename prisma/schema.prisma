@@ -147,6 +147,110 @@ model LoginAttempt {
 }
 
 // ============================================================
+// catalog — campaña, curso, nivel, lección, cuestionario
+// ============================================================
+
+enum CourseTipo {
+  JUNIOR // 6–9 años
+  YOUNGSTER // 10–13 años
+
+  @@map("catalog_course_tipo")
+}
+
+enum QuizTipo {
+  PRACTICA // uno por lección
+  LEVEL_UP // uno por nivel; aprobarlo promueve
+
+  @@map("catalog_quiz_tipo")
+}
+
+model Campaign {
+  id     String @id @default(uuid()) @db.Uuid
+  nombre String @unique
+  // Campaña GLOBAL (ADR-0009): el país vive en el contrato, no aquí.
+  // El estado (En matrícula | Activa | Cerrada) se DERIVA por fecha,
+  // nunca se almacena.
+  inicio    DateTime @db.Date
+  fin       DateTime @db.Date // nominal: inicio + duración
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  courses Course[]
+
+  @@index([inicio, fin])
+  @@map("catalog_campaign")
+}
+
+model Course {
+  id         String     @id @default(uuid()) @db.Uuid
+  campaignId String     @map("campaign_id") @db.Uuid
+  tipo       CourseTipo
+  inicio     DateTime   @db.Date
+  // REGLA DURA 1: final_curso NUNCA se reescribe. Es la ventana nominal
+  // con la que se cuenta el número de sesiones; el fin real del curso es
+  // la fecha de su última sesión (scheduling). No existe endpoint que lo
+  // edite.
+  finalCurso DateTime @map("final_curso") @db.Date
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  levels   Level[]
+
+  // Una campaña genera UN curso por tipo.
+  @@unique([campaignId, tipo])
+  @@map("catalog_course")
+}
+
+model Level {
+  id       String @id @default(uuid()) @db.Uuid
+  courseId String @map("course_id") @db.Uuid
+  codigo   String // ROOKIE | CHAMPION | ELITE | LEGENDARY
+  orden    Int // 1..4
+  nombre   String
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+  quizzes Quiz[]
+
+  @@unique([courseId, orden])
+  @@unique([courseId, codigo])
+  @@map("catalog_level")
+}
+
+model Lesson {
+  id      String @id @default(uuid()) @db.Uuid
+  levelId String @map("level_id") @db.Uuid
+  orden   Int // 1..4 (4 lecciones por nivel)
+  titulo  String
+
+  level Level @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  quizzes Quiz[]
+
+  @@unique([levelId, orden])
+  @@map("catalog_lesson")
+}
+
+model Quiz {
+  id      String   @id @default(uuid()) @db.Uuid
+  levelId String   @map("level_id") @db.Uuid
+  // PRACTICA → lessonId obligatorio; LEVEL_UP → lessonId NULL.
+  // (La exclusividad la garantiza la generación transaccional única.)
+  lessonId String?  @map("lesson_id") @db.Uuid
+  tipo     QuizTipo
+  titulo   String
+  // Las preguntas llegan con `assessment` (Fase 8); aquí vive la estructura.
+  contenido Json?
+
+  level  Level   @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  lesson Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, tipo])
+  @@index([levelId])
+  @@map("catalog_quiz")
+}
+
+// ============================================================
 // audit — separada de las tablas operativas
 // ============================================================
 

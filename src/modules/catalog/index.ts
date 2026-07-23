@@ -7,4 +7,13 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export {};
+export {
+  crearCampaniaHandler,
+  listarCampaniasHandler,
+  detalleCampaniaHandler,
+} from "./api/handlers";
+export { derivarEstadoCampania, ETIQUETA_ESTADO } from "./domain/campania";
+export type { EstadoCampania } from "./domain/campania";
+export { NIVELES, LECCIONES_POR_NIVEL, TIPOS_CURSO } from "./domain/curriculo";
+export type { NivelCodigo, CursoTipo } from "./domain/curriculo";
+export type { CampaignListItem, CampaignDetail } from "./application/ports";

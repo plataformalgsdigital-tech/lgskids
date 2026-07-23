@@ -10,7 +10,7 @@ diagramas de flujo).
 | identity      | 3 ✅ | [src/modules/identity/README.md](../../src/modules/identity/README.md) — sesiones JWT + refresh rotativo con familias, rate limiting en tabla |
 | access        | 3 ✅ | [src/modules/access/README.md](../../src/modules/access/README.md) — RBAC, alcance por país, caché lectura 60 s                               |
 | audit         | 3 ✅ | [src/modules/audit/README.md](../../src/modules/audit/README.md) — registrar/listar; nunca rompe la operación principal                       |
-| catalog       | 4    | _pendiente_                                                                                                                                   |
+| catalog       | 4 ✅ | [src/modules/catalog/README.md](../../src/modules/catalog/README.md) — campaña genera todo transaccionalmente; estado derivado por fecha      |
 | people        | 5    | _pendiente_                                                                                                                                   |
 | contracts     | 5    | _pendiente_                                                                                                                                   |
 | scheduling    | 6    | _pendiente_                                                                                                                                   |
