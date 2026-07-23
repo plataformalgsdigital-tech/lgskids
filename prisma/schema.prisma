@@ -1,0 +1,168 @@
+// Esquema KIDS2026 — Fase 3: identity, access, audit.
+// Convenciones (ADR-0004): esquema único, tablas con prefijo de módulo,
+// UUID expuestos, created_at/updated_at, snake_case en base.
+// Instantes SIEMPRE en timestamptz (ADR-0007).
+// Migraciones versionadas; NUNCA `prisma db push` contra producción.
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// access — países, roles, permisos
+// ============================================================
+
+model Country {
+  code      String   @id @db.Char(2) // CL | CO | EC | PE
+  nombre    String
+  timezone  String // zona operativa (ADR-0007)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  userRoles UserRole[]
+
+  @@map("access_country")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique // admin | coordinador | guia | apoderado | alumno
+  nombre      String
+  descripcion String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@map("access_role")
+}
+
+model Permission {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique // ej. usuarios.gestionar, auditoria.ver
+  nombre    String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  roles RolePermission[]
+
+  @@map("access_permission")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("access_role_permission")
+}
+
+model UserRole {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  // NULL = alcance global; con valor = rol limitado a ese país (ADR-0009).
+  countryCode String?  @map("country_code") @db.Char(2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  country Country? @relation(fields: [countryCode], references: [code])
+
+  // Nota: countryCode NULL no participa del unique en Postgres; el caso
+  // "mismo rol global duplicado" se controla en el caso de uso.
+  @@unique([userId, roleId, countryCode])
+  @@index([userId])
+  @@map("access_user_role")
+}
+
+// ============================================================
+// identity — usuarios, sesiones, intentos
+// ============================================================
+
+enum UserEstado {
+  ACTIVO
+  INACTIVO
+  BLOQUEADO
+
+  @@map("identity_user_estado")
+}
+
+model User {
+  id       String @id @default(uuid()) @db.Uuid
+  username String @unique // el LOGIN es por username, no por correo (ADR-0005)
+  // Sin UNIQUE: hermanos comparten el correo del apoderado. Puede ser
+  // sintético (@alumnos.lgskidsplataforma.com, no enrutable).
+  email               String?
+  emailSintetico      Boolean    @default(false) @map("email_sintetico")
+  passwordHash        String     @map("password_hash") // argon2id
+  estado              UserEstado @default(ACTIVO)
+  debeCambiarPassword Boolean    @default(false) @map("debe_cambiar_password")
+  ultimoLoginEn       DateTime?  @map("ultimo_login_en") @db.Timestamptz(3)
+  createdAt           DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  refreshTokens RefreshToken[]
+  roles         UserRole[]
+
+  @@map("identity_user")
+}
+
+model RefreshToken {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  // Solo se guarda el hash del token (sha256); el valor viaja en la cookie.
+  tokenHash String @unique @map("token_hash")
+  // Familia de rotación: reuso de un token ya rotado = posible robo →
+  // se revoca la familia completa.
+  familyId      String    @map("family_id") @db.Uuid
+  expiraEn      DateTime  @map("expira_en") @db.Timestamptz(3)
+  revocadoEn    DateTime? @map("revocado_en") @db.Timestamptz(3)
+  motivoRevoque String?   @map("motivo_revoque")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiraEn]) // purga del worker
+  @@map("identity_refresh_token")
+}
+
+model LoginAttempt {
+  id        BigInt   @id @default(autoincrement())
+  username  String
+  ip        String
+  exito     Boolean
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  // Rate limiting persistido en tabla (nada en memoria — trampa 2.8.5).
+  @@index([username, createdAt])
+  @@index([ip, createdAt])
+  @@map("identity_login_attempt")
+}
+
+// ============================================================
+// audit — separada de las tablas operativas
+// ============================================================
+
+model AuditLog {
+  id            BigInt   @id @default(autoincrement())
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  accion        String // ej. auth.login, access.rol_asignado
+  entidad       String // ej. identity_user
+  entidadId     String?  @map("entidad_id")
+  payload       Json?
+  correlationId String?  @map("correlation_id")
+  ip            String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([entidad, entidadId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([accion, createdAt])
+  @@map("audit_log")
+}

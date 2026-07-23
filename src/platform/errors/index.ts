@@ -48,6 +48,12 @@ export class ConflictError extends AppError {
   override readonly code = "CONFLICT";
 }
 
+/** 429 — Demasiados intentos (rate limiting). */
+export class TooManyRequestsError extends AppError {
+  override readonly status = 429;
+  override readonly code = "TOO_MANY_REQUESTS";
+}
+
 /** ¿Es un error controlado de la aplicación? */
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;

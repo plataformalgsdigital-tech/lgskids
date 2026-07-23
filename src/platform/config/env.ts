@@ -27,6 +27,22 @@ const envSchema = z.object({
 
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 
+  /** Secreto de firma de JWT (mínimo 32 caracteres). Requerido en runtime. */
+  AUTH_JWT_SECRET: z.string().min(32).optional(),
+
+  /** Vida del access token en segundos (default 15 minutos). */
+  AUTH_ACCESS_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+
+  /** Vida del refresh token en días (default 30). */
+  AUTH_REFRESH_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+
+  /** "1" activa las pruebas de integración contra base real (CI). */
+  INTEGRATION_TESTS: z.string().optional(),
+
+  /** Solo para el seed: credenciales del admin inicial. */
+  SEED_ADMIN_USERNAME: z.string().min(3).default("admin"),
+  SEED_ADMIN_PASSWORD: z.string().min(10).optional(),
+
   /**
    * Zona operativa por defecto para salones nuevos. Cada salón puede
    * configurar la suya (decisión funcional 2026-07-22).
@@ -55,6 +71,17 @@ export function requireDatabaseUrl(): string {
     );
   }
   return url;
+}
+
+/** Exige AUTH_JWT_SECRET en runtime; error claro si falta. */
+export function requireAuthSecret(): string {
+  const secret = env().AUTH_JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "AUTH_JWT_SECRET no está configurada (mínimo 32 caracteres). Ver .env.example.",
+    );
+  }
+  return secret;
 }
 
 /** Solo para pruebas: limpia la caché de configuración. */

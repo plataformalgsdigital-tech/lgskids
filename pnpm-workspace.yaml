@@ -2,5 +2,8 @@
 # Dependencias autorizadas a ejecutar scripts de build (protección de cadena
 # de suministro): solo las estrictamente necesarias.
 allowBuilds:
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
   sharp: true
   unrs-resolver: true
