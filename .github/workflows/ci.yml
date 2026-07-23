@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  verify:
+    name: Lint · Tipos · Pruebas · Arquitectura · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalación reproducible
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Revisión de tipos
+        run: pnpm typecheck
+
+      - name: Pruebas unitarias e integración
+        run: pnpm test
+
+      - name: Pruebas de arquitectura (límites de módulos)
+        run: pnpm test:arch
+
+      - name: Formato
+        run: pnpm format:check
+
+      - name: Compilación
+        run: pnpm build
+
+      - name: Escaneo de dependencias
+        run: pnpm audit --prod --audit-level high
+
+  # Los despliegues (staging desde develop, producción desde main con
+  # aprobación) se configuran en la Fase 11 junto con las migraciones como
+  # paso previo. No se crean recursos pagos sin autorización expresa.
