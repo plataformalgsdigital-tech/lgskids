@@ -7,4 +7,13 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export {};
+export {
+  matricular,
+  matricularTx,
+  cambioAcademico,
+  cancelarMatriculaDeContratoTx,
+  obtenerRoster,
+  historialDeNino,
+  findActivaByContract,
+} from "./application/matricula";
+export { matricularHandler, rosterHandler, cambioAcademicoHandler } from "./api/handlers";

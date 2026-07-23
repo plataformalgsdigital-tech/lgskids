@@ -66,8 +66,21 @@ del salón, nunca de una acción del estudiante.
   sesiones POR LOTES (unnest). `starts_at` = pared de reloj del salón →
   UTC (DST chileno probado). Permisos: salones.gestionar/ver.
   UI: /panel/salones (+ detalle con suspender/regenerar).
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 7
-  (`enrollment`: matrícula, cupos, cambio académico; extiende el alta única).
+- **Fase 7 (`enrollment`) completada**: migración
+  `20260727000000_enrollment_contract_numero` (matrículas + `numero` SERIAL
+  en contratos). **La lista del salón se DERIVA de matrículas ACTIVAS** —
+  no hay tabla de inscripciones que se desincronice. `matricularTx` es el
+  núcleo único compartido por todos los caminos (matricular directo,
+  aprobar contrato con salón, cambio académico): cupo con `FOR UPDATE`
+  (sin carreras), tipo de curso validado, una ACTIVA por contrato.
+  Cambio académico: cierra con motivo (historial) + crea nueva validando
+  cupo, en una transacción. La cascada de inactivar contrato CANCELA la
+  matrícula. Aprobar contrato acepta `classroomId` opcional (alta única
+  completa). **Buscador global** en el panel (`/api/search` + /panel/buscar):
+  N° de contrato, documento, nombre, apellido o username, respetando
+  alcance por país. Permisos: matriculas.gestionar/ver (guía ve).
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 8
+  (`attendance` + `assessment`).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 

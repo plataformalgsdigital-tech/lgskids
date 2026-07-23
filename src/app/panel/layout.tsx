@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 /**
  * Layout del panel: el sidebar (menú según permisos) persiste en TODAS las
@@ -54,6 +54,15 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [me, setMe] = useState<Me | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+
+  function buscar(event: FormEvent) {
+    event.preventDefault();
+    const q = busqueda.trim();
+    if (q.length >= 2) {
+      router.push(`/panel/buscar?q=${encodeURIComponent(q)}`);
+    }
+  }
 
   useEffect(() => {
     let cancelado = false;
@@ -166,7 +175,47 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           Cerrar sesión
         </button>
       </aside>
-      <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        {(permisos.has("personas.ver") || permisos.has("contratos.ver")) && (
+          <header
+            style={{
+              padding: "0.75rem 2rem",
+              borderBottom: "1px solid #e3e7f0",
+              background: "#fafbfe",
+            }}
+          >
+            <form onSubmit={buscar} style={{ display: "flex", gap: "0.5rem", maxWidth: "34rem" }}>
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="🔍 Buscar por N° de contrato, documento, nombre, apellido o usuario…"
+                style={{
+                  flex: 1,
+                  padding: "0.55rem 0.8rem",
+                  borderRadius: "0.6rem",
+                  border: "1.5px solid #d8dce6",
+                  fontSize: "0.9rem",
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  padding: "0.55rem 1.1rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  background: "var(--lgs-azul)",
+                  color: "white",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Buscar
+              </button>
+            </form>
+          </header>
+        )}
+        <div style={{ flex: 1 }}>{children}</div>
+      </div>
     </div>
   );
 }

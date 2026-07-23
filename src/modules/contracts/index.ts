@@ -15,6 +15,7 @@ export {
   inactivarContrato,
   procesarVencimientos,
   listarContratos,
+  buscarContratos,
   obtenerContrato,
 } from "./application/gestion-contratos";
 export {

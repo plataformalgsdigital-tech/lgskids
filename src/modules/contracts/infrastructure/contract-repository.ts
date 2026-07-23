@@ -9,6 +9,7 @@ export type ContractEstado = "PENDIENTE" | "APROBADO" | "ONHOLD" | "INACTIVO";
 
 export interface ContractRecord {
   id: string;
+  numero: number;
   titularId: string;
   beneficiarioId: string;
   countryCode: string;
@@ -18,7 +19,7 @@ export interface ContractRecord {
   estado: ContractEstado;
 }
 
-const SELECT_CONTRACT = `SELECT id, titular_id AS "titularId",
+const SELECT_CONTRACT = `SELECT id, numero, titular_id AS "titularId",
   beneficiario_id AS "beneficiarioId", country_code AS "countryCode",
   tipo_curso AS "tipoCurso", inicio::text AS inicio,
   final_contrato::text AS "finalContrato", estado
@@ -166,6 +167,9 @@ export interface ContractListItem extends ContractRecord {
   beneficiario: string;
   titular: string;
   username: string | null;
+  /** Matrícula ACTIVA (Fase 7): salón y matrícula, si existen. */
+  salon: string | null;
+  enrollmentId: string | null;
 }
 
 /** Lista con alcance por país (ADR-0009) y nombres resueltos. */
@@ -191,20 +195,75 @@ export async function listContracts(params: {
   const offsetIdx = values.length;
 
   return queryRows<ContractListItem>(
-    `SELECT c.id, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
+    `SELECT c.id, c.numero, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
             c.country_code AS "countryCode", c.tipo_curso AS "tipoCurso",
             c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
             c.estado,
             b.nombres || ' ' || b.apellidos AS beneficiario,
             t.nombres || ' ' || t.apellidos AS titular,
-            u.username
+            u.username,
+            cl.nombre AS salon,
+            e.id AS "enrollmentId"
        FROM contracts_contract c
        JOIN people_person b ON b.id = c.beneficiario_id
        JOIN people_person t ON t.id = c.titular_id
        LEFT JOIN identity_user u ON u.id = b.user_id
+       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado = 'ACTIVA'
+       LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
       ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY c.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    values,
+  );
+}
+
+/**
+ * Búsqueda global de contratos: por NÚMERO exacto, o por nombre/apellido del
+ * beneficiario o titular, o por username del alumno. Respeta el alcance por
+ * país del solicitante.
+ */
+export async function searchContracts(params: {
+  q: string;
+  countryScope: string[] | null;
+  limit: number;
+}): Promise<ContractListItem[]> {
+  const values: unknown[] = [];
+  const where: string[] = [];
+  if (params.countryScope !== null) {
+    values.push(params.countryScope);
+    where.push(`c.country_code = ANY($${values.length})`);
+  }
+  if (/^\d+$/.test(params.q)) {
+    values.push(Number(params.q));
+    where.push(`c.numero = $${values.length}`);
+  } else {
+    values.push(`%${params.q}%`);
+    const i = values.length;
+    where.push(
+      `(b.nombres ILIKE $${i} OR b.apellidos ILIKE $${i} OR t.nombres ILIKE $${i} OR t.apellidos ILIKE $${i} OR u.username ILIKE $${i})`,
+    );
+  }
+  values.push(params.limit);
+
+  return queryRows<ContractListItem>(
+    `SELECT c.id, c.numero, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
+            c.country_code AS "countryCode", c.tipo_curso AS "tipoCurso",
+            c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
+            c.estado,
+            b.nombres || ' ' || b.apellidos AS beneficiario,
+            t.nombres || ' ' || t.apellidos AS titular,
+            u.username,
+            cl.nombre AS salon,
+            e.id AS "enrollmentId"
+       FROM contracts_contract c
+       JOIN people_person b ON b.id = c.beneficiario_id
+       JOIN people_person t ON t.id = c.titular_id
+       LEFT JOIN identity_user u ON u.id = b.user_id
+       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado = 'ACTIVA'
+       LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY c.numero DESC
+      LIMIT $${values.length}`,
     values,
   );
 }

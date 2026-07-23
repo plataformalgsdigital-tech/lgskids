@@ -30,4 +30,6 @@ export interface PersonInput {
 export interface PersonListItem extends PersonRecord {
   /** Apoderados del niño (vacío si no es niño). */
   apoderados: { id: string; nombres: string; apellidos: string }[];
+  /** Username del alumno si tiene credenciales. */
+  username: string | null;
 }

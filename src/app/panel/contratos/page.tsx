@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } 
 
 interface Contrato {
   id: string;
+  numero: number;
   beneficiario: string;
   titular: string;
   username: string | null;
@@ -12,6 +13,17 @@ interface Contrato {
   inicio: string;
   finalContrato: string;
   estado: "PENDIENTE" | "APROBADO" | "ONHOLD" | "INACTIVO";
+  salon: string | null;
+  enrollmentId: string | null;
+}
+
+interface SalonOpcion {
+  id: string;
+  nombre: string;
+  campania: string;
+  curso: string; // tipo del curso (JUNIOR | YOUNGSTER)
+  cupo: number;
+  sesiones: number;
 }
 
 interface Persona {
@@ -66,9 +78,20 @@ export default function ContratosPage() {
   const [error, setError] = useState<string | null>(null);
   const [credenciales, setCredenciales] = useState<Credenciales | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [salones, setSalones] = useState<SalonOpcion[]>([]);
+  // Contrato al que se le está eligiendo salón (matrícula o cambio académico).
+  const [eligiendoSalon, setEligiendoSalon] = useState<{
+    contrato: Contrato;
+    modo: "matricular" | "mover";
+  } | null>(null);
+  const [salonElegido, setSalonElegido] = useState("");
 
   const cargar = useCallback(async () => {
-    const [resC, resP] = await Promise.all([fetch("/api/contracts"), fetch("/api/people")]);
+    const [resC, resP, resS] = await Promise.all([
+      fetch("/api/contracts"),
+      fetch("/api/people"),
+      fetch("/api/scheduling/classrooms"),
+    ]);
     if (resC.ok) {
       const data: { contratos: Contrato[] } = await resC.json();
       setContratos(data.contratos);
@@ -76,6 +99,10 @@ export default function ContratosPage() {
     if (resP.ok) {
       const data: { personas: Persona[] } = await resP.json();
       setPersonas(data.personas.filter((p) => p.estado === "ACTIVA"));
+    }
+    if (resS.ok) {
+      const data: { salones: SalonOpcion[] } = await resS.json();
+      setSalones(data.salones);
     }
   }, []);
 
@@ -148,6 +175,53 @@ export default function ContratosPage() {
 
   function aprobar(id: string) {
     void accion(id, "approve");
+  }
+
+  async function confirmarSalon() {
+    if (eligiendoSalon === null || salonElegido === "") return;
+    setError(null);
+    setOcupado(true);
+    try {
+      let res: Response;
+      if (eligiendoSalon.modo === "matricular") {
+        res = await fetch("/api/enrollment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contractId: eligiendoSalon.contrato.id,
+            classroomId: salonElegido,
+          }),
+        });
+      } else {
+        const motivo = window.prompt("Motivo del cambio académico (obligatorio):");
+        if (motivo === null) {
+          setOcupado(false);
+          return;
+        }
+        if (motivo.trim().length < 5) {
+          setError("El motivo debe tener al menos 5 caracteres.");
+          setOcupado(false);
+          return;
+        }
+        res = await fetch(`/api/enrollment/${eligiendoSalon.contrato.enrollmentId}/move`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nuevoClassroomId: salonElegido, motivo }),
+        });
+      }
+      const data: { error?: { message: string } } = await res.json();
+      if (!res.ok) {
+        setError(data.error?.message ?? "La operación falló.");
+        return;
+      }
+      setEligiendoSalon(null);
+      setSalonElegido("");
+      await cargar();
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setOcupado(false);
+    }
   }
   function pausar(id: string) {
     const motivo = window.prompt("Motivo de la pausa (obligatorio):");
@@ -356,14 +430,63 @@ export default function ContratosPage() {
                 }}
               >
                 <div style={{ minWidth: "16rem" }}>
-                  <strong>{c.beneficiario}</strong>{" "}
+                  <strong>
+                    N° {c.numero} · {c.beneficiario}
+                  </strong>{" "}
                   <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                     {c.tipoCurso} · {c.countryCode} · {c.inicio} → {c.finalContrato}
                   </span>
                   <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                     Titular: {c.titular}
                     {c.username !== null && ` · usuario: ${c.username}`}
+                    {c.salon !== null && (
+                      <>
+                        {" · "}
+                        <strong style={{ color: "var(--lgs-azul-oscuro)" }}>🎓 {c.salon}</strong>
+                      </>
+                    )}
                   </div>
+                  {eligiendoSalon?.contrato.id === c.id && (
+                    <div
+                      style={{
+                        marginTop: "0.4rem",
+                        display: "flex",
+                        gap: "0.4rem",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <select
+                        value={salonElegido}
+                        onChange={(e) => setSalonElegido(e.target.value)}
+                        style={{
+                          padding: "0.4rem",
+                          borderRadius: "0.5rem",
+                          border: "1.5px solid #d8dce6",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        <option value="">— Elegir salón {c.tipoCurso} —</option>
+                        {salones
+                          .filter((s) => s.curso === c.tipoCurso)
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.campania} · {s.nombre} (cupo {s.cupo})
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        style={{ ...botonAccion, borderColor: "var(--lgs-verde)" }}
+                        disabled={ocupado || salonElegido === ""}
+                        onClick={() => void confirmarSalon()}
+                      >
+                        Confirmar
+                      </button>
+                      <button style={botonAccion} onClick={() => setEligiendoSalon(null)}>
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
                   <span
@@ -385,6 +508,30 @@ export default function ContratosPage() {
                       disabled={ocupado}
                     >
                       ✔ Aprobar
+                    </button>
+                  )}
+                  {c.estado === "APROBADO" && c.enrollmentId === null && (
+                    <button
+                      style={{ ...botonAccion, borderColor: "var(--lgs-azul)" }}
+                      disabled={ocupado}
+                      onClick={() => {
+                        setEligiendoSalon({ contrato: c, modo: "matricular" });
+                        setSalonElegido("");
+                      }}
+                    >
+                      🎓 Matricular
+                    </button>
+                  )}
+                  {c.estado === "APROBADO" && c.enrollmentId !== null && (
+                    <button
+                      style={botonAccion}
+                      disabled={ocupado}
+                      onClick={() => {
+                        setEligiendoSalon({ contrato: c, modo: "mover" });
+                        setSalonElegido("");
+                      }}
+                    >
+                      🔀 Cambiar salón
                     </button>
                   )}
                   {c.estado === "APROBADO" && (

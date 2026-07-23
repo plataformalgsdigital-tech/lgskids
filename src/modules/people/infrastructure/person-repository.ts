@@ -107,7 +107,7 @@ export async function listPersons(params: {
   if (params.buscar !== undefined && params.buscar !== "") {
     values.push(`%${params.buscar}%`);
     where.push(
-      `(p.nombres ILIKE $${values.length} OR p.apellidos ILIKE $${values.length} OR p.doc_numero ILIKE $${values.length})`,
+      `(p.nombres ILIKE $${values.length} OR p.apellidos ILIKE $${values.length} OR p.doc_numero ILIKE $${values.length} OR u.username ILIKE $${values.length})`,
     );
   }
   values.push(params.limit);
@@ -117,18 +117,20 @@ export async function listPersons(params: {
 
   interface Row extends PersonRecord {
     apoderados: { id: string; nombres: string; apellidos: string }[] | null;
+    username: string | null;
   }
   const rows = await queryRows<Row>(
     `SELECT p.id, p.nombres, p.apellidos,
             p.fecha_nacimiento::text AS "fechaNacimiento",
             p.doc_tipo AS "docTipo", p.doc_numero AS "docNumero",
             p.country_code AS "countryCode", p.email, p.telefono, p.estado,
-            p.user_id AS "userId",
+            p.user_id AS "userId", u.username,
             (SELECT json_agg(json_build_object('id', a.id, 'nombres', a.nombres, 'apellidos', a.apellidos))
                FROM people_guardianship g
                JOIN people_person a ON a.id = g.apoderado_id
               WHERE g.nino_id = p.id) AS apoderados
        FROM people_person p
+       LEFT JOIN identity_user u ON u.id = p.user_id
       ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY p.apellidos, p.nombres
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,

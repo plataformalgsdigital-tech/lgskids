@@ -281,6 +281,7 @@ model Person {
 
   user             User?          @relation(fields: [userId], references: [id])
   comoNino         Guardianship[] @relation("nino")
+  enrollments      Enrollment[]
   comoApoderado    Guardianship[] @relation("apoderado")
   contratosTitular Contract[]     @relation("titular")
   contratosBenef   Contract[]     @relation("beneficiario")
@@ -319,7 +320,9 @@ enum ContractEstado {
 }
 
 model Contract {
-  id             String  @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
+  // Correlativo humano para búsqueda y comunicación ("contrato N° 1042").
+  numero         Int     @unique @default(autoincrement())
   titularId      String  @map("titular_id") @db.Uuid
   beneficiarioId String  @map("beneficiario_id") @db.Uuid
   countryCode    String  @map("country_code") @db.Char(2) // AQUÍ vive el país (ADR-0009)
@@ -336,10 +339,47 @@ model Contract {
   titular      Person         @relation("titular", fields: [titularId], references: [id])
   beneficiario Person         @relation("beneficiario", fields: [beneficiarioId], references: [id])
   onholds      ContractHold[]
+  enrollments  Enrollment[]
 
   @@index([beneficiarioId, estado])
   @@index([estado, finalContrato]) // barrido diario de vencimiento
   @@map("contracts_contract")
+}
+
+// ============================================================
+// enrollment — matrícula, cupos, cambio académico
+// ============================================================
+
+enum EnrollmentEstado {
+  ACTIVA
+  FINALIZADA // terminó o fue movida por cambio académico (historial)
+  CANCELADA
+
+  @@map("enrollment_estado")
+}
+
+model Enrollment {
+  id            String @id @default(uuid()) @db.Uuid
+  contractId    String @map("contract_id") @db.Uuid
+  childPersonId String @map("child_person_id") @db.Uuid
+  classroomId   String @map("classroom_id") @db.Uuid
+  estado        EnrollmentEstado @default(ACTIVA)
+  // Motivo del cierre (cambio académico, cancelación) — obligatorio al cerrar.
+  motivoCierre String?  @map("motivo_cierre")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  contract  Contract  @relation(fields: [contractId], references: [id])
+  child     Person    @relation(fields: [childPersonId], references: [id])
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+
+  // La LISTA de una sesión se DERIVA de las matrículas ACTIVAS del salón
+  // (regla de oro del modelo de cohortes) — no hay tabla de inscripciones
+  // que pueda desincronizarse; regenerar sesiones no toca la matrícula.
+  @@index([classroomId, estado])
+  @@index([childPersonId, estado])
+  @@index([contractId, estado])
+  @@map("enrollment_enrollment")
 }
 
 model ContractHold {
@@ -390,6 +430,7 @@ model Classroom {
   slots       Slot[]
   sessions    Session[]
   suspensions Suspension[]
+  enrollments Enrollment[]
 
   @@index([courseId])
   @@map("scheduling_classroom")

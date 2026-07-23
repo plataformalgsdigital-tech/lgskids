@@ -49,6 +49,8 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.CONTRATOS_VER]: "Ver contratos",
   [PERMISOS.SALONES_GESTIONAR]: "Gestionar salones y sesiones",
   [PERMISOS.SALONES_VER]: "Ver salones y sesiones",
+  [PERMISOS.MATRICULAS_GESTIONAR]: "Gestionar matrículas y cambios académicos",
+  [PERMISOS.MATRICULAS_VER]: "Ver matrículas y listas de salón",
   [PERMISOS.PANEL_ADMINISTRACION]: "Panel de administración",
   [PERMISOS.PANEL_GUIA]: "Panel del guía",
   [PERMISOS.PANEL_APODERADO]: "Panel del apoderado",

@@ -1,5 +1,6 @@
 import { asignarRolTx, ROLES } from "@/modules/access";
 import { registrarAuditoria } from "@/modules/audit";
+import { cancelarMatriculaDeContratoTx, matricularTx } from "@/modules/enrollment";
 import {
   inactivarUsuarioTx,
   provisionarUsuarioAlumno,
@@ -21,6 +22,7 @@ import {
   insertContract,
   insertOnhold,
   listContracts,
+  searchContracts,
   setContractEstado,
   type ContractListItem,
   type ContractRecord,
@@ -90,8 +92,10 @@ export async function crearContrato(input: {
 export async function aprobarContrato(input: {
   actorUserId: string;
   contractId: string;
+  /** Si viene, el alta única incluye la MATRÍCULA en ese salón (Fase 7). */
+  classroomId?: string | null;
   ip?: string | null;
-}): Promise<{ credenciales: AlumnoProvisionado | null }> {
+}): Promise<{ credenciales: AlumnoProvisionado | null; enrollmentId: string | null }> {
   const contrato = await findContractById(input.contractId);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
   if (contrato.estado !== "PENDIENTE") {
@@ -104,22 +108,33 @@ export async function aprobarContrato(input: {
     throw new ConflictError("El beneficiario no está activo.");
   }
 
-  const credenciales = await withTransaction(async (tx) => {
+  const resultado = await withTransaction(async (tx) => {
     await setContractEstado(contrato.id, "APROBADO", tx);
-    if (beneficiario.userId !== null) {
-      return null; // ya tenía credenciales (ej. segundo contrato)
+
+    let credenciales: AlumnoProvisionado | null = null;
+    if (beneficiario.userId === null) {
+      credenciales = await provisionarUsuarioAlumno(tx, {
+        nombres: beneficiario.nombres,
+        apellidos: beneficiario.apellidos,
+      });
+      await linkUser(beneficiario.id, credenciales.userId, tx);
+      await asignarRolTx(tx, {
+        userId: credenciales.userId,
+        roleCode: ROLES.ALUMNO,
+        countryCode: contrato.countryCode,
+      });
     }
-    const alumno = await provisionarUsuarioAlumno(tx, {
-      nombres: beneficiario.nombres,
-      apellidos: beneficiario.apellidos,
-    });
-    await linkUser(beneficiario.id, alumno.userId, tx);
-    await asignarRolTx(tx, {
-      userId: alumno.userId,
-      roleCode: ROLES.ALUMNO,
-      countryCode: contrato.countryCode,
-    });
-    return alumno;
+
+    let enrollmentId: string | null = null;
+    if (input.classroomId != null) {
+      enrollmentId = await matricularTx(tx, {
+        contractId: contrato.id,
+        childPersonId: contrato.beneficiarioId,
+        classroomId: input.classroomId,
+        tipoCursoContrato: contrato.tipoCurso,
+      });
+    }
+    return { credenciales, enrollmentId };
   });
 
   await registrarAuditoria({
@@ -129,12 +144,13 @@ export async function aprobarContrato(input: {
     entidadId: contrato.id,
     payload: {
       beneficiarioId: contrato.beneficiarioId,
-      credencialesCreadas: credenciales !== null,
-      ...(credenciales !== null && { username: credenciales.username }),
+      credencialesCreadas: resultado.credenciales !== null,
+      ...(resultado.credenciales !== null && { username: resultado.credenciales.username }),
+      ...(resultado.enrollmentId !== null && { enrollmentId: resultado.enrollmentId }),
     },
     ip: input.ip ?? null,
   });
-  return { credenciales };
+  return resultado;
 }
 
 /** Pausa (OnHold) un contrato APROBADO. Motivo obligatorio, auditado. */
@@ -235,6 +251,9 @@ export async function inactivarContrato(input: {
 
   await withTransaction(async (tx) => {
     await setContractEstado(contrato.id, "INACTIVO", tx);
+    // La cascada también CANCELA la matrícula activa (Fase 7): el niño sale
+    // de la lista del salón por derivación, sin tocar sesiones pasadas.
+    await cancelarMatriculaDeContratoTx(tx, contrato.id, `inactivación: ${input.motivo.trim()}`);
     const pausa = await findOnholdAbierto(contrato.id, tx);
     if (pausa !== null) {
       await cerrarOnhold(pausa.id, fechaUtcHoy(), 0, tx);
@@ -281,6 +300,21 @@ export async function procesarVencimientos(): Promise<number> {
     });
   }
   return vencidos.length;
+}
+
+/** Búsqueda global (número, nombres, username) con alcance por país. */
+export async function buscarContratos(params: {
+  q: string;
+  countryScope: string[] | null;
+  limit?: number;
+}): Promise<ContractListItem[]> {
+  const q = params.q.trim();
+  if (q.length < 2) return [];
+  return searchContracts({
+    q,
+    countryScope: params.countryScope,
+    limit: Math.min(Math.max(params.limit ?? 10, 1), 50),
+  });
 }
 
 export async function listarContratos(params: {

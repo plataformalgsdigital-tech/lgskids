@@ -85,7 +85,10 @@ export default function PersonasPage() {
 
   useEffect(() => {
     async function inicial() {
-      await cargar("");
+      // El buscador global puede llegar con ?buscar=<documento>.
+      const q = new URLSearchParams(window.location.search).get("buscar") ?? "";
+      await cargar(q);
+      if (q !== "") setBuscar(q);
     }
     void inicial();
   }, [cargar]);

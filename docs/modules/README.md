@@ -14,7 +14,7 @@ diagramas de flujo).
 | people        | 5 ✅ | [src/modules/people/README.md](../../src/modules/people/README.md) — doc único; niño+apoderado transaccional; alcance por país en listados       |
 | contracts     | 5 ✅ | [src/modules/contracts/README.md](../../src/modules/contracts/README.md) — vigencia UNA función; alta única al aprobar; OnHold extiende; cascada |
 | scheduling    | 6 ✅ | [src/modules/scheduling/README.md](../../src/modules/scheduling/README.md) — generación nominal determinística; feriados por código; corrimiento |
-| enrollment    | 7    | _pendiente_                                                                                                                                      |
+| enrollment    | 7 ✅ | [src/modules/enrollment/README.md](../../src/modules/enrollment/README.md) — roster derivado; matricularTx único; cupo con FOR UPDATE            |
 | attendance    | 8    | _pendiente_                                                                                                                                      |
 | assessment    | 8    | _pendiente_                                                                                                                                      |
 | progression   | 9    | _pendiente_                                                                                                                                      |

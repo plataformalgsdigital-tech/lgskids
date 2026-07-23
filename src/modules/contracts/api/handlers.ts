@@ -64,14 +64,18 @@ export const listarContratosHandler = handlerWithAuth(async (request, auth) => {
   return json({ contratos });
 });
 
+const aprobarSchema = z.object({ classroomId: z.uuid().nullish() });
+
 /** POST /api/contracts/[id]/approve — EL ALTA ÚNICA. Devuelve credenciales (una vez). */
 export const aprobarContratoHandler = handlerWithAuth(async (request, auth, context) => {
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  const body = aprobarSchema.parse(await request.json().catch(() => ({})));
   const resultado = await aprobarContrato({
     actorUserId: auth.userId,
     contractId,
+    classroomId: body.classroomId ?? null,
     ip: ip(request),
   });
   return json(resultado);

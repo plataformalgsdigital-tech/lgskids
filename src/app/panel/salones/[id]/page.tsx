@@ -31,17 +31,34 @@ const boton: CSSProperties = {
   cursor: "pointer",
 };
 
+interface RosterItem {
+  enrollmentId: string;
+  childPersonId: string;
+  nombres: string;
+  apellidos: string;
+  username: string | null;
+  contratoNumero: number;
+}
+
 export default function DetalleSalonPage() {
   const params = useParams<{ id: string }>();
   const [detalle, setDetalle] = useState<Detalle | null>(null);
+  const [roster, setRoster] = useState<RosterItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
   const cargar = useCallback(async () => {
-    const res = await fetch(`/api/scheduling/classrooms/${params.id}`);
+    const [res, resRoster] = await Promise.all([
+      fetch(`/api/scheduling/classrooms/${params.id}`),
+      fetch(`/api/enrollment?classroomId=${params.id}`),
+    ]);
     if (res.ok) {
       setDetalle((await res.json()) as Detalle);
+    }
+    if (resRoster.ok) {
+      const data: { roster: RosterItem[] } = await resRoster.json();
+      setRoster(data.roster);
     }
   }, [params.id]);
 
@@ -170,6 +187,40 @@ export default function DetalleSalonPage() {
           {error}
         </p>
       )}
+
+      <section style={{ marginTop: "1.25rem" }}>
+        <h2 style={{ fontSize: "1.1rem", marginBottom: "0.6rem" }}>
+          Alumnos matriculados ({roster.length}/{detalle.salon.cupo})
+        </h2>
+        {roster.length === 0 ? (
+          <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+            Sin matrículas todavía. La lista se deriva de las matrículas activas — se matricula
+            desde la sección Contratos.
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+            {roster.map((r) => (
+              <div
+                key={r.enrollmentId}
+                style={{
+                  padding: "0.45rem 0.75rem",
+                  border: "1px solid #edf0f6",
+                  borderRadius: "0.5rem",
+                  fontSize: "0.85rem",
+                }}
+              >
+                <strong>
+                  {r.apellidos}, {r.nombres}
+                </strong>{" "}
+                <span style={{ color: "var(--texto-suave)" }}>
+                  · contrato N° {r.contratoNumero}
+                  {r.username !== null && ` · ${r.username}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section style={{ marginTop: "1.25rem" }}>
         <h2 style={{ fontSize: "1.1rem", marginBottom: "0.6rem" }}>
