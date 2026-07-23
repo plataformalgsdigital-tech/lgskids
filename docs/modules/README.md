@@ -15,8 +15,8 @@ diagramas de flujo).
 | contracts     | 5 ✅ | [src/modules/contracts/README.md](../../src/modules/contracts/README.md) — vigencia UNA función; alta única al aprobar; OnHold extiende; cascada |
 | scheduling    | 6 ✅ | [src/modules/scheduling/README.md](../../src/modules/scheduling/README.md) — generación nominal determinística; feriados por código; corrimiento |
 | enrollment    | 7 ✅ | [src/modules/enrollment/README.md](../../src/modules/enrollment/README.md) — roster derivado; matricularTx único; cupo con FOR UPDATE            |
-| attendance    | 8    | _pendiente_                                                                                                                                      |
-| assessment    | 8    | _pendiente_                                                                                                                                      |
+| attendance    | 8 ✅ | [src/modules/attendance/README.md](../../src/modules/attendance/README.md) — upsert por sesión+niño; aviso feriado del país del niño             |
+| assessment    | 8 ✅ | [src/modules/assessment/README.md](../../src/modules/assessment/README.md) — intentos con umbral 70 provisional; valida matrícula                |
 | progression   | 9    | _pendiente_                                                                                                                                      |
 | reporting     | 10   | _pendiente_                                                                                                                                      |
 | notifications | 10   | _pendiente_                                                                                                                                      |

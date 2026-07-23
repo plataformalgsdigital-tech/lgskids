@@ -8,8 +8,15 @@ import {
   getCourseLevels,
   getLessonsByCampaign,
   getQuizzesByCampaign,
+  getQuizzesByCourse,
   listCampaigns,
+  type QuizDeCurso,
 } from "../infrastructure/catalog-repository";
+
+/** Cuestionarios de un curso (registro de intentos en assessment). */
+export async function cuestionariosDeCurso(courseId: string): Promise<QuizDeCurso[]> {
+  return getQuizzesByCourse(courseId);
+}
 
 /**
  * "Hoy" para derivar el estado de una campaña GLOBAL: la fecha operativa en

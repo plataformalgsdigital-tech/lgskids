@@ -79,8 +79,21 @@ del salón, nunca de una acción del estudiante.
   completa). **Buscador global** en el panel (`/api/search` + /panel/buscar):
   N° de contrato, documento, nombre, apellido o username, respetando
   alcance por país. Permisos: matriculas.gestionar/ver (guía ve).
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 8
-  (`attendance` + `assessment`).
+- **Fase 8 (`attendance` + `assessment`) completada**: migración
+  `20260728000000_attendance_assessment`. Asistencia: UNA marca por
+  (sesión, niño) con UPSERT — individual y masiva pasan por el MISMO
+  camino (`marcarAsistencia`); JUSTIFICADO exige justificación; la lista
+  muestra AVISO cuando la fecha es feriado en el país del NIÑO (política
+  de docs/operacion/politica-feriados-asistencia.md). Cuestionarios:
+  intentos con umbral 70/100 (PROVISIONAL — `assessment/domain/calificacion.ts`,
+  reintentos ilimitados), validando matrícula activa en el curso del quiz.
+  **Hooks de Fase 9**: `marcarAsistencia` y `registrarIntento` son LOS DOS
+  únicos caminos que dispararán la función central de progresión.
+  UI: clic en una sesión del salón → página de asistencia con quiz inline.
+  `ver-base-datos.bat` abre Prisma Studio (puerto 5555). Permisos:
+  asistencia.gestionar/ver, evaluaciones.gestionar/ver (guía gestiona).
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 9
+  (`progression`: LA función central de avance).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 

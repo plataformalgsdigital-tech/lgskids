@@ -7,4 +7,6 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export {};
+export { registrarIntento, intentosDeNino, tieneAprobado } from "./application/intentos";
+export { NOTA_MINIMA_APROBACION, esAprobado } from "./domain/calificacion";
+export { registrarIntentoHandler, intentosHandler } from "./api/handlers";

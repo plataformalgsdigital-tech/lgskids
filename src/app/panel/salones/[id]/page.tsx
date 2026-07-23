@@ -247,11 +247,15 @@ export default function DetalleSalonPage() {
                 fontSize: "0.85rem",
               }}
             >
-              <span>
+              <Link
+                href={`/panel/salones/${params.id}/sesion/${s.id}`}
+                style={{ color: "inherit", flex: 1 }}
+                title="Abrir asistencia de esta sesión"
+              >
                 <strong>{s.tipo === "CLUB" ? "Club" : `Sesión ${s.numero}`}</strong> ·{" "}
                 {DIAS[new Date(`${s.fecha}T12:00:00Z`).getUTCDay()]} {s.fecha} ·{" "}
                 {horaLocal(s.startsAt)}
-              </span>
+              </Link>
               <button
                 style={{ ...boton, padding: "0.2rem 0.5rem" }}
                 disabled={ocupado}

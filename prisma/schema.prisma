@@ -245,6 +245,7 @@ model Quiz {
 
   level  Level   @relation(fields: [levelId], references: [id], onDelete: Cascade)
   lesson Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  attempts QuizAttempt[]
 
   @@unique([lessonId, tipo])
   @@index([levelId])
@@ -282,6 +283,8 @@ model Person {
   user             User?          @relation(fields: [userId], references: [id])
   comoNino         Guardianship[] @relation("nino")
   enrollments      Enrollment[]
+  attendances      Attendance[]
+  quizAttempts     QuizAttempt[]
   comoApoderado    Guardianship[] @relation("apoderado")
   contratosTitular Contract[]     @relation("titular")
   contratosBenef   Contract[]     @relation("beneficiario")
@@ -468,6 +471,7 @@ model Session {
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   slot      Slot      @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  attendances Attendance[]
 
   @@unique([classroomId, startsAt])
   @@unique([slotId, numero])
@@ -500,6 +504,59 @@ model Suspension {
   // EN TABLA, nunca en memoria: la regeneración es destructiva y las relee.
   @@unique([classroomId, fecha])
   @@map("scheduling_suspension")
+}
+
+// ============================================================
+// attendance — asistencia y justificaciones
+// ============================================================
+
+enum AttendanceEstado {
+  PRESENTE
+  AUSENTE
+  JUSTIFICADO // incluye feriado del país del niño distinto al del salón
+
+  @@map("attendance_estado")
+}
+
+model Attendance {
+  id            String @id @default(uuid()) @db.Uuid
+  sessionId     String @map("session_id") @db.Uuid
+  childPersonId String @map("child_person_id") @db.Uuid
+  estado        AttendanceEstado
+  justificacion String?
+  // Quién marcó (guía/coordinador) y cuándo — auditable en la propia fila.
+  marcadoPor String   @map("marcado_por") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  child   Person  @relation(fields: [childPersonId], references: [id])
+
+  // Una marca por niño y sesión; re-marcar ACTUALIZA (upsert).
+  @@unique([sessionId, childPersonId])
+  @@index([childPersonId, sessionId])
+  @@map("attendance_attendance")
+}
+
+// ============================================================
+// assessment — intentos de cuestionario y calificación
+// ============================================================
+
+model QuizAttempt {
+  id            String @id @default(uuid()) @db.Uuid
+  quizId        String @map("quiz_id") @db.Uuid
+  childPersonId String @map("child_person_id") @db.Uuid
+  score         Int // 0–100
+  aprobado      Boolean
+  registradoPor String   @map("registrado_por") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  quiz  Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  child Person @relation(fields: [childPersonId], references: [id])
+
+  @@index([childPersonId, quizId])
+  @@index([quizId])
+  @@map("assessment_attempt")
 }
 
 // ============================================================

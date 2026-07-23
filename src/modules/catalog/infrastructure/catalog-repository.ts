@@ -147,6 +147,29 @@ export async function getLessonsByCampaign(campaignId: string): Promise<LessonRo
   );
 }
 
+export interface QuizDeCurso {
+  id: string;
+  tipo: string;
+  titulo: string;
+  nivel: string;
+  nivelOrden: number;
+  leccionOrden: number | null;
+}
+
+/** Cuestionarios de un curso, ordenados por nivel y lección (para registrar intentos). */
+export async function getQuizzesByCourse(courseId: string): Promise<QuizDeCurso[]> {
+  return queryRows<QuizDeCurso>(
+    `SELECT q.id, q.tipo::text AS tipo, q.titulo,
+            n.nombre AS nivel, n.orden AS "nivelOrden", l.orden AS "leccionOrden"
+       FROM catalog_quiz q
+       JOIN catalog_level n ON n.id = q.level_id
+       LEFT JOIN catalog_lesson l ON l.id = q.lesson_id
+      WHERE n.course_id = $1
+      ORDER BY n.orden, q.tipo = 'LEVEL_UP', l.orden`,
+    [courseId],
+  );
+}
+
 export interface QuizRow {
   level_id: string;
   id: string;
