@@ -103,8 +103,20 @@ del salón, nunca de una acción del estudiante.
   seguridad). Awards con `notificado_en` NULL hasta que Fase 10 envíe por
   WhatsApp. UI: /panel/progreso/[childId] (enlace 📈 en el roster).
   Permiso: progresion.ver.
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 10
-  (`reporting`, `notifications` WhatsApp, `files`).
+- **Fase 10 (`reporting` + `notifications` + `files`) completada**:
+  migración `20260730000000_notifications_files`. Notifications: patrón
+  OUTBOX (encolar barato; el worker despacha cada 5 min con reintentos,
+  máx 5) — LogSender sin credenciales, WhatsAppCloudSender (Meta) cuando
+  existan WHATSAPP_TOKEN/PHONE_ID; `notificarPremiosPendientes` cada 15
+  min arma el mensaje de medalla/diploma al WhatsApp REAL del apoderado.
+  Files: StoragePort + LocalStorage (STORAGE_DIR) — PRIVADO por defecto,
+  descarga solo autenticada, MIME allowlist (pdf/jpg/png/webp), 10 MB máx,
+  claves impredecibles; adaptador Spaces se enchufa en Fase 11. Reporting:
+  asistencia por salón/mes con `AT TIME ZONE cl.timezone` EN SQL,
+  ocupación de salones, contratos por país (con alcance). UI:
+  /panel/reportes. Permisos: reportes.ver, archivos.gestionar/ver.
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 11
+  (despliegue DigitalOcean — requisitos en docs/runbooks/).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 

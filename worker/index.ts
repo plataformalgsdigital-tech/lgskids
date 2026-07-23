@@ -9,6 +9,7 @@
  */
 import { procesarVencimientos } from "../src/modules/contracts";
 import { sessionService } from "../src/modules/identity";
+import { notificarPremiosPendientes, procesarOutbox } from "../src/modules/notifications";
 import { recalculoGlobal } from "../src/modules/progression";
 import { closePool } from "../src/platform/db/pool";
 import { logger } from "../src/platform/logging/logger";
@@ -53,6 +54,28 @@ const tasks: ScheduledTask[] = [
     run: async () => {
       const ninos = await recalculoGlobal();
       logger.info("Recalculo global de progresión", { ninos });
+    },
+  },
+  {
+    // Medallas/diplomas sin avisar → mensajes al WhatsApp del apoderado
+    // (encolados al outbox). Idempotente.
+    name: "notifications.premios",
+    everyMinutes: 15,
+    run: async () => {
+      const encoladas = await notificarPremiosPendientes();
+      if (encoladas > 0) logger.info("Premios encolados para WhatsApp", { encoladas });
+    },
+  },
+  {
+    // Despacho del outbox con reintentos (LogSender en dev; WhatsApp real
+    // cuando existan credenciales — Fase 11).
+    name: "notifications.outbox",
+    everyMinutes: 5,
+    run: async () => {
+      const resultado = await procesarOutbox();
+      if (resultado.enviadas + resultado.fallidas > 0) {
+        logger.info("Outbox procesado", resultado);
+      }
     },
   },
 ];

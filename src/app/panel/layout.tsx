@@ -44,6 +44,12 @@ const MENU: { permiso: string; etiqueta: string; color: string; href?: string }[
   },
   { permiso: "usuarios.gestionar", etiqueta: "Usuarios", color: "var(--lgs-cian)" },
   { permiso: "roles.asignar", etiqueta: "Roles y permisos", color: "var(--lgs-purpura)" },
+  {
+    permiso: "reportes.ver",
+    etiqueta: "Reportes",
+    color: "var(--lgs-purpura)",
+    href: "/panel/reportes",
+  },
   { permiso: "auditoria.ver", etiqueta: "Auditoría", color: "var(--lgs-verde)" },
   { permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)" },
   { permiso: "panel.apoderado", etiqueta: "Mis niños", color: "var(--lgs-magenta)" },

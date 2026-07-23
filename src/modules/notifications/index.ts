@@ -7,4 +7,10 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export {};
+export {
+  encolarNotificacion,
+  procesarOutbox,
+  notificarPremiosPendientes,
+} from "./application/outbox";
+export type { NotificationSenderPort, MensajeSaliente, Canal } from "./application/ports";
+export { setSenderForTests } from "./infrastructure/senders";

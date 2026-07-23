@@ -623,6 +623,66 @@ model Award {
 }
 
 // ============================================================
+// notifications — outbox de WhatsApp/correo
+// ============================================================
+
+enum NotifCanal {
+  WHATSAPP
+  EMAIL
+
+  @@map("notifications_canal")
+}
+
+enum NotifEstado {
+  PENDIENTE
+  ENVIADA
+  FALLIDA
+
+  @@map("notifications_estado")
+}
+
+model NotificationOutbox {
+  id           String     @id @default(uuid()) @db.Uuid
+  canal        NotifCanal
+  destinatario String // teléfono E.164 o correo REAL (del apoderado)
+  mensaje      String
+  // Contexto para plantillas/reintentos (tipo de aviso, ids).
+  payload     Json?
+  estado      NotifEstado @default(PENDIENTE)
+  intentos    Int         @default(0)
+  ultimoError String?     @map("ultimo_error")
+  enviadaEn   DateTime?   @map("enviada_en") @db.Timestamptz(3)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  // OUTBOX: nada se envía en línea con la operación de negocio; el worker
+  // despacha con reintentos. Nada de estado en memoria (trampa 2.8.5).
+  @@index([estado, createdAt])
+  @@map("notifications_outbox")
+}
+
+// ============================================================
+// files — metadatos; los bytes viven en el StoragePort (ADR-0006)
+// ============================================================
+
+model FileObject {
+  id             String @id @default(uuid()) @db.Uuid
+  nombreOriginal String @map("nombre_original")
+  mime           String
+  sizeBytes      Int    @map("size_bytes")
+  // Nombre interno NO predecible dentro del almacenamiento.
+  storageKey String  @unique @map("storage_key")
+  // PRIVADO POR DEFECTO — datos de menores (ADR-0006). No existe flag
+  // "público": compartir es SIEMPRE vía descarga autenticada.
+  subidoPor String   @map("subido_por") @db.Uuid
+  entidad   String? // ej. people_person, contracts_contract
+  entidadId String?  @map("entidad_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([entidad, entidadId])
+  @@map("files_object")
+}
+
+// ============================================================
 // audit — separada de las tablas operativas
 // ============================================================
 

@@ -39,6 +39,13 @@ const envSchema = z.object({
   /** "1" activa las pruebas de integración contra base real (CI). */
   INTEGRATION_TESTS: z.string().optional(),
 
+  /** WhatsApp Cloud API (Fase 11). Sin credenciales se usa LogSender. */
+  WHATSAPP_TOKEN: z.string().min(10).optional(),
+  WHATSAPP_PHONE_ID: z.string().min(3).optional(),
+
+  /** Carpeta del adaptador local de archivos (desarrollo). */
+  STORAGE_DIR: z.string().default(".storage"),
+
   /** Solo para el seed: credenciales del admin inicial. */
   SEED_ADMIN_USERNAME: z.string().min(3).default("admin"),
   SEED_ADMIN_PASSWORD: z.string().min(10).optional(),
