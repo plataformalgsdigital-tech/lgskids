@@ -1,0 +1,43 @@
+/*
+ * Paleta LGS Kids — derivada de "Logo sin fondo.jpg" (2026-07-22).
+ * Azul primario del logotipo "LGS"; acentos del lettering "KiDS";
+ * púrpura de la sombra. UI amigable para niños de 6–13 años.
+ */
+:root {
+  --lgs-azul: #2196f3; /* primario — "LGS" */
+  --lgs-azul-oscuro: #1565c0;
+  --lgs-purpura: #7b2fbe; /* sombra del logo — títulos/fondos oscuros */
+  --lgs-verde: #8bc34a; /* acento — "K" */
+  --lgs-amarillo: #ffd600; /* acento — "i" */
+  --lgs-cian: #00aeef; /* acento — "D" */
+  --lgs-magenta: #ec008f; /* acento — "S" */
+
+  --fondo: #ffffff;
+  --texto: #1f2430;
+  --texto-suave: #5a6172;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: var(--texto);
+  background: var(--fondo);
+}
+
+a {
+  color: var(--lgs-azul);
+  text-decoration: none;
+}

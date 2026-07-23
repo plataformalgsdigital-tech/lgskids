@@ -1,0 +1,10 @@
+/**
+ * Módulo `scheduling` — API PÚBLICA.
+ *
+ * Salón (horario recurrente, guía, cupo, enlace, zona operativa y calendario de feriados configurables por salón), generación de sesiones, feriados por país, suspensiones persistidas en tabla. finalCurso NUNCA se reescribe.
+ *
+ * REGLA DE ARQUITECTURA: este archivo es lo ÚNICO importable desde fuera del
+ * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
+ * api/, ui/) desde otro módulo es una violación verificada en CI.
+ */
+export {};
