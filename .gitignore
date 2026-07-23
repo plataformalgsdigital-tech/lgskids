@@ -1,0 +1,40 @@
+# Dependencias
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Producción
+build/
+dist/
+
+# Variables de entorno — NUNCA subir secretos
+.env
+.env.*
+!.env.example
+
+# Almacenamiento local de desarrollo (adaptador local de archivos)
+.storage/
+
+# Logs y depuración
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# Pruebas
+coverage/
+
+# Prisma
+prisma/*.db

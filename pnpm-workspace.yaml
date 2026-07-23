@@ -1,0 +1,6 @@
+# Configuración de pnpm (v11 lee los ajustes desde aquí).
+# Dependencias autorizadas a ejecutar scripts de build (protección de cadena
+# de suministro): solo las estrictamente necesarias.
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
