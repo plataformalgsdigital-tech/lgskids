@@ -118,6 +118,16 @@ del salón, nunca de una acción del estudiante.
 - Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 11
   (despliegue DigitalOcean — requisitos en docs/runbooks/).
 
+## Gestión de roles y permisos (2026-07-23)
+
+- **Rol = conjunto de permisos marcables** (RBAC editable desde el panel).
+  UI /panel/usuarios con 2 pestañas: Usuarios (crear staff con password
+  inicial + asignar roles con alcance por país) y Roles (crear rol + marcar
+  sus permisos con checkboxes). `superadmin` es INTOCABLE (siempre todos
+  los permisos; la app y el seed lo fuerzan). El seed llena permisos de un
+  rol NO-superadmin solo si está vacío → respeta ediciones del panel.
+  Editar permisos de un rol invalida toda la caché de perfiles.
+
 ## Vocabulario del negocio (obligatorio en código y UI)
 
 **Guía** (no profesor) · **Club** (no taller) · **Sesión** (no clase) ·

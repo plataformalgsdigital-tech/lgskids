@@ -107,7 +107,20 @@ async function main(): Promise<void> {
       );
     }
 
+    // Matriz rol→permisos:
+    // - superadmin SIEMPRE recibe todos los permisos (llave maestra).
+    // - Los demás roles solo se llenan si están VACÍOS (primer seed): las
+    //   ediciones hechas desde el panel de Usuarios y Roles se respetan.
     for (const [roleCode, permisos] of Object.entries(MATRIZ_ROL_PERMISOS)) {
+      if (roleCode !== ROLES.SUPERADMIN) {
+        const tiene = await queryOne<{ n: string }>(
+          `SELECT count(*)::text AS n FROM access_role_permission rp
+             JOIN access_role r ON r.id = rp.role_id WHERE r.code = $1`,
+          [roleCode],
+          tx,
+        );
+        if (tiene !== null && Number(tiene.n) > 0) continue;
+      }
       for (const permisoCode of permisos) {
         await execute(
           `INSERT INTO access_role_permission (role_id, permission_id)

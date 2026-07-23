@@ -14,6 +14,8 @@ export {
 } from "./application/get-access-profile";
 export { AccessProfile } from "./application/profile";
 export { asignarRol, asignarRolTx } from "./application/asignar-rol";
+export { crearRol, permisosDeRol, actualizarPermisosDeRol } from "./application/gestionar-roles";
+export type { PermisosDeRol } from "./application/gestionar-roles";
 export { PERMISOS, ROLES, MATRIZ_ROL_PERMISOS } from "./domain/permisos";
 export type { PermisoCode, RoleCode } from "./domain/permisos";
 export type { RoleAssignment, PermissionGrant } from "./application/ports";

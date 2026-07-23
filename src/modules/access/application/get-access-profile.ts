@@ -35,6 +35,11 @@ export function invalidateAccessProfile(userId: string): void {
   cache.delete(userId);
 }
 
+/** Invalidar TODO (tras editar los permisos de un rol). */
+export function invalidateAllProfiles(): void {
+  cache.clear();
+}
+
 export function accessRepository(): AccessRepositoryPort {
   return repository;
 }

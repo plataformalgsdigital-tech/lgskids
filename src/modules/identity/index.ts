@@ -22,3 +22,4 @@ export type { AlumnoProvisionado } from "./application/provisionar-alumno";
 export { baseUsername, correoSintetico } from "./domain/username";
 export { listarUsuarios } from "./application/listar-usuarios";
 export type { UsuarioListItem } from "./application/listar-usuarios";
+export { crearUsuarioStaff } from "./application/crear-usuario";
