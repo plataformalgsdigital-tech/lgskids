@@ -50,6 +50,10 @@ const envSchema = z.object({
   SEED_ADMIN_USERNAME: z.string().min(3).default("admin"),
   SEED_ADMIN_PASSWORD: z.string().min(10).optional(),
 
+  /** Solo para el seed: SuperAdmin (llave maestra, alcance total). */
+  SEED_SUPERADMIN_USERNAME: z.string().min(3).default("superadmin"),
+  SEED_SUPERADMIN_PASSWORD: z.string().min(10).optional(),
+
   /**
    * Zona operativa por defecto para salones nuevos. Cada salón puede
    * configurar la suya (decisión funcional 2026-07-22).

@@ -30,6 +30,10 @@ const PAISES: { code: string; nombre: string; timezone: string }[] = [
 ];
 
 const NOMBRES_ROL: Record<string, { nombre: string; descripcion: string }> = {
+  [ROLES.SUPERADMIN]: {
+    nombre: "SuperAdmin",
+    descripcion: "Llave maestra: alcance total y sin restricciones",
+  },
   [ROLES.ADMIN]: { nombre: "Administrador", descripcion: "Acceso total a la plataforma" },
   [ROLES.COORDINADOR]: { nombre: "Coordinador", descripcion: "Gestión académica y de usuarios" },
   [ROLES.GUIA]: { nombre: "Guía", descripcion: "Dicta sesiones y marca asistencia" },
@@ -155,6 +159,49 @@ async function main(): Promise<void> {
       [newId(), adminId, ROLES.ADMIN],
       tx,
     );
+
+    // SUPERADMIN (llave maestra): solo se crea si viene su contraseña.
+    const superUsername = env().SEED_SUPERADMIN_USERNAME.toLowerCase();
+    const superPassword = env().SEED_SUPERADMIN_PASSWORD;
+    if (superPassword !== undefined) {
+      const superExistente = await queryOne<{ id: string }>(
+        `SELECT id FROM identity_user WHERE username = $1`,
+        [superUsername],
+        tx,
+      );
+      let superId: string;
+      if (superExistente === null) {
+        superId = newId();
+        const superHash = await hash(superPassword, {
+          memoryCost: 19_456,
+          timeCost: 2,
+          parallelism: 1,
+        });
+        await execute(
+          `INSERT INTO identity_user (id, username, password_hash, estado, debe_cambiar_password, updated_at)
+           VALUES ($1, $2, $3, 'ACTIVO', true, now())`,
+          [superId, superUsername, superHash],
+          tx,
+        );
+        logger.info("Usuario SUPERADMIN creado", { username: superUsername });
+      } else {
+        superId = superExistente.id;
+        logger.info("SuperAdmin ya existía; no se toca su contraseña", {
+          username: superUsername,
+        });
+      }
+      await execute(
+        `INSERT INTO access_user_role (id, user_id, role_id, country_code)
+         SELECT $1, $2, r.id, NULL FROM access_role r
+          WHERE r.code = $3
+            AND NOT EXISTS (
+              SELECT 1 FROM access_user_role ur
+               WHERE ur.user_id = $2 AND ur.role_id = r.id AND ur.country_code IS NULL
+            )`,
+        [newId(), superId, ROLES.SUPERADMIN],
+        tx,
+      );
+    }
 
     await execute(
       `INSERT INTO audit_log (actor_user_id, accion, entidad, entidad_id, payload)

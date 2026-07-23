@@ -34,6 +34,12 @@ export type PermisoCode = (typeof PERMISOS)[keyof typeof PERMISOS];
 
 /** Roles semilla. */
 export const ROLES = {
+  /**
+   * SUPERADMIN: alcance total y sin restricciones — SIEMPRE tiene TODOS los
+   * permisos (presentes y futuros) con alcance global. Existe para que
+   * `admin` pueda restringirse en el futuro sin perder la llave maestra.
+   */
+  SUPERADMIN: "superadmin",
   ADMIN: "admin",
   COORDINADOR: "coordinador",
   GUIA: "guia",
@@ -45,6 +51,7 @@ export type RoleCode = (typeof ROLES)[keyof typeof ROLES];
 
 /** Matriz rol → permisos que el seed materializa. */
 export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
+  superadmin: Object.values(PERMISOS),
   admin: Object.values(PERMISOS),
   coordinador: [
     PERMISOS.USUARIOS_GESTIONAR,
