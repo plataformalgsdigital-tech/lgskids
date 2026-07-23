@@ -99,8 +99,7 @@ del salón, nunca de una acción del estudiante.
   IDEMPOTENTE (premios una sola vez) y RECUPERABLE (cualquier invocación
   re-deriva todo). NO cuenta sesiones asistidas. **Caminos que la
   disparan** (verificados por `progression/tests/caminos-progresion.test.ts`
-  — agregar un camino nuevo EXIGE sumarlo ahí): 1) marcarAsistencia,
-  2) registrarIntento, 3) worker recalculo_global cada 12 h (red de
+  — agregar un camino nuevo EXIGE sumarlo ahí): 1) marcarAsistencia, 2) registrarIntento, 3) worker recalculo_global cada 12 h (red de
   seguridad). Awards con `notificado_en` NULL hasta que Fase 10 envíe por
   WhatsApp. UI: /panel/progreso/[childId] (enlace 📈 en el roster).
   Permiso: progresion.ver.
