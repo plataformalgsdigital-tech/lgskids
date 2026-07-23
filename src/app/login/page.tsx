@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -59,10 +60,14 @@ export default function LoginPage() {
           boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
         }}
       >
-        <h1 style={{ textAlign: "center", fontSize: "1.8rem" }}>
-          <span style={{ color: "var(--lgs-azul)" }}>LGS</span>{" "}
-          <span style={{ color: "var(--lgs-magenta)" }}>Kids</span>
-        </h1>
+        <Image
+          src="/logo.jpg"
+          alt="LGS Kids"
+          width={160}
+          height={142}
+          priority
+          style={{ alignSelf: "center", height: "auto" }}
+        />
         <p style={{ textAlign: "center", color: "var(--texto-suave)", fontSize: "0.95rem" }}>
           Ingresa con tu usuario
         </p>
