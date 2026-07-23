@@ -1,0 +1,10 @@
+{
+  // Identidad visual del workspace KIDS2026: barra superior VERDE
+  // (verde del logo LGS Kids) para diferenciarlo de MOSAICO y LGS.
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#8bc34a",
+    "titleBar.activeForeground": "#1b2a10",
+    "titleBar.inactiveBackground": "#6b9c37",
+    "titleBar.inactiveForeground": "#1b2a10"
+  }
+}
