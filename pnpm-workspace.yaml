@@ -7,3 +7,8 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+
+# sharp <0.35 hereda CVEs de libvips (GHSA-f88m-g3jw-g9cj); Next aún pide
+# ^0.34. Forzamos la versión parchada hasta que Next actualice su rango.
+overrides:
+  sharp: ">=0.35.0"
