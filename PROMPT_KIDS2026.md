@@ -49,7 +49,7 @@ CAMPAÑA
 
 - **Los feriados no se dictan y la sesión se corre al final del curso**, conservando el número total de clases. Los feriados fijos y Semana Santa deben calcularse por código (para que funcione en años futuros sin mantenimiento) y los movibles cargarse desde un JSON curado que solo suma, nunca anula.
 - **Se puede suspender un día puntual de clase** (motivo obligatorio, auditado) con el mismo efecto: la sesión se corre al final. **Las suspensiones van en tabla, no en memoria** — regenerar un curso borra y recrea sus clases desde `(inicio, final, horario)`, así que una suspensión no persistida reaparece.
-- **`finalCurso` NUNCA se reescribe.** Es la ventana nominal con la que se *cuenta* el número de sesiones. Extenderla hace que cada regeneración agregue una sesión de más y el curso crezca solo. **El fin real del curso es la fecha de la última clase**, que puede caer más allá de `finalCurso`.
+- **`finalCurso` NUNCA se reescribe.** Es la ventana nominal con la que se _cuenta_ el número de sesiones. Extenderla hace que cada regeneración agregue una sesión de más y el curso crezca solo. **El fin real del curso es la fecha de la última clase**, que puede caer más allá de `finalCurso`.
 - **Al regenerar, los alumnos se derivan del contrato/matrícula, no de las inscripciones previas.** Es robusto ante borrados.
 
 ### 2.4 Contratos
@@ -71,7 +71,7 @@ CAMPAÑA
 
 El avance de nivel se determina por **lecciones dictadas + cuestionario aprobado**. No por conteo de sesiones asistidas (esa regla viene del agendamiento libre y no aplica a cohortes).
 
-**El avance debe ser una sola función central**, invocada desde *todos* los caminos que registran asistencia o califican un cuestionario (individual, masiva, evaluación, panel de admin, aprobación de cuestionario). En LGS esa función no se disparaba desde todos los caminos y los alumnos quedaban trabados sin poder recuperarse.
+**El avance debe ser una sola función central**, invocada desde _todos_ los caminos que registran asistencia o califican un cuestionario (individual, masiva, evaluación, panel de admin, aprobación de cuestionario). En LGS esa función no se disparaba desde todos los caminos y los alumnos quedaban trabados sin poder recuperarse.
 
 ### 2.7 Movimientos del alumno
 
@@ -176,23 +176,23 @@ Renunciar a las FK "para preparar microservicios" empuja la integridad al códig
 
 ## 4. STACK
 
-| Componente | Elección |
-|---|---|
-| Frontend + Backend | **Next.js (App Router) + React + TypeScript estricto** |
-| Base de datos | **PostgreSQL administrado en DigitalOcean** |
-| Acceso a datos | **Prisma** para esquema, migraciones y consultas simples; **SQL crudo parametrizado** permitido y esperado en consultas críticas |
-| Validación | **Zod**, compartido entre formulario y endpoint |
-| Autenticación | JWT de corta duración + refresh rotativo en cookie HttpOnly/Secure/SameSite |
-| Permisos | RBAC por rol, con alcance por país |
-| Archivos | **DigitalOcean Spaces** vía puerto de almacenamiento |
-| Tareas programadas | Worker con cron. **Redis + BullMQ solo si aparece una necesidad real** |
-| Documentación API | OpenAPI generado desde los esquemas Zod |
-| Pruebas | **Vitest** unitarias e integración; **Playwright** para flujos críticos |
-| Calidad | ESLint + Prettier + `tsc --noEmit` |
-| Desarrollo local | **Docker Compose** (Postgres + adaptador de archivos local) |
-| CI/CD | **GitHub Actions** |
-| Despliegue | **DigitalOcean App Platform** (web + worker) |
-| Paquetes | pnpm |
+| Componente         | Elección                                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend + Backend | **Next.js (App Router) + React + TypeScript estricto**                                                                           |
+| Base de datos      | **PostgreSQL administrado en DigitalOcean**                                                                                      |
+| Acceso a datos     | **Prisma** para esquema, migraciones y consultas simples; **SQL crudo parametrizado** permitido y esperado en consultas críticas |
+| Validación         | **Zod**, compartido entre formulario y endpoint                                                                                  |
+| Autenticación      | JWT de corta duración + refresh rotativo en cookie HttpOnly/Secure/SameSite                                                      |
+| Permisos           | RBAC por rol, con alcance por país                                                                                               |
+| Archivos           | **DigitalOcean Spaces** vía puerto de almacenamiento                                                                             |
+| Tareas programadas | Worker con cron. **Redis + BullMQ solo si aparece una necesidad real**                                                           |
+| Documentación API  | OpenAPI generado desde los esquemas Zod                                                                                          |
+| Pruebas            | **Vitest** unitarias e integración; **Playwright** para flujos críticos                                                          |
+| Calidad            | ESLint + Prettier + `tsc --noEmit`                                                                                               |
+| Desarrollo local   | **Docker Compose** (Postgres + adaptador de archivos local)                                                                      |
+| CI/CD              | **GitHub Actions**                                                                                                               |
+| Despliegue         | **DigitalOcean App Platform** (web + worker)                                                                                     |
+| Paquetes           | pnpm                                                                                                                             |
 
 **Sobre Prisma:** úsalo para el esquema, las migraciones y el CRUD. Pero las consultas que dependen de índices o de agrupación por zona horaria van en SQL crudo parametrizado con `$queryRaw`. No fuerces el ORM donde el rendimiento importa; documenta cada caso en el módulo correspondiente.
 
@@ -206,13 +206,13 @@ Renunciar a las FK "para preparar microservicios" empuja la integridad al códig
 - **Índices explícitos** desde el diseño, no después del incidente. Mínimos: clase por (salón, fecha), asistencia por clase, asistencia por (niño, clase), matrícula por (niño, estado), contrato por (beneficiario, estado), intento por (niño, cuestionario).
 - **Restricciones únicas** donde el negocio las exige (suspensión única por curso y fecha; documento único por persona).
 - **Transacciones** en toda operación que toque más de una tabla: creación de alumno, cambio académico, ajuste de cupos, regeneración de clases.
-- **Un solo esquema PostgreSQL**, con prefijo de módulo en el nombre de las tablas. Los esquemas separados por módulo añaden fricción con Prisma y no aportan aislamiento real en un monolito. *(Documentar en ADR.)*
+- **Un solo esquema PostgreSQL**, con prefijo de módulo en el nombre de las tablas. Los esquemas separados por módulo añaden fricción con Prisma y no aportan aislamiento real en un monolito. _(Documentar en ADR.)_
 - **`DATABASE_URL`** con pool para la aplicación; **`DIRECT_DATABASE_URL`** para migraciones.
 - **Presupuesto de conexiones**: la base administrada admite ~22 conexiones. Configura el pool en **8–10** y documéntalo. En LGS un pool mal dimensionado agotó la base.
 - **Auditoría separada** de las tablas operativas.
 - **Seed mínimo** para desarrollo: roles, permisos, usuario admin, una campaña de prueba con ambos tipos de curso y sus niveles.
 
-**Acceso a la base desde desarrollo:** la base administrada filtra por IP (*trusted sources*) y la IP del entorno cambia entre sesiones. Documenta el procedimiento: agregar la IP con `doctl` antes de correr scripts, y **removerla al terminar**.
+**Acceso a la base desde desarrollo:** la base administrada filtra por IP (_trusted sources_) y la IP del entorno cambia entre sesiones. Documenta el procedimiento: agregar la IP con `doctl` antes de correr scripts, y **removerla al terminar**.
 
 ---
 
@@ -281,6 +281,7 @@ La interfaz del niño (6–13 años) merece diseño propio: lenguaje simple, apo
 
 **FASE 1 — Diseño (empieza solo con esto).**
 Analiza el requerimiento, propón la división definitiva de módulos y entrega:
+
 - Diagrama de arquitectura y diagrama de módulos.
 - **Mapa de dependencias permitidas entre módulos** (qué puerto expone cada uno y quién lo consume).
 - Estructura del repositorio.
