@@ -10,6 +10,29 @@ jobs:
   verify:
     name: Lint · Tipos · Pruebas · Arquitectura · Build
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kids
+          POSTGRES_PASSWORD: kids_ci
+          POSTGRES_DB: kids2026_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kids -d kids2026_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://kids:kids_ci@localhost:5432/kids2026_ci
+      DIRECT_DATABASE_URL: postgresql://kids:kids_ci@localhost:5432/kids2026_ci
+      AUTH_JWT_SECRET: ci-secret-solo-para-pruebas-0123456789abcdef
+      SEED_ADMIN_PASSWORD: CiAdminPass123
+      INTEGRATION_TESTS: "1"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +45,12 @@ jobs:
 
       - name: Instalación reproducible
         run: pnpm install --frozen-lockfile
+
+      - name: Migraciones (contra Postgres de CI)
+        run: pnpm migrate:deploy
+
+      - name: Seed
+        run: pnpm seed
 
       - name: Lint
         run: pnpm lint
