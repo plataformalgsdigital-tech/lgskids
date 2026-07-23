@@ -36,6 +36,12 @@ const MENU: { permiso: string; etiqueta: string; color: string; href?: string }[
     color: "var(--lgs-magenta)",
     href: "/panel/contratos",
   },
+  {
+    permiso: "salones.ver",
+    etiqueta: "Salones",
+    color: "var(--lgs-verde)",
+    href: "/panel/salones",
+  },
   { permiso: "usuarios.gestionar", etiqueta: "Usuarios", color: "var(--lgs-cian)" },
   { permiso: "roles.asignar", etiqueta: "Roles y permisos", color: "var(--lgs-purpura)" },
   { permiso: "auditoria.ver", etiqueta: "Auditoría", color: "var(--lgs-verde)" },

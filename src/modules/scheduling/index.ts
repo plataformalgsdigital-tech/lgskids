@@ -7,4 +7,21 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export {};
+export {
+  crearSalon,
+  regenerarSesiones,
+  suspenderDia,
+  sincronizarFeriados,
+  listarSalones,
+  detalleSalon,
+} from "./application/gestion-salones";
+export type { SlotInput, DetalleSalon } from "./application/gestion-salones";
+export {
+  crearSalonHandler,
+  listarSalonesHandler,
+  detalleSalonHandler,
+  regenerarHandler,
+  suspenderHandler,
+} from "./api/handlers";
+export { feriadosDelPais, domingoPascua } from "./domain/feriados";
+export type { Feriado } from "./domain/feriados";

@@ -52,9 +52,22 @@ del salón, nunca de una acción del estudiante.
   solo si no hay otros contratos vivos. Worker: barrido de vencidos cada
   6 h. Permisos: personas.gestionar/ver, contratos.gestionar/ver.
   UI: /panel/personas y /panel/contratos.
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 6
-  (`scheduling`: salones, generación de sesiones, feriados, suspensiones —
-  las reglas más delicadas del dominio).
+- **Fase 6 (`scheduling`) completada**: migración `20260726000000_scheduling`
+  (salón, slots, sesiones, feriados, suspensiones). Salón: zona operativa Y
+  calendario de feriados configurables por salón; slots SESION/CLUB.
+  **Generación determinística** (`scheduling/domain/generacion.ts`): conteo
+  NOMINAL desde `(inicio, final_curso, díaSemana)`; feriados/suspensiones
+  corren la sesión AL FINAL conservando el total; el fin real es la última
+  sesión y `final_curso` jamás cambia (invariante probado: regenerar N
+  veces = mismo conjunto). Feriados por CÓDIGO 4 países (computus de
+  Pascua, Ley Emiliani CO, trasladables CL) + `feriados-extra.ts` curado
+  que SOLO SUMA; se materializan en tabla antes de generar. Suspensión:
+  motivo obligatorio, en tabla, con regeneración inmediata. Inserción de
+  sesiones POR LOTES (unnest). `starts_at` = pared de reloj del salón →
+  UTC (DST chileno probado). Permisos: salones.gestionar/ver.
+  UI: /panel/salones (+ detalle con suspender/regenerar).
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 7
+  (`enrollment`: matrícula, cupos, cambio académico; extiende el alta única).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 

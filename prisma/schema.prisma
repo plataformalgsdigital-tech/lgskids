@@ -359,6 +359,109 @@ model ContractHold {
 }
 
 // ============================================================
+// scheduling — salón, sesiones, feriados, suspensiones
+// ============================================================
+
+enum SlotTipo {
+  SESION // 2 por semana, cuentan para la progresión
+  CLUB // viernes o sábado, práctica con inscripción
+
+  @@map("scheduling_slot_tipo")
+}
+
+model Classroom {
+  id       String  @id @default(uuid()) @db.Uuid
+  courseId String  @map("course_id") @db.Uuid
+  nombre   String
+  // Guía asignado (usuario con rol guia). Opcional hasta tener gestión de guías.
+  guiaUserId String? @map("guia_user_id") @db.Uuid
+  cupo       Int
+  meetingUrl String? @map("meeting_url") // clases virtuales (decisión 2026-07-22)
+  // Zona operativa DEL SALÓN (ADR-0007): el horario "martes 18:00" se
+  // interpreta aquí. Configurable por salón.
+  timezone String
+  // Calendario de feriados DEL SALÓN (ADR-0009): SOLO este país suspende
+  // y corre sesiones; feriados del país del niño = ausencia justificable.
+  holidayCountry String   @map("holiday_country") @db.Char(2)
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  slots       Slot[]
+  sessions    Session[]
+  suspensions Suspension[]
+
+  @@index([courseId])
+  @@map("scheduling_classroom")
+}
+
+model Slot {
+  id          String   @id @default(uuid()) @db.Uuid
+  classroomId String   @map("classroom_id") @db.Uuid
+  tipo        SlotTipo
+  // 0=domingo … 6=sábado, en la zona operativa del salón.
+  diaSemana Int    @map("dia_semana")
+  horaLocal String @map("hora_local") // "HH:MM" en la zona del salón
+  duracionMin Int  @default(60) @map("duracion_min")
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  sessions  Session[]
+
+  @@unique([classroomId, diaSemana, horaLocal])
+  @@map("scheduling_slot")
+}
+
+model Session {
+  id          String   @id @default(uuid()) @db.Uuid
+  classroomId String   @map("classroom_id") @db.Uuid
+  slotId      String   @map("slot_id") @db.Uuid
+  tipo        SlotTipo
+  // Fecha OPERATIVA (día en la zona del salón) y el instante UTC exacto.
+  fecha    DateTime @db.Date
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  duracionMin Int   @map("duracion_min")
+  // Número correlativo dentro de su slot (1..N nominal). El fin REAL del
+  // curso es la fecha de la última sesión — final_curso NUNCA se toca.
+  numero    Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  slot      Slot      @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, startsAt])
+  @@unique([slotId, numero])
+  @@index([classroomId, fecha]) // lista de sesión por salón y día
+  @@map("scheduling_session")
+}
+
+model Holiday {
+  countryCode String   @map("country_code") @db.Char(2)
+  fecha       DateTime @db.Date
+  nombre      String
+  // 'codigo' = calculado (fijos + Semana Santa + traslados de ley);
+  // 'json' = curado manual (decretos). El JSON SOLO SUMA, nunca anula.
+  fuente    String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([countryCode, fecha])
+  @@map("scheduling_holiday")
+}
+
+model Suspension {
+  id          String   @id @default(uuid()) @db.Uuid
+  classroomId String   @map("classroom_id") @db.Uuid
+  fecha       DateTime @db.Date
+  motivo      String // OBLIGATORIO y auditado (sección 2.3)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  // EN TABLA, nunca en memoria: la regeneración es destructiva y las relee.
+  @@unique([classroomId, fecha])
+  @@map("scheduling_suspension")
+}
+
+// ============================================================
 // audit — separada de las tablas operativas
 // ============================================================
 
