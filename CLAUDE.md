@@ -39,8 +39,22 @@ del salón, nunca de una acción del estudiante.
   `catalogo.gestionar` (admin, coordinador) y `catalogo.ver` (+ guía).
   UI: /panel/campanias (+ detalle). `final_curso` no tiene endpoint de
   edición a propósito.
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 5
-  (`people` y `contracts`).
+- **Fase 5 (`people` + `contracts`) completada**: migración
+  `20260725000000_people_contracts`. Persona (doc único por país+tipo+número,
+  SIN unique de email), apoderado–niño, contrato con país (ADR-0009).
+  **Vigencia: UNA función** (`contracts/domain/vigencia.ts`) + gemelo SQL
+  `SQL_CONTRATO_VENCIDO` (+2 días de gracia) — NO reimplementar. Edad
+  validada contra fecha de nacimiento a la fecha de inicio. **Aprobar
+  contrato = ALTA ÚNICA transaccional** (credenciales autogeneradas +
+  correo sintético + rol alumno por país; Fase 7 le sumará matrícula).
+  OnHold/reactivar extiende `final_contrato` por los días pausados.
+  Inactivar = cascada sincronizada (contrato+persona+credenciales+sesiones)
+  solo si no hay otros contratos vivos. Worker: barrido de vencidos cada
+  6 h. Permisos: personas.gestionar/ver, contratos.gestionar/ver.
+  UI: /panel/personas y /panel/contratos.
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 6
+  (`scheduling`: salones, generación de sesiones, feriados, suspensiones —
+  las reglas más delicadas del dominio).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 

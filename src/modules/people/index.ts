@@ -7,4 +7,12 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export {};
+export {
+  crearAdulto,
+  crearNino,
+  listarPersonas,
+  obtenerPersona,
+} from "./application/crear-personas";
+export { crearAdultoHandler, crearNinoHandler, listarPersonasHandler } from "./api/handlers";
+export { findPersonById, linkUser, setPersonEstado } from "./infrastructure/person-repository";
+export type { PersonRecord, PersonInput, PersonListItem } from "./application/ports";

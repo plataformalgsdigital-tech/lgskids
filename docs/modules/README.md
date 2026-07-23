@@ -11,8 +11,8 @@ diagramas de flujo).
 | access        | 3 ✅ | [src/modules/access/README.md](../../src/modules/access/README.md) — RBAC, alcance por país, caché lectura 60 s                               |
 | audit         | 3 ✅ | [src/modules/audit/README.md](../../src/modules/audit/README.md) — registrar/listar; nunca rompe la operación principal                       |
 | catalog       | 4 ✅ | [src/modules/catalog/README.md](../../src/modules/catalog/README.md) — campaña genera todo transaccionalmente; estado derivado por fecha      |
-| people        | 5    | _pendiente_                                                                                                                                   |
-| contracts     | 5    | _pendiente_                                                                                                                                   |
+| people        | 5 ✅ | [src/modules/people/README.md](../../src/modules/people/README.md) — doc único; niño+apoderado transaccional; alcance por país en listados    |
+| contracts     | 5 ✅ | [src/modules/contracts/README.md](../../src/modules/contracts/README.md) — vigencia UNA función; alta única al aprobar; OnHold extiende; cascada |
 | scheduling    | 6    | _pendiente_                                                                                                                                   |
 | enrollment    | 7    | _pendiente_                                                                                                                                   |
 | attendance    | 8    | _pendiente_                                                                                                                                   |

@@ -7,6 +7,7 @@
  *
  * Uso local:  pnpm worker:dev
  */
+import { procesarVencimientos } from "../src/modules/contracts";
 import { sessionService } from "../src/modules/identity";
 import { closePool } from "../src/platform/db/pool";
 import { logger } from "../src/platform/logging/logger";
@@ -31,6 +32,16 @@ const tasks: ScheduledTask[] = [
     run: async () => {
       const borrados = await sessionService().purgeExpiredRefreshTokens();
       logger.info("Purga de refresh tokens expirados", { borrados });
+    },
+  },
+  {
+    // Usa LA función única de vencimiento (+2 días de gracia) vía su gemelo
+    // SQL, con cascada de inactivación sincronizada. Idempotente.
+    name: "contracts.vencimientos",
+    everyMinutes: 6 * 60,
+    run: async () => {
+      const procesados = await procesarVencimientos();
+      logger.info("Barrido de contratos vencidos", { procesados });
     },
   },
 ];

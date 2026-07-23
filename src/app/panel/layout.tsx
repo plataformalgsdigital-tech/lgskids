@@ -24,6 +24,18 @@ const MENU: { permiso: string; etiqueta: string; color: string; href?: string }[
     color: "var(--lgs-azul)",
     href: "/panel/campanias",
   },
+  {
+    permiso: "personas.ver",
+    etiqueta: "Personas",
+    color: "var(--lgs-cian)",
+    href: "/panel/personas",
+  },
+  {
+    permiso: "contratos.ver",
+    etiqueta: "Contratos",
+    color: "var(--lgs-magenta)",
+    href: "/panel/contratos",
+  },
   { permiso: "usuarios.gestionar", etiqueta: "Usuarios", color: "var(--lgs-cian)" },
   { permiso: "roles.asignar", etiqueta: "Roles y permisos", color: "var(--lgs-purpura)" },
   { permiso: "auditoria.ver", etiqueta: "Auditoría", color: "var(--lgs-verde)" },

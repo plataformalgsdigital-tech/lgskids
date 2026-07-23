@@ -108,6 +108,7 @@ model User {
 
   refreshTokens RefreshToken[]
   roles         UserRole[]
+  person        Person?
 
   @@map("identity_user")
 }
@@ -248,6 +249,113 @@ model Quiz {
   @@unique([lessonId, tipo])
   @@index([levelId])
   @@map("catalog_quiz")
+}
+
+// ============================================================
+// people — niño, apoderado, titular
+// ============================================================
+
+enum PersonEstado {
+  ACTIVA
+  INACTIVA
+
+  @@map("people_person_estado")
+}
+
+model Person {
+  id        String  @id @default(uuid()) @db.Uuid
+  nombres   String
+  apellidos String
+  // Obligatoria para niños (valida edad vs tipo de curso); opcional en adultos.
+  fechaNacimiento DateTime? @map("fecha_nacimiento") @db.Date
+  docTipo         String    @map("doc_tipo") // CC | TI | RUT | DNI | PASAPORTE...
+  docNumero       String    @map("doc_numero")
+  countryCode     String    @map("country_code") @db.Char(2)
+  email           String?
+  telefono        String? // WhatsApp del apoderado para notificaciones
+  estado          PersonEstado @default(ACTIVA)
+  // Credenciales del niño (se crean al aprobar su contrato — alta única).
+  userId    String?  @unique @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user             User?          @relation(fields: [userId], references: [id])
+  comoNino         Guardianship[] @relation("nino")
+  comoApoderado    Guardianship[] @relation("apoderado")
+  contratosTitular Contract[]     @relation("titular")
+  contratosBenef   Contract[]     @relation("beneficiario")
+
+  // Documento único por persona (restricción del negocio).
+  @@unique([countryCode, docTipo, docNumero])
+  @@index([apellidos, nombres])
+  @@map("people_person")
+}
+
+model Guardianship {
+  id          String  @id @default(uuid()) @db.Uuid
+  ninoId      String  @map("nino_id") @db.Uuid
+  apoderadoId String  @map("apoderado_id") @db.Uuid
+  parentesco  String? // madre | padre | tutor...
+
+  nino      Person @relation("nino", fields: [ninoId], references: [id], onDelete: Cascade)
+  apoderado Person @relation("apoderado", fields: [apoderadoId], references: [id], onDelete: Cascade)
+
+  @@unique([ninoId, apoderadoId])
+  @@index([apoderadoId])
+  @@map("people_guardianship")
+}
+
+// ============================================================
+// contracts — el contrato NACE EN KIDS (ADR-0008)
+// ============================================================
+
+enum ContractEstado {
+  PENDIENTE
+  APROBADO
+  ONHOLD
+  INACTIVO
+
+  @@map("contracts_estado")
+}
+
+model Contract {
+  id             String  @id @default(uuid()) @db.Uuid
+  titularId      String  @map("titular_id") @db.Uuid
+  beneficiarioId String  @map("beneficiario_id") @db.Uuid
+  countryCode    String  @map("country_code") @db.Char(2) // AQUÍ vive el país (ADR-0009)
+  tipoCurso      CourseTipo @map("tipo_curso")
+  inicio         DateTime   @db.Date
+  // DATE puro (sin hora ni zona). Vencido SOLO cuando la fecha UTC del
+  // servidor es >= 2 días posterior — UNA función lo decide (domain/vigencia).
+  // OnHold extiende esta fecha al reactivar (días pausados, auditado).
+  finalContrato DateTime       @map("final_contrato") @db.Date
+  estado        ContractEstado @default(PENDIENTE)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  titular      Person         @relation("titular", fields: [titularId], references: [id])
+  beneficiario Person         @relation("beneficiario", fields: [beneficiarioId], references: [id])
+  onholds      ContractHold[]
+
+  @@index([beneficiarioId, estado])
+  @@index([estado, finalContrato]) // barrido diario de vencimiento
+  @@map("contracts_contract")
+}
+
+model ContractHold {
+  id         String    @id @default(uuid()) @db.Uuid
+  contractId String    @map("contract_id") @db.Uuid
+  desde      DateTime  @db.Date
+  hasta      DateTime? @db.Date // NULL = pausa vigente
+  // Días que se sumaron a final_contrato al reactivar (historial).
+  diasExtendidos Int?     @map("dias_extendidos")
+  motivo         String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contracts_onhold")
 }
 
 // ============================================================
