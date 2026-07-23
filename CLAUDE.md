@@ -14,10 +14,23 @@ del salón, nunca de una acción del estudiante.
 
 ## Estado actual
 
-- **Fase 2 (cimientos) completada**: scaffold, platform/, módulos vacíos,
-  Docker Compose, CI, pruebas de arquitectura, ADRs.
-- **Sin esquema de base de datos todavía** — Prisma entra en Fase 3.
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11.
+- **Fase 3 (identidad, acceso, auditoría) completada**: login por username
+  (JWT 15 min + refresh rotativo con detección de reuso por familia), RBAC
+  con alcance por país, auditoría, rate limiting persistido, UI /login y
+  /panel con menú por permisos.
+- **Esquema Prisma 7**: `prisma/schema.prisma` (URLs en `prisma.config.ts`,
+  NO en el schema — cambio de Prisma 7). Migración inicial
+  `20260723000000_identity_access_audit`. Todo instante es `timestamptz`.
+- El acceso a datos usa SQL parametrizado vía `platform/db` (el client de
+  Prisma se adoptará cuando aporte; CLI solo para esquema/migraciones).
+- Rutas protegidas: `handlerWithAuth` + `getAccessProfile(...).requirePermission(...)`
+  endpoint por endpoint. El autenticador se registra en `src/instrumentation.ts`
+  (con guard `NEXT_RUNTIME === "nodejs"` — obligatorio para que el build Edge
+  no intente compilar argon2/pg).
+- Comandos nuevos: `pnpm seed` (países, roles, permisos, admin — exige
+  SEED_ADMIN_PASSWORD), `pnpm migrate:dev|deploy`, `pnpm worker:dev`.
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 4
+  (`catalog`: campaña → curso → nivel → lección → cuestionario).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 
