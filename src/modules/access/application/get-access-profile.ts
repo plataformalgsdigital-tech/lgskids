@@ -38,3 +38,10 @@ export function invalidateAccessProfile(userId: string): void {
 export function accessRepository(): AccessRepositoryPort {
   return repository;
 }
+
+/** Roles disponibles (para la UI de gestión de usuarios). */
+export async function listarRoles(): Promise<
+  { code: string; nombre: string; descripcion: string | null }[]
+> {
+  return repository.listRoles();
+}

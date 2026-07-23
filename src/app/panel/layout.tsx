@@ -16,8 +16,13 @@ interface Me {
   permisos: { code: string }[];
 }
 
-const MENU: { permiso: string; etiqueta: string; color: string; href?: string }[] = [
-  { permiso: "panel.administracion", etiqueta: "Administración", color: "var(--lgs-azul)" },
+const MENU: {
+  permiso: string;
+  etiqueta: string;
+  color: string;
+  href?: string;
+  pronto?: boolean;
+}[] = [
   {
     permiso: "catalogo.ver",
     etiqueta: "Campañas",
@@ -42,18 +47,33 @@ const MENU: { permiso: string; etiqueta: string; color: string; href?: string }[
     color: "var(--lgs-verde)",
     href: "/panel/salones",
   },
-  { permiso: "usuarios.gestionar", etiqueta: "Usuarios", color: "var(--lgs-cian)" },
-  { permiso: "roles.asignar", etiqueta: "Roles y permisos", color: "var(--lgs-purpura)" },
+  {
+    permiso: "usuarios.gestionar",
+    etiqueta: "Usuarios y roles",
+    color: "var(--lgs-cian)",
+    href: "/panel/usuarios",
+  },
   {
     permiso: "reportes.ver",
     etiqueta: "Reportes",
     color: "var(--lgs-purpura)",
     href: "/panel/reportes",
   },
-  { permiso: "auditoria.ver", etiqueta: "Auditoría", color: "var(--lgs-verde)" },
-  { permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)" },
-  { permiso: "panel.apoderado", etiqueta: "Mis niños", color: "var(--lgs-magenta)" },
-  { permiso: "panel.alumno", etiqueta: "Mis clases", color: "var(--lgs-verde)" },
+  {
+    permiso: "auditoria.ver",
+    etiqueta: "Auditoría",
+    color: "var(--lgs-verde)",
+    href: "/panel/auditoria",
+  },
+  // Paneles por tipo de usuario: se construyen junto con la operación real.
+  { permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", pronto: true },
+  {
+    permiso: "panel.apoderado",
+    etiqueta: "Mis niños",
+    color: "var(--lgs-magenta)",
+    pronto: true,
+  },
+  { permiso: "panel.alumno", etiqueta: "Mis clases", color: "var(--lgs-verde)", pronto: true },
 ];
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
@@ -161,25 +181,74 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
               {item.etiqueta}
             </Link>
           ) : (
-            <div key={item.permiso} style={estilo} title="Disponible en próximas fases">
-              {item.etiqueta}
+            <div
+              key={item.permiso}
+              style={{ ...estilo, opacity: 0.55 }}
+              title="Disponible próximamente"
+            >
+              {item.etiqueta}{" "}
+              <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)" }}>(pronto)</span>
             </div>
           );
         })}
-        <button
-          onClick={() => void salir()}
+        <div
           style={{
             marginTop: "auto",
-            padding: "0.6rem",
-            borderRadius: "0.6rem",
-            border: "1px solid #e3e7f0",
-            background: "white",
-            cursor: "pointer",
-            fontSize: "0.9rem",
+            borderTop: "1px solid #e3e7f0",
+            paddingTop: "0.75rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem",
           }}
         >
-          Cerrar sesión
-        </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <span
+              aria-hidden
+              style={{
+                width: "2.2rem",
+                height: "2.2rem",
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 800,
+                fontSize: "1rem",
+                color: "white",
+                background: "linear-gradient(135deg, var(--lgs-azul) 0%, var(--lgs-magenta) 100%)",
+                flexShrink: 0,
+              }}
+            >
+              {(me.user?.username ?? "?").charAt(0).toUpperCase()}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {me.user?.username}
+              </div>
+              <div style={{ fontSize: "0.72rem", color: "var(--texto-suave)" }}>sesión activa</div>
+            </div>
+          </div>
+          <button
+            onClick={() => void salir()}
+            style={{
+              padding: "0.55rem",
+              borderRadius: "0.6rem",
+              border: "1px solid #e3e7f0",
+              background: "white",
+              cursor: "pointer",
+              fontSize: "0.88rem",
+              fontWeight: 600,
+            }}
+          >
+            🚪 Cerrar sesión
+          </button>
+        </div>
       </aside>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         {(permisos.has("personas.ver") || permisos.has("contratos.ver")) && (

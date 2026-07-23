@@ -7,7 +7,11 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export { getAccessProfile, invalidateAccessProfile } from "./application/get-access-profile";
+export {
+  getAccessProfile,
+  invalidateAccessProfile,
+  listarRoles,
+} from "./application/get-access-profile";
 export { AccessProfile } from "./application/profile";
 export { asignarRol, asignarRolTx } from "./application/asignar-rol";
 export { PERMISOS, ROLES, MATRIZ_ROL_PERMISOS } from "./domain/permisos";
