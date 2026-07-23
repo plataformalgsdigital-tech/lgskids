@@ -14,5 +14,10 @@ export {
   obtenerPersona,
 } from "./application/crear-personas";
 export { crearAdultoHandler, crearNinoHandler, listarPersonasHandler } from "./api/handlers";
-export { findPersonById, linkUser, setPersonEstado } from "./infrastructure/person-repository";
+export {
+  findPersonById,
+  findPersonByUserId,
+  linkUser,
+  setPersonEstado,
+} from "./infrastructure/person-repository";
 export type { PersonRecord, PersonInput, PersonListItem } from "./application/ports";

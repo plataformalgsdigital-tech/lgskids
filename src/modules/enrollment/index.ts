@@ -14,6 +14,8 @@ export {
   cancelarMatriculaDeContratoTx,
   obtenerRoster,
   historialDeNino,
+  matriculaDeNino,
   findActivaByContract,
 } from "./application/matricula";
+export type { MatriculaActual } from "./application/matricula";
 export { matricularHandler, rosterHandler, cambioAcademicoHandler } from "./api/handlers";

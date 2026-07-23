@@ -11,8 +11,10 @@ import {
   historialPorNino,
   insertEnrollment,
   lockClassroom,
+  matriculaActualDeNino,
   rosterSalon,
   type EnrollmentHistoryItem,
+  type MatriculaActual,
   type RosterItem,
 } from "../infrastructure/enrollment-repository";
 
@@ -165,4 +167,9 @@ export async function historialDeNino(childPersonId: string): Promise<Enrollment
   return historialPorNino(childPersonId);
 }
 
+export async function matriculaDeNino(childPersonId: string): Promise<MatriculaActual | null> {
+  return matriculaActualDeNino(childPersonId);
+}
+
 export { findActivaByContract };
+export type { MatriculaActual };

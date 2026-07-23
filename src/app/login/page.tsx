@@ -27,7 +27,23 @@ export default function LoginPage() {
         setError(data.error?.message ?? "No se pudo iniciar sesión.");
         return;
       }
-      router.push(data.user?.debeCambiarPassword === true ? "/panel/cambiar-password" : "/panel");
+      if (data.user?.debeCambiarPassword === true) {
+        router.push("/panel/cambiar-password");
+        return;
+      }
+      // Los ALUMNOS van a su panel propio; el resto al panel de gestión.
+      const me = await fetch("/api/auth/me");
+      if (me.ok) {
+        const perfil: { permisos: { code: string }[] } = await me.json();
+        const codes = new Set(perfil.permisos.map((p) => p.code));
+        const esAlumno =
+          codes.has("panel.alumno") &&
+          !codes.has("panel.administracion") &&
+          !codes.has("panel.guia");
+        router.push(esAlumno ? "/mi-panel" : "/panel");
+      } else {
+        router.push("/panel");
+      }
     } catch {
       setError("Error de conexión. Intenta nuevamente.");
     } finally {

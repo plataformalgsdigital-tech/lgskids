@@ -15,6 +15,13 @@ export async function findPersonById(id: string, client?: Queryable): Promise<Pe
   return queryOne<PersonRecord>(`${SELECT_PERSON} WHERE id = $1`, [id], client);
 }
 
+export async function findPersonByUserId(
+  userId: string,
+  client?: Queryable,
+): Promise<PersonRecord | null> {
+  return queryOne<PersonRecord>(`${SELECT_PERSON} WHERE user_id = $1`, [userId], client);
+}
+
 export async function findPersonByDoc(
   countryCode: string,
   docTipo: string,

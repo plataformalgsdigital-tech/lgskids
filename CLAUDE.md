@@ -128,6 +128,18 @@ del salón, nunca de una acción del estudiante.
   rol NO-superadmin solo si está vacío → respeta ediciones del panel.
   Editar permisos de un rol invalida toda la caché de perfiles.
 
+## Panel del alumno (2026-07-23)
+
+- **Interfaz propia del niño** en `/mi-panel` (layout separado del /panel
+  administrativo, decisión de diseño). `GET /api/student/dashboard` deriva
+  TODO del usuario logueado (findPersonByUserId) — un niño solo ve SUS
+  datos; compone people+enrollment+attendance+progression en la capa app.
+  Muestra: próxima clase (con botón "Entrar a clase" si hay meeting_url),
+  salón/guía/campaña, resumen de asistencia (asistidas/ausentes/
+  justificadas/total), progreso por nivel con medallas y diploma, y agenda
+  de próximas sesiones. Requiere permiso `panel.alumno`. El login enruta a
+  /mi-panel si el usuario es alumno (y no staff), al /panel en otro caso.
+
 ## Vocabulario del negocio (obligatorio en código y UI)
 
 **Guía** (no profesor) · **Club** (no taller) · **Sesión** (no clase) ·
