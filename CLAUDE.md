@@ -92,8 +92,20 @@ del salón, nunca de una acción del estudiante.
   UI: clic en una sesión del salón → página de asistencia con quiz inline.
   `ver-base-datos.bat` abre Prisma Studio (puerto 5555). Permisos:
   asistencia.gestionar/ver, evaluaciones.gestionar/ver (guía gestiona).
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 9
-  (`progression`: LA función central de avance).
+- **Fase 9 (`progression`) completada**: migración `20260729000000_progression`.
+  **LA FUNCIÓN CENTRAL** (`progression/application/recalcular.ts`):
+  4 prácticas aprobadas + Level Up aprobado ⇒ nivel COMPLETADO ⇒ MEDALLA;
+  4 niveles ⇒ DIPLOMA. DERIVADA de assessment (nada se edita a mano),
+  IDEMPOTENTE (premios una sola vez) y RECUPERABLE (cualquier invocación
+  re-deriva todo). NO cuenta sesiones asistidas. **Caminos que la
+  disparan** (verificados por `progression/tests/caminos-progresion.test.ts`
+  — agregar un camino nuevo EXIGE sumarlo ahí): 1) marcarAsistencia,
+  2) registrarIntento, 3) worker recalculo_global cada 12 h (red de
+  seguridad). Awards con `notificado_en` NULL hasta que Fase 10 envíe por
+  WhatsApp. UI: /panel/progreso/[childId] (enlace 📈 en el roster).
+  Permiso: progresion.ver.
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 10
+  (`reporting`, `notifications` WhatsApp, `files`).
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 

@@ -17,7 +17,7 @@ diagramas de flujo).
 | enrollment    | 7 ✅ | [src/modules/enrollment/README.md](../../src/modules/enrollment/README.md) — roster derivado; matricularTx único; cupo con FOR UPDATE            |
 | attendance    | 8 ✅ | [src/modules/attendance/README.md](../../src/modules/attendance/README.md) — upsert por sesión+niño; aviso feriado del país del niño             |
 | assessment    | 8 ✅ | [src/modules/assessment/README.md](../../src/modules/assessment/README.md) — intentos con umbral 70 provisional; valida matrícula                |
-| progression   | 9    | _pendiente_                                                                                                                                      |
+| progression   | 9 ✅ | [src/modules/progression/README.md](../../src/modules/progression/README.md) — LA función central: derivada, idempotente, recuperable; 3 caminos |
 | reporting     | 10   | _pendiente_                                                                                                                                      |
 | notifications | 10   | _pendiente_                                                                                                                                      |
 | files         | 10   | _pendiente_                                                                                                                                      |

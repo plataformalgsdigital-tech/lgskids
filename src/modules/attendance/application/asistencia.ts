@@ -1,4 +1,5 @@
 import { registrarAuditoria } from "@/modules/audit";
+import { recalcularProgresion } from "@/modules/progression";
 import { withTransaction } from "@/platform/db/transaction";
 import { NotFoundError, ValidationError } from "@/platform/errors";
 import {
@@ -101,6 +102,12 @@ export async function marcarAsistencia(input: {
       });
     }
   });
+
+  // CAMINO 1 de LA FUNCIÓN CENTRAL (regla dura 4): toda marca de
+  // asistencia dispara el recálculo de progresión de cada niño afectado.
+  for (const childPersonId of new Set(input.marcas.map((m) => m.childPersonId))) {
+    await recalcularProgresion(childPersonId);
+  }
 
   const conteos = input.marcas.reduce<Record<string, number>>((acc, m) => {
     acc[m.estado] = (acc[m.estado] ?? 0) + 1;

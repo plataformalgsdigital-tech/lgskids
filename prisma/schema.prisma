@@ -197,6 +197,7 @@ model Course {
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   levels   Level[]
+  awards   Award[]
 
   // Una campaña genera UN curso por tipo.
   @@unique([campaignId, tipo])
@@ -213,6 +214,8 @@ model Level {
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
   quizzes Quiz[]
+  progress LevelProgress[]
+  awards   Award[]
 
   @@unique([courseId, orden])
   @@unique([courseId, codigo])
@@ -285,6 +288,8 @@ model Person {
   enrollments      Enrollment[]
   attendances      Attendance[]
   quizAttempts     QuizAttempt[]
+  levelProgress    LevelProgress[]
+  awards           Award[]
   comoApoderado    Guardianship[] @relation("apoderado")
   contratosTitular Contract[]     @relation("titular")
   contratosBenef   Contract[]     @relation("beneficiario")
@@ -557,6 +562,64 @@ model QuizAttempt {
   @@index([childPersonId, quizId])
   @@index([quizId])
   @@map("assessment_attempt")
+}
+
+// ============================================================
+// progression — LA función central de avance (regla dura 4)
+// ============================================================
+
+enum ProgressEstado {
+  EN_CURSO
+  COMPLETADO
+
+  @@map("progression_estado")
+}
+
+model LevelProgress {
+  id            String @id @default(uuid()) @db.Uuid
+  childPersonId String @map("child_person_id") @db.Uuid
+  levelId       String @map("level_id") @db.Uuid
+  // DERIVADO de assessment por la función central — nunca se edita a mano.
+  leccionesCompletadas Int            @default(0) @map("lecciones_completadas")
+  levelUpAprobado      Boolean        @default(false) @map("level_up_aprobado")
+  estado               ProgressEstado @default(EN_CURSO)
+  completadoEn         DateTime?      @map("completado_en") @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  child Person @relation(fields: [childPersonId], references: [id], onDelete: Cascade)
+  level Level  @relation(fields: [levelId], references: [id], onDelete: Cascade)
+
+  @@unique([childPersonId, levelId])
+  @@index([childPersonId])
+  @@map("progression_level_progress")
+}
+
+enum AwardTipo {
+  MEDALLA // al completar un nivel
+  DIPLOMA // al completar los 4 niveles del curso
+
+  @@map("progression_award_tipo")
+}
+
+model Award {
+  id            String    @id @default(uuid()) @db.Uuid
+  childPersonId String    @map("child_person_id") @db.Uuid
+  tipo          AwardTipo
+  levelId       String?   @map("level_id") @db.Uuid // MEDALLA
+  courseId      String?   @map("course_id") @db.Uuid // DIPLOMA
+  otorgadoEn    DateTime  @default(now()) @map("otorgado_en") @db.Timestamptz(3)
+  // El envío por WhatsApp llega en Fase 10 (notifications).
+  notificadoEn DateTime? @map("notificado_en") @db.Timestamptz(3)
+
+  child  Person  @relation(fields: [childPersonId], references: [id], onDelete: Cascade)
+  level  Level?  @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  // Una medalla por nivel y un diploma por curso (NULL no colisiona; la
+  // función central es el único camino que otorga).
+  @@unique([childPersonId, tipo, levelId, courseId])
+  @@index([childPersonId])
+  @@map("progression_award")
 }
 
 // ============================================================

@@ -1,4 +1,5 @@
 import { registrarAuditoria } from "@/modules/audit";
+import { recalcularProgresion } from "@/modules/progression";
 import { NotFoundError, ValidationError } from "@/platform/errors";
 import { esAprobado, validarScore } from "../domain/calificacion";
 import {
@@ -24,7 +25,12 @@ export async function registrarIntento(input: {
   quizId: string;
   score: number;
   ip?: string | null;
-}): Promise<{ id: string; aprobado: boolean; tipo: string }> {
+}): Promise<{
+  id: string;
+  aprobado: boolean;
+  tipo: string;
+  progresion: { nivelActual: string | null; medallasNuevas: number; diplomaNuevo: boolean } | null;
+}> {
   validarScore(input.score);
 
   const quiz = await getQuizInfo(input.quizId);
@@ -44,6 +50,10 @@ export async function registrarIntento(input: {
     registradoPor: input.actorUserId,
   });
 
+  // CAMINO 2 de LA FUNCIÓN CENTRAL (regla dura 4): todo intento calificado
+  // dispara el recálculo (el LEVEL_UP aprobado es el que promueve).
+  const progreso = await recalcularProgresion(input.childPersonId);
+
   await registrarAuditoria({
     actorUserId: input.actorUserId,
     accion: aprobado ? "assessment.aprobado" : "assessment.intento",
@@ -57,7 +67,7 @@ export async function registrarIntento(input: {
     },
     ip: input.ip ?? null,
   });
-  return { id, aprobado, tipo: quiz.tipo };
+  return { id, aprobado, tipo: quiz.tipo, progresion: progreso };
 }
 
 export async function intentosDeNino(childPersonId: string): Promise<AttemptListItem[]> {

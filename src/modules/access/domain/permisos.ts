@@ -20,6 +20,7 @@ export const PERMISOS = {
   ASISTENCIA_VER: "asistencia.ver",
   EVALUACIONES_GESTIONAR: "evaluaciones.gestionar",
   EVALUACIONES_VER: "evaluaciones.ver",
+  PROGRESION_VER: "progresion.ver",
   PANEL_ADMINISTRACION: "panel.administracion",
   PANEL_GUIA: "panel.guia",
   PANEL_APODERADO: "panel.apoderado",
@@ -59,6 +60,7 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.ASISTENCIA_VER,
     PERMISOS.EVALUACIONES_GESTIONAR,
     PERMISOS.EVALUACIONES_VER,
+    PERMISOS.PROGRESION_VER,
     PERMISOS.PANEL_ADMINISTRACION,
   ],
   guia: [
@@ -70,6 +72,7 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.ASISTENCIA_VER,
     PERMISOS.EVALUACIONES_GESTIONAR,
     PERMISOS.EVALUACIONES_VER,
+    PERMISOS.PROGRESION_VER,
   ],
   apoderado: [PERMISOS.PANEL_APODERADO],
   alumno: [PERMISOS.PANEL_ALUMNO],

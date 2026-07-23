@@ -9,6 +9,7 @@
  */
 import { procesarVencimientos } from "../src/modules/contracts";
 import { sessionService } from "../src/modules/identity";
+import { recalculoGlobal } from "../src/modules/progression";
 import { closePool } from "../src/platform/db/pool";
 import { logger } from "../src/platform/logging/logger";
 
@@ -42,6 +43,16 @@ const tasks: ScheduledTask[] = [
     run: async () => {
       const procesados = await procesarVencimientos();
       logger.info("Barrido de contratos vencidos", { procesados });
+    },
+  },
+  {
+    // CAMINO 3 de LA función central de progresión: red de seguridad — si un
+    // camino no disparó (bug, caída), aquí se corrige solo (lección de LGS).
+    name: "progression.recalculo_global",
+    everyMinutes: 12 * 60,
+    run: async () => {
+      const ninos = await recalculoGlobal();
+      logger.info("Recalculo global de progresión", { ninos });
     },
   },
 ];

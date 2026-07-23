@@ -215,7 +215,10 @@ export default function DetalleSalonPage() {
                 <span style={{ color: "var(--texto-suave)" }}>
                   · contrato N° {r.contratoNumero}
                   {r.username !== null && ` · ${r.username}`}
-                </span>
+                </span>{" "}
+                <Link href={`/panel/progreso/${r.childPersonId}`} title="Ver progreso y medallas">
+                  📈
+                </Link>
               </div>
             ))}
           </div>

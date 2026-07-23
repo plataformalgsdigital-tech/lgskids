@@ -55,6 +55,7 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.ASISTENCIA_VER]: "Ver asistencia",
   [PERMISOS.EVALUACIONES_GESTIONAR]: "Registrar cuestionarios",
   [PERMISOS.EVALUACIONES_VER]: "Ver cuestionarios e intentos",
+  [PERMISOS.PROGRESION_VER]: "Ver progresión, medallas y diplomas",
   [PERMISOS.PANEL_ADMINISTRACION]: "Panel de administración",
   [PERMISOS.PANEL_GUIA]: "Panel del guía",
   [PERMISOS.PANEL_APODERADO]: "Panel del apoderado",
