@@ -7,4 +7,13 @@
  * módulo. Alcanzar rutas internas (domain/, application/, infrastructure/,
  * api/, ui/) desde otro módulo es una violación verificada en CI.
  */
-export {};
+export {
+  loginHandler,
+  refreshHandler,
+  logoutHandler,
+  meHandler,
+  changePasswordHandler,
+} from "./api/handlers";
+export { bootstrapIdentity } from "./infrastructure/authenticator";
+export { sessionService } from "./infrastructure/composition";
+export { validarPassword, PASSWORD_MIN_LENGTH } from "./domain/password-policy";
