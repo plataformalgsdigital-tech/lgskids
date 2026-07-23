@@ -1,0 +1,25 @@
+# Desarrollo local de KIDS2026.
+# Uso:  docker compose -f infra/docker/docker-compose.yml up -d
+# Requiere Docker Desktop instalado.
+name: kids2026
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kids2026-postgres
+    environment:
+      POSTGRES_USER: kids
+      POSTGRES_PASSWORD: kids_dev # solo desarrollo local — nunca en producción
+      POSTGRES_DB: kids2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kids -d kids2026"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
