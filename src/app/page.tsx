@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type CSSProperties } from "react";
 import "./landing.css";
 
@@ -207,68 +208,78 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="hero-card">
-            <span
-              className="float"
-              style={{ background: "var(--magenta)", top: "-.6rem", left: "1rem" }}
-            >
-              Hello!
-            </span>
-            <span
-              className="float"
-              style={{
-                background: "var(--cian)",
-                top: "2.5rem",
-                right: "-.5rem",
-                animationDelay: "1.2s",
-              }}
-            >
-              Let&apos;s play
-            </span>
-            <span
-              className="float"
-              style={{
-                background: "var(--verde)",
-                bottom: "-.6rem",
-                right: "2.5rem",
-                animationDelay: "2.4s",
-              }}
-            >
-              Well done!
-            </span>
-            <h3>El avance de Sofía</h3>
-            <div className="beadline">
-              <div className="bead">
-                <span className="b" style={{ background: "var(--verde)" }}>
-                  R
-                </span>
-                <small>Rookie</small>
+          <div className="hero-right">
+            <Image
+              className="hero-logo"
+              src="/logo.jpg"
+              alt="LGS Kids"
+              width={260}
+              height={231}
+              priority
+            />
+            <div className="hero-card">
+              <span
+                className="float"
+                style={{ background: "var(--magenta)", top: "-.6rem", left: "1rem" }}
+              >
+                Hello!
+              </span>
+              <span
+                className="float"
+                style={{
+                  background: "var(--cian)",
+                  top: "2.5rem",
+                  right: "-.5rem",
+                  animationDelay: "1.2s",
+                }}
+              >
+                Let&apos;s play
+              </span>
+              <span
+                className="float"
+                style={{
+                  background: "var(--verde)",
+                  bottom: "-.6rem",
+                  right: "2.5rem",
+                  animationDelay: "2.4s",
+                }}
+              >
+                Well done!
+              </span>
+              <h3>El avance de Sofía</h3>
+              <div className="beadline">
+                <div className="bead">
+                  <span className="b" style={{ background: "var(--verde)" }}>
+                    R
+                  </span>
+                  <small>Rookie</small>
+                </div>
+                <div className="bead">
+                  <span className="b" style={{ background: "var(--cian)" }}>
+                    C
+                  </span>
+                  <small>Champion</small>
+                </div>
+                <div className="bead">
+                  <span className="b" style={{ background: "var(--ambar)" }}>
+                    E
+                  </span>
+                  <small>Elite</small>
+                </div>
+                <div className="bead">
+                  <span className="b" style={{ background: "var(--line)", color: "var(--muted)" }}>
+                    L
+                  </span>
+                  <small>Legend</small>
+                </div>
               </div>
-              <div className="bead">
-                <span className="b" style={{ background: "var(--cian)" }}>
-                  C
-                </span>
-                <small>Champion</small>
+              <div className="barwrap">
+                <div className="bar" />
               </div>
-              <div className="bead">
-                <span className="b" style={{ background: "var(--ambar)" }}>
-                  E
-                </span>
-                <small>Elite</small>
+              <div className="foot">
+                <span>🏅 2 medallas ganadas</span>
+                <span>Nivel Elite</span>
               </div>
-              <div className="bead">
-                <span className="b" style={{ background: "var(--line)", color: "var(--muted)" }}>
-                  L
-                </span>
-                <small>Legend</small>
-              </div>
-            </div>
-            <div className="barwrap">
-              <div className="bar" />
-            </div>
-            <div className="foot">
-              <span>🏅 2 medallas ganadas</span>
-              <span>Nivel Elite</span>
             </div>
           </div>
         </div>
