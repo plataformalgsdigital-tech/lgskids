@@ -1,0 +1,240 @@
+<title>LGS Kids · Guía para reconstruir la landing en Elementor</title>
+<style>
+  :root{
+    --bg:#fbfaff; --card:#fff; --ink:#1a1730; --muted:#6a6786; --line:#e9e7f4;
+    --azul:#1e88ef; --cian:#00aeef; --verde:#69ae2e; --ambar:#f5a800; --magenta:#ec008f; --purpura:#7b2fbe;
+    --code-bg:#f4f2fb; --code-ink:#3a2f5c;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0f1020; --card:#181a30; --ink:#f0eefb; --muted:#a5a3c4; --line:#2a2c4c; --code-bg:#12132a; --code-ink:#c9c4ee; }
+  }
+  :root[data-theme="dark"]{ --bg:#0f1020; --card:#181a30; --ink:#f0eefb; --muted:#a5a3c4; --line:#2a2c4c; --code-bg:#12132a; --code-ink:#c9c4ee; }
+  :root[data-theme="light"]{ --bg:#fbfaff; --card:#fff; --ink:#1a1730; --muted:#6a6786; --line:#e9e7f4; --code-bg:#f4f2fb; --code-ink:#3a2f5c; }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.6;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:860px;margin:0 auto;padding:2.5rem 1.25rem 5rem;}
+  h1{font-size:2rem;letter-spacing:-.02em;margin:0 0 .3rem;text-wrap:balance;}
+  h2{font-size:1.35rem;letter-spacing:-.02em;margin:2.6rem 0 .3rem;padding-top:1.4rem;border-top:1px solid var(--line);}
+  h3{font-size:1.02rem;margin:1.4rem 0 .4rem;}
+  p{margin:.5rem 0;} .sub{color:var(--muted);}
+  a{color:var(--azul);}
+  .lead{color:var(--muted);font-size:1.08rem;margin-bottom:.5rem;}
+  .step{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--purpura);background:color-mix(in srgb,var(--purpura) 12%,transparent);padding:.2rem .6rem;border-radius:999px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:.9rem;padding:1.1rem 1.3rem;margin:1rem 0;
+    box-shadow:0 1px 3px rgba(40,20,90,.04),0 10px 30px rgba(40,20,90,.05);}
+  .callout{border-left:4px solid var(--ambar);background:color-mix(in srgb,var(--ambar) 8%,transparent);
+    border-radius:.5rem;padding:.8rem 1rem;margin:1rem 0;font-size:.95rem;}
+  .callout.tip{border-left-color:var(--verde);background:color-mix(in srgb,var(--verde) 8%,transparent);}
+  ul,ol{padding-left:1.25rem;} li{margin:.25rem 0;}
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.6rem;margin:.8rem 0;}
+  .sw{border:1px solid var(--line);border-radius:.6rem;overflow:hidden;background:var(--card);}
+  .sw .chip{height:2.8rem;} .sw .meta{padding:.4rem .6rem;font-size:.78rem;}
+  .sw .meta b{display:block;} .sw code{font-size:.75rem;color:var(--muted);}
+  pre{background:var(--code-bg);color:var(--code-ink);border:1px solid var(--line);border-radius:.7rem;
+    padding:1rem 1.1rem;overflow-x:auto;font-size:.82rem;line-height:1.5;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;}
+  code.inline{background:var(--code-bg);color:var(--code-ink);padding:.1rem .4rem;border-radius:.35rem;font-size:.85em;
+    font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .blk-label{display:flex;align-items:center;gap:.5rem;font-weight:700;margin:.4rem 0;}
+  .blk-label .tag{font-size:.7rem;font-weight:800;background:var(--magenta);color:#fff;padding:.15rem .55rem;border-radius:999px;}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;margin:.6rem 0;}
+  th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;}
+  .themebtn{position:fixed;top:1rem;right:1rem;background:var(--card);border:1px solid var(--line);color:var(--ink);
+    border-radius:999px;width:2.4rem;height:2.4rem;cursor:pointer;font-size:1rem;}
+  .themebtn:focus-visible{outline:3px solid var(--azul);outline-offset:2px;}
+  footer{color:var(--muted);font-size:.85rem;margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line);}
+</style>
+
+<button class="themebtn" id="theme" aria-label="Cambiar tema">◐</button>
+<div class="wrap">
+
+  <span class="step">Guía para el administrador web</span>
+  <h1>Reconstruir la landing de LGS&nbsp;Kids en WordPress&nbsp;+&nbsp;Elementor</h1>
+  <p class="lead">Método mixto: las secciones de texto se arman con widgets nativos de Elementor;
+    las partes animadas se pegan como bloques HTML listos. El resultado queda igual a la página que ya está publicada, y editable con el editor visual.</p>
+
+  <div class="callout tip"><b>Cómo trabajar esta guía.</b> Para cada sección se indica el widget de Elementor a usar y el texto exacto.
+    Donde dice <b>«Bloque HTML»</b>, arrastra el widget <b>HTML</b> de Elementor y pega el código tal cual — no hay que tocarlo.</div>
+
+  <h2>0 · Preparación</h2>
+  <ol>
+    <li>En WordPress: <b>Plugins → Elementor</b> (gratis) y tema <b>Hello Elementor</b>.</li>
+    <li>Sube el <b>logo</b> (el archivo <code class="inline">Logo sin fondo.jpg</code>) a <b>Medios</b>.</li>
+    <li>Crea una página nueva → «Editar con Elementor» → plantilla <b>Elementor Full Width / Canvas</b> (sin sidebar).</li>
+  </ol>
+
+  <h2>1 · Colores y tipografía (ajustes globales)</h2>
+  <p class="sub">En Elementor: <b>☰ → Ajustes del sitio → Colores globales</b>. Carga estos valores para usarlos en toda la página:</p>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#1e88ef"></div><div class="meta"><b>Azul</b><code>#1e88ef</code></div></div>
+    <div class="sw"><div class="chip" style="background:#00aeef"></div><div class="meta"><b>Cian</b><code>#00aeef</code></div></div>
+    <div class="sw"><div class="chip" style="background:#69ae2e"></div><div class="meta"><b>Verde</b><code>#69ae2e</code></div></div>
+    <div class="sw"><div class="chip" style="background:#f5a800"></div><div class="meta"><b>Ámbar</b><code>#f5a800</code></div></div>
+    <div class="sw"><div class="chip" style="background:#ec008f"></div><div class="meta"><b>Magenta</b><code>#ec008f</code></div></div>
+    <div class="sw"><div class="chip" style="background:#7b2fbe"></div><div class="meta"><b>Púrpura</b><code>#7b2fbe</code></div></div>
+    <div class="sw"><div class="chip" style="background:#191634"></div><div class="meta"><b>Texto</b><code>#191634</code></div></div>
+    <div class="sw"><div class="chip" style="background:#6a6786"></div><div class="meta"><b>Texto suave</b><code>#6a6786</code></div></div>
+  </div>
+  <table>
+    <tr><th>Rol</th><th>Fuente / peso</th><th>Tamaño</th></tr>
+    <tr><td>Títulos (H1/H2)</td><td>System UI, peso 900</td><td>H1 ~40px · H2 ~34px</td></tr>
+    <tr><td>Texto</td><td>System UI, peso 400</td><td>16–18px</td></tr>
+    <tr><td>Etiquetas (eyebrow)</td><td>Peso 800, MAYÚS, +interletra</td><td>12px</td></tr>
+  </table>
+  <p class="sub">Tipografía: la página usa la fuente del sistema (system-ui). En Elementor deja «Default» o elige <b>Nunito</b> / <b>Baloo 2</b> si quieres un aire más redondeado infantil.</p>
+
+  <h2>2 · Barra superior</h2>
+  <p><b>Widget:</b> encabezado de Elementor (o una sección sticky con 3 columnas): logo · menú · botón.</p>
+  <ul>
+    <li><b>Logo</b> (izquierda): imagen del logo, alto ~50px.</li>
+    <li><b>Menú</b> (centro): Programa · Niveles · Cómo funciona · Edades (anclas a cada sección).</li>
+    <li><b>Botón «Acceder»</b> (derecha): usa el <b>Bloque HTML B</b> de abajo para el botón animado, o un botón normal de Elementor con enlace a <code class="inline">https://lgskids.cl/</code>.</li>
+  </ul>
+
+  <h2>3 · Sección Hero (portada)</h2>
+  <p><b>Estructura:</b> una sección de <b>2 columnas</b>.</p>
+  <p><b>Columna izquierda</b> — widgets nativos:</p>
+  <ul>
+    <li>Eyebrow (widget Texto, mayúsculas, color púrpura): <em>Inglés en vivo · niños de 6 a 13 años</em></li>
+    <li>Título (Heading H1): <em>Aprender inglés se siente como <b>jugar</b> y avanzar de <b>nivel</b>.</em> — pon «jugar» en azul y «nivel» en magenta.</li>
+    <li>Texto: <em>Clases online en vivo, en grupos pequeños con su propio guía. Cada niño avanza de Rookie a Legendary ganando medallas por lo que realmente aprende.</em></li>
+    <li>2 Botones: <b>¡Comienza hoy!</b> (relleno púrpura → ancla al formulario/WhatsApp) y <b>Conoce el método</b> (contorno → ancla a la sección Programa).</li>
+    <li>Chips (widget Lista de iconos, en línea): 2 sesiones por semana · Grupos de 1 a 9 niños · Clases en vivo · Plataforma 24/7.</li>
+  </ul>
+  <p><b>Columna derecha</b> — logo (imagen) arriba y debajo el <b>Bloque HTML A</b> (tarjeta de progreso).</p>
+
+  <h2>4 · «Por qué funciona» (6 tarjetas)</h2>
+  <p><b>Widget:</b> 6 × <b>Icon Box</b> (Caja de icono) en una grilla de 3 columnas. Borde superior del color indicado.</p>
+  <table>
+    <tr><th>Color borde</th><th>Título</th><th>Texto</th></tr>
+    <tr><td>Verde</td><td>Grupos reducidos</td><td>De 1 a 9 niños por sesión: cada uno participa, habla y recibe atención de su guía.</td></tr>
+    <tr><td>Cian</td><td>Guías en vivo</td><td>No videos grabados: un guía acompaña cada salón en clases en vivo, con energía y cercanía.</td></tr>
+    <tr><td>Magenta</td><td>Progresa por lo que aprende</td><td>El niño avanza al completar sus lecciones y su Level Up — no por solo asistir. Aprendizaje real.</td></tr>
+    <tr><td>Ámbar</td><td>Juego y recompensas</td><td>Canciones, videos, juegos y un sistema de medallas que mantiene viva la motivación.</td></tr>
+    <tr><td>Azul</td><td>Situaciones reales</td><td>Actividades de la vida cotidiana para que el inglés sirva de verdad, no solo en el cuaderno.</td></tr>
+    <tr><td>Púrpura</td><td>Material 24/7 + clubs</td><td>Plataforma siempre activa con material interactivo y talleres de refuerzo para practicar más.</td></tr>
+  </table>
+
+  <h2>5 · «El viaje del aprendizaje» (niveles)</h2>
+  <p>Título (H2): <em>Cuatro niveles, un montón de medallas y un diploma final</em>. Debajo, el <b>Bloque HTML C</b> (el camino animado Rookie → Legendary). Es la parte estrella: pégala tal cual.</p>
+  <p class="sub">Nota final debajo del bloque (widget Texto): «Al terminar Junior, el niño puede continuar en Youngster; y al completar Youngster, dar el salto a LGS para adultos.»</p>
+
+  <h2>6 · «Cómo funciona»</h2>
+  <p><b>Widget:</b> 4 × Icon Box con número (1–4), en columna. Textos:</p>
+  <ol>
+    <li><b>Se matricula en un salón</b> — Con horario fijo y su propio guía. Nada de andar reservando cada semana.</li>
+    <li><b>Asiste a sus sesiones en vivo</b> — Dos sesiones por semana de una hora, en un grupo pequeño y estable.</li>
+    <li><b>Practica y refuerza</b> — Material interactivo 24/7 y un club de refuerzo los fines de semana.</li>
+    <li><b>Avanza y celebra</b> — Completa lecciones, aprueba su Level Up y suma medallas hacia su diploma.</li>
+  </ol>
+
+  <h2>7 · «Junior y Youngster» (edades)</h2>
+  <p><b>Widget:</b> 2 columnas con fondo degradado.</p>
+  <ul>
+    <li><b>6–9 · Junior</b> (degradado verde→cian): Descubrir el inglés jugando: canciones, personajes y juegos que despiertan el gusto por aprender desde pequeños.</li>
+    <li><b>10–13 · Youngster</b> (degradado azul→púrpura): Más autonomía y conversación: situaciones reales, retos y proyectos que preparan para comunicarse con seguridad.</li>
+  </ul>
+
+  <h2>8 · Cierre (avalado + llamado a la acción)</h2>
+  <ul>
+    <li>Texto pequeño centrado: «Un programa avalado por» + <b>LetsGoSpeak</b>.</li>
+    <li>Caja CTA (fondo degradado púrpura→magenta): título <em>Comienza hoy el programa de inglés de tu hijo</em>, botón <b>Hablar con LGS Kids</b> → <code class="inline">https://wa.me/56940852708</code>, y el teléfono <b>+56 9 4085 2708</b> · Viña del Mar.</li>
+  </ul>
+
+  <h2>Bloques HTML para pegar</h2>
+  <p class="sub">Cada bloque es autocontenido (trae su propio estilo con prefijo <code class="inline">lk-</code> para no chocar con el tema). Arrastra el widget <b>HTML</b> de Elementor y pega.</p>
+
+  <div class="blk-label"><span class="tag">Bloque A</span> Tarjeta de progreso del hero</div>
+  <pre>&lt;div class="lk-card"&gt;
+  &lt;div class="lk-floats"&gt;
+    &lt;span class="lk-f" style="background:#ec008f;top:-.5rem;left:1rem"&gt;Hello!&lt;/span&gt;
+    &lt;span class="lk-f" style="background:#00aeef;top:2.4rem;right:-.4rem;animation-delay:1.2s"&gt;Let's play&lt;/span&gt;
+    &lt;span class="lk-f" style="background:#69ae2e;bottom:-.5rem;right:2.4rem;animation-delay:2.4s"&gt;Well done!&lt;/span&gt;
+  &lt;/div&gt;
+  &lt;h4&gt;El avance de Sofía&lt;/h4&gt;
+  &lt;div class="lk-beads"&gt;
+    &lt;div&gt;&lt;span class="lk-b" style="background:#69ae2e"&gt;R&lt;/span&gt;&lt;small&gt;Rookie&lt;/small&gt;&lt;/div&gt;
+    &lt;div&gt;&lt;span class="lk-b" style="background:#00aeef"&gt;C&lt;/span&gt;&lt;small&gt;Champion&lt;/small&gt;&lt;/div&gt;
+    &lt;div&gt;&lt;span class="lk-b" style="background:#f5a800"&gt;E&lt;/span&gt;&lt;small&gt;Elite&lt;/small&gt;&lt;/div&gt;
+    &lt;div&gt;&lt;span class="lk-b" style="background:#e9e7f4;color:#6a6786"&gt;L&lt;/span&gt;&lt;small&gt;Legend&lt;/small&gt;&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="lk-bar"&gt;&lt;i&gt;&lt;/i&gt;&lt;/div&gt;
+  &lt;div class="lk-foot"&gt;&lt;span&gt;🏅 2 medallas ganadas&lt;/span&gt;&lt;span&gt;Nivel Elite&lt;/span&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;style&gt;
+.lk-card{position:relative;font-family:system-ui,sans-serif;background:#fff;border:1px solid #eceaf6;
+  border-radius:1.4rem;padding:1.5rem;box-shadow:0 18px 44px rgba(40,20,90,.10);max-width:420px;}
+.lk-card h4{margin:0 0 1rem;color:#6a6786;font-size:1rem;}
+.lk-beads{display:flex;justify-content:space-between;margin-bottom:1.1rem;text-align:center;}
+.lk-b{width:2.5rem;height:2.5rem;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:900;
+  font-size:1.1rem;box-shadow:0 6px 14px rgba(0,0,0,.12);}
+.lk-beads small{display:block;font-size:.62rem;font-weight:800;color:#6a6786;text-transform:uppercase;margin-top:.35rem;}
+.lk-bar{height:.7rem;border-radius:999px;background:#eceaf6;overflow:hidden;}
+.lk-bar i{display:block;height:100%;width:62%;background:linear-gradient(90deg,#69ae2e,#00aeef,#f5a800);}
+.lk-foot{display:flex;justify-content:space-between;margin-top:.8rem;font-size:.82rem;color:#6a6786;font-weight:600;}
+.lk-floats .lk-f{position:absolute;z-index:2;font-weight:900;font-size:.8rem;padding:.3rem .65rem;border-radius:999px;
+  color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.15);animation:lkbob 5s ease-in-out infinite;}
+@keyframes lkbob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}
+&lt;/style&gt;</pre>
+
+  <div class="blk-label"><span class="tag">Bloque B</span> Botón «Acceder a la plataforma» (animado)</div>
+  <pre>&lt;a href="https://lgskids.cl/" target="_blank" rel="noreferrer" class="lk-btn-app"&gt;🚀 Acceder a la plataforma&lt;/a&gt;
+&lt;style&gt;
+.lk-btn-app{display:inline-block;font-family:system-ui,sans-serif;font-weight:800;text-decoration:none;color:#fff;
+  padding:.75rem 1.4rem;border-radius:999px;position:relative;overflow:hidden;transition:transform .12s ease;
+  background:linear-gradient(120deg,#ec008f,#7b2fbe,#1e88ef,#7b2fbe);background-size:220% 100%;
+  box-shadow:0 6px 18px rgba(236,0,143,.4);animation:lkflow 4s ease infinite;}
+.lk-btn-app:hover{transform:translateY(-2px) scale(1.03);}
+.lk-btn-app::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-20deg);
+  animation:lkshine 4s ease-in-out infinite;}
+@keyframes lkflow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes lkshine{0%,15%{left:-70%}55%,100%{left:150%}}
+&lt;/style&gt;</pre>
+
+  <div class="blk-label"><span class="tag">Bloque C</span> Camino de niveles Rookie → Legendary (aparece animado)</div>
+  <pre>&lt;div class="lk-path"&gt;
+  &lt;div class="lk-node" style="--c:#69ae2e"&gt;&lt;span class="lk-lv"&gt;Nivel 1&lt;/span&gt;&lt;div class="lk-medal" style="background:#69ae2e"&gt;🏅&lt;/div&gt;&lt;h3&gt;Rookie&lt;/h3&gt;&lt;small&gt;Los primeros pasos con confianza&lt;/small&gt;&lt;/div&gt;
+  &lt;div class="lk-node" style="--c:#00aeef"&gt;&lt;span class="lk-lv"&gt;Nivel 2&lt;/span&gt;&lt;div class="lk-medal" style="background:#00aeef"&gt;🏅&lt;/div&gt;&lt;h3&gt;Champion&lt;/h3&gt;&lt;small&gt;Frases y conversaciones simples&lt;/small&gt;&lt;/div&gt;
+  &lt;div class="lk-node" style="--c:#f5a800"&gt;&lt;span class="lk-lv"&gt;Nivel 3&lt;/span&gt;&lt;div class="lk-medal" style="background:#f5a800"&gt;🏅&lt;/div&gt;&lt;h3&gt;Elite&lt;/h3&gt;&lt;small&gt;Fluidez y vocabulario amplio&lt;/small&gt;&lt;/div&gt;
+  &lt;div class="lk-node" style="--c:#ec008f"&gt;&lt;span class="lk-lv"&gt;Nivel 4&lt;/span&gt;&lt;div class="lk-medal" style="background:#ec008f"&gt;🏅&lt;/div&gt;&lt;h3&gt;Legendary&lt;/h3&gt;&lt;small&gt;Comunicación con seguridad&lt;/small&gt;&lt;/div&gt;
+  &lt;div class="lk-node lk-diploma"&gt;&lt;span class="lk-lv"&gt;Meta&lt;/span&gt;&lt;div class="lk-medal"&gt;🎓&lt;/div&gt;&lt;h3&gt;Diploma&lt;/h3&gt;&lt;small&gt;¡Curso completado!&lt;/small&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;style&gt;
+.lk-path{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;font-family:system-ui,sans-serif;}
+@media(max-width:820px){.lk-path{grid-template-columns:1fr 1fr;}}
+.lk-node{position:relative;background:#fff;border:1px solid #eceaf6;border-radius:1rem;padding:1.2rem 1rem;text-align:center;
+  box-shadow:0 12px 30px rgba(40,20,90,.08);opacity:0;transform:translateY(16px);animation:lkin .6s ease forwards;}
+.lk-node:nth-child(1){animation-delay:.05s}.lk-node:nth-child(2){animation-delay:.2s}
+.lk-node:nth-child(3){animation-delay:.35s}.lk-node:nth-child(4){animation-delay:.5s}.lk-node:nth-child(5){animation-delay:.65s}
+@keyframes lkin{to{opacity:1;transform:none}}
+.lk-medal{width:3.4rem;height:3.4rem;margin:0 auto .7rem;border-radius:50%;display:grid;place-items:center;
+  font-size:1.5rem;color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.16);position:relative;}
+.lk-medal::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:3px solid var(--c);opacity:.35;}
+.lk-node h3{margin:.2rem 0 0;font-size:1.05rem;color:#191634;}
+.lk-node small{color:#6a6786;font-size:.8rem;}
+.lk-lv{position:absolute;top:.7rem;right:.8rem;font-size:.68rem;font-weight:900;color:#6a6786;}
+.lk-diploma .lk-medal{background:linear-gradient(135deg,#f5a800,#ec008f);}
+&lt;/style&gt;</pre>
+
+  <div class="callout"><b>Si algún bloque no toma el estilo:</b> algunos temas o cachés “limpian” el <code class="inline">&lt;style&gt;</code> dentro del widget HTML.
+    En ese caso, pega solo el HTML en el widget y mueve el contenido de <code class="inline">&lt;style&gt;</code> a
+    <b>Elementor → Ajustes del sitio → CSS personalizado</b> (o al Personalizador → CSS adicional).</div>
+
+  <footer>
+    Guía generada para el equipo de LGS Kids · úsala junto al logo oficial y la página ya publicada como referencia visual.
+    Cualquier ajuste de textos o colores, se actualiza aquí.
+  </footer>
+</div>
+
+<script>
+  const root=document.documentElement;
+  document.getElementById("theme").addEventListener("click",()=>{
+    const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+    root.setAttribute("data-theme",cur==="dark"?"light":"dark");
+  });
+</script>
