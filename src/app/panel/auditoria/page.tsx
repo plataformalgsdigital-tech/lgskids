@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Registro {
   id: string;
@@ -36,7 +37,7 @@ export default function AuditoriaPage() {
   const cargar = useCallback(async (filtroAccion: string, nuevoOffset: number) => {
     const params = new URLSearchParams({ limit: "50", offset: String(nuevoOffset) });
     if (filtroAccion !== "") params.set("accion", filtroAccion);
-    const res = await fetch(`/api/audit?${params}`);
+    const res = await apiFetch(`/api/audit?${params}`);
     if (res.ok) {
       const data: { registros: Registro[] } = await res.json();
       setRegistros(data.registros);

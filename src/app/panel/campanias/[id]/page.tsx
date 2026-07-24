@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Detalle {
   id: string;
@@ -46,7 +47,7 @@ export default function DetalleCampaniaPage() {
 
   useEffect(() => {
     async function cargar() {
-      const res = await fetch(`/api/catalog/campaigns/${params.id}`);
+      const res = await apiFetch(`/api/catalog/campaigns/${params.id}`);
       if (res.status === 401) {
         router.replace("/login");
         return;

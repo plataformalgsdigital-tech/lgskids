@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Resultados {
   q: string;
@@ -40,7 +41,7 @@ function ResultadosBusqueda() {
     if (q.trim().length < 2) return;
     let cancelado = false;
     async function buscar() {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const res = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
       if (!res.ok) {
         if (!cancelado) setError("No se pudo buscar.");
         return;

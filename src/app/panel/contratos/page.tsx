@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Contrato {
   id: string;
@@ -88,9 +89,9 @@ export default function ContratosPage() {
 
   const cargar = useCallback(async () => {
     const [resC, resP, resS] = await Promise.all([
-      fetch("/api/contracts"),
-      fetch("/api/people"),
-      fetch("/api/scheduling/classrooms"),
+      apiFetch("/api/contracts"),
+      apiFetch("/api/people"),
+      apiFetch("/api/scheduling/classrooms"),
     ]);
     if (resC.ok) {
       const data: { contratos: Contrato[] } = await resC.json();
@@ -118,7 +119,7 @@ export default function ContratosPage() {
     setError(null);
     setOcupado(true);
     try {
-      const res = await fetch("/api/contracts", {
+      const res = await apiFetch("/api/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -148,7 +149,7 @@ export default function ContratosPage() {
     setError(null);
     setOcupado(true);
     try {
-      const res = await fetch(`/api/contracts/${id}/${ruta}`, {
+      const res = await apiFetch(`/api/contracts/${id}/${ruta}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         ...(body !== undefined && { body: JSON.stringify(body) }),
@@ -184,7 +185,7 @@ export default function ContratosPage() {
     try {
       let res: Response;
       if (eligiendoSalon.modo === "matricular") {
-        res = await fetch("/api/enrollment", {
+        res = await apiFetch("/api/enrollment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -203,7 +204,7 @@ export default function ContratosPage() {
           setOcupado(false);
           return;
         }
-        res = await fetch(`/api/enrollment/${eligiendoSalon.contrato.enrollmentId}/move`, {
+        res = await apiFetch(`/api/enrollment/${eligiendoSalon.contrato.enrollmentId}/move`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nuevoClassroomId: salonElegido, motivo }),

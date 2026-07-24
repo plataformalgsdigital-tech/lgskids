@@ -140,6 +140,27 @@ del salón, nunca de una acción del estudiante.
   de próximas sesiones. Requiere permiso `panel.alumno`. El login enruta a
   /mi-panel si el usuario es alumno (y no staff), al /panel en otro caso.
 
+## Sitio público / landing (2026-07-23)
+
+- **Landing de marketing en la raíz `/`** (`src/app/page.tsx`, cliente):
+  ruta Next DELGADA, solo presentación, SIN reglas de negocio (respeta el
+  monolito: la lógica vive en `modules/`, esto es `app/` puro). Estilos en
+  `src/app/landing.css` AISLADOS con el prefijo `.lgs-landing` (no afectan
+  login/panel); tema propio claro/oscuro con `.lgs-landing.dark|.light`.
+  Contenido tomado de letsgospeak.cl/lgs-kids (6–13 años, en vivo, grupos
+  1–9, niveles Rookie→Legendary, medallas, guías, LetsGoSpeak). La app vive
+  en `/login` y `/panel`; el footer enlaza a `/login`.
+- **Versión estática** en `landing-estatica/index.html`: el MISMO diseño en
+  un HTML autocontenido para subir a **Hostinger** (hosting compartido) en
+  lgskidsplataforma.com. La plataforma completa (Node + Postgres) irá a
+  DigitalOcean, previsiblemente en `app.lgskidsplataforma.com`.
+- **Sesión en el cliente**: las páginas del panel usan `@/ui/api-fetch`
+  (`apiFetch`), que ante un 401 rota el refresh token y reintenta —así la
+  sesión no se cae a los 15 min del access token. NO volver a poner
+  `router.replace("/login")` directo sobre un 401 sin pasar por `apiFetch`.
+- `pnpm demo:alumno` crea un alumno matriculado de punta a punta (con
+  asistencia y medalla) e imprime usuario/clave para revisar `/mi-panel`.
+
 ## Vocabulario del negocio (obligatorio en código y UI)
 
 **Guía** (no profesor) · **Club** (no taller) · **Sesión** (no clase) ·

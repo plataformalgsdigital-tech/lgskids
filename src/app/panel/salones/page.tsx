@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Salon {
   id: string;
@@ -65,7 +66,7 @@ export default function SalonesPage() {
   const [ocupado, setOcupado] = useState(false);
 
   const cargarSalones = useCallback(async () => {
-    const res = await fetch("/api/scheduling/classrooms");
+    const res = await apiFetch("/api/scheduling/classrooms");
     if (res.ok) {
       const data: { salones: Salon[] } = await res.json();
       setSalones(data.salones);
@@ -75,7 +76,7 @@ export default function SalonesPage() {
   useEffect(() => {
     async function inicial() {
       await cargarSalones();
-      const res = await fetch("/api/catalog/campaigns");
+      const res = await apiFetch("/api/catalog/campaigns");
       if (res.ok) {
         const data: { campanias: CampaniaLista[] } = await res.json();
         setCampanias(data.campanias);
@@ -91,7 +92,7 @@ export default function SalonesPage() {
       setCursos([]);
       return;
     }
-    const res = await fetch(`/api/catalog/campaigns/${id}`);
+    const res = await apiFetch(`/api/catalog/campaigns/${id}`);
     if (res.ok) {
       const data: { campania: { courses: CursoDetalle[] } } = await res.json();
       setCursos(data.campania.courses);
@@ -103,7 +104,7 @@ export default function SalonesPage() {
     setError(null);
     setOcupado(true);
     try {
-      const res = await fetch("/api/scheduling/classrooms", {
+      const res = await apiFetch("/api/scheduling/classrooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

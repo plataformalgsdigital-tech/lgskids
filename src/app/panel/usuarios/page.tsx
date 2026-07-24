@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Usuario {
   id: string;
@@ -81,7 +82,7 @@ export default function UsuariosPage() {
   const cargarUsuarios = useCallback(async (q: string) => {
     const url =
       q === "" ? "/api/identity/users" : `/api/identity/users?buscar=${encodeURIComponent(q)}`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (res.ok) {
       const data: { usuarios: Usuario[] } = await res.json();
       setUsuarios(data.usuarios);
@@ -89,7 +90,7 @@ export default function UsuariosPage() {
   }, []);
 
   const cargarRoles = useCallback(async () => {
-    const res = await fetch("/api/access/roles");
+    const res = await apiFetch("/api/access/roles");
     if (res.ok) {
       const data: { roles: Rol[] } = await res.json();
       setRoles(data.roles);
@@ -107,7 +108,7 @@ export default function UsuariosPage() {
   async function abrirRol(code: string) {
     setRolSeleccionado(code);
     setPermisosRol(null);
-    const res = await fetch(`/api/access/roles/${code}/permissions`);
+    const res = await apiFetch(`/api/access/roles/${code}/permissions`);
     if (res.ok) {
       const data = (await res.json()) as PermisosRol;
       setPermisosRol(data);
@@ -121,7 +122,7 @@ export default function UsuariosPage() {
     setAviso(null);
     setOcupado(true);
     try {
-      const res = await fetch(`/api/access/roles/${rolSeleccionado}/permissions`, {
+      const res = await apiFetch(`/api/access/roles/${rolSeleccionado}/permissions`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ permisos: [...marcados] }),
@@ -144,7 +145,7 @@ export default function UsuariosPage() {
     setError(null);
     setOcupado(true);
     try {
-      const res = await fetch("/api/access/roles", {
+      const res = await apiFetch("/api/access/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre: nuevoRolNombre, descripcion: nuevoRolDescripcion || null }),
@@ -172,7 +173,7 @@ export default function UsuariosPage() {
     setError(null);
     setOcupado(true);
     try {
-      const res = await fetch("/api/identity/users", {
+      const res = await apiFetch("/api/identity/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -214,7 +215,7 @@ export default function UsuariosPage() {
     setAviso(null);
     setOcupado(true);
     try {
-      const res = await fetch("/api/access/user-roles", {
+      const res = await apiFetch("/api/access/user-roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

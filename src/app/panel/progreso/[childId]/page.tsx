@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Progreso {
   curso: { courseId: string; tipo: string; campania: string } | null;
@@ -34,7 +35,7 @@ export default function ProgresoPage() {
   useEffect(() => {
     let cancelado = false;
     async function cargar() {
-      const res = await fetch(`/api/progression/children/${params.childId}`);
+      const res = await apiFetch(`/api/progression/children/${params.childId}`);
       if (res.ok && !cancelado) {
         setProgreso((await res.json()) as Progreso);
       }

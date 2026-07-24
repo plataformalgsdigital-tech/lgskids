@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Detalle {
   salon: {
@@ -50,8 +51,8 @@ export default function DetalleSalonPage() {
 
   const cargar = useCallback(async () => {
     const [res, resRoster] = await Promise.all([
-      fetch(`/api/scheduling/classrooms/${params.id}`),
-      fetch(`/api/enrollment?classroomId=${params.id}`),
+      apiFetch(`/api/scheduling/classrooms/${params.id}`),
+      apiFetch(`/api/enrollment?classroomId=${params.id}`),
     ]);
     if (res.ok) {
       setDetalle((await res.json()) as Detalle);
@@ -74,7 +75,7 @@ export default function DetalleSalonPage() {
     setAviso(null);
     setOcupado(true);
     try {
-      const res = await fetch(`/api/scheduling/classrooms/${params.id}/${ruta}`, {
+      const res = await apiFetch(`/api/scheduling/classrooms/${params.id}/${ruta}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         ...(body !== undefined && { body: JSON.stringify(body) }),

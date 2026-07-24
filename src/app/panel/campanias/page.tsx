@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Campania {
   id: string;
@@ -31,7 +32,7 @@ export default function CampaniasPage() {
   const [creando, setCreando] = useState(false);
 
   const cargar = useCallback(async () => {
-    const res = await fetch("/api/catalog/campaigns");
+    const res = await apiFetch("/api/catalog/campaigns");
     if (res.status === 401) {
       router.replace("/login");
       return;
@@ -59,7 +60,7 @@ export default function CampaniasPage() {
     setError(null);
     setCreando(true);
     try {
-      const res = await fetch("/api/catalog/campaigns", {
+      const res = await apiFetch("/api/catalog/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre, inicio, duracionSemanas: Number(semanas) }),

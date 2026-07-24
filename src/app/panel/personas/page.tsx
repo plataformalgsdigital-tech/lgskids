@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Persona {
   id: string;
@@ -76,7 +77,7 @@ export default function PersonasPage() {
 
   const cargar = useCallback(async (q: string) => {
     const url = q === "" ? "/api/people" : `/api/people?buscar=${encodeURIComponent(q)}`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (res.ok) {
       const data: { personas: Persona[] } = await res.json();
       setPersonas(data.personas);
@@ -99,7 +100,7 @@ export default function PersonasPage() {
     setExito(null);
     setGuardando(true);
     try {
-      const res = await fetch("/api/people/ninos", {
+      const res = await apiFetch("/api/people/ninos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Resumen {
   mes: string;
@@ -57,7 +58,7 @@ export default function ReportesPage() {
 
   const cargar = useCallback(async (m: string) => {
     setError(null);
-    const res = await fetch(`/api/reporting/summary?mes=${m}`);
+    const res = await apiFetch(`/api/reporting/summary?mes=${m}`);
     if (!res.ok) {
       setError("No se pudo cargar el reporte.");
       return;

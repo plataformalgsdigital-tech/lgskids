@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { apiFetch } from "@/ui/api-fetch";
 
 interface Fila {
   childPersonId: string;
@@ -69,7 +70,7 @@ export default function SesionPage() {
   const [ocupado, setOcupado] = useState(false);
 
   const cargar = useCallback(async () => {
-    const res = await fetch(`/api/attendance/sessions/${params.sessionId}`);
+    const res = await apiFetch(`/api/attendance/sessions/${params.sessionId}`);
     if (!res.ok) return;
     const data = (await res.json()) as Lista;
     setLista(data);
@@ -83,7 +84,7 @@ export default function SesionPage() {
       }
     }
     setMarcas(iniciales);
-    const resQ = await fetch(`/api/catalog/courses/${data.sesion.courseId}/quizzes`);
+    const resQ = await apiFetch(`/api/catalog/courses/${data.sesion.courseId}/quizzes`);
     if (resQ.ok) {
       const dataQ: { cuestionarios: Quiz[] } = await resQ.json();
       setQuizzes(dataQ.cuestionarios);
@@ -130,7 +131,7 @@ export default function SesionPage() {
         setError("Marca al menos un niño.");
         return;
       }
-      const res = await fetch(`/api/attendance/sessions/${params.sessionId}`, {
+      const res = await apiFetch(`/api/attendance/sessions/${params.sessionId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ marcas: payload }),
@@ -155,7 +156,7 @@ export default function SesionPage() {
     setAviso(null);
     setOcupado(true);
     try {
-      const res = await fetch("/api/assessment/attempts", {
+      const res = await apiFetch("/api/assessment/attempts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ childPersonId: quizPara, quizId, score: Number(score) }),

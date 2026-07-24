@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:arch": "depcruise src --config .dependency-cruiser.cjs",
     "seed": "tsx scripts/seed.ts",
+    "demo:alumno": "tsx scripts/demo-alumno.ts",
     "worker:dev": "tsx worker/index.ts",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
