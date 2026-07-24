@@ -152,7 +152,14 @@ export default function LandingPage() {
       <nav className="nav">
         <div className="wrap row">
           <span className="brand">
-            <span className="mk">LK</span>LGS <b>Kids</b>
+            <Image
+              className="brand-logo"
+              src="/logo.jpg"
+              alt="LGS Kids"
+              width={120}
+              height={107}
+              priority
+            />
           </span>
           <span className="links">
             <a href="#programa">Programa</a>

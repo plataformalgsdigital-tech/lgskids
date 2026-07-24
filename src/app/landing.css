@@ -120,7 +120,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  height: 4.2rem;
+  height: 4.8rem;
 }
 .lgs-landing .brand {
   display: flex;
@@ -151,6 +151,11 @@
 }
 .lgs-landing .brand b {
   color: var(--magenta);
+}
+.lgs-landing .brand-logo {
+  height: 3.1rem;
+  width: auto;
+  display: block;
 }
 .lgs-landing .nav .links {
   display: flex;
@@ -419,7 +424,7 @@
   align-items: center;
 }
 .lgs-landing .hero-logo {
-  width: min(260px, 66%);
+  width: min(320px, 76%);
   height: auto;
   margin: 0 auto 1.4rem;
   filter: drop-shadow(0 12px 22px rgba(40, 20, 90, 0.18));
