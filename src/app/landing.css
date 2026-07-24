@@ -111,6 +111,7 @@
   position: sticky;
   top: 0;
   z-index: 50;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   border-bottom: 1px solid var(--line);
@@ -200,6 +201,49 @@
 }
 .lgs-landing .btn-ghost:hover {
   border-color: var(--azul);
+}
+/* Botón "Acceder a la plataforma" — llamativo y dinámico */
+.lgs-landing .btn-app {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(120deg, var(--magenta), var(--purpura), var(--azul), var(--purpura));
+  background-size: 220% 100%;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--magenta) 40%, transparent);
+  animation: lgsflow 4s ease infinite;
+}
+.lgs-landing .btn-app:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+.lgs-landing .btn-app::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -70%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  animation: lgsshine 4s ease-in-out infinite;
+}
+@keyframes lgsflow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+@keyframes lgsshine {
+  0%,
+  15% {
+    left: -70%;
+  }
+  55%,
+  100% {
+    left: 150%;
+  }
 }
 .lgs-landing .themebtn {
   margin-left: 0.4rem;

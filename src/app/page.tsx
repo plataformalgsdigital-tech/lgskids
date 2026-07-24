@@ -159,8 +159,8 @@ export default function LandingPage() {
             <a href="#clases">Cómo funciona</a>
             <a href="#edades">Edades</a>
           </span>
-          <a className="btn btn-primary" href="#inscribir">
-            Comenzar
+          <a className="btn btn-app" href="https://lgskids.cl/" target="_blank" rel="noreferrer">
+            🚀 Acceder a la plataforma
           </a>
           <button className="themebtn" onClick={toggleTema} aria-label="Cambiar tema" type="button">
             ◐
