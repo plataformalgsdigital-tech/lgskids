@@ -18,4 +18,4 @@ export type { EstadoCampania } from "./domain/campania";
 export { NIVELES, LECCIONES_POR_NIVEL, TIPOS_CURSO } from "./domain/curriculo";
 export type { NivelCodigo, CursoTipo } from "./domain/curriculo";
 export type { CampaignListItem, CampaignDetail } from "./application/ports";
-export { cuestionariosDeCurso } from "./application/consultas";
+export { cuestionariosDeCurso, listarCampanias, detalleCampania } from "./application/consultas";

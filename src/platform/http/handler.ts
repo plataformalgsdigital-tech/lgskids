@@ -1,5 +1,7 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError } from "zod";
+import { env } from "../config/env";
 import { isAppError, UnauthorizedError } from "../errors";
 import { newId } from "../ids";
 import { logger, withCorrelationId } from "../logging/logger";
@@ -124,5 +126,30 @@ export function handlerWithAuth(fn: AuthedHandler): Handler {
     }
     const auth = await authenticator.authenticate(request);
     return fn(request, auth, context);
+  });
+}
+
+/** Comparación de secretos en tiempo constante (evita timing attacks). */
+function claveIgual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
+
+/**
+ * Handler de SERVICIO (máquina-a-máquina): valida el header `x-api-key` contra
+ * `LGS_INTAKE_API_KEY`. Es una puerta DISTINTA de `handlerWithAuth` (usuario
+ * final): aquí no hay `userId`; el principal es el servicio LGS. Si la clave no
+ * está configurada, la puerta queda CERRADA (401).
+ */
+export function handlerWithServiceAuth(fn: Handler): Handler {
+  return handler(async (request, context) => {
+    const esperada = env().LGS_INTAKE_API_KEY;
+    const recibida = request.headers.get("x-api-key");
+    if (!esperada || !recibida || !claveIgual(recibida, esperada)) {
+      throw new UnauthorizedError("Clave de servicio inválida.");
+    }
+    return fn(request, context);
   });
 }

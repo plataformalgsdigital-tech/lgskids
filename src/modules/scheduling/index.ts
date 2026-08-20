@@ -29,6 +29,7 @@ export type {
   SesionDetalle,
   HorarioCatalogoRecord,
   HorarioSlotInput,
+  ClassroomListItem,
 } from "./infrastructure/scheduling-repository";
 export {
   crearSalonHandler,

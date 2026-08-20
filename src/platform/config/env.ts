@@ -43,6 +43,12 @@ const envSchema = z.object({
   WHATSAPP_TOKEN: z.string().min(10).optional(),
   WHATSAPP_PHONE_ID: z.string().min(3).optional(),
 
+  /**
+   * Clave de servicio para el intake desde LGS (Fase B). Si está ausente, la
+   * puerta de servicio queda CERRADA (todo 401). Mínimo 16 caracteres.
+   */
+  LGS_INTAKE_API_KEY: z.string().min(16).optional(),
+
   /** Carpeta del adaptador local de archivos (desarrollo). */
   STORAGE_DIR: z.string().default(".storage"),
 

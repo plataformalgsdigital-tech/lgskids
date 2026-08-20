@@ -273,6 +273,23 @@ export async function aprobarContrato(input: {
   return resultado;
 }
 
+/** Aprueba (alta única) la reserva de un contrato identificado por su ref LGS. */
+export async function aprobarReservaPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  ip?: string | null;
+}): Promise<{ credenciales: AlumnoProvisionado | null; enrollmentId: string | null }> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  return aprobarContrato({
+    actorUserId: input.actorUserId,
+    contractId: contrato.id,
+    ip: input.ip ?? null,
+  });
+}
+
 /** Pausa (OnHold) un contrato APROBADO. Motivo obligatorio, auditado. */
 export async function ponerEnPausa(input: {
   actorUserId: string;
