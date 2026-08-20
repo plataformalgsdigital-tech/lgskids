@@ -241,6 +241,7 @@ selector al crear salón (materializa `scheduling_slot`; NO es texto como Mosaic
   `LGS_INTAKE_API_KEY` provisionada en ambos sistemas).
 - Procedimiento operativo para cuando el desfase CL–CO sea de 2 h (verano
   austral): el negocio lo definirá más adelante.
-- Repositorio remoto de GitHub aún no creado (protección de main, etc.).
+- Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. Falta definir
+  protección de `main` y CI.
 - Docker Desktop SÍ está instalado; `docker compose -f infra/docker/...` levanta
   Postgres local.
