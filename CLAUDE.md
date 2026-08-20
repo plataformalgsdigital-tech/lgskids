@@ -216,10 +216,31 @@ Node 24.11.0 · pnpm 11.16.0 · Next 16.2.11 · React 19.2.8 · TypeScript 5.9.3
 10: eslint-plugin-react incompatible) · Zod 4.4.3 (API nueva: `z.url()`) ·
 pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
 
+## Intake de beneficiarios desde LGS (2026-08-19, ADR-0010)
+
+Entrada desde LGS/MOSAICO: un beneficiario niño se registra en KIDS contra una
+campaña abierta + curso (por edad) + salón con cupo, reteniendo el cupo como
+matrícula `RESERVADA` hasta aprobar (el alta única activa RESERVADA→ACTIVA).
+`contracts_contract.external_ref` (N° LGS, idempotente) + `firmado`. Núcleo
+único `crearReservaBeneficiario`. Dos puertas al mismo núcleo: el **wizard**
+`/panel/reservas` (JWT) y la **puerta de servicio** módulo `intake`
+(API-key `x-api-key` / `LGS_INTAKE_API_KEY`, `handlerWithServiceAuth`):
+`GET /api/kids-intake/availability`, `POST /api/kids-intake/reservations`,
+`POST /api/kids-intake/reservations/{externalRef}/approve`. Auditoría contra el
+usuario de sistema `sistema-lgs`. **Catálogo de horarios** reutilizable por tipo
+de curso (`scheduling_horario`) mantenible en `/panel/horarios`, alimenta el
+selector al crear salón (materializa `scheduling_slot`; NO es texto como Mosaico).
+
 ## Pendientes conocidos
 
-- Docker Desktop NO está instalado en esta máquina — instalarlo para
-  levantar Postgres local.
+- **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
+  anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
+  No urgente sobre HTTPS con rotación de clave.
+- Despliegue a DigitalOcean (Fase 11) pendiente: sin él, la puerta de servicio
+  no puede recibir llamadas reales de LGS (KIDS debe ser público + la clave
+  `LGS_INTAKE_API_KEY` provisionada en ambos sistemas).
 - Procedimiento operativo para cuando el desfase CL–CO sea de 2 h (verano
   austral): el negocio lo definirá más adelante.
 - Repositorio remoto de GitHub aún no creado (protección de main, etc.).
+- Docker Desktop SÍ está instalado; `docker compose -f infra/docker/...` levanta
+  Postgres local.
