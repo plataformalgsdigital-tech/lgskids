@@ -2,12 +2,20 @@ import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 import {
+  agenda,
+  cambiarGuia,
   crearSalon,
   detalleSalon,
   listarSalones,
+  obtenerDetalleSesion,
   regenerarSesiones,
   suspenderDia,
 } from "../application/gestion-salones";
+import {
+  cambiarActivoHorario,
+  crearHorario,
+  listarHorarios,
+} from "../application/horarios-catalogo";
 
 const slotSchema = z.object({
   tipo: z.enum(["SESION", "CLUB"]),
@@ -106,4 +114,95 @@ export const suspenderHandler = handlerWithAuth(async (request, auth, context) =
     ip: ip(request),
   });
   return json(resultado);
+});
+
+const fechaSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD");
+
+/** GET /api/scheduling/agenda?from=&to=&campaignId= — sesiones del mes (todos los salones). */
+export const agendaHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_VER);
+  const q = request.nextUrl.searchParams;
+  const desde = fechaSchema.parse(q.get("from"));
+  const hasta = fechaSchema.parse(q.get("to"));
+  const campaignRaw = q.get("campaignId");
+  const campaignId =
+    campaignRaw !== null && campaignRaw !== "" ? z.uuid().parse(campaignRaw) : undefined;
+  return json({ sesiones: await agenda({ desde, hasta, campaignId }) });
+});
+
+/** GET /api/scheduling/sessions/[sessionId] — detalle de sesión (evento + salón + guía). */
+export const detalleSesionHandler = handlerWithAuth(async (_request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_VER);
+  const params = await context.params;
+  const sessionId = z.uuid().parse(params["sessionId"]);
+  return json(await obtenerDetalleSesion(sessionId));
+});
+
+const cambiarGuiaSchema = z.object({ guiaUserId: z.uuid().nullable() });
+
+/** POST /api/scheduling/classrooms/[id]/guide — cambia (o quita) el guía del salón. */
+export const cambiarGuiaHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const body = cambiarGuiaSchema.parse(await request.json());
+  await cambiarGuia({
+    actorUserId: auth.userId,
+    classroomId: id,
+    guiaUserId: body.guiaUserId,
+    ip: ip(request),
+  });
+  return json({ ok: true });
+});
+
+// ---- Catálogo de horarios (mantenimiento) ----
+
+const crearHorarioSchema = z.object({
+  tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
+  etiqueta: z.string().min(2).max(60),
+  orden: z.number().int().min(0).max(999).optional(),
+  slots: z.array(slotSchema).min(1).max(4),
+});
+
+/** GET /api/scheduling/horarios?tipoCurso=&activos=1 — lista del catálogo. */
+export const listarHorariosHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_VER);
+  const q = request.nextUrl.searchParams;
+  const tipoCurso = q.get("tipoCurso");
+  const soloActivos = q.get("activos") === "1";
+  return json({
+    horarios: await listarHorarios({
+      ...(tipoCurso !== null && tipoCurso !== "" && { tipoCurso }),
+      soloActivos,
+    }),
+  });
+});
+
+/** POST /api/scheduling/horarios — crea un horario del catálogo. */
+export const crearHorarioHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const body = crearHorarioSchema.parse(await request.json());
+  const resultado = await crearHorario({ actorUserId: auth.userId, ...body, ip: ip(request) });
+  return json(resultado, { status: 201 });
+});
+
+const toggleHorarioSchema = z.object({ activo: z.boolean() });
+
+/** PATCH /api/scheduling/horarios/[id] — activa/desactiva un horario. */
+export const toggleHorarioHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const body = toggleHorarioSchema.parse(await request.json());
+  await cambiarActivoHorario({
+    actorUserId: auth.userId,
+    horarioId: id,
+    activo: body.activo,
+    ip: ip(request),
+  });
+  return json({ ok: true });
 });

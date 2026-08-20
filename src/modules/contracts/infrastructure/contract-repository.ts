@@ -40,6 +40,8 @@ export async function insertContract(
     tipoCurso: string;
     inicio: string;
     finalContrato: string;
+    externalRef?: string | null;
+    firmado?: boolean;
   },
   client?: Queryable,
 ): Promise<string> {
@@ -47,8 +49,8 @@ export async function insertContract(
   await execute(
     `INSERT INTO contracts_contract
        (id, titular_id, beneficiario_id, country_code, tipo_curso, inicio,
-        final_contrato, updated_at)
-     VALUES ($1, $2, $3, $4, $5::catalog_course_tipo, $6::date, $7::date, now())`,
+        final_contrato, external_ref, firmado, updated_at)
+     VALUES ($1, $2, $3, $4, $5::catalog_course_tipo, $6::date, $7::date, $8, $9, now())`,
     [
       id,
       input.titularId,
@@ -57,10 +59,24 @@ export async function insertContract(
       input.tipoCurso,
       input.inicio,
       input.finalContrato,
+      input.externalRef ?? null,
+      input.firmado ?? false,
     ],
     client,
   );
   return id;
+}
+
+/** Busca un contrato por su referencia externa de LGS (idempotencia del alta). */
+export async function findContractByExternalRef(
+  externalRef: string,
+  client?: Queryable,
+): Promise<ContractRecord | null> {
+  return queryOne<ContractRecord>(
+    `${SELECT_CONTRACT} WHERE external_ref = $1`,
+    [externalRef],
+    client,
+  );
 }
 
 export async function setContractEstado(

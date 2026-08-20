@@ -20,6 +20,6 @@ export { validarPassword, PASSWORD_MIN_LENGTH } from "./domain/password-policy";
 export { provisionarUsuarioAlumno, inactivarUsuarioTx } from "./application/provisionar-alumno";
 export type { AlumnoProvisionado } from "./application/provisionar-alumno";
 export { baseUsername, correoSintetico } from "./domain/username";
-export { listarUsuarios } from "./application/listar-usuarios";
-export type { UsuarioListItem } from "./application/listar-usuarios";
+export { listarUsuarios, listarGuias } from "./application/listar-usuarios";
+export type { UsuarioListItem, GuiaListItem } from "./application/listar-usuarios";
 export { crearUsuarioStaff } from "./application/crear-usuario";

@@ -341,7 +341,11 @@ model Contract {
   // OnHold extiende esta fecha al reactivar (días pausados, auditado).
   finalContrato DateTime       @map("final_contrato") @db.Date
   estado        ContractEstado @default(PENDIENTE)
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Entrada desde LGS (ADR-0010): N° de contrato en LGS (idempotencia) y
+  // "firmado sin aprobar". NULL cuando el contrato nace en KIDS (ADR-0008).
+  externalRef String?  @unique @map("external_ref")
+  firmado     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   titular      Person         @relation("titular", fields: [titularId], references: [id])
@@ -362,6 +366,7 @@ enum EnrollmentEstado {
   ACTIVA
   FINALIZADA // terminó o fue movida por cambio académico (historial)
   CANCELADA
+  RESERVADA // retiene cupo; el alumno se ACTIVA al aprobar el contrato (entrada LGS)
 
   @@map("enrollment_estado")
 }
@@ -458,6 +463,40 @@ model Slot {
 
   @@unique([classroomId, diaSemana, horaLocal])
   @@map("scheduling_slot")
+}
+
+// Catálogo de horarios reutilizables POR TIPO DE CURSO (mantenimiento
+// centralizado, inspirado en HORARIOS_CURSO de Mosaico pero ESTRUCTURADO —
+// sin el string frágil). Se ELIGE al crear un salón y se materializa en sus
+// Slot; NO participa en la generación de sesiones (solo alimenta el selector).
+model HorarioCatalogo {
+  id        String     @id @default(uuid()) @db.Uuid
+  tipoCurso CourseTipo @map("tipo_curso")
+  etiqueta  String // nombre legible, ej. "Lun-Mié 16:00"
+  activo    Boolean    @default(true) // desactivar en vez de borrar
+  orden     Int        @default(0)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  slots HorarioCatalogoSlot[]
+
+  @@unique([tipoCurso, etiqueta])
+  @@index([tipoCurso, activo])
+  @@map("scheduling_horario")
+}
+
+model HorarioCatalogoSlot {
+  id          String   @id @default(uuid()) @db.Uuid
+  horarioId   String   @map("horario_id") @db.Uuid
+  tipo        SlotTipo
+  diaSemana   Int      @map("dia_semana") // 0=domingo … 6=sábado
+  horaLocal   String   @map("hora_local") // "HH:MM"
+  duracionMin Int      @default(60) @map("duracion_min")
+
+  horario HorarioCatalogo @relation(fields: [horarioId], references: [id], onDelete: Cascade)
+
+  @@unique([horarioId, diaSemana, horaLocal])
+  @@map("scheduling_horario_slot")
 }
 
 model Session {

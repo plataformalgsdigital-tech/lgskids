@@ -1,12 +1,24 @@
 import { asignarRolTx, ROLES } from "@/modules/access";
 import { registrarAuditoria } from "@/modules/audit";
-import { cancelarMatriculaDeContratoTx, matricularTx } from "@/modules/enrollment";
+import {
+  activarReservaDeContratoTx,
+  cancelarMatriculaDeContratoTx,
+  matricularTx,
+} from "@/modules/enrollment";
 import {
   inactivarUsuarioTx,
   provisionarUsuarioAlumno,
   type AlumnoProvisionado,
 } from "@/modules/identity";
-import { findPersonById, linkUser, setPersonEstado } from "@/modules/people";
+import {
+  findPersonById,
+  findPersonByDoc,
+  insertGuardianship,
+  insertPerson,
+  linkUser,
+  setPersonEstado,
+  type PersonInput,
+} from "@/modules/people";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { logger } from "@/platform/logging/logger";
@@ -17,6 +29,7 @@ import {
   cerrarOnhold,
   extenderFinalContrato,
   findContractById,
+  findContractByExternalRef,
   findContratosVencidos,
   findOnholdAbierto,
   insertContract,
@@ -82,6 +95,111 @@ export async function crearContrato(input: {
   return id;
 }
 
+/** Rechaza si el documento (país+tipo+número) ya existe en otra persona. */
+async function exigirDocLibre(p: PersonInput): Promise<void> {
+  const existe = await findPersonByDoc(p.countryCode, p.docTipo.trim().toUpperCase(), p.docNumero.trim());
+  if (existe !== null) {
+    throw new ConflictError(
+      `Ya existe una persona con documento ${p.docTipo} ${p.docNumero} en ${p.countryCode}.`,
+    );
+  }
+}
+
+/**
+ * RESERVA DE BENEFICIARIO DESDE LGS (ADR-0010): crea, en UNA transacción,
+ * titular + apoderado + niño (con guardianship) + contrato PENDIENTE (firmado,
+ * con external_ref del contrato LGS) + matrícula RESERVADA en el salón elegido
+ * (retiene cupo). El alumno se ACTIVA luego al aprobar el contrato. Idempotente
+ * por external_ref. NO aprovisiona credenciales todavía (eso es el alta única).
+ */
+export async function crearReservaBeneficiario(input: {
+  actorUserId: string;
+  externalRef: string;
+  countryCode: string;
+  tipoCurso: "JUNIOR" | "YOUNGSTER";
+  inicio: string;
+  finalContrato: string;
+  classroomId: string;
+  titular: PersonInput;
+  titularEsApoderado?: boolean | undefined;
+  apoderadoNuevo?: PersonInput | undefined;
+  nino: PersonInput; // exige fechaNacimiento
+  parentesco?: string | null | undefined;
+  ip?: string | null;
+}): Promise<{ contractId: string; externalRef: string; enrollmentId: string }> {
+  if (input.finalContrato <= input.inicio) {
+    throw new ValidationError("final_contrato debe ser posterior al inicio.");
+  }
+  if (!input.nino.fechaNacimiento) {
+    throw new ValidationError("El niño necesita fecha de nacimiento.");
+  }
+  if (input.titularEsApoderado !== true && input.apoderadoNuevo === undefined) {
+    throw new ValidationError("Falta el apoderado (o marca titular = apoderado).");
+  }
+  validarEdadParaTipo(input.nino.fechaNacimiento, input.inicio, input.tipoCurso);
+
+  const yaExiste = await findContractByExternalRef(input.externalRef);
+  if (yaExiste !== null) {
+    throw new ConflictError(`Ya existe una reserva para el contrato LGS ${input.externalRef}.`);
+  }
+  await exigirDocLibre(input.titular);
+  if (input.apoderadoNuevo !== undefined) await exigirDocLibre(input.apoderadoNuevo);
+  await exigirDocLibre(input.nino);
+
+  const resultado = await withTransaction(async (tx) => {
+    const titularId = await insertPerson(input.titular, tx);
+    const apoderadoId =
+      input.titularEsApoderado === true
+        ? titularId
+        : await insertPerson(input.apoderadoNuevo as PersonInput, tx);
+    const ninoId = await insertPerson(input.nino, tx);
+    await insertGuardianship(ninoId, apoderadoId, input.parentesco ?? null, tx);
+    const contractId = await insertContract(
+      {
+        titularId,
+        beneficiarioId: ninoId,
+        countryCode: input.countryCode,
+        tipoCurso: input.tipoCurso,
+        inicio: input.inicio,
+        finalContrato: input.finalContrato,
+        externalRef: input.externalRef,
+        firmado: true,
+      },
+      tx,
+    );
+    const enrollmentId = await matricularTx(
+      tx,
+      {
+        contractId,
+        childPersonId: ninoId,
+        classroomId: input.classroomId,
+        tipoCursoContrato: input.tipoCurso,
+      },
+      "RESERVADA",
+    );
+    return { contractId, enrollmentId };
+  });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.reserva_creada",
+    entidad: "contracts_contract",
+    entidadId: resultado.contractId,
+    payload: {
+      externalRef: input.externalRef,
+      tipoCurso: input.tipoCurso,
+      pais: input.countryCode,
+      classroomId: input.classroomId,
+    },
+    ip: input.ip ?? null,
+  });
+  return {
+    contractId: resultado.contractId,
+    externalRef: input.externalRef,
+    enrollmentId: resultado.enrollmentId,
+  };
+}
+
 /**
  * APRUEBA un contrato — EL ALTA ÚNICA DEL ALUMNO (regla dura 5), en UNA
  * transacción: contrato → APROBADO y, si el niño aún no tiene credenciales,
@@ -125,8 +243,10 @@ export async function aprobarContrato(input: {
       });
     }
 
-    let enrollmentId: string | null = null;
-    if (input.classroomId != null) {
+    // Si el contrato viene de una RESERVA (entrada LGS), se ACTIVA su matrícula
+    // reservada en vez de crear una nueva. Si no, se matricula en el salón dado.
+    let enrollmentId: string | null = await activarReservaDeContratoTx(tx, contrato.id);
+    if (enrollmentId === null && input.classroomId != null) {
       enrollmentId = await matricularTx(tx, {
         contractId: contrato.id,
         childPersonId: contrato.beneficiarioId,

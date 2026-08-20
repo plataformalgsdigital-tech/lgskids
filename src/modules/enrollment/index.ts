@@ -10,6 +10,7 @@
 export {
   matricular,
   matricularTx,
+  activarReservaDeContratoTx,
   cambioAcademico,
   cancelarMatriculaDeContratoTx,
   obtenerRoster,

@@ -9,7 +9,7 @@ export interface EnrollmentRecord {
   contractId: string;
   childPersonId: string;
   classroomId: string;
-  estado: "ACTIVA" | "FINALIZADA" | "CANCELADA";
+  estado: "ACTIVA" | "FINALIZADA" | "CANCELADA" | "RESERVADA";
 }
 
 const SELECT_ENROLLMENT = `SELECT id, contract_id AS "contractId",
@@ -29,6 +29,30 @@ export async function findActivaByContract(
 ): Promise<EnrollmentRecord | null> {
   return queryOne<EnrollmentRecord>(
     `${SELECT_ENROLLMENT} WHERE contract_id = $1 AND estado = 'ACTIVA'`,
+    [contractId],
+    client,
+  );
+}
+
+/** Matrícula VIVA de un contrato: ACTIVA o RESERVADA (retiene cupo). */
+export async function findMatriculaVivaByContract(
+  contractId: string,
+  client?: Queryable,
+): Promise<EnrollmentRecord | null> {
+  return queryOne<EnrollmentRecord>(
+    `${SELECT_ENROLLMENT} WHERE contract_id = $1 AND estado IN ('ACTIVA', 'RESERVADA')`,
+    [contractId],
+    client,
+  );
+}
+
+/** Matrícula RESERVADA de un contrato (para activarla al aprobar). */
+export async function findReservadaByContract(
+  contractId: string,
+  client?: Queryable,
+): Promise<EnrollmentRecord | null> {
+  return queryOne<EnrollmentRecord>(
+    `${SELECT_ENROLLMENT} WHERE contract_id = $1 AND estado = 'RESERVADA'`,
     [contractId],
     client,
   );
@@ -54,10 +78,11 @@ export async function lockClassroom(
   );
 }
 
+/** Ocupación del salón: cuenta ACTIVA + RESERVADA (la reserva RETIENE cupo). */
 export async function countActivas(tx: Queryable, classroomId: string): Promise<number> {
   const row = await queryOne<{ total: string }>(
     `SELECT count(*)::text AS total FROM enrollment_enrollment
-      WHERE classroom_id = $1 AND estado = 'ACTIVA'`,
+      WHERE classroom_id = $1 AND estado IN ('ACTIVA', 'RESERVADA')`,
     [classroomId],
     tx,
   );
@@ -66,14 +91,19 @@ export async function countActivas(tx: Queryable, classroomId: string): Promise<
 
 export async function insertEnrollment(
   tx: Queryable,
-  input: { contractId: string; childPersonId: string; classroomId: string },
+  input: {
+    contractId: string;
+    childPersonId: string;
+    classroomId: string;
+    estado?: "ACTIVA" | "RESERVADA";
+  },
 ): Promise<string> {
   const id = newId();
   await execute(
     `INSERT INTO enrollment_enrollment
-       (id, contract_id, child_person_id, classroom_id, updated_at)
-     VALUES ($1, $2, $3, $4, now())`,
-    [id, input.contractId, input.childPersonId, input.classroomId],
+       (id, contract_id, child_person_id, classroom_id, estado, updated_at)
+     VALUES ($1, $2, $3, $4, $5::enrollment_estado, now())`,
+    [id, input.contractId, input.childPersonId, input.classroomId, input.estado ?? "ACTIVA"],
     tx,
   );
   return id;
@@ -88,8 +118,19 @@ export async function cerrarEnrollment(
   await execute(
     `UPDATE enrollment_enrollment
         SET estado = $2::enrollment_estado, motivo_cierre = $3, updated_at = now()
-      WHERE id = $1 AND estado = 'ACTIVA'`,
+      WHERE id = $1 AND estado IN ('ACTIVA', 'RESERVADA')`,
     [id, estado, motivo],
+    tx,
+  );
+}
+
+/** Activa una matrícula RESERVADA (al aprobar el contrato). */
+export async function activarReserva(tx: Queryable, id: string): Promise<void> {
+  await execute(
+    `UPDATE enrollment_enrollment
+        SET estado = 'ACTIVA', updated_at = now()
+      WHERE id = $1 AND estado = 'RESERVADA'`,
+    [id],
     tx,
   );
 }

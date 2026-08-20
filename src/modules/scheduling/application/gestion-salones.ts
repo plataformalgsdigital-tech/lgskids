@@ -6,7 +6,9 @@ import { isValidTimeZone, wallTimeToUtc } from "@/platform/time";
 import { feriadosDelPais } from "../domain/feriados";
 import { generarFechasSlot } from "../domain/generacion";
 import {
+  agendaSesiones,
   deleteSessions,
+  detalleSesion,
   findClassroomById,
   getCourseWindow,
   getHolidayDates,
@@ -19,9 +21,12 @@ import {
   insertSuspension,
   listClassrooms,
   sessionExisteEnFecha,
+  updateGuiaSalon,
   upsertHolidays,
+  type AgendaItem,
   type ClassroomListItem,
   type ClassroomRecord,
+  type SesionDetalle,
   type SessionListItem,
   type SessionRow,
   type SlotRecord,
@@ -276,6 +281,42 @@ export async function suspenderDia(input: {
 
 export async function listarSalones(courseId?: string): Promise<ClassroomListItem[]> {
   return listClassrooms(courseId);
+}
+
+/** Agenda del mes: sesiones de TODOS los salones entre dos fechas. */
+export async function agenda(input: {
+  desde: string;
+  hasta: string;
+  campaignId?: string | undefined;
+}): Promise<AgendaItem[]> {
+  return agendaSesiones(input.desde, input.hasta, { campaignId: input.campaignId });
+}
+
+/** Detalle de una sesión (info del evento + salón + curso + guía). */
+export async function obtenerDetalleSesion(sessionId: string): Promise<SesionDetalle> {
+  const detalle = await detalleSesion(sessionId);
+  if (detalle === null) throw new NotFoundError("La sesión no existe.");
+  return detalle;
+}
+
+/** Cambia el guía de un salón (null = quitar). Auditado; no toca el horario. */
+export async function cambiarGuia(input: {
+  actorUserId: string;
+  classroomId: string;
+  guiaUserId: string | null;
+  ip?: string | null;
+}): Promise<void> {
+  const classroom = await findClassroomById(input.classroomId);
+  if (classroom === null) throw new NotFoundError("El salón no existe.");
+  await updateGuiaSalon(input.classroomId, input.guiaUserId);
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.guia_cambiado",
+    entidad: "scheduling_classroom",
+    entidadId: input.classroomId,
+    payload: { guiaAnterior: classroom.guiaUserId, guiaNuevo: input.guiaUserId },
+    ip: input.ip ?? null,
+  });
 }
 
 export interface DetalleSalon {

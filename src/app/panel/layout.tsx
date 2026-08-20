@@ -42,10 +42,22 @@ const MENU: {
     href: "/panel/contratos",
   },
   {
+    permiso: "contratos.gestionar",
+    etiqueta: "Reservas (LGS)",
+    color: "var(--lgs-purpura)",
+    href: "/panel/reservas",
+  },
+  {
     permiso: "salones.ver",
     etiqueta: "Salones",
     color: "var(--lgs-verde)",
     href: "/panel/salones",
+  },
+  {
+    permiso: "salones.ver",
+    etiqueta: "Horarios",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/horarios",
   },
   {
     permiso: "usuarios.gestionar",

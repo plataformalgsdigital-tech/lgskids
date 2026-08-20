@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 interface Salon {
@@ -43,6 +50,404 @@ interface SlotForm {
   tipo: "SESION" | "CLUB";
   diaSemana: number;
   horaLocal: string;
+  duracionMin?: number;
+}
+
+interface HorarioCat {
+  id: string;
+  tipoCurso: string;
+  etiqueta: string;
+  slots: { tipo: "SESION" | "CLUB"; diaSemana: number; horaLocal: string; duracionMin: number }[];
+}
+
+interface AgendaSesion {
+  id: string;
+  fecha: string;
+  horaLocal: string;
+  tipo: string;
+  numero: number;
+  classroomId: string;
+  salon: string;
+  cursoTipo: string;
+  campania: string;
+  cupo: number;
+  ocupados: number;
+  guia: string | null;
+}
+
+const MESES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+const DOW = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const COLOR_CURSO: Record<string, { bg: string; fg: string }> = {
+  JUNIOR: { bg: "#e3f2fd", fg: "#0d47a1" },
+  YOUNGSTER: { bg: "#f3e5f5", fg: "#6a1b9a" },
+};
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+const CELDA_ALTO = "6.5rem";
+const MAX_VISIBLE = 2;
+
+/** "2026-07-08" → "miércoles, 8 de julio de 2026". */
+function fechaBonita(iso: string): string {
+  const dias = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const [yy, mm, dd] = iso.split("-").map(Number);
+  const f = new Date(yy ?? 0, (mm ?? 1) - 1, dd ?? 1);
+  return `${dias[f.getDay()]}, ${dd} de ${MESES[(mm ?? 1) - 1]} de ${yy}`;
+}
+
+/** Calendario mensual con las sesiones de TODOS los salones. */
+function CalendarioSalones() {
+  const [y, setY] = useState<number>(() => new Date().getFullYear());
+  const [m, setM] = useState<number>(() => new Date().getMonth()); // 0-based
+  const [sesiones, setSesiones] = useState<AgendaSesion[] | null>(null);
+  const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
+  const [campaniaId, setCampaniaId] = useState("");
+  const [diaAbierto, setDiaAbierto] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function cargarCampanias() {
+      const res = await apiFetch("/api/catalog/campaigns");
+      if (res.ok) {
+        const data: { campanias: { id: string; nombre: string }[] } = await res.json();
+        setCampanias(data.campanias);
+      }
+    }
+    void cargarCampanias();
+  }, []);
+
+  useEffect(() => {
+    async function cargar() {
+      setSesiones(null);
+      const diasMes = new Date(y, m + 1, 0).getDate();
+      const from = `${y}-${pad2(m + 1)}-01`;
+      const to = `${y}-${pad2(m + 1)}-${pad2(diasMes)}`;
+      const filtro = campaniaId !== "" ? `&campaignId=${campaniaId}` : "";
+      const res = await apiFetch(`/api/scheduling/agenda?from=${from}&to=${to}${filtro}`);
+      if (res.ok) {
+        const data: { sesiones: AgendaSesion[] } = await res.json();
+        setSesiones(data.sesiones);
+      } else {
+        setSesiones([]);
+      }
+    }
+    void cargar();
+  }, [y, m, campaniaId]);
+
+  const porDia = useMemo(() => {
+    const mapa = new Map<string, AgendaSesion[]>();
+    for (const s of sesiones ?? []) {
+      const lista = mapa.get(s.fecha) ?? [];
+      lista.push(s);
+      mapa.set(s.fecha, lista);
+    }
+    return mapa;
+  }, [sesiones]);
+
+  const diasMes = new Date(y, m + 1, 0).getDate();
+  const offset = (new Date(y, m, 1).getDay() + 6) % 7; // lunes primero
+  const celdas: (number | null)[] = [
+    ...Array.from({ length: offset }, () => null),
+    ...Array.from({ length: diasMes }, (_, i) => i + 1),
+  ];
+  while (celdas.length % 7 !== 0) celdas.push(null);
+
+  function mover(delta: number) {
+    const nueva = m + delta;
+    if (nueva < 0) {
+      setM(11);
+      setY((v) => v - 1);
+    } else if (nueva > 11) {
+      setM(0);
+      setY((v) => v + 1);
+    } else {
+      setM(nueva);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: "1rem" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "0.75rem",
+          flexWrap: "wrap",
+          marginBottom: "0.75rem",
+        }}
+      >
+        <h2 style={{ fontSize: "1.2rem", margin: 0, textTransform: "capitalize" }}>
+          {MESES[m]} {y}
+        </h2>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <select
+            value={campaniaId}
+            onChange={(e) => setCampaniaId(e.target.value)}
+            style={{ ...inputStyle, padding: "0.4rem 0.6rem" }}
+          >
+            <option value="">Todas las campañas</option>
+            {campanias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => mover(-1)}
+            aria-label="Mes anterior"
+            style={{ ...inputStyle, cursor: "pointer" }}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={() => mover(1)}
+            aria-label="Mes siguiente"
+            style={{ ...inputStyle, cursor: "pointer" }}
+          >
+            ›
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px" }}>
+        {DOW.map((d) => (
+          <div
+            key={d}
+            style={{
+              padding: "0.4rem",
+              fontSize: "0.78rem",
+              fontWeight: 700,
+              color: "var(--texto-suave)",
+              textAlign: "center",
+            }}
+          >
+            {d}
+          </div>
+        ))}
+        {celdas.map((dia, i) => {
+          if (dia === null) {
+            return (
+              <div
+                key={`v${i}`}
+                style={{ height: CELDA_ALTO, background: "#fafbfe", borderRadius: "0.4rem" }}
+              />
+            );
+          }
+          const fecha = `${y}-${pad2(m + 1)}-${pad2(dia)}`;
+          const delDia = (porDia.get(fecha) ?? []).sort((a, b) =>
+            a.horaLocal.localeCompare(b.horaLocal),
+          );
+          const visibles = delDia.slice(0, MAX_VISIBLE);
+          const ocultos = delDia.length - visibles.length;
+          return (
+            <div
+              key={fecha}
+              style={{
+                height: CELDA_ALTO,
+                border: "1px solid #edf0f6",
+                borderRadius: "0.4rem",
+                padding: "0.3rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.2rem",
+                overflow: "hidden",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => delDia.length > 0 && setDiaAbierto(fecha)}
+                title={delDia.length > 0 ? "Ver sesiones del día" : undefined}
+                style={{
+                  alignSelf: "flex-start",
+                  border: "none",
+                  background: "transparent",
+                  padding: 0,
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                  color: "var(--texto-suave)",
+                  cursor: delDia.length > 0 ? "pointer" : "default",
+                }}
+              >
+                {dia}
+              </button>
+              {visibles.map((s) => {
+                const color = COLOR_CURSO[s.cursoTipo] ?? { bg: "#eceff1", fg: "#37474f" };
+                return (
+                  <Link
+                    key={s.id}
+                    href={`/panel/salones/sesion/${s.id}`}
+                    title={`${s.horaLocal} · ${s.cursoTipo} · ${s.salon} · ${s.ocupados}/${s.cupo}`}
+                    style={{
+                      display: "block",
+                      background: color.bg,
+                      color: color.fg,
+                      borderRadius: "0.35rem",
+                      padding: "0.15rem 0.35rem",
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {s.horaLocal} {s.tipo === "CLUB" ? "Club " : ""}
+                    {s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"} · {s.salon}
+                  </Link>
+                );
+              })}
+              {ocultos > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDiaAbierto(fecha)}
+                  style={{
+                    alignSelf: "flex-start",
+                    border: "none",
+                    background: "transparent",
+                    padding: 0,
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    color: "var(--lgs-azul)",
+                    cursor: "pointer",
+                  }}
+                >
+                  +{ocultos} más
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {sesiones === null && (
+        <p style={{ marginTop: "0.75rem", color: "var(--texto-suave)" }}>Cargando agenda…</p>
+      )}
+
+      {diaAbierto !== null && (
+        <div
+          onClick={() => setDiaAbierto(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+            zIndex: 50,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "white",
+              borderRadius: "0.9rem",
+              padding: "1.25rem",
+              width: "100%",
+              maxWidth: "34rem",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "0.5rem",
+                marginBottom: "0.75rem",
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: "1.05rem", textTransform: "capitalize" }}>
+                {fechaBonita(diaAbierto)}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setDiaAbierto(null)}
+                aria-label="Cerrar"
+                style={{ ...inputStyle, cursor: "pointer", padding: "0.3rem 0.6rem" }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ margin: "0 0 0.75rem", color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+              {(porDia.get(diaAbierto) ?? []).length} sesiones
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {(porDia.get(diaAbierto) ?? [])
+                .slice()
+                .sort((a, b) => a.horaLocal.localeCompare(b.horaLocal))
+                .map((s) => {
+                  const color = COLOR_CURSO[s.cursoTipo] ?? { bg: "#eceff1", fg: "#37474f" };
+                  return (
+                    <Link
+                      key={s.id}
+                      href={`/panel/salones/sesion/${s.id}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.6rem",
+                        padding: "0.55rem 0.75rem",
+                        border: "1px solid #edf0f6",
+                        borderRadius: "0.6rem",
+                        textDecoration: "none",
+                        color: "inherit",
+                      }}
+                    >
+                      <span>
+                        <strong>{s.horaLocal}</strong>{" "}
+                        <span
+                          style={{
+                            background: color.bg,
+                            color: color.fg,
+                            padding: "0.1rem 0.45rem",
+                            borderRadius: "0.5rem",
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {s.cursoTipo === "JUNIOR" ? "Junior" : "Youngster"}
+                        </span>{" "}
+                        {s.tipo === "CLUB" ? "Club · " : ""}
+                        {s.salon}
+                        {s.guia !== null && (
+                          <span style={{ color: "var(--texto-suave)", fontSize: "0.8rem" }}>
+                            {" "}
+                            · {s.guia}
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", whiteSpace: "nowrap" }}>
+                        {s.ocupados}/{s.cupo} →
+                      </span>
+                    </Link>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function SalonesPage() {
@@ -64,6 +469,8 @@ export default function SalonesPage() {
   ]);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [vista, setVista] = useState<"calendario" | "lista">("calendario");
+  const [horariosCat, setHorariosCat] = useState<HorarioCat[]>([]);
 
   const cargarSalones = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/classrooms");
@@ -81,9 +488,30 @@ export default function SalonesPage() {
         const data: { campanias: CampaniaLista[] } = await res.json();
         setCampanias(data.campanias);
       }
+      const resH = await apiFetch("/api/scheduling/horarios?activos=1");
+      if (resH.ok) {
+        const dataH: { horarios: HorarioCat[] } = await resH.json();
+        setHorariosCat(dataH.horarios);
+      }
     }
     void inicial();
   }, [cargarSalones]);
+
+  const tipoCursoSel = cursos.find((c) => c.id === courseId)?.tipo;
+  const horariosDelTipo = horariosCat.filter((h) => h.tipoCurso === tipoCursoSel);
+
+  function cargarHorarioCatalogo(horarioId: string) {
+    const h = horariosCat.find((x) => x.id === horarioId);
+    if (h === undefined) return;
+    setSlots(
+      h.slots.map((s) => ({
+        tipo: s.tipo,
+        diaSemana: s.diaSemana,
+        horaLocal: s.horaLocal,
+        duracionMin: s.duracionMin,
+      })),
+    );
+  }
 
   async function elegirCampania(id: string) {
     setCampaniaId(id);
@@ -138,25 +566,49 @@ export default function SalonesPage() {
 
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
         <h1 style={{ fontSize: "1.6rem" }}>Salones</h1>
-        <button
-          onClick={() => setMostrarForm((v) => !v)}
-          style={{
-            padding: "0.55rem 1.2rem",
-            borderRadius: "0.6rem",
-            border: "none",
-            background: "var(--lgs-azul)",
-            color: "white",
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          {mostrarForm ? "Cancelar" : "+ Nuevo salón"}
-        </button>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <div style={{ display: "flex", border: "1.5px solid #d8dce6", borderRadius: "0.6rem", overflow: "hidden" }}>
+            {(["calendario", "lista"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setVista(v)}
+                style={{
+                  padding: "0.5rem 1rem",
+                  border: "none",
+                  background: vista === v ? "var(--lgs-azul)" : "white",
+                  color: vista === v ? "white" : "inherit",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {v === "calendario" ? "📅 Calendario" : "Lista de salones"}
+              </button>
+            ))}
+          </div>
+          {vista === "lista" && (
+            <button
+              onClick={() => setMostrarForm((v) => !v)}
+              style={{
+                padding: "0.55rem 1.2rem",
+                borderRadius: "0.6rem",
+                border: "none",
+                background: "var(--lgs-verde)",
+                color: "#1b2a10",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {mostrarForm ? "Cancelar" : "+ Nuevo salón"}
+            </button>
+          )}
+        </div>
       </div>
 
-      {mostrarForm && (
+      {vista === "calendario" && <CalendarioSalones />}
+
+      {vista === "lista" && mostrarForm && (
         <form
           onSubmit={crear}
           style={{
@@ -278,6 +730,48 @@ export default function SalonesPage() {
             <legend style={{ fontWeight: 700, fontSize: "0.9rem", padding: "0 0.4rem" }}>
               Horario semanal (hora local del salón)
             </legend>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexWrap: "wrap",
+                marginBottom: "0.7rem",
+              }}
+            >
+              <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--texto-suave)" }}>
+                Cargar del catálogo:
+              </span>
+              <select
+                value=""
+                onChange={(e) => cargarHorarioCatalogo(e.target.value)}
+                disabled={courseId === "" || horariosDelTipo.length === 0}
+                title={
+                  courseId === ""
+                    ? "Elige primero el curso"
+                    : horariosDelTipo.length === 0
+                      ? "No hay horarios en el catálogo para este curso"
+                      : undefined
+                }
+                style={{ ...inputStyle, padding: "0.4rem 0.6rem" }}
+              >
+                <option value="">
+                  {courseId === ""
+                    ? "— elige curso primero —"
+                    : horariosDelTipo.length === 0
+                      ? "— sin horarios en catálogo —"
+                      : "— elegir horario —"}
+                </option>
+                {horariosDelTipo.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.etiqueta}
+                  </option>
+                ))}
+              </select>
+              <Link href="/panel/horarios" style={{ fontSize: "0.78rem" }}>
+                gestionar horarios →
+              </Link>
+            </div>
             {slots.map((slot, i) => (
               <div
                 key={i}
@@ -370,6 +864,7 @@ export default function SalonesPage() {
         </form>
       )}
 
+      {vista === "lista" && (
       <section
         style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
       >
@@ -423,6 +918,7 @@ export default function SalonesPage() {
           ))
         )}
       </section>
+      )}
     </main>
   );
 }

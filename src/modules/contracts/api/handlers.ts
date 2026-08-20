@@ -4,6 +4,7 @@ import { handlerWithAuth, json } from "@/platform/http/handler";
 import {
   aprobarContrato,
   crearContrato,
+  crearReservaBeneficiario,
   inactivarContrato,
   listarContratos,
   ponerEnPausa,
@@ -11,6 +12,36 @@ import {
 } from "../application/gestion-contratos";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const paisSchema = z
+  .string()
+  .length(2)
+  .transform((c) => c.toUpperCase());
+
+const personaSchema = z.object({
+  nombres: z.string().min(1).max(80),
+  apellidos: z.string().min(1).max(80),
+  fechaNacimiento: z.string().regex(ISO_DATE).nullish(),
+  docTipo: z.string().min(1).max(20),
+  docNumero: z.string().min(1).max(40),
+  countryCode: paisSchema,
+  email: z.email().nullish(),
+  telefono: z.string().max(30).nullish(),
+});
+
+const reservaSchema = z.object({
+  externalRef: z.string().min(1).max(60),
+  countryCode: paisSchema,
+  tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
+  inicio: z.string().regex(ISO_DATE),
+  finalContrato: z.string().regex(ISO_DATE),
+  classroomId: z.uuid(),
+  titular: personaSchema,
+  titularEsApoderado: z.boolean().optional(),
+  apoderadoNuevo: personaSchema.optional(),
+  nino: personaSchema.extend({ fechaNacimiento: z.string().regex(ISO_DATE) }),
+  parentesco: z.string().max(40).nullish(),
+});
 
 const crearSchema = z.object({
   titularId: z.uuid(),
@@ -42,6 +73,19 @@ export const crearContratoHandler = handlerWithAuth(async (request, auth) => {
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR, body.countryCode);
   const id = await crearContrato({ actorUserId: auth.userId, ...body, ip: ip(request) });
   return json({ id }, { status: 201 });
+});
+
+/** POST /api/contracts/reservations — RESERVA de beneficiario desde LGS. */
+export const crearReservaHandler = handlerWithAuth(async (request, auth) => {
+  const body = reservaSchema.parse(await request.json());
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR, body.countryCode);
+  const resultado = await crearReservaBeneficiario({
+    actorUserId: auth.userId,
+    ...body,
+    ip: ip(request),
+  });
+  return json(resultado, { status: 201 });
 });
 
 const listarSchema = z.object({

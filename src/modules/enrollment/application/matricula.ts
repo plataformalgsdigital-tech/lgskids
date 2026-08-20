@@ -3,10 +3,13 @@ import { registrarAuditoria } from "@/modules/audit";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import {
+  activarReserva,
   cerrarEnrollment,
   countActivas,
   findActivaByContract,
   findEnrollmentById,
+  findMatriculaVivaByContract,
+  findReservadaByContract,
   getContractData,
   historialPorNino,
   insertEnrollment,
@@ -38,6 +41,8 @@ export async function matricularTx(
     classroomId: string;
     tipoCursoContrato: string;
   },
+  /** ACTIVA (alta normal) o RESERVADA (retiene cupo hasta aprobar). */
+  estado: "ACTIVA" | "RESERVADA" = "ACTIVA",
 ): Promise<string> {
   const salon = await lockClassroom(tx, input.classroomId);
   if (salon === null || !salon.activo) {
@@ -48,15 +53,29 @@ export async function matricularTx(
       `El salón es de tipo ${salon.courseTipo} y el contrato es ${input.tipoCursoContrato}.`,
     );
   }
-  const activa = await findActivaByContract(input.contractId, tx);
-  if (activa !== null) {
-    throw new ConflictError("El contrato ya tiene una matrícula activa.");
+  const viva = await findMatriculaVivaByContract(input.contractId, tx);
+  if (viva !== null) {
+    throw new ConflictError("El contrato ya tiene una matrícula activa o reservada.");
   }
   const ocupados = await countActivas(tx, input.classroomId);
   if (ocupados >= salon.cupo) {
     throw new ConflictError(`El salón está lleno (${ocupados}/${salon.cupo}).`);
   }
-  return insertEnrollment(tx, input);
+  return insertEnrollment(tx, { ...input, estado });
+}
+
+/**
+ * Activa la matrícula RESERVADA de un contrato (al aprobar): RESERVADA→ACTIVA.
+ * Devuelve el enrollmentId activado, o null si el contrato no tiene reserva.
+ */
+export async function activarReservaDeContratoTx(
+  tx: Queryable,
+  contractId: string,
+): Promise<string | null> {
+  const reserva = await findReservadaByContract(contractId, tx);
+  if (reserva === null) return null;
+  await activarReserva(tx, reserva.id);
+  return reserva.id;
 }
 
 /** Matricula un contrato APROBADO en un salón (camino directo). */
@@ -153,9 +172,9 @@ export async function cancelarMatriculaDeContratoTx(
   contractId: string,
   motivo: string,
 ): Promise<void> {
-  const activa = await findActivaByContract(contractId, tx);
-  if (activa !== null) {
-    await cerrarEnrollment(tx, activa.id, "CANCELADA", motivo);
+  const viva = await findMatriculaVivaByContract(contractId, tx);
+  if (viva !== null) {
+    await cerrarEnrollment(tx, viva.id, "CANCELADA", motivo);
   }
 }
 

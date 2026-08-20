@@ -14,14 +14,34 @@ export {
   sincronizarFeriados,
   listarSalones,
   detalleSalon,
+  agenda,
+  obtenerDetalleSesion,
+  cambiarGuia,
 } from "./application/gestion-salones";
 export type { SlotInput, DetalleSalon } from "./application/gestion-salones";
+export {
+  crearHorario,
+  listarHorarios,
+  cambiarActivoHorario,
+} from "./application/horarios-catalogo";
+export type {
+  AgendaItem,
+  SesionDetalle,
+  HorarioCatalogoRecord,
+  HorarioSlotInput,
+} from "./infrastructure/scheduling-repository";
 export {
   crearSalonHandler,
   listarSalonesHandler,
   detalleSalonHandler,
   regenerarHandler,
   suspenderHandler,
+  agendaHandler,
+  detalleSesionHandler,
+  cambiarGuiaHandler,
+  listarHorariosHandler,
+  crearHorarioHandler,
+  toggleHorarioHandler,
 } from "./api/handlers";
 export { feriadosDelPais, domingoPascua } from "./domain/feriados";
 export type { Feriado } from "./domain/feriados";

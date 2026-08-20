@@ -9,6 +9,7 @@
  */
 export {
   crearContrato,
+  crearReservaBeneficiario,
   aprobarContrato,
   ponerEnPausa,
   reactivar,
@@ -27,6 +28,7 @@ export {
 export { edadEnFecha, validarEdadParaTipo } from "./domain/edad";
 export {
   crearContratoHandler,
+  crearReservaHandler,
   listarContratosHandler,
   aprobarContratoHandler,
   onholdHandler,

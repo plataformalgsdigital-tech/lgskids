@@ -17,6 +17,9 @@ export { crearAdultoHandler, crearNinoHandler, listarPersonasHandler } from "./a
 export {
   findPersonById,
   findPersonByUserId,
+  findPersonByDoc,
+  insertPerson,
+  insertGuardianship,
   linkUser,
   setPersonEstado,
 } from "./infrastructure/person-repository";
