@@ -15,6 +15,13 @@ interface Contrato {
   titularDocNumero: string;
   titularTelefono: string | null;
   titularEmail: string | null;
+  apoderados: {
+    nombre: string;
+    docTipo: string;
+    docNumero: string;
+    telefono: string | null;
+    parentesco: string | null;
+  }[];
   username: string | null;
   countryCode: string;
   tipoCurso: "JUNIOR" | "YOUNGSTER";
@@ -478,6 +485,17 @@ export default function ContratosPage() {
                       </>
                     )}
                   </div>
+                  {c.apoderados.length > 0 && (
+                    <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                      🧑‍🤝‍🧑 Apoderado{c.apoderados.length > 1 ? "s" : ""}:{" "}
+                      {c.apoderados
+                        .map(
+                          (a) =>
+                            `${a.nombre}${a.parentesco !== null ? ` (${a.parentesco})` : ""} · ${a.docTipo} ${a.docNumero}${a.telefono !== null ? ` · tel. ${a.telefono}` : ""}`,
+                        )
+                        .join("   |   ")}
+                    </div>
+                  )}
                   {eligiendoSalon?.contrato.id === c.id && (
                     <div
                       style={{

@@ -190,6 +190,14 @@ export interface ContractListItem extends ContractRecord {
   titularTelefono: string | null;
   titularEmail: string | null;
   username: string | null;
+  /** Apoderados del beneficiario (relación people_guardianship). */
+  apoderados: {
+    nombre: string;
+    docTipo: string;
+    docNumero: string;
+    telefono: string | null;
+    parentesco: string | null;
+  }[];
   /** N° de contrato de LGS (formato PP-NNNNN-YY), si vino del intake. */
   externalRef: string | null;
   /** Matrícula ACTIVA (Fase 7): salón y matrícula, si existen. */
@@ -231,6 +239,13 @@ export async function listContracts(params: {
             t.doc_tipo AS "titularDocTipo", t.doc_numero AS "titularDocNumero",
             t.telefono AS "titularTelefono", t.email AS "titularEmail",
             u.username,
+            COALESCE((SELECT json_agg(json_build_object(
+                        'nombre', a.nombres || ' ' || a.apellidos,
+                        'docTipo', a.doc_tipo, 'docNumero', a.doc_numero,
+                        'telefono', a.telefono, 'parentesco', g.parentesco))
+                        FROM people_guardianship g
+                        JOIN people_person a ON a.id = g.apoderado_id
+                       WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
             cl.nombre AS salon,
             e.id AS "enrollmentId"
        FROM contracts_contract c
@@ -286,6 +301,13 @@ export async function searchContracts(params: {
             t.doc_tipo AS "titularDocTipo", t.doc_numero AS "titularDocNumero",
             t.telefono AS "titularTelefono", t.email AS "titularEmail",
             u.username,
+            COALESCE((SELECT json_agg(json_build_object(
+                        'nombre', a.nombres || ' ' || a.apellidos,
+                        'docTipo', a.doc_tipo, 'docNumero', a.doc_numero,
+                        'telefono', a.telefono, 'parentesco', g.parentesco))
+                        FROM people_guardianship g
+                        JOIN people_person a ON a.id = g.apoderado_id
+                       WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
             cl.nombre AS salon,
             e.id AS "enrollmentId"
        FROM contracts_contract c
