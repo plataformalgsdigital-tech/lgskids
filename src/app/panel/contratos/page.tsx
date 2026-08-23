@@ -486,38 +486,60 @@ export default function ContratosPage() {
                 }}
               >
                 <div style={{ minWidth: "16rem" }}>
-                  <strong>
-                    N° {c.numero} · {c.beneficiario}
-                  </strong>{" "}
-                  <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                    {c.tipoCurso} · {c.countryCode} · {c.inicio} → {c.finalContrato}
-                  </span>
-                  {c.externalRef !== null && (
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 700,
-                        color: "#0d47a1",
-                        background: "#e3f2fd",
-                        padding: "0.1rem 0.45rem",
-                        borderRadius: "0.5rem",
-                        marginLeft: "0.4rem",
-                      }}
-                    >
-                      LGS {c.externalRef}
+                  {/* 1) Campaña · N° de contrato · Fecha · Plataforma */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: "0.5rem",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong style={{ fontSize: "1rem", color: "var(--lgs-azul-oscuro)" }}>
+                      {c.campania ?? "— sin campaña —"}
+                    </strong>
+                    <strong>· N° {c.numero}</strong>
+                    {c.externalRef !== null && (
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          color: "#0d47a1",
+                          background: "#e3f2fd",
+                          padding: "0.1rem 0.45rem",
+                          borderRadius: "0.5rem",
+                        }}
+                      >
+                        LGS {c.externalRef}
+                      </span>
+                    )}
+                    <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                      · {c.inicio} → {c.finalContrato} · {c.countryCode}
                     </span>
-                  )}
-                  <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                    👦 Beneficiario: <strong>{c.beneficiario}</strong> · {c.beneficiarioDocTipo}{" "}
-                    {c.beneficiarioDocNumero}
-                    {c.beneficiarioFechaNac !== null && ` · nac. ${c.beneficiarioFechaNac}`}
-                    {c.username !== null && ` · usuario: ${c.username}`}
                   </div>
-                  <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                  {/* 2) Titular + datos */}
+                  <div
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "var(--texto-suave)",
+                      marginTop: "0.25rem",
+                    }}
+                  >
                     👤 Titular: <strong>{c.titular}</strong> · {c.titularDocTipo}{" "}
                     {c.titularDocNumero}
                     {c.titularTelefono !== null && ` · tel. ${c.titularTelefono}`}
                     {c.titularEmail !== null && ` · ${c.titularEmail}`}
+                  </div>
+                  {/* 3) Beneficiario + datos + curso */}
+                  <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                    👦 Beneficiario: <strong>{c.beneficiario}</strong> · {c.beneficiarioDocTipo}{" "}
+                    {c.beneficiarioDocNumero}
+                    {c.beneficiarioFechaNac !== null && ` · nac. ${c.beneficiarioFechaNac}`}
+                    {" · "}
+                    <strong>
+                      {c.tipoCurso === "JUNIOR" ? "Junior (6–9)" : "Youngster (10–13)"}
+                    </strong>
+                    {c.username !== null && ` · usuario: ${c.username}`}
                     {c.salon !== null && (
                       <>
                         {" · "}
@@ -525,6 +547,7 @@ export default function ContratosPage() {
                       </>
                     )}
                   </div>
+                  {/* 4) Apoderado(s) */}
                   {c.apoderados.length > 0 && (
                     <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                       🧑‍🤝‍🧑 Apoderado{c.apoderados.length > 1 ? "s" : ""}:{" "}
