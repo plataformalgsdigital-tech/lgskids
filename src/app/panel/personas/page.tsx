@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 interface Nino {
@@ -23,8 +23,6 @@ interface Nino {
   campania: string | null;
   curso: string | null;
 }
-
-const PAISES = ["CL", "CO", "EC", "PE"];
 
 const inputStyle: CSSProperties = {
   padding: "0.5rem 0.65rem",
@@ -49,36 +47,9 @@ function Campo(props: { etiqueta: string; children: React.ReactNode; ancho?: str
   );
 }
 
-interface DatosPersona {
-  nombres: string;
-  apellidos: string;
-  docTipo: string;
-  docNumero: string;
-  fechaNacimiento: string;
-  email: string;
-  telefono: string;
-}
-
-const personaVacia: DatosPersona = {
-  nombres: "",
-  apellidos: "",
-  docTipo: "",
-  docNumero: "",
-  fechaNacimiento: "",
-  email: "",
-  telefono: "",
-};
-
 export default function PersonasPage() {
   const [ninos, setNinos] = useState<Nino[] | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [pais, setPais] = useState("CL");
-  const [nino, setNino] = useState<DatosPersona>(personaVacia);
-  const [apoderado, setApoderado] = useState<DatosPersona>(personaVacia);
-  const [parentesco, setParentesco] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [exito, setExito] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
+  const [descargando, setDescargando] = useState(false);
   const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
   // Filtros (el buscador global puede llegar con ?buscar=<documento>).
   const [fId, setFId] = useState(() =>
@@ -125,51 +96,57 @@ export default function PersonasPage() {
     void cargarCampanias();
   }, []);
 
-  async function crear(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setExito(null);
-    setGuardando(true);
+  /** Exporta a CSV los niños actualmente listados (respeta los filtros). */
+  function descargarCSV() {
+    if (ninos === null || ninos.length === 0) return;
+    setDescargando(true);
     try {
-      const res = await apiFetch("/api/people/ninos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nino: {
-            nombres: nino.nombres,
-            apellidos: nino.apellidos,
-            docTipo: nino.docTipo,
-            docNumero: nino.docNumero,
-            fechaNacimiento: nino.fechaNacimiento,
-            countryCode: pais,
-          },
-          apoderadoNuevo: {
-            nombres: apoderado.nombres,
-            apellidos: apoderado.apellidos,
-            docTipo: apoderado.docTipo,
-            docNumero: apoderado.docNumero,
-            countryCode: pais,
-            email: apoderado.email || null,
-            telefono: apoderado.telefono || null,
-          },
-          parentesco: parentesco || null,
-        }),
-      });
-      const data: { error?: { message: string; details?: unknown } } = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? "No se pudo crear.");
-        return;
-      }
-      setExito(`Niño ${nino.nombres} ${nino.apellidos} creado con su apoderado.`);
-      setNino(personaVacia);
-      setApoderado(personaVacia);
-      setParentesco("");
-      setMostrarForm(false);
-      await cargar();
-    } catch {
-      setError("Error de conexión.");
+      const headers = [
+        "Nombre",
+        "Documento",
+        "Correo",
+        "Usuario",
+        "Campana",
+        "Curso",
+        "Estado",
+        "Contrato",
+        "N LGS",
+        "Inicio",
+        "Final",
+      ];
+      const esc = (v: unknown): string => {
+        const s = v === null || v === undefined ? "" : String(v);
+        return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const filas = ninos.map((n) =>
+        [
+          `${n.apellidos}, ${n.nombres}`,
+          `${n.docTipo} ${n.docNumero}`,
+          n.correo ?? "",
+          n.username ?? "",
+          n.campania ?? "",
+          n.curso ?? "",
+          n.estado,
+          n.contratoNumero ?? "",
+          n.externalRef ?? "",
+          n.inicio ?? "",
+          n.finalContrato ?? "",
+        ]
+          .map(esc)
+          .join(","),
+      );
+      const csv = [headers.join(","), ...filas].join("\r\n");
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kids-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } finally {
-      setGuardando(false);
+      setDescargando(false);
     }
   }
 
@@ -178,201 +155,29 @@ export default function PersonasPage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: "1.6rem" }}>Kids</h1>
         <button
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={descargarCSV}
+          disabled={descargando || ninos === null || ninos.length === 0}
+          title={
+            ninos !== null && ninos.length > 0
+              ? "Descarga los niños listados (con los filtros aplicados)"
+              : "No hay niños para exportar"
+          }
           style={{
             padding: "0.55rem 1.2rem",
             borderRadius: "0.6rem",
             border: "none",
-            background: "var(--lgs-azul)",
-            color: "white",
+            background:
+              descargando || ninos === null || ninos.length === 0
+                ? "#9e9e9e"
+                : "var(--lgs-verde)",
+            color: "#1b2a10",
             fontWeight: 700,
-            cursor: "pointer",
+            cursor: descargando ? "wait" : "pointer",
           }}
         >
-          {mostrarForm ? "Cancelar" : "+ Niño y apoderado"}
+          {descargando ? "Generando…" : "⬇ Descargar CSV"}
         </button>
       </div>
-
-      {exito !== null && (
-        <p
-          style={{
-            marginTop: "0.75rem",
-            color: "#1b5e20",
-            background: "#e8f5e9",
-            padding: "0.6rem 0.9rem",
-            borderRadius: "0.6rem",
-          }}
-        >
-          {exito}
-        </p>
-      )}
-
-      {mostrarForm && (
-        <form
-          onSubmit={crear}
-          style={{
-            marginTop: "1rem",
-            padding: "1.25rem",
-            border: "1px solid #e3e7f0",
-            borderRadius: "0.9rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-          }}
-        >
-          <Campo etiqueta="País del contrato/personas" ancho="0 0 8rem">
-            <select value={pais} onChange={(e) => setPais(e.target.value)} style={inputStyle}>
-              {PAISES.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
-          </Campo>
-
-          <fieldset
-            style={{ border: "1px dashed #cfd6e4", borderRadius: "0.7rem", padding: "0.9rem" }}
-          >
-            <legend style={{ fontWeight: 700, fontSize: "0.9rem", padding: "0 0.4rem" }}>
-              👧 Niño
-            </legend>
-            <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-              <Campo etiqueta="Nombres">
-                <input
-                  required
-                  minLength={2}
-                  value={nino.nombres}
-                  onChange={(e) => setNino({ ...nino, nombres: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Apellidos">
-                <input
-                  required
-                  minLength={2}
-                  value={nino.apellidos}
-                  onChange={(e) => setNino({ ...nino, apellidos: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Fecha de nacimiento" ancho="0 0 10rem">
-                <input
-                  type="date"
-                  required
-                  value={nino.fechaNacimiento}
-                  onChange={(e) => setNino({ ...nino, fechaNacimiento: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Tipo doc." ancho="0 0 7rem">
-                <input
-                  required
-                  placeholder="TI / RUT / DNI"
-                  value={nino.docTipo}
-                  onChange={(e) => setNino({ ...nino, docTipo: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Número doc." ancho="0 0 10rem">
-                <input
-                  required
-                  value={nino.docNumero}
-                  onChange={(e) => setNino({ ...nino, docNumero: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-            </div>
-          </fieldset>
-
-          <fieldset
-            style={{ border: "1px dashed #cfd6e4", borderRadius: "0.7rem", padding: "0.9rem" }}
-          >
-            <legend style={{ fontWeight: 700, fontSize: "0.9rem", padding: "0 0.4rem" }}>
-              🧑 Apoderado (sus datos de contacto reciben las comunicaciones)
-            </legend>
-            <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-              <Campo etiqueta="Nombres">
-                <input
-                  required
-                  minLength={2}
-                  value={apoderado.nombres}
-                  onChange={(e) => setApoderado({ ...apoderado, nombres: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Apellidos">
-                <input
-                  required
-                  minLength={2}
-                  value={apoderado.apellidos}
-                  onChange={(e) => setApoderado({ ...apoderado, apellidos: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Tipo doc." ancho="0 0 7rem">
-                <input
-                  required
-                  placeholder="CC / RUT / DNI"
-                  value={apoderado.docTipo}
-                  onChange={(e) => setApoderado({ ...apoderado, docTipo: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Número doc." ancho="0 0 10rem">
-                <input
-                  required
-                  value={apoderado.docNumero}
-                  onChange={(e) => setApoderado({ ...apoderado, docNumero: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Email real" ancho="0 0 14rem">
-                <input
-                  type="email"
-                  value={apoderado.email}
-                  onChange={(e) => setApoderado({ ...apoderado, email: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="WhatsApp" ancho="0 0 10rem">
-                <input
-                  value={apoderado.telefono}
-                  onChange={(e) => setApoderado({ ...apoderado, telefono: e.target.value })}
-                  style={inputStyle}
-                />
-              </Campo>
-              <Campo etiqueta="Parentesco" ancho="0 0 8rem">
-                <input
-                  placeholder="madre / padre"
-                  value={parentesco}
-                  onChange={(e) => setParentesco(e.target.value)}
-                  style={inputStyle}
-                />
-              </Campo>
-            </div>
-          </fieldset>
-
-          {error !== null && (
-            <p role="alert" style={{ color: "#c62828", fontSize: "0.9rem" }}>
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={guardando}
-            style={{
-              alignSelf: "flex-start",
-              padding: "0.65rem 1.5rem",
-              borderRadius: "0.7rem",
-              border: "none",
-              background: guardando ? "#9e9e9e" : "var(--lgs-verde)",
-              color: "#1b2a10",
-              fontWeight: 700,
-              cursor: guardando ? "wait" : "pointer",
-            }}
-          >
-            {guardando ? "Guardando…" : "Crear niño + apoderado"}
-          </button>
-        </form>
-      )}
 
       <div
         style={{
