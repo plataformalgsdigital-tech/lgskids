@@ -1,3 +1,4 @@
-import { crearNinoHandler } from "@/modules/people";
+import { crearNinoHandler, listarNinosHandler } from "@/modules/people";
 
+export const GET = listarNinosHandler;
 export const POST = crearNinoHandler;

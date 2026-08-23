@@ -31,7 +31,7 @@ const MENU: {
   },
   {
     permiso: "personas.ver",
-    etiqueta: "Personas",
+    etiqueta: "Kids",
     color: "var(--lgs-cian)",
     href: "/panel/personas",
   },

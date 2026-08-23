@@ -8,7 +8,9 @@ import {
   findPersonById,
   insertGuardianship,
   insertPerson,
+  listNinos,
   listPersons,
+  type NinoListItem,
 } from "../infrastructure/person-repository";
 
 async function exigirDocLibre(input: PersonInput): Promise<void> {
@@ -96,6 +98,31 @@ export async function listarPersonas(params: {
     countryScope: params.countryScope,
     ...(params.buscar !== undefined && { buscar: params.buscar }),
     limit: Math.min(Math.max(params.limit ?? 50, 1), 200),
+    offset: Math.max(params.offset ?? 0, 0),
+  });
+}
+
+/** Lista de niños (sección Kids) con filtros. */
+export async function listarNinos(params: {
+  countryScope: string[] | null;
+  id?: string;
+  estado?: string;
+  tipoCurso?: string;
+  campaignId?: string;
+  inicioDesde?: string;
+  finalHasta?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<NinoListItem[]> {
+  return listNinos({
+    countryScope: params.countryScope,
+    ...(params.id !== undefined && { id: params.id }),
+    ...(params.estado !== undefined && { estado: params.estado }),
+    ...(params.tipoCurso !== undefined && { tipoCurso: params.tipoCurso }),
+    ...(params.campaignId !== undefined && { campaignId: params.campaignId }),
+    ...(params.inicioDesde !== undefined && { inicioDesde: params.inicioDesde }),
+    ...(params.finalHasta !== undefined && { finalHasta: params.finalHasta }),
+    limit: Math.min(Math.max(params.limit ?? 100, 1), 500),
     offset: Math.max(params.offset ?? 0, 0),
   });
 }

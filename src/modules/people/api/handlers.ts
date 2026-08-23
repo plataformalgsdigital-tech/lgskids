@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
-import { crearAdulto, crearNino, listarPersonas } from "../application/crear-personas";
+import {
+  crearAdulto,
+  crearNino,
+  listarNinos,
+  listarPersonas,
+} from "../application/crear-personas";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -74,4 +79,34 @@ export const listarPersonasHandler = handlerWithAuth(async (request, auth) => {
     offset: query.offset,
   });
   return json({ personas });
+});
+
+const listarNinosSchema = z.object({
+  id: z.string().max(40).optional(),
+  estado: z.enum(["ACTIVA", "INACTIVA"]).optional(),
+  tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
+  campaignId: z.uuid().optional(),
+  inicioDesde: z.string().regex(ISO_DATE).optional(),
+  finalHasta: z.string().regex(ISO_DATE).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+/** GET /api/people/ninos — lista de niños (sección Kids) con filtros. */
+export const listarNinosHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.PERSONAS_VER);
+  const q = listarNinosSchema.parse(Object.fromEntries(request.nextUrl.searchParams));
+  const ninos = await listarNinos({
+    countryScope: auth.countryScope,
+    ...(q.id !== undefined && { id: q.id }),
+    ...(q.estado !== undefined && { estado: q.estado }),
+    ...(q.tipoCurso !== undefined && { tipoCurso: q.tipoCurso }),
+    ...(q.campaignId !== undefined && { campaignId: q.campaignId }),
+    ...(q.inicioDesde !== undefined && { inicioDesde: q.inicioDesde }),
+    ...(q.finalHasta !== undefined && { finalHasta: q.finalHasta }),
+    limit: q.limit,
+    offset: q.offset,
+  });
+  return json({ ninos });
 });

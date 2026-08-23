@@ -56,6 +56,106 @@ export async function insertPerson(input: PersonInput, client?: Queryable): Prom
   return id;
 }
 
+export interface NinoListItem {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  docTipo: string;
+  docNumero: string;
+  countryCode: string;
+  fechaNacimiento: string | null;
+  estado: string;
+  username: string | null;
+  correo: string | null;
+  contratoNumero: number | null;
+  externalRef: string | null;
+  tipoCurso: string | null;
+  inicio: string | null;
+  finalContrato: string | null;
+  contratoEstado: string | null;
+  campania: string | null;
+  curso: string | null;
+}
+
+/**
+ * Lista de NIÑOS (personas con fecha de nacimiento) enriquecida con su usuario,
+ * su contrato más reciente y — si tiene matrícula viva — su campaña y curso.
+ * Alcance por país (ADR-0009) + filtros de la sección Kids.
+ */
+export async function listNinos(params: {
+  countryScope: string[] | null;
+  id?: string;
+  estado?: string;
+  tipoCurso?: string;
+  campaignId?: string;
+  inicioDesde?: string;
+  finalHasta?: string;
+  limit: number;
+  offset: number;
+}): Promise<NinoListItem[]> {
+  const where: string[] = ["p.fecha_nacimiento IS NOT NULL"];
+  const values: unknown[] = [];
+  if (params.countryScope !== null) {
+    values.push(params.countryScope);
+    where.push(`p.country_code = ANY($${values.length})`);
+  }
+  if (params.id !== undefined && params.id !== "") {
+    values.push(`%${params.id}%`);
+    where.push(`p.doc_numero ILIKE $${values.length}`);
+  }
+  if (params.estado !== undefined) {
+    values.push(params.estado);
+    where.push(`p.estado = $${values.length}::people_person_estado`);
+  }
+  if (params.tipoCurso !== undefined) {
+    values.push(params.tipoCurso);
+    where.push(`c.tipo_curso = $${values.length}::catalog_course_tipo`);
+  }
+  if (params.campaignId !== undefined) {
+    values.push(params.campaignId);
+    where.push(`ca.id = $${values.length}`);
+  }
+  if (params.inicioDesde !== undefined) {
+    values.push(params.inicioDesde);
+    where.push(`c.inicio >= $${values.length}::date`);
+  }
+  if (params.finalHasta !== undefined) {
+    values.push(params.finalHasta);
+    where.push(`c.final_contrato <= $${values.length}::date`);
+  }
+  values.push(params.limit);
+  const limitIdx = values.length;
+  values.push(params.offset);
+  const offsetIdx = values.length;
+
+  return queryRows<NinoListItem>(
+    `SELECT p.id, p.nombres, p.apellidos, p.doc_tipo AS "docTipo", p.doc_numero AS "docNumero",
+            p.country_code AS "countryCode", p.fecha_nacimiento::text AS "fechaNacimiento",
+            p.estado, u.username, COALESCE(u.email, p.email) AS correo,
+            c.numero AS "contratoNumero", c.external_ref AS "externalRef",
+            c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
+            c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
+            ca.nombre AS campania,
+            COALESCE(cu.tipo::text, c.tipo_curso::text) AS curso
+       FROM people_person p
+       LEFT JOIN identity_user u ON u.id = p.user_id
+       LEFT JOIN LATERAL (
+         SELECT * FROM contracts_contract cc
+          WHERE cc.beneficiario_id = p.id
+          ORDER BY cc.created_at DESC LIMIT 1
+       ) c ON true
+       LEFT JOIN enrollment_enrollment e
+         ON e.child_person_id = p.id AND e.estado IN ('ACTIVA', 'RESERVADA')
+       LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+       LEFT JOIN catalog_course cu ON cu.id = cl.course_id
+       LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY p.apellidos, p.nombres
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    values,
+  );
+}
+
 export async function insertGuardianship(
   ninoId: string,
   apoderadoId: string,
