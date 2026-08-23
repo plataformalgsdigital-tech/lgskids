@@ -21,6 +21,7 @@ interface Resultados {
   contratos: {
     id: string;
     numero: number;
+    beneficiarioId: string;
     beneficiario: string;
     titular: string;
     tipoCurso: string;
@@ -87,7 +88,7 @@ function ResultadosBusqueda() {
             {resultados.contratos.map((c) => (
               <Link
                 key={c.id}
-                href="/panel/contratos"
+                href={`/panel/personas/${c.beneficiarioId}`}
                 style={{
                   padding: "0.7rem 1rem",
                   border: "1px solid #e3e7f0",
@@ -120,7 +121,11 @@ function ResultadosBusqueda() {
             {resultados.personas.map((p) => (
               <Link
                 key={p.id}
-                href={`/panel/personas?buscar=${encodeURIComponent(p.docNumero)}`}
+                href={
+                  p.fechaNacimiento !== null
+                    ? `/panel/personas/${p.id}`
+                    : `/panel/personas?buscar=${encodeURIComponent(p.docNumero)}`
+                }
                 style={{
                   padding: "0.7rem 1rem",
                   border: "1px solid #e3e7f0",

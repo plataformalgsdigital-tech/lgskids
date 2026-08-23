@@ -12,6 +12,7 @@ export {
   crearNino,
   listarPersonas,
   listarNinos,
+  obtenerDetalleNino,
   obtenerPersona,
 } from "./application/crear-personas";
 export {
@@ -19,6 +20,7 @@ export {
   crearNinoHandler,
   listarPersonasHandler,
   listarNinosHandler,
+  detalleNinoHandler,
 } from "./api/handlers";
 export {
   findPersonById,
@@ -29,5 +31,5 @@ export {
   linkUser,
   setPersonEstado,
 } from "./infrastructure/person-repository";
-export type { NinoListItem } from "./infrastructure/person-repository";
+export type { NinoListItem, NinoDetalle } from "./infrastructure/person-repository";
 export type { PersonRecord, PersonInput, PersonListItem } from "./application/ports";

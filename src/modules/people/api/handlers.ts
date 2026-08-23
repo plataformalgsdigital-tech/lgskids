@@ -6,6 +6,7 @@ import {
   crearNino,
   listarNinos,
   listarPersonas,
+  obtenerDetalleNino,
 } from "../application/crear-personas";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -109,4 +110,13 @@ export const listarNinosHandler = handlerWithAuth(async (request, auth) => {
     offset: q.offset,
   });
   return json({ ninos });
+});
+
+/** GET /api/people/ninos/[id] — ficha completa del niño (página de consulta). */
+export const detalleNinoHandler = handlerWithAuth(async (_request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.PERSONAS_VER);
+  const params = await context.params;
+  const id = z.uuid().parse(params["id"]);
+  return json({ nino: await obtenerDetalleNino(id) });
 });

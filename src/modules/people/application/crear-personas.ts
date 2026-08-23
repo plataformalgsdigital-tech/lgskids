@@ -4,12 +4,14 @@ import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors
 import { withTransaction } from "@/platform/db/transaction";
 import type { PersonInput, PersonListItem, PersonRecord } from "./ports";
 import {
+  detalleNino,
   findPersonByDoc,
   findPersonById,
   insertGuardianship,
   insertPerson,
   listNinos,
   listPersons,
+  type NinoDetalle,
   type NinoListItem,
 } from "../infrastructure/person-repository";
 
@@ -125,6 +127,13 @@ export async function listarNinos(params: {
     limit: Math.min(Math.max(params.limit ?? 100, 1), 500),
     offset: Math.max(params.offset ?? 0, 0),
   });
+}
+
+/** Ficha completa de un niño (página de consulta). */
+export async function obtenerDetalleNino(id: string): Promise<NinoDetalle> {
+  const nino = await detalleNino(id);
+  if (nino === null) throw new NotFoundError("El niño no existe.");
+  return nino;
 }
 
 export async function obtenerPersona(id: string): Promise<PersonRecord> {

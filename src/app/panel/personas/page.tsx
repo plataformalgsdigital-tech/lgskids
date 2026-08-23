@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
@@ -292,9 +293,12 @@ export default function PersonasPage() {
               }}
             >
               <div style={{ minWidth: "18rem" }}>
-                <strong style={{ fontSize: "1rem" }}>
+                <Link
+                  href={`/panel/personas/${n.id}`}
+                  style={{ fontSize: "1rem", fontWeight: 700, color: "var(--lgs-azul-oscuro)" }}
+                >
                   {n.apellidos}, {n.nombres}
-                </strong>{" "}
+                </Link>{" "}
                 <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                   {n.docTipo} {n.docNumero} · {n.countryCode}
                   {n.fechaNacimiento !== null && ` · nac. ${n.fechaNacimiento}`}

@@ -156,6 +156,89 @@ export async function listNinos(params: {
   );
 }
 
+export interface NinoDetalle {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  docTipo: string;
+  docNumero: string;
+  countryCode: string;
+  fechaNacimiento: string | null;
+  personaEmail: string | null;
+  telefono: string | null;
+  estado: string;
+  username: string | null;
+  correo: string | null;
+  contratoNumero: number | null;
+  externalRef: string | null;
+  tipoCurso: string | null;
+  inicio: string | null;
+  finalContrato: string | null;
+  contratoEstado: string | null;
+  firmado: boolean | null;
+  matriculaEstado: string | null;
+  salon: string | null;
+  meetingUrl: string | null;
+  campania: string | null;
+  curso: string | null;
+  guia: string | null;
+  proximaSesion: string | null;
+  apoderados: {
+    nombre: string;
+    docTipo: string;
+    docNumero: string;
+    telefono: string | null;
+    email: string | null;
+    parentesco: string | null;
+  }[];
+}
+
+/** Ficha COMPLETA de un niño para la página de consulta. */
+export async function detalleNino(id: string): Promise<NinoDetalle | null> {
+  interface Row extends Omit<NinoDetalle, "apoderados"> {
+    apoderados: NinoDetalle["apoderados"] | null;
+  }
+  const row = await queryOne<Row>(
+    `SELECT p.id, p.nombres, p.apellidos, p.doc_tipo AS "docTipo", p.doc_numero AS "docNumero",
+            p.country_code AS "countryCode", p.fecha_nacimiento::text AS "fechaNacimiento",
+            p.email AS "personaEmail", p.telefono, p.estado,
+            u.username, u.email AS correo,
+            c.numero AS "contratoNumero", c.external_ref AS "externalRef",
+            c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
+            c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
+            c.firmado,
+            e.estado::text AS "matriculaEstado", cl.nombre AS salon,
+            cl.meeting_url AS "meetingUrl", ca.nombre AS campania,
+            COALESCE(cu.tipo::text, c.tipo_curso::text) AS curso,
+            COALESCE(NULLIF(TRIM(gp.nombres || ' ' || gp.apellidos), ''), gu.username) AS guia,
+            (SELECT min(s.fecha)::text FROM scheduling_session s
+              WHERE s.classroom_id = cl.id AND s.fecha >= (now() AT TIME ZONE 'UTC')::date) AS "proximaSesion",
+            COALESCE((SELECT json_agg(json_build_object(
+                        'nombre', a.nombres || ' ' || a.apellidos, 'docTipo', a.doc_tipo,
+                        'docNumero', a.doc_numero, 'telefono', a.telefono, 'email', a.email,
+                        'parentesco', g.parentesco))
+                        FROM people_guardianship g
+                        JOIN people_person a ON a.id = g.apoderado_id
+                       WHERE g.nino_id = p.id), '[]'::json) AS apoderados
+       FROM people_person p
+       LEFT JOIN identity_user u ON u.id = p.user_id
+       LEFT JOIN LATERAL (
+         SELECT * FROM contracts_contract cc WHERE cc.beneficiario_id = p.id
+          ORDER BY cc.created_at DESC LIMIT 1
+       ) c ON true
+       LEFT JOIN enrollment_enrollment e ON e.child_person_id = p.id AND e.estado IN ('ACTIVA', 'RESERVADA')
+       LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+       LEFT JOIN catalog_course cu ON cu.id = cl.course_id
+       LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+       LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
+       LEFT JOIN people_person gp ON gp.user_id = gu.id
+      WHERE p.id = $1`,
+    [id],
+  );
+  if (row === null) return null;
+  return { ...row, apoderados: row.apoderados ?? [] };
+}
+
 export async function insertGuardianship(
   ninoId: string,
   apoderadoId: string,
