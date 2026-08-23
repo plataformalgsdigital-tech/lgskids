@@ -7,7 +7,14 @@ interface Contrato {
   id: string;
   numero: number;
   beneficiario: string;
+  beneficiarioDocTipo: string;
+  beneficiarioDocNumero: string;
+  beneficiarioFechaNac: string | null;
   titular: string;
+  titularDocTipo: string;
+  titularDocNumero: string;
+  titularTelefono: string | null;
+  titularEmail: string | null;
   username: string | null;
   countryCode: string;
   tipoCurso: "JUNIOR" | "YOUNGSTER";
@@ -454,8 +461,16 @@ export default function ContratosPage() {
                     </span>
                   )}
                   <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                    Titular: {c.titular}
+                    👦 Beneficiario: <strong>{c.beneficiario}</strong> · {c.beneficiarioDocTipo}{" "}
+                    {c.beneficiarioDocNumero}
+                    {c.beneficiarioFechaNac !== null && ` · nac. ${c.beneficiarioFechaNac}`}
                     {c.username !== null && ` · usuario: ${c.username}`}
+                  </div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                    👤 Titular: <strong>{c.titular}</strong> · {c.titularDocTipo}{" "}
+                    {c.titularDocNumero}
+                    {c.titularTelefono !== null && ` · tel. ${c.titularTelefono}`}
+                    {c.titularEmail !== null && ` · ${c.titularEmail}`}
                     {c.salon !== null && (
                       <>
                         {" · "}

@@ -181,7 +181,14 @@ export async function findContratosVencidos(limit: number): Promise<ContractReco
 
 export interface ContractListItem extends ContractRecord {
   beneficiario: string;
+  beneficiarioDocTipo: string;
+  beneficiarioDocNumero: string;
+  beneficiarioFechaNac: string | null;
   titular: string;
+  titularDocTipo: string;
+  titularDocNumero: string;
+  titularTelefono: string | null;
+  titularEmail: string | null;
   username: string | null;
   /** N° de contrato de LGS (formato PP-NNNNN-YY), si vino del intake. */
   externalRef: string | null;
@@ -218,7 +225,11 @@ export async function listContracts(params: {
             c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
             c.estado, c.external_ref AS "externalRef",
             b.nombres || ' ' || b.apellidos AS beneficiario,
+            b.doc_tipo AS "beneficiarioDocTipo", b.doc_numero AS "beneficiarioDocNumero",
+            b.fecha_nacimiento::text AS "beneficiarioFechaNac",
             t.nombres || ' ' || t.apellidos AS titular,
+            t.doc_tipo AS "titularDocTipo", t.doc_numero AS "titularDocNumero",
+            t.telefono AS "titularTelefono", t.email AS "titularEmail",
             u.username,
             cl.nombre AS salon,
             e.id AS "enrollmentId"
@@ -269,7 +280,11 @@ export async function searchContracts(params: {
             c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
             c.estado, c.external_ref AS "externalRef",
             b.nombres || ' ' || b.apellidos AS beneficiario,
+            b.doc_tipo AS "beneficiarioDocTipo", b.doc_numero AS "beneficiarioDocNumero",
+            b.fecha_nacimiento::text AS "beneficiarioFechaNac",
             t.nombres || ' ' || t.apellidos AS titular,
+            t.doc_tipo AS "titularDocTipo", t.doc_numero AS "titularDocNumero",
+            t.telefono AS "titularTelefono", t.email AS "titularEmail",
             u.username,
             cl.nombre AS salon,
             e.id AS "enrollmentId"
