@@ -183,6 +183,8 @@ export interface ContractListItem extends ContractRecord {
   beneficiario: string;
   titular: string;
   username: string | null;
+  /** N° de contrato de LGS (formato PP-NNNNN-YY), si vino del intake. */
+  externalRef: string | null;
   /** Matrícula ACTIVA (Fase 7): salón y matrícula, si existen. */
   salon: string | null;
   enrollmentId: string | null;
@@ -214,7 +216,7 @@ export async function listContracts(params: {
     `SELECT c.id, c.numero, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
             c.country_code AS "countryCode", c.tipo_curso AS "tipoCurso",
             c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
-            c.estado,
+            c.estado, c.external_ref AS "externalRef",
             b.nombres || ' ' || b.apellidos AS beneficiario,
             t.nombres || ' ' || t.apellidos AS titular,
             u.username,
@@ -256,7 +258,7 @@ export async function searchContracts(params: {
     values.push(`%${params.q}%`);
     const i = values.length;
     where.push(
-      `(b.nombres ILIKE $${i} OR b.apellidos ILIKE $${i} OR t.nombres ILIKE $${i} OR t.apellidos ILIKE $${i} OR u.username ILIKE $${i})`,
+      `(b.nombres ILIKE $${i} OR b.apellidos ILIKE $${i} OR t.nombres ILIKE $${i} OR t.apellidos ILIKE $${i} OR u.username ILIKE $${i} OR c.external_ref ILIKE $${i})`,
     );
   }
   values.push(params.limit);
@@ -265,7 +267,7 @@ export async function searchContracts(params: {
     `SELECT c.id, c.numero, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
             c.country_code AS "countryCode", c.tipo_curso AS "tipoCurso",
             c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
-            c.estado,
+            c.estado, c.external_ref AS "externalRef",
             b.nombres || ' ' || b.apellidos AS beneficiario,
             t.nombres || ' ' || t.apellidos AS titular,
             u.username,

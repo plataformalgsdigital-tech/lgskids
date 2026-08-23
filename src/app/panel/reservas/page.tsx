@@ -288,8 +288,8 @@ export default function ReservasPage() {
             <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>1 · Contrato LGS y titular</h2>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.6rem" }}>
               <label>
-                <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>N° contrato LGS</span>
-                <input value={externalRef} onChange={(e) => setExternalRef(e.target.value)} required placeholder="M5-00123-26" style={inputStyle} />
+                <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>N° contrato LGS (PP-NNNNN-YY)</span>
+                <input value={externalRef} onChange={(e) => setExternalRef(e.target.value)} required placeholder="01-16016-26" style={inputStyle} />
               </label>
               <label>
                 <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>País</span>

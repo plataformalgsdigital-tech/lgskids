@@ -23,6 +23,7 @@ import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { logger } from "@/platform/logging/logger";
 import { validarEdadParaTipo } from "../domain/edad";
+import { validarExternalRef } from "../domain/external-ref";
 import { contratoVencido, fechaUtcHoy } from "../domain/vigencia";
 import {
   beneficiarioTieneOtrosContratosVivos,
@@ -136,6 +137,8 @@ export async function crearReservaBeneficiario(input: {
   if (input.titularEsApoderado !== true && input.apoderadoNuevo === undefined) {
     throw new ValidationError("Falta el apoderado (o marca titular = apoderado).");
   }
+  // N° de contrato LGS: formato PP-NNNNN-YY y país del prefijo == país del contrato.
+  validarExternalRef(input.externalRef, input.countryCode);
   validarEdadParaTipo(input.nino.fechaNacimiento, input.inicio, input.tipoCurso);
 
   const yaExiste = await findContractByExternalRef(input.externalRef);

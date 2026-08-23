@@ -14,6 +14,7 @@ interface Contrato {
   inicio: string;
   finalContrato: string;
   estado: "PENDIENTE" | "APROBADO" | "ONHOLD" | "INACTIVO";
+  externalRef: string | null;
   salon: string | null;
   enrollmentId: string | null;
 }
@@ -437,6 +438,21 @@ export default function ContratosPage() {
                   <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                     {c.tipoCurso} · {c.countryCode} · {c.inicio} → {c.finalContrato}
                   </span>
+                  {c.externalRef !== null && (
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        color: "#0d47a1",
+                        background: "#e3f2fd",
+                        padding: "0.1rem 0.45rem",
+                        borderRadius: "0.5rem",
+                        marginLeft: "0.4rem",
+                      }}
+                    >
+                      LGS {c.externalRef}
+                    </span>
+                  )}
                   <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                     Titular: {c.titular}
                     {c.username !== null && ` · usuario: ${c.username}`}

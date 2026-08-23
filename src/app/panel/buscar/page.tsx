@@ -26,6 +26,7 @@ interface Resultados {
     tipoCurso: string;
     countryCode: string;
     estado: string;
+    externalRef: string | null;
     salon: string | null;
     username: string | null;
   }[];
@@ -97,6 +98,7 @@ function ResultadosBusqueda() {
               >
                 <strong>Contrato N° {c.numero}</strong> · {c.beneficiario} ({c.tipoCurso},{" "}
                 {c.countryCode}) · {c.estado}
+                {c.externalRef !== null && ` · LGS ${c.externalRef}`}
                 <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                   {" "}
                   · Titular: {c.titular}
