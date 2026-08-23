@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 interface Contrato {
@@ -30,6 +30,7 @@ interface Contrato {
   estado: "PENDIENTE" | "APROBADO" | "ONHOLD" | "INACTIVO";
   externalRef: string | null;
   salon: string | null;
+  campania: string | null;
   enrollmentId: string | null;
 }
 
@@ -40,15 +41,6 @@ interface SalonOpcion {
   curso: string; // tipo del curso (JUNIOR | YOUNGSTER)
   cupo: number;
   sesiones: number;
-}
-
-interface Persona {
-  id: string;
-  nombres: string;
-  apellidos: string;
-  fechaNacimiento: string | null;
-  countryCode: string;
-  estado: string;
 }
 
 interface Credenciales {
@@ -83,80 +75,139 @@ const botonAccion: CSSProperties = {
 
 export default function ContratosPage() {
   const [contratos, setContratos] = useState<Contrato[] | null>(null);
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [beneficiarioId, setBeneficiarioId] = useState("");
-  const [titularId, setTitularId] = useState("");
-  const [tipoCurso, setTipoCurso] = useState<"JUNIOR" | "YOUNGSTER">("JUNIOR");
-  const [pais, setPais] = useState("CL");
-  const [inicio, setInicio] = useState("");
-  const [fin, setFin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [credenciales, setCredenciales] = useState<Credenciales | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [descargando, setDescargando] = useState(false);
   const [salones, setSalones] = useState<SalonOpcion[]>([]);
+  const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
   // Contrato al que se le está eligiendo salón (matrícula o cambio académico).
   const [eligiendoSalon, setEligiendoSalon] = useState<{
     contrato: Contrato;
     modo: "matricular" | "mover";
   } | null>(null);
   const [salonElegido, setSalonElegido] = useState("");
+  // Filtros
+  const [fEstado, setFEstado] = useState("");
+  const [fPais, setFPais] = useState("");
+  const [fTipoCurso, setFTipoCurso] = useState("");
+  const [fCampaniaId, setFCampaniaId] = useState("");
+  const [fInicioDesde, setFInicioDesde] = useState("");
+  const [fFinalHasta, setFFinalHasta] = useState("");
 
-  const cargar = useCallback(async () => {
-    const [resC, resP, resS] = await Promise.all([
-      apiFetch("/api/contracts"),
-      apiFetch("/api/people"),
-      apiFetch("/api/scheduling/classrooms"),
-    ]);
-    if (resC.ok) {
-      const data: { contratos: Contrato[] } = await resC.json();
+  const cargarContratos = useCallback(async () => {
+    const p = new URLSearchParams();
+    if (fEstado) p.set("estado", fEstado);
+    if (fPais) p.set("pais", fPais);
+    if (fTipoCurso) p.set("tipoCurso", fTipoCurso);
+    if (fCampaniaId) p.set("campaignId", fCampaniaId);
+    if (fInicioDesde) p.set("inicioDesde", fInicioDesde);
+    if (fFinalHasta) p.set("finalHasta", fFinalHasta);
+    p.set("limit", "200");
+    const res = await apiFetch(`/api/contracts?${p.toString()}`);
+    if (res.ok) {
+      const data: { contratos: Contrato[] } = await res.json();
       setContratos(data.contratos);
     }
-    if (resP.ok) {
-      const data: { personas: Persona[] } = await resP.json();
-      setPersonas(data.personas.filter((p) => p.estado === "ACTIVA"));
-    }
-    if (resS.ok) {
-      const data: { salones: SalonOpcion[] } = await resS.json();
-      setSalones(data.salones);
-    }
-  }, []);
+  }, [fEstado, fPais, fTipoCurso, fCampaniaId, fInicioDesde, fFinalHasta]);
 
   useEffect(() => {
-    async function inicial() {
-      await cargar();
+    async function run() {
+      await cargarContratos();
     }
-    void inicial();
-  }, [cargar]);
+    void run();
+  }, [cargarContratos]);
 
-  async function crear(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setOcupado(true);
-    try {
-      const res = await apiFetch("/api/contracts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          beneficiarioId,
-          titularId,
-          tipoCurso,
-          countryCode: pais,
-          inicio,
-          finalContrato: fin,
-        }),
-      });
-      const data: { error?: { message: string } } = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? "No se pudo crear el contrato.");
-        return;
+  useEffect(() => {
+    async function estaticos() {
+      const [resS, resCa] = await Promise.all([
+        apiFetch("/api/scheduling/classrooms"),
+        apiFetch("/api/catalog/campaigns"),
+      ]);
+      if (resS.ok) {
+        const data: { salones: SalonOpcion[] } = await resS.json();
+        setSalones(data.salones);
       }
-      setMostrarForm(false);
-      await cargar();
-    } catch {
-      setError("Error de conexión.");
+      if (resCa.ok) {
+        const data: { campanias: { id: string; nombre: string }[] } = await resCa.json();
+        setCampanias(data.campanias);
+      }
+    }
+    void estaticos();
+  }, []);
+
+  /** Genera un CSV con los contratos actualmente listados (respeta los filtros). */
+  function descargarCSV() {
+    if (contratos === null || contratos.length === 0) return;
+    setDescargando(true);
+    try {
+      const headers = [
+        "N",
+        "N LGS",
+        "Estado",
+        "Pais",
+        "Curso",
+        "Inicio",
+        "Final",
+        "Beneficiario",
+        "Doc beneficiario",
+        "Nacimiento",
+        "Usuario",
+        "Titular",
+        "Doc titular",
+        "Tel titular",
+        "Email titular",
+        "Apoderados",
+        "Salon",
+        "Campana",
+      ];
+      const esc = (v: unknown): string => {
+        const s = v === null || v === undefined ? "" : String(v);
+        return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const filas = contratos.map((c) =>
+        [
+          c.numero,
+          c.externalRef ?? "",
+          c.estado,
+          c.countryCode,
+          c.tipoCurso,
+          c.inicio,
+          c.finalContrato,
+          c.beneficiario,
+          `${c.beneficiarioDocTipo} ${c.beneficiarioDocNumero}`,
+          c.beneficiarioFechaNac ?? "",
+          c.username ?? "",
+          c.titular,
+          `${c.titularDocTipo} ${c.titularDocNumero}`,
+          c.titularTelefono ?? "",
+          c.titularEmail ?? "",
+          c.apoderados
+            .map(
+              (a) =>
+                `${a.nombre}${a.parentesco !== null ? ` (${a.parentesco})` : ""} ${a.docTipo} ${a.docNumero}`,
+            )
+            .join(" | "),
+          c.salon ?? "",
+          c.campania ?? "",
+        ]
+          .map(esc)
+          .join(","),
+      );
+      const csv = [headers.join(","), ...filas].join("\r\n");
+      // BOM para que Excel respete los acentos.
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const hoy = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `contratos-${hoy}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } finally {
-      setOcupado(false);
+      setDescargando(false);
     }
   }
 
@@ -181,7 +232,7 @@ export default function ContratosPage() {
       if (data.credenciales != null) {
         setCredenciales(data.credenciales);
       }
-      await cargar();
+      await cargarContratos();
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -232,7 +283,7 @@ export default function ContratosPage() {
       }
       setEligiendoSalon(null);
       setSalonElegido("");
-      await cargar();
+      await cargarContratos();
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -253,26 +304,126 @@ export default function ContratosPage() {
     else if (motivo !== null) setError("El motivo debe tener al menos 5 caracteres.");
   }
 
-  const ninos = personas.filter((p) => p.fechaNacimiento !== null);
-
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: "1.6rem" }}>Contratos</h1>
         <button
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={descargarCSV}
+          disabled={descargando || contratos === null || contratos.length === 0}
+          title={
+            contratos !== null && contratos.length > 0
+              ? "Descarga los contratos listados (con los filtros aplicados)"
+              : "No hay contratos para exportar"
+          }
           style={{
             padding: "0.55rem 1.2rem",
             borderRadius: "0.6rem",
             border: "none",
-            background: "var(--lgs-azul)",
-            color: "white",
+            background:
+              descargando || contratos === null || contratos.length === 0
+                ? "#9e9e9e"
+                : "var(--lgs-verde)",
+            color: "#1b2a10",
             fontWeight: 700,
-            cursor: "pointer",
+            cursor: descargando ? "wait" : "pointer",
           }}
         >
-          {mostrarForm ? "Cancelar" : "+ Nuevo contrato"}
+          {descargando ? "Generando…" : "⬇ Descargar CSV"}
         </button>
+      </div>
+
+      <div
+        style={{
+          marginTop: "1rem",
+          padding: "0.9rem 1rem",
+          border: "1px solid #e3e7f0",
+          borderRadius: "0.9rem",
+          display: "flex",
+          gap: "0.7rem",
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+        }}
+      >
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Contrato (estado)</span>
+          <select value={fEstado} onChange={(e) => setFEstado(e.target.value)} style={inputStyle}>
+            <option value="">Todos</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="APROBADO">Aprobado</option>
+            <option value="ONHOLD">En pausa</option>
+            <option value="INACTIVO">Inactivo</option>
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Plataforma</span>
+          <select value={fPais} onChange={(e) => setFPais(e.target.value)} style={inputStyle}>
+            <option value="">Todas</option>
+            {["CL", "CO", "EC", "PE"].map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 12rem" }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Campaña</span>
+          <select
+            value={fCampaniaId}
+            onChange={(e) => setFCampaniaId(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">Todas</option>
+            {campanias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Curso</span>
+          <select
+            value={fTipoCurso}
+            onChange={(e) => setFTipoCurso(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">Todos</option>
+            <option value="JUNIOR">Junior (6–9)</option>
+            <option value="YOUNGSTER">Youngster (10–13)</option>
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Inicio desde</span>
+          <input
+            type="date"
+            value={fInicioDesde}
+            onChange={(e) => setFInicioDesde(e.target.value)}
+            style={inputStyle}
+          />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Final hasta</span>
+          <input
+            type="date"
+            value={fFinalHasta}
+            onChange={(e) => setFFinalHasta(e.target.value)}
+            style={inputStyle}
+          />
+        </label>
+        {(fEstado || fPais || fTipoCurso || fCampaniaId || fInicioDesde || fFinalHasta) && (
+          <button
+            onClick={() => {
+              setFEstado("");
+              setFPais("");
+              setFTipoCurso("");
+              setFCampaniaId("");
+              setFInicioDesde("");
+              setFFinalHasta("");
+            }}
+            style={botonAccion}
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {credenciales !== null && (
@@ -300,117 +451,6 @@ export default function ContratosPage() {
             Entendido, cerrar
           </button>
         </div>
-      )}
-
-      {mostrarForm && (
-        <form
-          onSubmit={crear}
-          style={{
-            marginTop: "1rem",
-            padding: "1.25rem",
-            border: "1px solid #e3e7f0",
-            borderRadius: "0.9rem",
-            display: "flex",
-            gap: "0.75rem",
-            flexWrap: "wrap",
-            alignItems: "flex-end",
-          }}
-        >
-          <label
-            style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 14rem" }}
-          >
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Niño (beneficiario)</span>
-            <select
-              required
-              value={beneficiarioId}
-              onChange={(e) => setBeneficiarioId(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">— Elegir —</option>
-              {ninos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.apellidos}, {p.nombres} ({p.countryCode})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label
-            style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 14rem" }}
-          >
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Titular del contrato</span>
-            <select
-              required
-              value={titularId}
-              onChange={(e) => setTitularId(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">— Elegir —</option>
-              {personas.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.apellidos}, {p.nombres} ({p.countryCode})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Tipo de curso</span>
-            <select
-              value={tipoCurso}
-              onChange={(e) => setTipoCurso(e.target.value as "JUNIOR" | "YOUNGSTER")}
-              style={inputStyle}
-            >
-              <option value="JUNIOR">Junior (6–9)</option>
-              <option value="YOUNGSTER">Youngster (10–13)</option>
-            </select>
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>País</span>
-            <select value={pais} onChange={(e) => setPais(e.target.value)} style={inputStyle}>
-              {["CL", "CO", "EC", "PE"].map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Inicio</span>
-            <input
-              type="date"
-              required
-              value={inicio}
-              onChange={(e) => setInicio(e.target.value)}
-              style={inputStyle}
-            />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Fin del contrato</span>
-            <input
-              type="date"
-              required
-              value={fin}
-              onChange={(e) => setFin(e.target.value)}
-              style={inputStyle}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={ocupado}
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "0.6rem",
-              border: "none",
-              background: ocupado ? "#9e9e9e" : "var(--lgs-verde)",
-              color: "#1b2a10",
-              fontWeight: 700,
-              cursor: ocupado ? "wait" : "pointer",
-            }}
-          >
-            Crear contrato
-          </button>
-          <p style={{ width: "100%", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-            La edad del niño a la fecha de inicio se valida contra su fecha de nacimiento. El
-            contrato nace PENDIENTE; al aprobarlo se crean las credenciales del alumno.
-          </p>
-        </form>
       )}
 
       {error !== null && (

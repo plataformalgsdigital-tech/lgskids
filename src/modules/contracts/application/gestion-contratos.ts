@@ -460,12 +460,22 @@ export async function buscarContratos(params: {
 export async function listarContratos(params: {
   countryScope: string[] | null;
   estado?: string;
+  pais?: string;
+  tipoCurso?: string;
+  campaignId?: string;
+  inicioDesde?: string;
+  finalHasta?: string;
   limit?: number;
   offset?: number;
 }): Promise<ContractListItem[]> {
   return listContracts({
     countryScope: params.countryScope,
     ...(params.estado !== undefined && { estado: params.estado }),
+    ...(params.pais !== undefined && { pais: params.pais }),
+    ...(params.tipoCurso !== undefined && { tipoCurso: params.tipoCurso }),
+    ...(params.campaignId !== undefined && { campaignId: params.campaignId }),
+    ...(params.inicioDesde !== undefined && { inicioDesde: params.inicioDesde }),
+    ...(params.finalHasta !== undefined && { finalHasta: params.finalHasta }),
     limit: Math.min(Math.max(params.limit ?? 50, 1), 200),
     offset: Math.max(params.offset ?? 0, 0),
   });

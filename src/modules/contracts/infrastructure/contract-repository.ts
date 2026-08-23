@@ -200,8 +200,9 @@ export interface ContractListItem extends ContractRecord {
   }[];
   /** N° de contrato de LGS (formato PP-NNNNN-YY), si vino del intake. */
   externalRef: string | null;
-  /** Matrícula ACTIVA (Fase 7): salón y matrícula, si existen. */
+  /** Matrícula viva (ACTIVA/RESERVADA): salón y campaña, si existen. */
   salon: string | null;
+  campania: string | null;
   enrollmentId: string | null;
 }
 
@@ -209,6 +210,11 @@ export interface ContractListItem extends ContractRecord {
 export async function listContracts(params: {
   countryScope: string[] | null;
   estado?: string;
+  pais?: string;
+  tipoCurso?: string;
+  campaignId?: string;
+  inicioDesde?: string;
+  finalHasta?: string;
   limit: number;
   offset: number;
 }): Promise<ContractListItem[]> {
@@ -221,6 +227,26 @@ export async function listContracts(params: {
   if (params.estado !== undefined) {
     values.push(params.estado);
     where.push(`c.estado = $${values.length}::contracts_estado`);
+  }
+  if (params.pais !== undefined) {
+    values.push(params.pais);
+    where.push(`c.country_code = $${values.length}`);
+  }
+  if (params.tipoCurso !== undefined) {
+    values.push(params.tipoCurso);
+    where.push(`c.tipo_curso = $${values.length}::catalog_course_tipo`);
+  }
+  if (params.campaignId !== undefined) {
+    values.push(params.campaignId);
+    where.push(`ca.id = $${values.length}`);
+  }
+  if (params.inicioDesde !== undefined) {
+    values.push(params.inicioDesde);
+    where.push(`c.inicio >= $${values.length}::date`);
+  }
+  if (params.finalHasta !== undefined) {
+    values.push(params.finalHasta);
+    where.push(`c.final_contrato <= $${values.length}::date`);
   }
   values.push(params.limit);
   const limitIdx = values.length;
@@ -246,14 +272,16 @@ export async function listContracts(params: {
                         FROM people_guardianship g
                         JOIN people_person a ON a.id = g.apoderado_id
                        WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
-            cl.nombre AS salon,
+            cl.nombre AS salon, ca.nombre AS campania,
             e.id AS "enrollmentId"
        FROM contracts_contract c
        JOIN people_person b ON b.id = c.beneficiario_id
        JOIN people_person t ON t.id = c.titular_id
        LEFT JOIN identity_user u ON u.id = b.user_id
-       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado = 'ACTIVA'
+       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado IN ('ACTIVA', 'RESERVADA')
        LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+       LEFT JOIN catalog_course cu ON cu.id = cl.course_id
+       LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
       ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY c.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
@@ -308,14 +336,16 @@ export async function searchContracts(params: {
                         FROM people_guardianship g
                         JOIN people_person a ON a.id = g.apoderado_id
                        WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
-            cl.nombre AS salon,
+            cl.nombre AS salon, ca.nombre AS campania,
             e.id AS "enrollmentId"
        FROM contracts_contract c
        JOIN people_person b ON b.id = c.beneficiario_id
        JOIN people_person t ON t.id = c.titular_id
        LEFT JOIN identity_user u ON u.id = b.user_id
-       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado = 'ACTIVA'
+       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado IN ('ACTIVA', 'RESERVADA')
        LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+       LEFT JOIN catalog_course cu ON cu.id = cl.course_id
+       LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
       WHERE ${where.join(" AND ")}
       ORDER BY c.numero DESC
       LIMIT $${values.length}`,

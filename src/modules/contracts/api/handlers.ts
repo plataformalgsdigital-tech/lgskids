@@ -88,13 +88,19 @@ export const crearReservaHandler = handlerWithAuth(async (request, auth) => {
   return json(resultado, { status: 201 });
 });
 
+const ISO_DATE_OPT = z.string().regex(ISO_DATE).optional();
 const listarSchema = z.object({
   estado: z.enum(["PENDIENTE", "APROBADO", "ONHOLD", "INACTIVO"]).optional(),
+  pais: z.string().length(2).transform((c) => c.toUpperCase()).optional(),
+  tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
+  campaignId: z.uuid().optional(),
+  inicioDesde: ISO_DATE_OPT,
+  finalHasta: ISO_DATE_OPT,
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-/** GET /api/contracts — con alcance por país. */
+/** GET /api/contracts — con alcance por país + filtros. */
 export const listarContratosHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_VER);
@@ -102,6 +108,11 @@ export const listarContratosHandler = handlerWithAuth(async (request, auth) => {
   const contratos = await listarContratos({
     countryScope: auth.countryScope,
     ...(query.estado !== undefined && { estado: query.estado }),
+    ...(query.pais !== undefined && { pais: query.pais }),
+    ...(query.tipoCurso !== undefined && { tipoCurso: query.tipoCurso }),
+    ...(query.campaignId !== undefined && { campaignId: query.campaignId }),
+    ...(query.inicioDesde !== undefined && { inicioDesde: query.inicioDesde }),
+    ...(query.finalHasta !== undefined && { finalHasta: query.finalHasta }),
     limit: query.limit,
     offset: query.offset,
   });
