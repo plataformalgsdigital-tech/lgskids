@@ -1,5 +1,5 @@
 import { PERMISOS, getAccessProfile } from "@/modules/access";
-import { agendaProximas, resumenAsistencia } from "@/modules/attendance";
+import { agendaProximas, historialAsistencia, resumenAsistencia } from "@/modules/attendance";
 import { matriculaDeNino } from "@/modules/enrollment";
 import { bootstrapIdentity } from "@/modules/identity";
 import { findPersonByUserId } from "@/modules/people";
@@ -30,10 +30,11 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     });
   }
 
-  const [asistencia, agenda, progreso] = await Promise.all([
+  const [asistencia, agenda, progreso, historial] = await Promise.all([
     resumenAsistencia(persona.id, matricula.classroomId),
     agendaProximas(matricula.classroomId, 8),
     progresoDeNino(persona.id),
+    historialAsistencia(persona.id, matricula.classroomId, 30),
   ]);
 
   return json({
@@ -43,5 +44,6 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     proxima: agenda[0] ?? null,
     agenda,
     progreso,
+    historial,
   });
 });

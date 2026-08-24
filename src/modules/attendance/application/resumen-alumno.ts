@@ -44,6 +44,33 @@ export async function resumenAsistencia(
   };
 }
 
+export interface ClaseHistorial {
+  sessionId: string;
+  tipo: string;
+  fecha: string;
+  numero: number;
+  estado: "PRESENTE" | "AUSENTE" | "JUSTIFICADO" | null;
+}
+
+/** Historial de clases YA dictadas del salón, con la marca del niño (o null). */
+export async function historialAsistencia(
+  childPersonId: string,
+  classroomId: string,
+  limit = 30,
+): Promise<ClaseHistorial[]> {
+  return queryRows<ClaseHistorial>(
+    `SELECT s.id AS "sessionId", s.tipo::text AS tipo, s.fecha::text AS fecha, s.numero,
+            a.estado::text AS estado
+       FROM scheduling_session s
+       LEFT JOIN attendance_attendance a
+         ON a.session_id = s.id AND a.child_person_id = $1
+      WHERE s.classroom_id = $2 AND s.starts_at < now()
+      ORDER BY s.starts_at DESC
+      LIMIT $3`,
+    [childPersonId, classroomId, limit],
+  );
+}
+
 /** Próximas sesiones del salón (agenda del niño), con el guía. */
 export async function agendaProximas(classroomId: string, limit = 8): Promise<EventoAgenda[]> {
   return queryRows<EventoAgenda>(

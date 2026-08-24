@@ -10,5 +10,5 @@
 export { listaDeSesion, marcarAsistencia } from "./application/asistencia";
 export type { ListaDeSesion, FilaLista, EstadoAsistencia } from "./application/asistencia";
 export { listaDeSesionHandler, marcarAsistenciaHandler } from "./api/handlers";
-export { resumenAsistencia, agendaProximas } from "./application/resumen-alumno";
-export type { ResumenAsistencia, EventoAgenda } from "./application/resumen-alumno";
+export { resumenAsistencia, agendaProximas, historialAsistencia } from "./application/resumen-alumno";
+export type { ResumenAsistencia, EventoAgenda, ClaseHistorial } from "./application/resumen-alumno";

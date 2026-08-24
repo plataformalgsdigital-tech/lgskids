@@ -41,7 +41,18 @@ interface Dashboard {
     }[];
     diploma: boolean;
   };
+  historial?: {
+    sessionId: string;
+    tipo: string;
+    fecha: string;
+    numero: number;
+    estado: "PRESENTE" | "AUSENTE" | "JUSTIFICADO" | null;
+  }[];
 }
+
+// Ventana de acceso a la clase (Zoom/meeting): 5 min antes → 15 min después.
+const ZOOM_ANTES_MS = 5 * 60_000;
+const ZOOM_DESPUES_MS = 15 * 60_000;
 
 const COLOR_NIVEL: Record<string, string> = {
   ROOKIE: "var(--lgs-verde)",
@@ -71,6 +82,13 @@ function hora(iso: string): string {
 export default function MiPanelPage() {
   const router = useRouter();
   const [data, setData] = useState<Dashboard | null>(null);
+  const [ahora, setAhora] = useState<number>(() => Date.now());
+
+  // Reloj para habilitar/deshabilitar el botón de clase en vivo.
+  useEffect(() => {
+    const id = setInterval(() => setAhora(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let cancelado = false;
@@ -115,6 +133,11 @@ export default function MiPanelPage() {
   }
 
   const nivelActual = data.progreso?.niveles.find((n) => n.estado === "EN_CURSO");
+  const inicioProxima = data.proxima != null ? new Date(data.proxima.startsAt).getTime() : null;
+  const zoomAbierto =
+    inicioProxima !== null &&
+    ahora >= inicioProxima - ZOOM_ANTES_MS &&
+    ahora <= inicioProxima + ZOOM_DESPUES_MS;
 
   return (
     <div
@@ -231,24 +254,46 @@ export default function MiPanelPage() {
                 </p>
               )}
             </div>
-            {data.matricula.meetingUrl !== null && (
-              <a
-                href={data.matricula.meetingUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  padding: "0.9rem 1.6rem",
-                  borderRadius: "0.9rem",
-                  background: "white",
-                  color: "var(--lgs-azul-oscuro)",
-                  fontWeight: 800,
-                  fontSize: "1.05rem",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                🎥 Entrar a clase
-              </a>
-            )}
+            {data.matricula.meetingUrl !== null &&
+              (zoomAbierto ? (
+                <a
+                  href={data.matricula.meetingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: "0.9rem 1.6rem",
+                    borderRadius: "0.9rem",
+                    background: "white",
+                    color: "var(--lgs-azul-oscuro)",
+                    fontWeight: 800,
+                    fontSize: "1.05rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  🎥 Entrar a clase
+                </a>
+              ) : (
+                <div style={{ textAlign: "right" }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "0.9rem 1.6rem",
+                      borderRadius: "0.9rem",
+                      background: "rgba(255,255,255,0.3)",
+                      color: "white",
+                      fontWeight: 800,
+                      fontSize: "1.05rem",
+                      whiteSpace: "nowrap",
+                      cursor: "not-allowed",
+                    }}
+                  >
+                    🎥 Entrar a clase
+                  </span>
+                  <p style={{ fontSize: "0.75rem", opacity: 0.9, marginTop: "0.35rem" }}>
+                    Se habilita 5 min antes de la clase
+                  </p>
+                </div>
+              ))}
           </section>
 
           {/* Salón + estadísticas de asistencia */}
@@ -432,6 +477,59 @@ export default function MiPanelPage() {
                     </span>
                   </div>
                 ))}
+              </div>
+            )}
+          </section>
+
+          {/* Historial de clases */}
+          <section style={card}>
+            <h2 style={{ fontSize: "1.15rem", marginBottom: "0.75rem" }}>📚 Historial de clases</h2>
+            {data.historial === undefined || data.historial.length === 0 ? (
+              <p style={{ color: "var(--texto-suave)" }}>Todavía no hay clases dictadas.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                {data.historial.map((h) => {
+                  const b =
+                    h.estado === "PRESENTE"
+                      ? { txt: "✔ Asistió", c: "#1b5e20", bg: "#e8f5e9" }
+                      : h.estado === "AUSENTE"
+                        ? { txt: "✘ Ausente", c: "#c62828", bg: "#ffebee" }
+                        : h.estado === "JUSTIFICADO"
+                          ? { txt: "📝 Justificado", c: "#8a6d00", bg: "#fff8e1" }
+                          : { txt: "— sin registro —", c: "#9e9e9e", bg: "#f5f5f5" };
+                  return (
+                    <div
+                      key={h.sessionId}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "0.5rem 0.9rem",
+                        borderRadius: "0.6rem",
+                        background: "#fafbfe",
+                        flexWrap: "wrap",
+                        gap: "0.3rem",
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>
+                        {h.tipo === "CLUB" ? "🎉 Club" : `📘 Sesión ${h.numero}`} ·{" "}
+                        {fechaLarga(`${h.fecha}T12:00:00`)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          color: b.c,
+                          background: b.bg,
+                          padding: "0.15rem 0.6rem",
+                          borderRadius: "1rem",
+                        }}
+                      >
+                        {b.txt}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
