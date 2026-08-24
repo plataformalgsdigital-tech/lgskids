@@ -138,6 +138,13 @@ export default function MiPanelPage() {
     inicioProxima !== null &&
     ahora >= inicioProxima - ZOOM_ANTES_MS &&
     ahora <= inicioProxima + ZOOM_DESPUES_MS;
+  const nombreAlumno = data.alumno?.nombre ?? "";
+  const partesNombre = nombreAlumno.split(" ").filter(Boolean);
+  const iniciales =
+    (
+      (partesNombre[0]?.[0] ?? "") +
+      (partesNombre.length > 1 ? (partesNombre[partesNombre.length - 1]?.[0] ?? "") : "")
+    ).toUpperCase() || "🙂";
 
   return (
     <div
@@ -233,26 +240,50 @@ export default function MiPanelPage() {
               gap: "1rem",
             }}
           >
-            <div>
-              <p style={{ opacity: 0.85, fontSize: "0.85rem", fontWeight: 700 }}>
-                📅 TU PRÓXIMA CLASE
-              </p>
-              {data.proxima != null ? (
-                <>
-                  <p style={{ fontSize: "1.6rem", fontWeight: 800, marginTop: "0.25rem" }}>
-                    {data.proxima.tipo === "CLUB" ? "Club" : "Sesión"} ·{" "}
-                    {fechaLarga(data.proxima.startsAt)}
-                  </p>
-                  <p style={{ fontSize: "1.05rem", opacity: 0.95 }}>
-                    {hora(data.proxima.startsAt)} (tu hora local)
-                    {data.proxima.guia !== null && ` · con ${data.proxima.guia}`}
-                  </p>
-                </>
-              ) : (
-                <p style={{ fontSize: "1.2rem", marginTop: "0.25rem" }}>
-                  No hay próximas clases programadas.
+            <div style={{ display: "flex", alignItems: "center", gap: "1.1rem", flexWrap: "wrap" }}>
+              {/* Foto del niño (avatar con iniciales mientras no se cargue foto) */}
+              <div
+                aria-hidden="true"
+                style={{
+                  width: "72px",
+                  height: "72px",
+                  borderRadius: "50%",
+                  flex: "none",
+                  background: "rgba(255,255,255,0.22)",
+                  border: "3px solid rgba(255,255,255,0.7)",
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: "1.7rem",
+                  fontWeight: 800,
+                  color: "white",
+                }}
+              >
+                {iniciales}
+              </div>
+              <div>
+                <p style={{ fontSize: "1.4rem", fontWeight: 800, lineHeight: 1.1 }}>
+                  {nombreAlumno}
                 </p>
-              )}
+                <p style={{ opacity: 0.85, fontSize: "0.85rem", fontWeight: 700, marginTop: "0.4rem" }}>
+                  📅 TU PRÓXIMA CLASE
+                </p>
+                {data.proxima != null ? (
+                  <>
+                    <p style={{ fontSize: "1.35rem", fontWeight: 800, marginTop: "0.15rem" }}>
+                      {data.proxima.tipo === "CLUB" ? "Club" : "Sesión"} ·{" "}
+                      {fechaLarga(data.proxima.startsAt)}
+                    </p>
+                    <p style={{ fontSize: "1.05rem", opacity: 0.95 }}>
+                      {hora(data.proxima.startsAt)} (tu hora local)
+                      {data.proxima.guia !== null && ` · con ${data.proxima.guia}`}
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ fontSize: "1.15rem", marginTop: "0.15rem" }}>
+                    No hay próximas clases programadas.
+                  </p>
+                )}
+              </div>
             </div>
             {data.matricula.meetingUrl !== null &&
               (zoomAbierto ? (
