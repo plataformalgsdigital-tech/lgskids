@@ -324,13 +324,21 @@ export interface ClassroomListItem extends ClassroomRecord {
   ultimaSesion: string | null;
 }
 
-export async function listClassrooms(courseId?: string): Promise<ClassroomListItem[]> {
+export async function listClassrooms(
+  courseId?: string,
+  guiaUserId?: string,
+): Promise<ClassroomListItem[]> {
   const values: unknown[] = [];
-  let where = "";
+  const conds: string[] = [];
   if (courseId !== undefined) {
     values.push(courseId);
-    where = `WHERE cl.course_id = $1`;
+    conds.push(`cl.course_id = $${values.length}`);
   }
+  if (guiaUserId !== undefined) {
+    values.push(guiaUserId);
+    conds.push(`cl.guia_user_id = $${values.length}`);
+  }
+  const where = conds.length > 0 ? `WHERE ${conds.join(" AND ")}` : "";
   const rows = await queryRows<Omit<ClassroomListItem, "horario"> & { horario: SlotResumen[] | null }>(
     `SELECT cl.id, cl.course_id AS "courseId", cl.nombre,
             cl.guia_user_id AS "guiaUserId", cl.cupo, cl.meeting_url AS "meetingUrl",
@@ -383,13 +391,17 @@ export interface AgendaItem {
 export async function agendaSesiones(
   desde: string,
   hasta: string,
-  filtros?: { campaignId?: string | undefined },
+  filtros?: { campaignId?: string | undefined; guiaUserId?: string | undefined },
 ): Promise<AgendaItem[]> {
   const values: unknown[] = [desde, hasta];
   let extra = "";
   if (filtros?.campaignId !== undefined && filtros.campaignId !== "") {
     values.push(filtros.campaignId);
-    extra = `AND cu.campaign_id = $${values.length}`;
+    extra += ` AND cu.campaign_id = $${values.length}`;
+  }
+  if (filtros?.guiaUserId !== undefined && filtros.guiaUserId !== "") {
+    values.push(filtros.guiaUserId);
+    extra += ` AND cl.guia_user_id = $${values.length}`;
   }
   return queryRows<AgendaItem>(
     `SELECT s.id, s.fecha::text AS fecha,
@@ -409,6 +421,36 @@ export async function agendaSesiones(
       WHERE s.fecha BETWEEN $1::date AND $2::date ${extra}
       ORDER BY s.starts_at, cl.nombre`,
     values,
+  );
+}
+
+export interface NinoDeGuia {
+  childPersonId: string;
+  nombres: string;
+  apellidos: string;
+  docTipo: string;
+  docNumero: string;
+  username: string | null;
+  salon: string;
+  campania: string;
+  cursoTipo: string;
+}
+
+/** Niños matriculados (ACTIVA) en los salones del guía. */
+export async function ninosDeGuia(guiaUserId: string): Promise<NinoDeGuia[]> {
+  return queryRows<NinoDeGuia>(
+    `SELECT p.id AS "childPersonId", p.nombres, p.apellidos,
+            p.doc_tipo AS "docTipo", p.doc_numero AS "docNumero", u.username,
+            cl.nombre AS salon, ca.nombre AS campania, cu.tipo::text AS "cursoTipo"
+       FROM enrollment_enrollment e
+       JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+       JOIN catalog_course cu ON cu.id = cl.course_id
+       JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+       JOIN people_person p ON p.id = e.child_person_id
+       LEFT JOIN identity_user u ON u.id = p.user_id
+      WHERE cl.guia_user_id = $1 AND e.estado = 'ACTIVA'
+      ORDER BY ca.nombre, cl.nombre, p.apellidos, p.nombres`,
+    [guiaUserId],
   );
 }
 

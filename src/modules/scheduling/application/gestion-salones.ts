@@ -20,12 +20,14 @@ import {
   insertSlot,
   insertSuspension,
   listClassrooms,
+  ninosDeGuia,
   sessionExisteEnFecha,
   updateGuiaSalon,
   upsertHolidays,
   type AgendaItem,
   type ClassroomListItem,
   type ClassroomRecord,
+  type NinoDeGuia,
   type SesionDetalle,
   type SessionListItem,
   type SessionRow,
@@ -279,17 +281,29 @@ export async function suspenderDia(input: {
   return { sesiones };
 }
 
-export async function listarSalones(courseId?: string): Promise<ClassroomListItem[]> {
-  return listClassrooms(courseId);
+export async function listarSalones(
+  courseId?: string,
+  guiaUserId?: string,
+): Promise<ClassroomListItem[]> {
+  return listClassrooms(courseId, guiaUserId);
 }
 
-/** Agenda del mes: sesiones de TODOS los salones entre dos fechas. */
+/** Agenda del mes: sesiones entre dos fechas (opcionalmente por campaña o guía). */
 export async function agenda(input: {
   desde: string;
   hasta: string;
   campaignId?: string | undefined;
+  guiaUserId?: string | undefined;
 }): Promise<AgendaItem[]> {
-  return agendaSesiones(input.desde, input.hasta, { campaignId: input.campaignId });
+  return agendaSesiones(input.desde, input.hasta, {
+    campaignId: input.campaignId,
+    guiaUserId: input.guiaUserId,
+  });
+}
+
+/** Niños de los salones del guía (panel del guía). */
+export async function misNinosDeGuia(guiaUserId: string): Promise<NinoDeGuia[]> {
+  return ninosDeGuia(guiaUserId);
 }
 
 /** Detalle de una sesión (info del evento + salón + curso + guía). */

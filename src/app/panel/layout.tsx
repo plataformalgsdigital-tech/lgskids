@@ -77,15 +77,10 @@ const MENU: {
     color: "var(--lgs-verde)",
     href: "/panel/auditoria",
   },
-  // Paneles por tipo de usuario: se construyen junto con la operación real.
-  { permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", pronto: true },
-  {
-    permiso: "panel.apoderado",
-    etiqueta: "Mis niños",
-    color: "var(--lgs-magenta)",
-    pronto: true,
-  },
-  { permiso: "panel.alumno", etiqueta: "Mis clases", color: "var(--lgs-verde)", pronto: true },
+  // Panel del GUÍA (restringido a sus salones/sesiones/niños).
+  { permiso: "panel.guia", etiqueta: "Mis clases", color: "var(--lgs-verde)", href: "/panel/mis-clases" },
+  { permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", href: "/panel/mis-salones" },
+  { permiso: "panel.guia", etiqueta: "Mis niños", color: "var(--lgs-magenta)", href: "/panel/mis-ninos" },
 ];
 
 export default function PanelLayout({ children }: { children: ReactNode }) {

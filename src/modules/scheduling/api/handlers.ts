@@ -7,6 +7,7 @@ import {
   crearSalon,
   detalleSalon,
   listarSalones,
+  misNinosDeGuia,
   obtenerDetalleSesion,
   regenerarSesiones,
   suspenderDia,
@@ -138,6 +139,32 @@ export const detalleSesionHandler = handlerWithAuth(async (_request, auth, conte
   const params = await context.params;
   const sessionId = z.uuid().parse(params["sessionId"]);
   return json(await obtenerDetalleSesion(sessionId));
+});
+
+// ---- Panel del GUÍA (restringido al guía logueado) ----
+
+/** GET /api/guia/agenda?from=&to= — sesiones de los salones del guía logueado. */
+export const agendaGuiaHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.PANEL_GUIA);
+  const q = request.nextUrl.searchParams;
+  const desde = fechaSchema.parse(q.get("from"));
+  const hasta = fechaSchema.parse(q.get("to"));
+  return json({ sesiones: await agenda({ desde, hasta, guiaUserId: auth.userId }) });
+});
+
+/** GET /api/guia/salones — salones asignados al guía logueado. */
+export const misSalonesHandler = handlerWithAuth(async (_request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.PANEL_GUIA);
+  return json({ salones: await listarSalones(undefined, auth.userId) });
+});
+
+/** GET /api/guia/ninos — niños matriculados en los salones del guía logueado. */
+export const misNinosHandler = handlerWithAuth(async (_request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.PANEL_GUIA);
+  return json({ ninos: await misNinosDeGuia(auth.userId) });
 });
 
 const cambiarGuiaSchema = z.object({ guiaUserId: z.uuid().nullable() });

@@ -24,12 +24,14 @@ export {
   listarHorarios,
   cambiarActivoHorario,
 } from "./application/horarios-catalogo";
+export { misNinosDeGuia } from "./application/gestion-salones";
 export type {
   AgendaItem,
   SesionDetalle,
   HorarioCatalogoRecord,
   HorarioSlotInput,
   ClassroomListItem,
+  NinoDeGuia,
 } from "./infrastructure/scheduling-repository";
 export {
   crearSalonHandler,
@@ -43,6 +45,9 @@ export {
   listarHorariosHandler,
   crearHorarioHandler,
   toggleHorarioHandler,
+  agendaGuiaHandler,
+  misSalonesHandler,
+  misNinosHandler,
 } from "./api/handlers";
 export { feriadosDelPais, domingoPascua } from "./domain/feriados";
 export type { Feriado } from "./domain/feriados";
