@@ -245,3 +245,9 @@ selector al crear salón (materializa `scheduling_slot`; NO es texto como Mosaic
   protección de `main` y CI.
 - Docker Desktop SÍ está instalado; `docker compose -f infra/docker/...` levanta
   Postgres local.
+- **Escopar el registro de intentos de quiz al salón del guía**: `POST
+  /api/assessment/attempts` valida `evaluaciones.gestionar` pero NO que el niño
+  pertenezca a un salón del guía (a diferencia de asistencia, que ya lo hace vía
+  `verificarAccesoGuia`). El intento no lleva sesión/salón, así que hay que
+  derivar la matrícula ACTIVA del niño y comparar `guia_user_id` con el actor
+  cuando este no tenga `salones.gestionar`.

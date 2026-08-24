@@ -1,7 +1,7 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { recalcularProgresion } from "@/modules/progression";
 import { withTransaction } from "@/platform/db/transaction";
-import { NotFoundError, ValidationError } from "@/platform/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/platform/errors";
 import {
   getMarcasDeSesion,
   getRosterConPais,
@@ -31,6 +31,23 @@ export interface FilaLista {
 export interface ListaDeSesion {
   sesion: SessionInfo;
   lista: FilaLista[];
+}
+
+/**
+ * ALCANCE DEL GUÍA (regla dura 6): un guía solo puede ver/gestionar sesiones
+ * de SUS propios salones. admin/coordinador (que pueden gestionar cualquier
+ * salón) no tienen esta restricción. Se verifica en el SERVIDOR, no en la UI.
+ */
+export async function verificarAccesoGuia(
+  sessionId: string,
+  actor: { userId: string; puedeGestionarCualquierSalon: boolean },
+): Promise<void> {
+  if (actor.puedeGestionarCualquierSalon) return;
+  const sesion = await getSessionInfo(sessionId);
+  if (sesion === null) throw new NotFoundError("La sesión no existe.");
+  if (sesion.guiaUserId !== actor.userId) {
+    throw new ForbiddenError("Solo puedes gestionar las sesiones de tus propios salones.");
+  }
 }
 
 /** Lista de la sesión: roster derivado + marcas existentes + aviso de feriado. */

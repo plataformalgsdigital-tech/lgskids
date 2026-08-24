@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
-import { listaDeSesion, marcarAsistencia } from "../application/asistencia";
+import { listaDeSesion, marcarAsistencia, verificarAccesoGuia } from "../application/asistencia";
 
 async function sessionIdFromContext(context: {
   params: Promise<Record<string, string | string[]>>;
@@ -15,6 +15,10 @@ export const listaDeSesionHandler = handlerWithAuth(async (_request, auth, conte
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ASISTENCIA_VER);
   const sessionId = await sessionIdFromContext(context);
+  await verificarAccesoGuia(sessionId, {
+    userId: auth.userId,
+    puedeGestionarCualquierSalon: profile.hasPermission(PERMISOS.SALONES_GESTIONAR),
+  });
   return json(await listaDeSesion(sessionId));
 });
 
@@ -36,6 +40,10 @@ export const marcarAsistenciaHandler = handlerWithAuth(async (request, auth, con
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ASISTENCIA_GESTIONAR);
   const sessionId = await sessionIdFromContext(context);
+  await verificarAccesoGuia(sessionId, {
+    userId: auth.userId,
+    puedeGestionarCualquierSalon: profile.hasPermission(PERMISOS.SALONES_GESTIONAR),
+  });
   const body = marcarSchema.parse(await request.json());
   const resultado = await marcarAsistencia({
     actorUserId: auth.userId,

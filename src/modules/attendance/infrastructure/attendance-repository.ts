@@ -13,13 +13,15 @@ export interface SessionInfo {
   fecha: string;
   startsAt: Date;
   numero: number;
+  /** Guía dueño del salón (para el alcance de un guía sobre SUS sesiones). */
+  guiaUserId: string | null;
 }
 
 export async function getSessionInfo(sessionId: string): Promise<SessionInfo | null> {
   return queryOne<SessionInfo>(
     `SELECT s.id, s.classroom_id AS "classroomId", cl.course_id AS "courseId",
             cl.nombre AS salon, s.tipo::text AS tipo, s.fecha::text AS fecha,
-            s.starts_at AS "startsAt", s.numero
+            s.starts_at AS "startsAt", s.numero, cl.guia_user_id AS "guiaUserId"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
       WHERE s.id = $1`,
