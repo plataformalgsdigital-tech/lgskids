@@ -1,70 +1,21 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { NotFoundError } from "@/platform/errors";
 import {
-  getReferenciaLeccion,
   getReferenciaNivel,
   getReferenciaQuiz,
-  updateReferenciaLeccion,
   updateReferenciaNivel,
   updateReferenciaQuiz,
-  type ReferenciaLeccion,
   type ReferenciaNivel,
   type ReferenciaQuiz,
 } from "../infrastructure/catalog-repository";
 
-export type {
-  ReferenciaLeccion,
-  ReferenciaNivel,
-  ReferenciaQuiz,
-} from "../infrastructure/catalog-repository";
+export type { ReferenciaNivel, ReferenciaQuiz } from "../infrastructure/catalog-repository";
 
 /**
- * REFERENCIA CURRICULAR: material, libros, video, actividades y evaluación que
- * cuelgan de cada lección / nivel / quiz del catálogo (adaptación normalizada
- * de la tabla NIVELES de MOSAICO). Lectura y escritura con semántica de MERGE:
- * solo se sobrescriben los campos provistos; los ausentes se conservan.
+ * REFERENCIA a nivel de NIVEL y QUIZ (pendiente de decidir si se conservan; el
+ * material a nivel de lección/curso vive en la tabla maestra catalog_curso).
+ * Lectura y escritura con MERGE: solo se sobrescriben los campos provistos.
  */
-
-export async function obtenerReferenciaLeccion(lessonId: string): Promise<ReferenciaLeccion> {
-  const ref = await getReferenciaLeccion(lessonId);
-  if (ref === null) throw new NotFoundError("La lección no existe.");
-  return ref;
-}
-
-export async function actualizarReferenciaLeccion(input: {
-  actorUserId: string;
-  lessonId: string;
-  contenido?: string | null | undefined;
-  videoUrl?: string | null | undefined;
-  material?: unknown[] | undefined;
-  materialUsuario?: unknown[] | undefined;
-  actividades?: unknown[] | undefined;
-  ip?: string | null;
-}): Promise<void> {
-  const actual = await getReferenciaLeccion(input.lessonId);
-  if (actual === null) throw new NotFoundError("La lección no existe.");
-  const ref: ReferenciaLeccion = {
-    contenido: input.contenido !== undefined ? input.contenido : actual.contenido,
-    videoUrl: input.videoUrl !== undefined ? input.videoUrl : actual.videoUrl,
-    material: input.material ?? actual.material,
-    materialUsuario: input.materialUsuario ?? actual.materialUsuario,
-    actividades: input.actividades ?? actual.actividades,
-  };
-  await updateReferenciaLeccion(input.lessonId, ref);
-  await registrarAuditoria({
-    actorUserId: input.actorUserId,
-    accion: "catalog.referencia_leccion",
-    entidad: "catalog_lesson",
-    entidadId: input.lessonId,
-    payload: {
-      material: ref.material.length,
-      materialUsuario: ref.materialUsuario.length,
-      actividades: ref.actividades.length,
-      video: ref.videoUrl !== null,
-    },
-    ip: input.ip ?? null,
-  });
-}
 
 export async function obtenerReferenciaNivel(levelId: string): Promise<ReferenciaNivel> {
   const ref = await getReferenciaNivel(levelId);

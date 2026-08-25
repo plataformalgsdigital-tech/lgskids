@@ -46,15 +46,21 @@ del salón, nunca de una acción del estudiante.
   Permisos: `catalogo.gestionar` (admin, coordinador) y `catalogo.ver`
   (+ guía). UI: /panel/campanias (wizard: campaña + crea JUNIOR/YOUNGSTER
   Salón 1–6 DESDE EL CATÁLOGO de horarios por número/grupo).
-- **Referencia curricular (2026-08-25, migración `20260825000000`)**: adaptación
-  NORMALIZADA de la tabla plana `NIVELES` de MOSAICO (evaluada, NO copiada). El
-  material cuelga de las tablas que ya existen: `catalog_lesson` (+`contenido`
-  markdown, `video_url`, `material`/`material_usuario`/`actividades` JSONB),
-  `catalog_level` (+`descripcion`, `recursos` JSONB) y `catalog_quiz`
-  (+`modo` IA|MANUAL, `minutos`; las preguntas viven en `contenido` JSONB).
-  API por entidad (`referencia-curricular.ts`, MERGE): `GET|PUT /api/catalog/
-  {lessons|levels|quizzes}/[id]/referencia` (ver=catalogo.ver, escribir=
-  catalogo.gestionar). Aún SIN UI ni consumo (alumno/guía/quiz real) — pendiente.
+- **Referencia curricular (2026-08-25)**: evaluada la tabla plana `NIVELES` de
+  MOSAICO; en KIDS se materializa como **tabla MAESTRA `catalog_curso`**
+  (migración `20260825000001`), INDEPENDIENTE de campañas: una fila por
+  `(curso, nivel, modulo, leccion)` con `contenido` (temario md), `video`,
+  `clubes`/`material_usuario`/`material_guia`/`actividades`/`recursos` (JSONB) +
+  `orden`. El contenido de "Junior·Rookie·Lección 1" es el mismo en toda
+  campaña → se carga UNA vez aquí. Es la fuente para paneles de alumno/guía y
+  actividades de seguimiento (consumo aún pendiente). CRUD:
+  `GET|POST /api/catalog/curso` + `GET|PUT|DELETE /api/catalog/curso/[id]`
+  (`curso-referencia.ts`; único por curso·nivel·módulo·lección; ver=catalogo.ver,
+  escribir=catalogo.gestionar). La migración `20260825000000` había puesto la
+  referencia en `catalog_lesson` (por campaña) — se RETIRÓ (superada por
+  `catalog_curso`); quedan como PENDIENTE (¿se necesitan?) las referencias de
+  `catalog_level` (`descripcion`,`recursos`) y `catalog_quiz` (`modo`,`minutos`,
+  preguntas en `contenido`) con `GET|PUT /api/catalog/{levels|quizzes}/[id]/referencia`.
 - **Fase 5 (`people` + `contracts`) completada**: migración
   `20260725000000_people_contracts`. Persona (doc único por país+tipo+número,
   SIN unique de email), apoderado–niño, contrato con país (ADR-0009).

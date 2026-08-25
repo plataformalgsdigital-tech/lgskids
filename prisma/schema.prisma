@@ -232,18 +232,37 @@ model Lesson {
   levelId String @map("level_id") @db.Uuid
   orden   Int // 1..4 (4 lecciones por nivel)
   titulo  String
-  // Referencia curricular (2026-08-25): temario, video y material.
-  contenido       String? // temario en markdown
-  videoUrl        String? @map("video_url") // key de storage o URL
-  material        Json? // guías del guía: [{nombre,url}]
-  materialUsuario Json?   @map("material_usuario") // libros del alumno: [{nombre,url}]
-  actividades     Json? // WordWall/links: [{nombre,link}]
+  // El material vive en catalog_curso (tabla maestra de referencia), no aquí.
 
   level Level @relation(fields: [levelId], references: [id], onDelete: Cascade)
   quizzes Quiz[]
 
   @@unique([levelId, orden])
   @@map("catalog_lesson")
+}
+
+/// Referencia MAESTRA de cursos (independiente de campañas): material, video,
+/// actividades y recursos por (curso, nivel, modulo, leccion). Fuente para los
+/// paneles de alumno/guía y las actividades de seguimiento.
+model CursoReferencia {
+  id              String     @id @default(uuid()) @db.Uuid
+  curso           CourseTipo // JUNIOR | YOUNGSTER
+  nivel           String // ROOKIE | CHAMPION | ELITE | LEGENDARY | ULTIMATE
+  modulo          String?
+  leccion         String
+  orden           Int        @default(0)
+  contenido       String? // temario (markdown)
+  video           String? // key de storage o URL
+  clubes          Json?
+  materialUsuario Json?      @map("material_usuario")
+  materialGuia    Json?      @map("material_guia")
+  actividades     Json?
+  recursos        Json?
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([curso, nivel, orden])
+  @@map("catalog_curso")
 }
 
 model Quiz {

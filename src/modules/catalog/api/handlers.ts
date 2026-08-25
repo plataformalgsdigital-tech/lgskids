@@ -5,13 +5,18 @@ import { crearCampania } from "../application/crear-campania";
 import { actualizarFechasCampania } from "../application/editar-campania";
 import { detalleCampania, listarCampanias } from "../application/consultas";
 import {
-  actualizarReferenciaLeccion,
   actualizarReferenciaNivel,
   actualizarReferenciaQuiz,
-  obtenerReferenciaLeccion,
   obtenerReferenciaNivel,
   obtenerReferenciaQuiz,
 } from "../application/referencia-curricular";
+import {
+  actualizarCursoReferencia,
+  crearCursoReferencia,
+  eliminarCursoReferencia,
+  listarCursoReferencia,
+  obtenerCursoReferencia,
+} from "../application/curso-referencia";
 
 const FECHA = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD");
 
@@ -102,13 +107,23 @@ const preguntaItem = z.object({
   explicacion: z.string().max(1000).optional(),
 });
 
-const refLeccionSchema = z.object({
-  contenido: z.string().max(20000).nullable().optional(),
-  videoUrl: z.string().max(1000).nullable().optional(),
-  material: z.array(materialItem).max(50).optional(),
+// Tabla maestra catalog_curso
+const cursoBaseSchema = {
+  curso: z.enum(["JUNIOR", "YOUNGSTER"]),
+  nivel: z.enum(["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"]),
+  modulo: z.string().max(120).nullish(),
+  leccion: z.string().min(1).max(200),
+  orden: z.number().int().min(0).max(999).optional(),
+  contenido: z.string().max(20000).nullish(),
+  video: z.string().max(1000).nullish(),
+  clubes: z.array(actividadItem).max(50).optional(),
   materialUsuario: z.array(materialItem).max(50).optional(),
+  materialGuia: z.array(materialItem).max(50).optional(),
   actividades: z.array(actividadItem).max(50).optional(),
-});
+  recursos: z.array(actividadItem).max(50).optional(),
+};
+const cursoCrearSchema = z.object(cursoBaseSchema);
+
 const refNivelSchema = z.object({
   descripcion: z.string().max(5000).nullable().optional(),
   recursos: z.array(actividadItem).max(50).optional(),
@@ -119,20 +134,53 @@ const refQuizSchema = z.object({
   preguntas: z.array(preguntaItem).max(100).optional(),
 });
 
-/** GET /api/catalog/lessons/[id]/referencia */
-export const referenciaLeccionGetHandler = handlerWithAuth(async (_request, auth, context) => {
+/** GET /api/catalog/curso?curso=&nivel= — lista la referencia maestra de cursos. */
+export const cursoReferenciaListHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
-  return json({ referencia: await obtenerReferenciaLeccion(await idParam(context)) });
+  const q = request.nextUrl.searchParams;
+  const curso = q.get("curso");
+  const nivel = q.get("nivel");
+  return json({
+    referencias: await listarCursoReferencia({
+      ...(curso !== null && curso !== "" && { curso }),
+      ...(nivel !== null && nivel !== "" && { nivel }),
+    }),
+  });
 });
 
-/** PUT /api/catalog/lessons/[id]/referencia — merge (solo campos provistos). */
-export const referenciaLeccionPutHandler = handlerWithAuth(async (request, auth, context) => {
+/** POST /api/catalog/curso — crea una fila de referencia (curso·nivel·módulo·lección). */
+export const cursoReferenciaCrearHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const body = cursoCrearSchema.parse(await request.json());
+  const r = await crearCursoReferencia({ actorUserId: auth.userId, ...body, ip: ipDe(request) });
+  return json(r, { status: 201 });
+});
+
+/** GET /api/catalog/curso/[id] */
+export const cursoReferenciaGetHandler = handlerWithAuth(async (_request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_VER);
+  return json({ referencia: await obtenerCursoReferencia(await idParam(context)) });
+});
+
+/** PUT /api/catalog/curso/[id] */
+export const cursoReferenciaPutHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
   const id = await idParam(context);
-  const body = refLeccionSchema.parse(await request.json());
-  await actualizarReferenciaLeccion({ actorUserId: auth.userId, lessonId: id, ...body, ip: ipDe(request) });
+  const body = cursoCrearSchema.parse(await request.json());
+  await actualizarCursoReferencia({ actorUserId: auth.userId, id, ...body, ip: ipDe(request) });
+  return json({ ok: true });
+});
+
+/** DELETE /api/catalog/curso/[id] */
+export const cursoReferenciaDeleteHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const id = await idParam(context);
+  await eliminarCursoReferencia({ actorUserId: auth.userId, id, ip: ipDe(request) });
   return json({ ok: true });
 });
 

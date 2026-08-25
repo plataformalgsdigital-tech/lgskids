@@ -131,43 +131,125 @@ export async function updateCampaignFechas(
 // Referencia curricular (material/video/actividades/evaluación)
 // ============================================================
 
-export interface ReferenciaLeccion {
+// ---- Tabla maestra de referencia de cursos (catalog_curso) ----
+
+export interface CursoReferenciaInput {
+  curso: string; // JUNIOR | YOUNGSTER
+  nivel: string; // ROOKIE | CHAMPION | ELITE | LEGENDARY | ULTIMATE
+  modulo: string | null;
+  leccion: string;
+  orden: number;
   contenido: string | null;
-  videoUrl: string | null;
-  material: unknown[];
+  video: string | null;
+  clubes: unknown[];
   materialUsuario: unknown[];
+  materialGuia: unknown[];
   actividades: unknown[];
+  recursos: unknown[];
 }
 
-export async function getReferenciaLeccion(lessonId: string): Promise<ReferenciaLeccion | null> {
-  return queryOne<ReferenciaLeccion>(
-    `SELECT contenido, video_url AS "videoUrl",
-            COALESCE(material, '[]'::jsonb) AS material,
-            COALESCE(material_usuario, '[]'::jsonb) AS "materialUsuario",
-            COALESCE(actividades, '[]'::jsonb) AS actividades
-       FROM catalog_lesson WHERE id = $1`,
-    [lessonId],
+export interface CursoReferenciaRow extends CursoReferenciaInput {
+  id: string;
+}
+
+const SELECT_CURSO = `SELECT id, curso::text AS curso, nivel, modulo, leccion, orden,
+    contenido, video,
+    COALESCE(clubes, '[]'::jsonb) AS clubes,
+    COALESCE(material_usuario, '[]'::jsonb) AS "materialUsuario",
+    COALESCE(material_guia, '[]'::jsonb) AS "materialGuia",
+    COALESCE(actividades, '[]'::jsonb) AS actividades,
+    COALESCE(recursos, '[]'::jsonb) AS recursos
+  FROM catalog_curso`;
+
+export async function listCursoReferencia(filtros?: {
+  curso?: string | undefined;
+  nivel?: string | undefined;
+}): Promise<CursoReferenciaRow[]> {
+  const where: string[] = [];
+  const values: unknown[] = [];
+  if (filtros?.curso !== undefined && filtros.curso !== "") {
+    values.push(filtros.curso);
+    where.push(`curso = $${values.length}::catalog_course_tipo`);
+  }
+  if (filtros?.nivel !== undefined && filtros.nivel !== "") {
+    values.push(filtros.nivel);
+    where.push(`nivel = $${values.length}`);
+  }
+  return queryRows<CursoReferenciaRow>(
+    `${SELECT_CURSO} ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY curso, nivel, orden, leccion`,
+    values,
   );
 }
 
-export async function updateReferenciaLeccion(
-  lessonId: string,
-  ref: ReferenciaLeccion,
-): Promise<void> {
+export async function getCursoReferencia(id: string): Promise<CursoReferenciaRow | null> {
+  return queryOne<CursoReferenciaRow>(`${SELECT_CURSO} WHERE id = $1`, [id]);
+}
+
+export async function existsCursoReferenciaKey(
+  curso: string,
+  nivel: string,
+  modulo: string | null,
+  leccion: string,
+  exceptId?: string,
+): Promise<boolean> {
+  const values: unknown[] = [curso, nivel, modulo ?? "", leccion.trim()];
+  let extra = "";
+  if (exceptId !== undefined) {
+    values.push(exceptId);
+    extra = ` AND id <> $${values.length}`;
+  }
+  const row = await queryOne<{ id: string }>(
+    `SELECT id FROM catalog_curso
+      WHERE curso = $1::catalog_course_tipo AND nivel = $2
+        AND COALESCE(modulo, '') = $3 AND lower(leccion) = lower($4)${extra}`,
+    values,
+  );
+  return row !== null;
+}
+
+function cursoParams(input: CursoReferenciaInput): unknown[] {
+  return [
+    input.curso,
+    input.nivel,
+    input.modulo,
+    input.leccion.trim(),
+    input.orden,
+    input.contenido,
+    input.video,
+    JSON.stringify(input.clubes),
+    JSON.stringify(input.materialUsuario),
+    JSON.stringify(input.materialGuia),
+    JSON.stringify(input.actividades),
+    JSON.stringify(input.recursos),
+  ];
+}
+
+export async function insertCursoReferencia(id: string, input: CursoReferenciaInput): Promise<void> {
   await execute(
-    `UPDATE catalog_lesson
-        SET contenido = $2, video_url = $3,
-            material = $4::jsonb, material_usuario = $5::jsonb, actividades = $6::jsonb
-      WHERE id = $1`,
-    [
-      lessonId,
-      ref.contenido,
-      ref.videoUrl,
-      JSON.stringify(ref.material),
-      JSON.stringify(ref.materialUsuario),
-      JSON.stringify(ref.actividades),
-    ],
+    `INSERT INTO catalog_curso
+       (id, curso, nivel, modulo, leccion, orden, contenido, video,
+        clubes, material_usuario, material_guia, actividades, recursos, updated_at)
+     VALUES ($1, $2::catalog_course_tipo, $3, $4, $5, $6, $7, $8,
+             $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, now())`,
+    [id, ...cursoParams(input)],
   );
+}
+
+export async function updateCursoReferencia(id: string, input: CursoReferenciaInput): Promise<void> {
+  await execute(
+    `UPDATE catalog_curso
+        SET curso = $2::catalog_course_tipo, nivel = $3, modulo = $4, leccion = $5,
+            orden = $6, contenido = $7, video = $8,
+            clubes = $9::jsonb, material_usuario = $10::jsonb, material_guia = $11::jsonb,
+            actividades = $12::jsonb, recursos = $13::jsonb, updated_at = now()
+      WHERE id = $1`,
+    [id, ...cursoParams(input)],
+  );
+}
+
+export async function deleteCursoReferencia(id: string): Promise<void> {
+  await execute(`DELETE FROM catalog_curso WHERE id = $1`, [id]);
 }
 
 export interface ReferenciaNivel {
