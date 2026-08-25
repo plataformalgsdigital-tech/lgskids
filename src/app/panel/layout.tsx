@@ -16,71 +16,94 @@ interface Me {
   permisos: { code: string }[];
 }
 
+// Orden de las secciones del sidebar.
+const SECCIONES = ["Académica", "Operación", "Administración", "Guía"] as const;
+
 const MENU: {
+  seccion: (typeof SECCIONES)[number];
   permiso: string;
   etiqueta: string;
   color: string;
   href?: string;
   pronto?: boolean;
 }[] = [
+  // ── Académica ──────────────────────────────────────────────
   {
+    seccion: "Académica",
     permiso: "catalogo.ver",
     etiqueta: "Campañas",
     color: "var(--lgs-azul)",
     href: "/panel/campanias",
   },
   {
-    permiso: "personas.ver",
-    etiqueta: "Kids",
-    color: "var(--lgs-cian)",
-    href: "/panel/personas",
-  },
-  {
-    permiso: "contratos.ver",
-    etiqueta: "Contratos",
-    color: "var(--lgs-magenta)",
-    href: "/panel/contratos",
-  },
-  {
-    permiso: "contratos.gestionar",
-    etiqueta: "Reservas (LGS)",
-    color: "var(--lgs-purpura)",
-    href: "/panel/reservas",
-  },
-  {
+    seccion: "Académica",
     permiso: "salones.ver",
     etiqueta: "Calendario",
     color: "var(--lgs-verde)",
     href: "/panel/salones",
   },
   {
+    seccion: "Académica",
     permiso: "salones.ver",
     etiqueta: "Horarios",
     color: "var(--lgs-amarillo)",
     href: "/panel/horarios",
   },
   {
+    seccion: "Académica",
+    permiso: "catalogo.ver",
+    etiqueta: "Mantenimiento de cursos",
+    color: "var(--lgs-purpura)",
+    href: "/panel/mantenimiento-cursos",
+  },
+  // ── Operación ──────────────────────────────────────────────
+  {
+    seccion: "Operación",
+    permiso: "personas.ver",
+    etiqueta: "Kids",
+    color: "var(--lgs-cian)",
+    href: "/panel/personas",
+  },
+  {
+    seccion: "Operación",
+    permiso: "contratos.ver",
+    etiqueta: "Contratos",
+    color: "var(--lgs-magenta)",
+    href: "/panel/contratos",
+  },
+  {
+    seccion: "Operación",
+    permiso: "contratos.gestionar",
+    etiqueta: "Reservas (LGS)",
+    color: "var(--lgs-purpura)",
+    href: "/panel/reservas",
+  },
+  // ── Administración ─────────────────────────────────────────
+  {
+    seccion: "Administración",
     permiso: "usuarios.gestionar",
     etiqueta: "Usuarios y roles",
     color: "var(--lgs-cian)",
     href: "/panel/usuarios",
   },
   {
+    seccion: "Administración",
     permiso: "reportes.ver",
     etiqueta: "Reportes",
     color: "var(--lgs-purpura)",
     href: "/panel/reportes",
   },
   {
+    seccion: "Administración",
     permiso: "auditoria.ver",
     etiqueta: "Auditoría",
     color: "var(--lgs-verde)",
     href: "/panel/auditoria",
   },
-  // Panel del GUÍA (restringido a sus salones/sesiones/niños).
-  { permiso: "panel.guia", etiqueta: "Mis clases", color: "var(--lgs-verde)", href: "/panel/mis-clases" },
-  { permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", href: "/panel/mis-salones" },
-  { permiso: "panel.guia", etiqueta: "Mis niños", color: "var(--lgs-magenta)", href: "/panel/mis-ninos" },
+  // ── Guía (restringido a sus salones/sesiones/niños) ────────
+  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis clases", color: "var(--lgs-verde)", href: "/panel/mis-clases" },
+  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", href: "/panel/mis-salones" },
+  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis niños", color: "var(--lgs-magenta)", href: "/panel/mis-ninos" },
 ];
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
@@ -171,30 +194,50 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             <span style={{ color: "var(--lgs-magenta)" }}>Kids</span>
           </span>
         </Link>
-        {opciones.map((item) => {
-          const activo = item.href !== undefined && pathname.startsWith(item.href);
-          const estilo = {
-            padding: "0.6rem 0.75rem",
-            borderRadius: "0.6rem",
-            borderLeft: `4px solid ${item.color}`,
-            background: activo ? "#e8f1fd" : "white",
-            fontWeight: 600,
-            fontSize: "0.95rem",
-            color: "inherit",
-            display: "block",
-          } as const;
-          return item.href !== undefined ? (
-            <Link key={item.permiso} href={item.href} style={estilo}>
-              {item.etiqueta}
-            </Link>
-          ) : (
-            <div
-              key={item.permiso}
-              style={{ ...estilo, opacity: 0.55 }}
-              title="Disponible próximamente"
-            >
-              {item.etiqueta}{" "}
-              <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)" }}>(pronto)</span>
+        {SECCIONES.map((seccion) => {
+          const items = opciones.filter((o) => o.seccion === seccion);
+          if (items.length === 0) return null;
+          return (
+            <div key={seccion} style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <span
+                style={{
+                  fontSize: "0.68rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "var(--texto-suave)",
+                  padding: "0.5rem 0.25rem 0.1rem",
+                }}
+              >
+                {seccion}
+              </span>
+              {items.map((item) => {
+                const activo = item.href !== undefined && pathname.startsWith(item.href);
+                const estilo = {
+                  padding: "0.55rem 0.75rem",
+                  borderRadius: "0.6rem",
+                  borderLeft: `4px solid ${item.color}`,
+                  background: activo ? "#e8f1fd" : "white",
+                  fontWeight: 600,
+                  fontSize: "0.92rem",
+                  color: "inherit",
+                  display: "block",
+                } as const;
+                return item.href !== undefined ? (
+                  <Link key={item.etiqueta} href={item.href} style={estilo}>
+                    {item.etiqueta}
+                  </Link>
+                ) : (
+                  <div
+                    key={item.etiqueta}
+                    style={{ ...estilo, opacity: 0.55 }}
+                    title="Disponible próximamente"
+                  >
+                    {item.etiqueta}{" "}
+                    <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)" }}>(pronto)</span>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
