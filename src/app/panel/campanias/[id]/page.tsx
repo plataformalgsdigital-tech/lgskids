@@ -17,6 +17,7 @@ interface Curso {
     codigo: string;
     nombre: string;
     orden: number;
+    duracionMeses: number;
     lecciones: { id: string; orden: number; titulo: string }[];
     cuestionarios: { id: string; tipo: string; titulo: string; leccionOrden: number | null }[];
   }[];
@@ -54,6 +55,7 @@ const COLOR_NIVEL: Record<string, string> = {
   CHAMPION: "var(--lgs-cian)",
   ELITE: "var(--lgs-amarillo)",
   LEGENDARY: "var(--lgs-magenta)",
+  ULTIMATE: "var(--lgs-purpura)",
 };
 
 const NOMBRE_TIPO: Record<string, string> = {
@@ -447,6 +449,10 @@ export default function DetalleCampaniaPage() {
                     <strong>
                       {nivel.orden}. {nivel.nombre}
                     </strong>
+                    <span style={{ color: "var(--texto-suave)", fontSize: "0.8rem" }}>
+                      {" "}
+                      · {nivel.duracionMeses} {nivel.duracionMeses === 1 ? "mes" : "meses"}
+                    </span>
                     <ul style={{ margin: "0.5rem 0 0 1rem", fontSize: "0.85rem" }}>
                       {nivel.lecciones.map((leccion) => (
                         <li key={leccion.id}>

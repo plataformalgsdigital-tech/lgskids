@@ -86,6 +86,7 @@ export async function detalleCampania(id: string): Promise<CampaignDetail> {
       codigo: row.codigo,
       nombre: row.nivel_nombre,
       orden: row.nivel_orden,
+      duracionMeses: row.duracion_meses,
       lecciones: lessonsByLevel.get(row.level_id) ?? [],
       cuestionarios: quizzesByLevel.get(row.level_id) ?? [],
     });

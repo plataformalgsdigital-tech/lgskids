@@ -207,11 +207,12 @@ model Course {
 }
 
 model Level {
-  id       String @id @default(uuid()) @db.Uuid
-  courseId String @map("course_id") @db.Uuid
-  codigo   String // ROOKIE | CHAMPION | ELITE | LEGENDARY
-  orden    Int // 1..4
-  nombre   String
+  id          String @id @default(uuid()) @db.Uuid
+  courseId    String @map("course_id") @db.Uuid
+  codigo      String // ROOKIE | CHAMPION | ELITE | LEGENDARY | ULTIMATE
+  orden       Int // 1..5
+  nombre      String
+  duracionMeses Int @default(2) @map("duracion_meses") // Rookie/Champion/Ultimate 2, Elite/Legendary 3
 
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]

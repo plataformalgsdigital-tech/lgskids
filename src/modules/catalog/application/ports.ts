@@ -15,6 +15,7 @@ export interface CampaignGraph {
       codigo: NivelCodigo;
       nombre: string;
       orden: number;
+      duracionMeses: number;
       lessons: { id: string; orden: number; titulo: string; quizPracticaId: string }[];
       quizLevelUpId: string;
     }[];
@@ -49,6 +50,7 @@ export interface CampaignDetail {
       codigo: string;
       nombre: string;
       orden: number;
+      duracionMeses: number;
       lecciones: { id: string; orden: number; titulo: string }[];
       cuestionarios: { id: string; tipo: string; titulo: string; leccionOrden: number | null }[];
     }[];

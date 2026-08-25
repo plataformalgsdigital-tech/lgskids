@@ -49,6 +49,7 @@ export async function crearCampania(input: {
         codigo: nivel.codigo,
         nombre: nivel.nombre,
         orden: nivel.orden,
+        duracionMeses: nivel.duracionMeses,
         lessons: Array.from({ length: LECCIONES_POR_NIVEL }, (_, i) => ({
           id: newId(),
           orden: i + 1,

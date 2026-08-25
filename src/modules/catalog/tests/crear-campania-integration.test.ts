@@ -49,9 +49,9 @@ describe.runIf(RUN)("crearCampania (integración con Postgres)", () => {
          (SELECT count(*) FROM catalog_quiz q JOIN catalog_level n ON n.id = q.level_id JOIN catalog_course c ON c.id = n.course_id WHERE c.campaign_id = $1)::text AS quizzes`,
       [campaignId],
     );
-    // 2 cursos × 4 niveles = 8; × 4 lecciones = 32;
-    // quizzes: 32 prácticas + 8 level up = 40.
-    expect(conteos).toEqual({ cursos: "2", niveles: "8", lecciones: "32", quizzes: "40" });
+    // 2 cursos × 5 niveles = 10; × 4 lecciones = 40;
+    // quizzes: 40 prácticas + 10 level up = 50.
+    expect(conteos).toEqual({ cursos: "2", niveles: "10", lecciones: "40", quizzes: "50" });
   });
 
   it("cada nivel tiene exactamente UN Level Up", async () => {
@@ -64,7 +64,7 @@ describe.runIf(RUN)("crearCampania (integración con Postgres)", () => {
         GROUP BY q.level_id`,
       [campaignId],
     );
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(10);
     expect(rows.every((r) => r.total === "1")).toBe(true);
   });
 
@@ -79,6 +79,7 @@ describe.runIf(RUN)("crearCampania (integración con Postgres)", () => {
         "CHAMPION",
         "ELITE",
         "LEGENDARY",
+        "ULTIMATE",
       ]);
       for (const nivel of curso.niveles) {
         expect(nivel.lecciones).toHaveLength(4);

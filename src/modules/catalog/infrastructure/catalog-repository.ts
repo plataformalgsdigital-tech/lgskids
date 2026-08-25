@@ -34,9 +34,9 @@ export async function insertCampaignGraph(tx: PoolClient, graph: CampaignGraph):
     );
     for (const level of course.levels) {
       await execute(
-        `INSERT INTO catalog_level (id, course_id, codigo, orden, nombre)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [level.id, course.id, level.codigo, level.orden, level.nombre],
+        `INSERT INTO catalog_level (id, course_id, codigo, orden, nombre, duracion_meses)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [level.id, course.id, level.codigo, level.orden, level.nombre, level.duracionMeses],
         tx,
       );
       for (const lesson of level.lessons) {
@@ -136,13 +136,15 @@ export interface CourseTreeRow {
   codigo: string;
   nivel_nombre: string;
   nivel_orden: number;
+  duracion_meses: number;
 }
 
 export async function getCourseLevels(campaignId: string): Promise<CourseTreeRow[]> {
   return queryRows<CourseTreeRow>(
     `SELECT cu.id AS course_id, cu.tipo::text AS tipo,
             cu.inicio::text AS curso_inicio, cu.final_curso::text AS final_curso,
-            n.id AS level_id, n.codigo, n.nombre AS nivel_nombre, n.orden AS nivel_orden
+            n.id AS level_id, n.codigo, n.nombre AS nivel_nombre, n.orden AS nivel_orden,
+            n.duracion_meses
        FROM catalog_course cu
        JOIN catalog_level n ON n.course_id = cu.id
       WHERE cu.campaign_id = $1

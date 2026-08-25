@@ -31,9 +31,10 @@ del salón, nunca de una acción del estudiante.
   SEED_ADMIN_PASSWORD), `pnpm migrate:dev|deploy`, `pnpm worker:dev`.
 - **Fase 4 (`catalog`) completada**: migración `20260724000000_catalog`
   (campaña, curso, nivel, lección, cuestionario). Crear campaña genera EN
-  UNA TRANSACCIÓN los cursos Junior+Youngster con 4 niveles c/u, 4
-  lecciones por nivel (cuestionario de práctica c/u) y un Level Up por
-  nivel: 2/8/32/40 filas. **Fechas (2026-08-24)**: la campaña pide `inicio`
+  UNA TRANSACCIÓN los cursos Junior+Youngster con **5 niveles** c/u
+  (Rookie 2m · Champion 2m · Elite 3m · Legendary 3m · Ultimate Stage 2m = 12
+  meses; `catalog_level.duracion_meses`), 4 lecciones por nivel (cuestionario
+  de práctica c/u) y un Level Up por nivel: 2/10/40/50 filas. **Fechas (2026-08-24)**: la campaña pide `inicio`
   (comercial) + `inicio del curso`; `fin` = inicio + **12 meses** (EDITABLE
   vía `PATCH /api/catalog/campaigns/[id]` → `actualizarFechasCampania`; NO
   toca `final_curso`). `final_venta` (cierre de matrícula) = inicio del curso
@@ -101,7 +102,8 @@ del salón, nunca de una acción del estudiante.
 - **Fase 9 (`progression`) completada**: migración `20260729000000_progression`.
   **LA FUNCIÓN CENTRAL** (`progression/application/recalcular.ts`):
   4 prácticas aprobadas + Level Up aprobado ⇒ nivel COMPLETADO ⇒ MEDALLA;
-  4 niveles ⇒ DIPLOMA. DERIVADA de assessment (nada se edita a mano),
+  TODOS los niveles del curso completados ⇒ DIPLOMA (derivado de los niveles
+  reales del curso, agnóstico al conteo — hoy 5). DERIVADA de assessment (nada se edita a mano),
   IDEMPOTENTE (premios una sola vez) y RECUPERABLE (cualquier invocación
   re-deriva todo). NO cuenta sesiones asistidas. **Caminos que la
   disparan** (verificados por `progression/tests/caminos-progresion.test.ts`
@@ -170,7 +172,8 @@ del salón, nunca de una acción del estudiante.
 ## Vocabulario del negocio (obligatorio en código y UI)
 
 **Guía** (no profesor) · **Club** (no taller) · **Sesión** (no clase) ·
-**Salón** · **Campaña**. Niveles: Rookie → Champion → Elite → Legendary.
+**Salón** · **Campaña**. Niveles: Rookie → Champion → Elite → Legendary →
+Ultimate Stage (5 niveles; duración 2/2/3/3/2 meses).
 
 ## Comandos
 

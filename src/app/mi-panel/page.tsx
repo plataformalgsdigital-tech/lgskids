@@ -59,6 +59,7 @@ const COLOR_NIVEL: Record<string, string> = {
   CHAMPION: "var(--lgs-cian)",
   ELITE: "var(--lgs-amarillo)",
   LEGENDARY: "var(--lgs-magenta)",
+  ULTIMATE: "var(--lgs-purpura)",
 };
 
 const card: CSSProperties = {
