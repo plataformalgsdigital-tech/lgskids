@@ -245,8 +245,12 @@ Mantenible en `/panel/horarios`, alimenta el selector al crear salón (materiali
 catálogo para generar JUNIOR/YOUNGSTER Salón 1–6 por grupo.
 **Salón editable (2026-08-24)**: `PATCH /api/scheduling/classrooms/[id]` →
 `editarSalon` (cupo, guía, `activo`); al **desactivar** un salón sale del wizard
-de contratos y del intake (ambos filtran `activo`). Su detalle muestra las fechas
-de la campaña (editar fin/cierre desde ahí afecta a TODA la campaña).
+de contratos y del intake (ambos filtran `activo`). `DELETE` → `eliminarSalon`
+(borra salón+sesiones+slots+suspensiones; SE BLOQUEA con 409 si el salón tiene
+matrículas — desactivar en su lugar). Su detalle muestra las fechas de la campaña
+(editar fin/cierre desde ahí afecta a TODA la campaña). El **detalle de campaña**
+(`/panel/campanias/[id]`) lista todos los salones en una tabla (Tipo, Salón,
+Guía, Horario, Inicio/Final curso, Cierre matríc., Cupos, Estado, Acciones).
 
 ## Pendientes conocidos
 

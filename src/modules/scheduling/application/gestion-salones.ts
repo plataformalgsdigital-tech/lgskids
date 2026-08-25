@@ -7,6 +7,8 @@ import { feriadosDelPais } from "../domain/feriados";
 import { generarFechasSlot } from "../domain/generacion";
 import {
   agendaSesiones,
+  classroomTieneMatriculas,
+  deleteClassroom,
   deleteSessions,
   detalleSesion,
   findClassroomById,
@@ -393,6 +395,32 @@ export async function editarSalon(input: {
     entidad: "scheduling_classroom",
     entidadId: input.classroomId,
     payload: { cupo, guiaUserId, activo },
+    ip: input.ip ?? null,
+  });
+}
+
+/** Elimina un salón (y sus sesiones/slots/suspensiones). Se BLOQUEA si el salón
+ * tiene matrículas (activas, reservadas o históricas): en ese caso hay que
+ * desactivarlo, no borrarlo. */
+export async function eliminarSalon(input: {
+  actorUserId: string;
+  classroomId: string;
+  ip?: string | null;
+}): Promise<void> {
+  const salon = await findClassroomById(input.classroomId);
+  if (salon === null) throw new NotFoundError("El salón no existe.");
+  if (await classroomTieneMatriculas(input.classroomId)) {
+    throw new ConflictError(
+      "No se puede eliminar: el salón tiene matrículas (activas o históricas). Desactívalo en su lugar.",
+    );
+  }
+  await withTransaction((tx) => deleteClassroom(tx, input.classroomId));
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.salon_eliminado",
+    entidad: "scheduling_classroom",
+    entidadId: input.classroomId,
+    payload: { nombre: salon.nombre },
     ip: input.ip ?? null,
   });
 }

@@ -7,6 +7,7 @@ import {
   crearSalon,
   detalleSalon,
   editarSalon,
+  eliminarSalon,
   listarSalones,
   misNinosDeGuia,
   obtenerDetalleSesion,
@@ -200,6 +201,15 @@ export const editarSalonHandler = handlerWithAuth(async (request, auth, context)
   const id = await idFromContext(context);
   const body = editarSalonSchema.parse(await request.json());
   await editarSalon({ actorUserId: auth.userId, classroomId: id, ...body, ip: ip(request) });
+  return json({ ok: true });
+});
+
+/** DELETE /api/scheduling/classrooms/[id] — elimina el salón (si no tiene matrículas). */
+export const eliminarSalonHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  await eliminarSalon({ actorUserId: auth.userId, classroomId: id, ip: ip(request) });
   return json({ ok: true });
 });
 

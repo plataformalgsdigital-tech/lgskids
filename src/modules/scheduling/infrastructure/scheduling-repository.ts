@@ -643,6 +643,24 @@ export async function updateClassroom(
   );
 }
 
+/** ¿El salón tiene matrículas (activas, reservadas o históricas)? Bloquea el borrado. */
+export async function classroomTieneMatriculas(classroomId: string): Promise<boolean> {
+  const row = await queryOne<{ n: number }>(
+    `SELECT count(*)::int AS n FROM enrollment_enrollment WHERE classroom_id = $1`,
+    [classroomId],
+  );
+  return (row?.n ?? 0) > 0;
+}
+
+/** Borra el salón y sus dependencias (sesiones, slots, suspensiones). Úsese solo
+ * tras verificar que no tiene matrículas. Transaccional. */
+export async function deleteClassroom(tx: Queryable, id: string): Promise<void> {
+  await execute(`DELETE FROM scheduling_session WHERE classroom_id = $1`, [id], tx);
+  await execute(`DELETE FROM scheduling_slot WHERE classroom_id = $1`, [id], tx);
+  await execute(`DELETE FROM scheduling_suspension WHERE classroom_id = $1`, [id], tx);
+  await execute(`DELETE FROM scheduling_classroom WHERE id = $1`, [id], tx);
+}
+
 export interface SalonCampania {
   campaignId: string;
   campaignNombre: string;
