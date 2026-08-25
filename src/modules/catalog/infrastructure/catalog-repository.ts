@@ -209,6 +209,22 @@ export async function existsCursoReferenciaKey(
   return row !== null;
 }
 
+/** id de una fila por su clave natural (curso, nivel, unidad, leccion) — para upsert del importador. */
+export async function findCursoReferenciaIdByKey(
+  curso: string,
+  nivel: string,
+  unidad: string | null,
+  leccion: string,
+): Promise<string | null> {
+  const row = await queryOne<{ id: string }>(
+    `SELECT id FROM catalog_curso
+      WHERE curso = $1::catalog_course_tipo AND nivel = $2
+        AND COALESCE(unidad, '') = $3 AND lower(leccion) = lower($4)`,
+    [curso, nivel, unidad ?? "", leccion.trim()],
+  );
+  return row?.id ?? null;
+}
+
 function cursoParams(input: CursoReferenciaInput): unknown[] {
   return [
     input.curso,

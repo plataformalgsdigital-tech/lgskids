@@ -35,9 +35,10 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     titulo: "Subir curso (CSV)",
-    desc: "Importar la referencia de un curso completo desde un archivo.",
+    desc: "Importar la referencia de un curso completo desde un archivo (con previo).",
     emoji: "⬆️",
     color: "var(--lgs-cian)",
+    href: "/panel/mantenimiento-cursos/subir-curso",
   },
   {
     titulo: "Imágenes de curso",

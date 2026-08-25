@@ -56,8 +56,11 @@ del salón, nunca de una acción del estudiante.
   campaña → se carga UNA vez aquí. Es la fuente para paneles de alumno/guía y
   actividades de seguimiento (consumo aún pendiente). CRUD:
   `GET|POST /api/catalog/curso` + `GET|PUT|DELETE /api/catalog/curso/[id]`
-  (`curso-referencia.ts`; único por curso·nivel·módulo·lección; ver=catalogo.ver,
-  escribir=catalogo.gestionar). La migración `20260825000000` había puesto la
+  (`curso-referencia.ts`; único por curso·nivel·unidad·lección; ver=catalogo.ver,
+  escribir=catalogo.gestionar). **Import CSV** (`POST /api/catalog/curso/bulk` →
+  `importarCursoReferencia`, UPSERT por clave natural): UI `/panel/mantenimiento-cursos/subir-curso`
+  parsea el CSV en el navegador, muestra un PREVIO validado (✔/✘ por fila) y solo
+  al confirmar sube las válidas. Listas en CSV: ítems `Nombre|enlace` separados por `;`. La migración `20260825000000` había puesto la
   referencia en `catalog_lesson` (por campaña) — se RETIRÓ (superada por
   `catalog_curso`); quedan como PENDIENTE (¿se necesitan?) las referencias de
   `catalog_level` (`descripcion`,`recursos`) y `catalog_quiz` (`modo`,`minutos`,

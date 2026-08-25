@@ -4,6 +4,7 @@ import { newId } from "@/platform/ids";
 import {
   deleteCursoReferencia,
   existsCursoReferenciaKey,
+  findCursoReferenciaIdByKey,
   getCursoReferencia,
   insertCursoReferencia,
   listCursoReferencia,
@@ -125,6 +126,52 @@ export async function actualizarCursoReferencia(
     payload: { curso: datos.curso, nivel: datos.nivel, leccion: datos.leccion },
     ip: input.ip ?? null,
   });
+}
+
+/**
+ * IMPORTA (upsert) filas de referencia desde CSV: por cada fila, si ya existe
+ * la clave (curso, nivel, unidad, lección) la actualiza; si no, la crea.
+ * Devuelve conteos y errores por fila (base 1, incluye la cabecera del CSV).
+ */
+export async function importarCursoReferencia(input: {
+  actorUserId: string;
+  filas: DatosCurso[];
+  ip?: string | null;
+}): Promise<{ creados: number; actualizados: number; errores: { fila: number; motivo: string }[] }> {
+  let creados = 0;
+  let actualizados = 0;
+  const errores: { fila: number; motivo: string }[] = [];
+
+  for (let i = 0; i < input.filas.length; i += 1) {
+    try {
+      const datos = normalizar(input.filas[i]!);
+      const id = await findCursoReferenciaIdByKey(
+        datos.curso,
+        datos.nivel,
+        datos.unidad,
+        datos.leccion,
+      );
+      if (id !== null) {
+        await updateCursoReferencia(id, datos);
+        actualizados += 1;
+      } else {
+        await insertCursoReferencia(newId(), datos);
+        creados += 1;
+      }
+    } catch (e) {
+      errores.push({ fila: i + 2, motivo: e instanceof Error ? e.message : "Error" }); // +2: cabecera + base 1
+    }
+  }
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "catalog.curso_referencia_importada",
+    entidad: "catalog_curso",
+    entidadId: null,
+    payload: { creados, actualizados, errores: errores.length },
+    ip: input.ip ?? null,
+  });
+  return { creados, actualizados, errores };
 }
 
 export async function eliminarCursoReferencia(input: {

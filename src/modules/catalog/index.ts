@@ -18,6 +18,7 @@ export {
   referenciaQuizPutHandler,
   cursoReferenciaListHandler,
   cursoReferenciaCrearHandler,
+  cursoReferenciaBulkHandler,
   cursoReferenciaGetHandler,
   cursoReferenciaPutHandler,
   cursoReferenciaDeleteHandler,
@@ -35,6 +36,7 @@ export {
   crearCursoReferencia,
   actualizarCursoReferencia,
   eliminarCursoReferencia,
+  importarCursoReferencia,
 } from "./application/curso-referencia";
 export type { CursoReferenciaRow } from "./application/curso-referencia";
 export { crearCampania } from "./application/crear-campania";

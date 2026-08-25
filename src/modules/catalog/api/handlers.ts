@@ -14,6 +14,7 @@ import {
   actualizarCursoReferencia,
   crearCursoReferencia,
   eliminarCursoReferencia,
+  importarCursoReferencia,
   listarCursoReferencia,
   obtenerCursoReferencia,
 } from "../application/curso-referencia";
@@ -157,6 +158,23 @@ export const cursoReferenciaCrearHandler = handlerWithAuth(async (request, auth)
   const body = cursoCrearSchema.parse(await request.json());
   const r = await crearCursoReferencia({ actorUserId: auth.userId, ...body, ip: ipDe(request) });
   return json(r, { status: 201 });
+});
+
+const cursoBulkSchema = z.object({
+  filas: z.array(z.object(cursoBaseSchema)).min(1).max(1000),
+});
+
+/** POST /api/catalog/curso/bulk — importa (upsert) muchas filas desde CSV. */
+export const cursoReferenciaBulkHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const body = cursoBulkSchema.parse(await request.json());
+  const r = await importarCursoReferencia({
+    actorUserId: auth.userId,
+    filas: body.filas,
+    ip: ipDe(request),
+  });
+  return json(r);
 });
 
 /** GET /api/catalog/curso/[id] */
