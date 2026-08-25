@@ -24,6 +24,7 @@ interface Lista {
     tipo: string;
     fecha: string;
     numero: number;
+    meetingUrl: string | null;
   };
   lista: Fila[];
 }
@@ -200,6 +201,25 @@ export default function SesionPage() {
         {lista.sesion.salon}
       </h1>
       <p style={{ color: "var(--texto-suave)" }}>{lista.sesion.fecha}</p>
+      {lista.sesion.meetingUrl !== null && (
+        <a
+          href={lista.sesion.meetingUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "inline-block",
+            marginTop: "0.4rem",
+            padding: "0.5rem 1rem",
+            borderRadius: "0.6rem",
+            background: "var(--lgs-azul)",
+            color: "white",
+            fontWeight: 700,
+            fontSize: "0.9rem",
+          }}
+        >
+          🎥 Ir a Zoom
+        </a>
+      )}
 
       {aviso !== null && (
         <p

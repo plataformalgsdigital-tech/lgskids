@@ -163,6 +163,18 @@ del salón, nunca de una acción del estudiante.
   justificadas/total), progreso por nivel con medallas y diploma, y agenda
   de próximas sesiones. Requiere permiso `panel.alumno`. El login enruta a
   /mi-panel si el usuario es alumno (y no staff), al /panel en otro caso.
+- **Acceso a Zoom (2026-08-25, replicado de MOSAICO)**: lógica PURA en
+  `src/ui/zoom-window.ts` (cliente): ventana de ingreso `[inicio − 5 min,
+  inicio + 15 min]`; tras entrar, **reconexión** hasta 10 min antes del fin
+  (fin = inicio + `duracion_min`). Estados `espera → disponible → vencido |
+  cerrado`. Iconos en `src/ui/ZoomAccessButton.tsx`: cámara azul + check verde
+  (disponible, enlace clicable) / cámara gris + reloj naranja (bloqueado), con
+  mensaje por estado. Se compara contra el INSTANTE `starts_at` (UTC), no la
+  hora local. El "entrar a tiempo" solo habilita la reconexión (recordada por
+  sesión en `localStorage`; NO penaliza asistencia). Enlace = `meeting_url` del
+  salón. El guía ve "🎥 Ir a Zoom" en la página de asistencia de la sesión
+  (siempre, sin ventana). Pendiente: bitácora server-side de accesos
+  (minutos-desde-inicio) para cruzar con el reporte de Zoom.
 
 ## Sitio público / landing (2026-07-23)
 

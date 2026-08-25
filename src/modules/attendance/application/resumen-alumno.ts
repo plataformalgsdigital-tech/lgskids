@@ -14,6 +14,7 @@ export interface EventoAgenda {
   tipo: string;
   fecha: string;
   startsAt: Date;
+  duracionMin: number;
   guia: string | null;
 }
 
@@ -75,7 +76,7 @@ export async function historialAsistencia(
 export async function agendaProximas(classroomId: string, limit = 8): Promise<EventoAgenda[]> {
   return queryRows<EventoAgenda>(
     `SELECT s.id AS "sessionId", s.tipo::text AS tipo, s.fecha::text AS fecha,
-            s.starts_at AS "startsAt",
+            s.starts_at AS "startsAt", s.duracion_min AS "duracionMin",
             COALESCE(gp.nombres || ' ' || gp.apellidos, gu.username) AS guia
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id

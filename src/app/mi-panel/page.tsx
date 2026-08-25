@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
+import { estadoZoom } from "@/ui/zoom-window";
+import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 
 interface Dashboard {
   alumno: { nombre: string } | null;
@@ -19,7 +21,14 @@ interface Dashboard {
     justificadas: number;
     totalSesiones: number;
   };
-  proxima?: { tipo: string; fecha: string; startsAt: string; guia: string | null } | null;
+  proxima?: {
+    sessionId: string;
+    tipo: string;
+    fecha: string;
+    startsAt: string;
+    duracionMin: number;
+    guia: string | null;
+  } | null;
   agenda?: {
     sessionId: string;
     tipo: string;
@@ -49,10 +58,6 @@ interface Dashboard {
     estado: "PRESENTE" | "AUSENTE" | "JUSTIFICADO" | null;
   }[];
 }
-
-// Ventana de acceso a la clase (Zoom/meeting): 5 min antes → 15 min después.
-const ZOOM_ANTES_MS = 5 * 60_000;
-const ZOOM_DESPUES_MS = 15 * 60_000;
 
 const COLOR_NIVEL: Record<string, string> = {
   ROOKIE: "var(--lgs-verde)",
@@ -84,6 +89,7 @@ export default function MiPanelPage() {
   const router = useRouter();
   const [data, setData] = useState<Dashboard | null>(null);
   const [ahora, setAhora] = useState<number>(() => Date.now());
+  const [ingreso, setIngreso] = useState(false); // ya entró a la clase (reconexión)
 
   // Reloj para habilitar/deshabilitar el botón de clase en vivo.
   useEffect(() => {
@@ -125,6 +131,31 @@ export default function MiPanelPage() {
     router.replace("/login");
   }
 
+  // Reconexión: si ya ingresó a esta sesión, su ícono sigue activo (se recuerda
+  // por sesión en el navegador). Un F5 no pierde el derecho de reconexión.
+  const proxSessionId = data?.proxima?.sessionId ?? null;
+  useEffect(() => {
+    function sync() {
+      try {
+        setIngreso(proxSessionId !== null && localStorage.getItem(`zoom-acceso-${proxSessionId}`) === "1");
+      } catch {
+        setIngreso(false);
+      }
+    }
+    sync();
+  }, [proxSessionId]);
+
+  function entrarZoom() {
+    if (proxSessionId !== null) {
+      try {
+        localStorage.setItem(`zoom-acceso-${proxSessionId}`, "1");
+      } catch {
+        /* localStorage no disponible: la reconexión no persiste, no es crítico */
+      }
+    }
+    setIngreso(true);
+  }
+
   if (data === null) {
     return (
       <main style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
@@ -135,10 +166,15 @@ export default function MiPanelPage() {
 
   const nivelActual = data.progreso?.niveles.find((n) => n.estado === "EN_CURSO");
   const inicioProxima = data.proxima != null ? new Date(data.proxima.startsAt).getTime() : null;
-  const zoomAbierto =
-    inicioProxima !== null &&
-    ahora >= inicioProxima - ZOOM_ANTES_MS &&
-    ahora <= inicioProxima + ZOOM_DESPUES_MS;
+  const estadoZoomActual =
+    inicioProxima !== null && data.proxima != null
+      ? estadoZoom({
+          inicioMs: inicioProxima,
+          ahoraMs: ahora,
+          duracionMin: Number(data.proxima.duracionMin) || 60,
+          tieneAcceso: ingreso,
+        })
+      : null;
   const nombreAlumno = data.alumno?.nombre ?? "";
   const partesNombre = nombreAlumno.split(" ").filter(Boolean);
   const iniciales =
@@ -287,45 +323,16 @@ export default function MiPanelPage() {
               </div>
             </div>
             {data.matricula.meetingUrl !== null &&
-              (zoomAbierto ? (
-                <a
-                  href={data.matricula.meetingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    padding: "0.9rem 1.6rem",
-                    borderRadius: "0.9rem",
-                    background: "white",
-                    color: "var(--lgs-azul-oscuro)",
-                    fontWeight: 800,
-                    fontSize: "1.05rem",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  🎥 Entrar a clase
-                </a>
-              ) : (
-                <div style={{ textAlign: "right" }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "0.9rem 1.6rem",
-                      borderRadius: "0.9rem",
-                      background: "rgba(255,255,255,0.3)",
-                      color: "white",
-                      fontWeight: 800,
-                      fontSize: "1.05rem",
-                      whiteSpace: "nowrap",
-                      cursor: "not-allowed",
-                    }}
-                  >
-                    🎥 Entrar a clase
-                  </span>
-                  <p style={{ fontSize: "0.75rem", opacity: 0.9, marginTop: "0.35rem" }}>
-                    Se habilita 5 min antes de la clase
-                  </p>
-                </div>
-              ))}
+              estadoZoomActual !== null &&
+              (
+                <ZoomAccessButton
+                  meetingUrl={data.matricula.meetingUrl}
+                  estado={estadoZoomActual}
+                  tieneAcceso={ingreso}
+                  onEntrar={entrarZoom}
+                  textoClaro
+                />
+              )}
           </section>
 
           {/* Salón + estadísticas de asistencia */}
