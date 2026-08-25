@@ -33,12 +33,18 @@ del salón, nunca de una acción del estudiante.
   (campaña, curso, nivel, lección, cuestionario). Crear campaña genera EN
   UNA TRANSACCIÓN los cursos Junior+Youngster con 4 niveles c/u, 4
   lecciones por nivel (cuestionario de práctica c/u) y un Level Up por
-  nivel: 2/8/32/40 filas. Estado de campaña SIEMPRE derivado por fecha
-  (nunca almacenado). Fechas de campaña/curso son DATE puro leído con
-  `::text` (pg parsearía DATE a medianoche local). Permisos nuevos:
-  `catalogo.gestionar` (admin, coordinador) y `catalogo.ver` (+ guía).
-  UI: /panel/campanias (+ detalle). `final_curso` no tiene endpoint de
-  edición a propósito.
+  nivel: 2/8/32/40 filas. **Fechas (2026-08-24)**: la campaña pide `inicio`
+  (comercial) + `inicio del curso`; `fin` = inicio + **12 meses** (EDITABLE
+  vía `PATCH /api/catalog/campaigns/[id]` → `actualizarFechasCampania`; NO
+  toca `final_curso`). `final_venta` (cierre de matrícula) = inicio del curso
+  + **3 semanas**. El curso arranca en su fecha; `final_curso` = fin de campaña
+  (nominal, NUNCA reescrito). Estado de campaña SIEMPRE derivado por fecha
+  (nunca almacenado): **EN_MATRÍCULA** hasta `final_venta` (única visible en el
+  wizard de contratos y en el intake, que ya filtran EN_MATRICULA) → **ACTIVA**
+  → **CERRADA/Inactiva** al pasar `fin`. Fechas DATE puro leído con `::text`.
+  Permisos: `catalogo.gestionar` (admin, coordinador) y `catalogo.ver`
+  (+ guía). UI: /panel/campanias (wizard: campaña + crea JUNIOR/YOUNGSTER
+  Salón 1–6 DESDE EL CATÁLOGO de horarios por número/grupo).
 - **Fase 5 (`people` + `contracts`) completada**: migración
   `20260725000000_people_contracts`. Persona (doc único por país+tipo+número,
   SIN unique de email), apoderado–niño, contrato con país (ADR-0009).
@@ -228,8 +234,19 @@ matrícula `RESERVADA` hasta aprobar (el alta única activa RESERVADA→ACTIVA).
 `GET /api/kids-intake/availability`, `POST /api/kids-intake/reservations`,
 `POST /api/kids-intake/reservations/{externalRef}/approve`. Auditoría contra el
 usuario de sistema `sistema-lgs`. **Catálogo de horarios** reutilizable por tipo
-de curso (`scheduling_horario`) mantenible en `/panel/horarios`, alimenta el
-selector al crear salón (materializa `scheduling_slot`; NO es texto como Mosaico).
+de curso, **grupo de país** (`scheduling_horario.grupo_pais`: `01`=Chile,
+`02`=Colombia/Ecuador/Perú — por el desfase horario CL vs. el resto) y **salón**
+(`salon_numero`: el horario COMPLETO es un salón — todos sus días son el mismo;
+el 1er horario suele ser Salón 01, el 2º Salón 02). Unicidad de etiqueta por
+(tipo, grupo, salón). Editable (`PUT /api/scheduling/horarios/[id]` →
+`actualizarHorario`, reemplaza bloques), activable/desactivable (`PATCH`).
+Mantenible en `/panel/horarios`, alimenta el selector al crear salón (materializa
+`scheduling_slot`; NO es texto como Mosaico) y el wizard de campaña usa este
+catálogo para generar JUNIOR/YOUNGSTER Salón 1–6 por grupo.
+**Salón editable (2026-08-24)**: `PATCH /api/scheduling/classrooms/[id]` →
+`editarSalon` (cupo, guía, `activo`); al **desactivar** un salón sale del wizard
+de contratos y del intake (ambos filtran `activo`). Su detalle muestra las fechas
+de la campaña (editar fin/cierre desde ahí afecta a TODA la campaña).
 
 ## Pendientes conocidos
 

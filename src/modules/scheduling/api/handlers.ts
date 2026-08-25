@@ -6,6 +6,7 @@ import {
   cambiarGuia,
   crearSalon,
   detalleSalon,
+  editarSalon,
   listarSalones,
   misNinosDeGuia,
   obtenerDetalleSesion,
@@ -13,8 +14,10 @@ import {
   suspenderDia,
 } from "../application/gestion-salones";
 import {
+  actualizarHorario,
   cambiarActivoHorario,
   crearHorario,
+  eliminarHorario,
   listarHorarios,
 } from "../application/horarios-catalogo";
 
@@ -184,25 +187,45 @@ export const cambiarGuiaHandler = handlerWithAuth(async (request, auth, context)
   return json({ ok: true });
 });
 
+const editarSalonSchema = z.object({
+  cupo: z.number().int().min(1).max(50).optional(),
+  guiaUserId: z.uuid().nullable().optional(),
+  activo: z.boolean().optional(),
+});
+
+/** PATCH /api/scheduling/classrooms/[id] — edita cupo, guía y/o activo. */
+export const editarSalonHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const body = editarSalonSchema.parse(await request.json());
+  await editarSalon({ actorUserId: auth.userId, classroomId: id, ...body, ip: ip(request) });
+  return json({ ok: true });
+});
+
 // ---- Catálogo de horarios (mantenimiento) ----
 
 const crearHorarioSchema = z.object({
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
+  grupoPais: z.enum(["01", "02"]),
+  salonNumero: z.string().regex(/^\d{2}$/),
   etiqueta: z.string().min(2).max(60),
   orden: z.number().int().min(0).max(999).optional(),
   slots: z.array(slotSchema).min(1).max(4),
 });
 
-/** GET /api/scheduling/horarios?tipoCurso=&activos=1 — lista del catálogo. */
+/** GET /api/scheduling/horarios?tipoCurso=&grupoPais=&activos=1 — lista del catálogo. */
 export const listarHorariosHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_VER);
   const q = request.nextUrl.searchParams;
   const tipoCurso = q.get("tipoCurso");
+  const grupoPais = q.get("grupoPais");
   const soloActivos = q.get("activos") === "1";
   return json({
     horarios: await listarHorarios({
       ...(tipoCurso !== null && tipoCurso !== "" && { tipoCurso }),
+      ...(grupoPais !== null && grupoPais !== "" && { grupoPais }),
       soloActivos,
     }),
   });
@@ -215,6 +238,34 @@ export const crearHorarioHandler = handlerWithAuth(async (request, auth) => {
   const body = crearHorarioSchema.parse(await request.json());
   const resultado = await crearHorario({ actorUserId: auth.userId, ...body, ip: ip(request) });
   return json(resultado, { status: 201 });
+});
+
+const actualizarHorarioSchema = z.object({
+  tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
+  grupoPais: z.enum(["01", "02"]),
+  salonNumero: z.string().regex(/^\d{2}$/),
+  etiqueta: z.string().min(2).max(60),
+  orden: z.number().int().min(0).max(999).optional(),
+  slots: z.array(slotSchema).min(1).max(4),
+});
+
+/** PUT /api/scheduling/horarios/[id] — edita un horario del catálogo. */
+export const actualizarHorarioHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const body = actualizarHorarioSchema.parse(await request.json());
+  await actualizarHorario({ actorUserId: auth.userId, horarioId: id, ...body, ip: ip(request) });
+  return json({ ok: true });
+});
+
+/** DELETE /api/scheduling/horarios/[id] — elimina un horario del catálogo. */
+export const eliminarHorarioHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  await eliminarHorario({ actorUserId: auth.userId, horarioId: id, ip: ip(request) });
+  return json({ ok: true });
 });
 
 const toggleHorarioSchema = z.object({ activo: z.boolean() });

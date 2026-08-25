@@ -18,10 +18,11 @@ import { campaignNombreExists, insertCampaignGraph } from "../infrastructure/cat
 export async function crearCampania(input: {
   actorUserId: string;
   nombre: string;
-  inicio: string; // YYYY-MM-DD
-  duracionSemanas: number;
+  inicio: string; // YYYY-MM-DD (inicio de campaña)
+  cursoInicio: string; // YYYY-MM-DD (inicio del curso)
+  fin?: string | undefined; // editable; por defecto inicio + 12 meses
   ip?: string | null;
-}): Promise<{ id: string; nombre: string; inicio: string; fin: string }> {
+}): Promise<{ id: string; nombre: string; inicio: string; fin: string; finalVenta: string }> {
   const plan = planificarCampania(input);
 
   if (await campaignNombreExists(plan.nombre)) {
@@ -29,11 +30,18 @@ export async function crearCampania(input: {
   }
 
   const graph: CampaignGraph = {
-    campaign: { id: newId(), ...plan },
+    campaign: {
+      id: newId(),
+      nombre: plan.nombre,
+      inicio: plan.inicio,
+      fin: plan.fin,
+      finalVenta: plan.finalVenta,
+    },
     courses: TIPOS_CURSO.map((tc) => ({
       id: newId(),
       tipo: tc.tipo,
-      inicio: plan.inicio,
+      // El curso arranca en su propia fecha; las sesiones corren hasta el fin.
+      inicio: plan.cursoInicio,
       // final_curso NOMINAL = fin de campaña. NUNCA se reescribe (regla 1).
       finalCurso: plan.fin,
       levels: NIVELES.map((nivel) => ({
@@ -63,10 +71,18 @@ export async function crearCampania(input: {
       nombre: plan.nombre,
       inicio: plan.inicio,
       fin: plan.fin,
+      cursoInicio: plan.cursoInicio,
+      finalVenta: plan.finalVenta,
       cursos: graph.courses.length,
     },
     ip: input.ip ?? null,
   });
 
-  return { id: graph.campaign.id, ...plan };
+  return {
+    id: graph.campaign.id,
+    nombre: plan.nombre,
+    inicio: plan.inicio,
+    fin: plan.fin,
+    finalVenta: plan.finalVenta,
+  };
 }

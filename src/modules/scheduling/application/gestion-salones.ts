@@ -17,17 +17,20 @@ import {
   getSuspensionDates,
   insertClassroom,
   insertSessionsBatch,
+  getSalonCampania,
   insertSlot,
   insertSuspension,
   listClassrooms,
   ninosDeGuia,
   sessionExisteEnFecha,
+  updateClassroom,
   updateGuiaSalon,
   upsertHolidays,
   type AgendaItem,
   type ClassroomListItem,
   type ClassroomRecord,
   type NinoDeGuia,
+  type SalonCampania,
   type SesionDetalle,
   type SessionListItem,
   type SessionRow,
@@ -339,15 +342,17 @@ export interface DetalleSalon {
   sesiones: SessionListItem[];
   suspensiones: string[];
   finReal: string | null;
+  campania: SalonCampania | null;
 }
 
 export async function detalleSalon(classroomId: string): Promise<DetalleSalon> {
   const salon = await findClassroomById(classroomId);
   if (salon === null) throw new NotFoundError("El salón no existe.");
-  const [slots, sesiones, suspensiones] = await Promise.all([
+  const [slots, sesiones, suspensiones, campania] = await Promise.all([
     getSlots(classroomId),
     getSessions(classroomId),
     getSuspensionDates(classroomId),
+    getSalonCampania(salon.courseId),
   ]);
   const soloSesiones = sesiones.filter((s) => s.tipo === "SESION");
   return {
@@ -356,5 +361,38 @@ export async function detalleSalon(classroomId: string): Promise<DetalleSalon> {
     sesiones,
     suspensiones: suspensiones.sort(),
     finReal: soloSesiones.at(-1)?.fecha ?? null,
+    campania,
   };
+}
+
+/** Edita cupo, guía y activo de un salón (no toca el horario). Al desactivarlo,
+ * deja de ofrecerse en el wizard de contratos y en el intake de LGS. */
+export async function editarSalon(input: {
+  actorUserId: string;
+  classroomId: string;
+  cupo?: number | undefined;
+  guiaUserId?: string | null | undefined;
+  activo?: boolean | undefined;
+  ip?: string | null;
+}): Promise<void> {
+  const salon = await findClassroomById(input.classroomId);
+  if (salon === null) throw new NotFoundError("El salón no existe.");
+
+  const cupo = input.cupo ?? salon.cupo;
+  if (!Number.isInteger(cupo) || cupo < 1 || cupo > 50) {
+    throw new ValidationError("El cupo debe ser un entero entre 1 y 50.");
+  }
+  const guiaUserId = input.guiaUserId !== undefined ? input.guiaUserId : salon.guiaUserId;
+  const activo = input.activo ?? salon.activo;
+
+  await updateClassroom(input.classroomId, { cupo, guiaUserId, activo });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.salon_editado",
+    entidad: "scheduling_classroom",
+    entidadId: input.classroomId,
+    payload: { cupo, guiaUserId, activo },
+    ip: input.ip ?? null,
+  });
 }

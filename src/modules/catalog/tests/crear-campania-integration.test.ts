@@ -30,10 +30,11 @@ describe.runIf(RUN)("crearCampania (integración con Postgres)", () => {
       actorUserId: "00000000-0000-0000-0000-000000000000",
       nombre,
       inicio: "2026-08-03",
-      duracionSemanas: 12,
+      cursoInicio: "2026-08-17",
     });
     campaignId = campania.id;
-    expect(campania.fin).toBe("2026-10-25");
+    expect(campania.fin).toBe("2027-08-03"); // inicio + 12 meses
+    expect(campania.finalVenta).toBe("2026-09-07"); // inicio del curso + 3 semanas
 
     const conteos = await queryOne<{
       cursos: string;
@@ -71,7 +72,8 @@ describe.runIf(RUN)("crearCampania (integración con Postgres)", () => {
     const detalle = await detalleCampania(campaignId as string);
     expect(detalle.courses).toHaveLength(2);
     for (const curso of detalle.courses) {
-      expect(curso.finalCurso).toBe("2026-10-25");
+      expect(curso.finalCurso).toBe("2027-08-03");
+      expect(curso.inicio).toBe("2026-08-17"); // inicio del curso
       expect(curso.niveles.map((n) => n.codigo)).toEqual([
         "ROOKIE",
         "CHAMPION",
@@ -92,7 +94,7 @@ describe.runIf(RUN)("crearCampania (integración con Postgres)", () => {
         actorUserId: "00000000-0000-0000-0000-000000000000",
         nombre: nombre.toUpperCase(),
         inicio: "2026-09-01",
-        duracionSemanas: 4,
+        cursoInicio: "2026-09-14",
       }),
     ).rejects.toBeInstanceOf(ConflictError);
   });

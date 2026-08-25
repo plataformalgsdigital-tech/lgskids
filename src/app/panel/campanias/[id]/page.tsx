@@ -10,6 +10,7 @@ interface Detalle {
   nombre: string;
   inicio: string;
   fin: string;
+  finalVenta: string;
   estado: "EN_MATRICULA" | "ACTIVA" | "CERRADA";
   courses: {
     id: string;
@@ -144,7 +145,8 @@ export default function DetalleCampaniaPage() {
       </Link>
       <h1 style={{ fontSize: "1.6rem", marginTop: "0.5rem" }}>{detalle.nombre}</h1>
       <p style={{ color: "var(--texto-suave)" }}>
-        {detalle.inicio} → {detalle.fin} (fin nominal — el fin real lo definirá la última sesión)
+        Campaña: {detalle.inicio} → {detalle.fin} (12 meses; el fin real del curso lo define la última
+        sesión) · Cierre de matrícula: {detalle.finalVenta}
       </p>
 
       {detalle.courses.map((curso) => (

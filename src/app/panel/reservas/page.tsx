@@ -28,6 +28,7 @@ interface Salon {
   courseId: string;
   cupo: number;
   ocupados: number;
+  activo: boolean;
   guia: string | null;
   horario: { tipo: string; diaSemana: number; horaLocal: string }[];
 }
@@ -262,7 +263,7 @@ export default function ReservasPage() {
     }
   }
 
-  const salonesDisponibles = salones.filter((s) => s.ocupados < s.cupo);
+  const salonesDisponibles = salones.filter((s) => s.activo && s.ocupados < s.cupo);
 
   return (
     <main style={{ padding: "2rem", maxWidth: "48rem", margin: "0 auto" }}>

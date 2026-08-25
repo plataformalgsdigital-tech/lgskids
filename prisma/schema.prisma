@@ -171,10 +171,12 @@ model Campaign {
   // Campaña GLOBAL (ADR-0009): el país vive en el contrato, no aquí.
   // El estado (En matrícula | Activa | Cerrada) se DERIVA por fecha,
   // nunca se almacena.
-  inicio    DateTime @db.Date
-  fin       DateTime @db.Date // nominal: inicio + duración
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  inicio DateTime @db.Date
+  fin    DateTime @db.Date // inicio + 12 meses (editable)
+  // Cierre de matrícula: inicio del curso + 3 semanas. Umbral EN_MATRÍCULA→ACTIVA.
+  finalVenta DateTime @map("final_venta") @db.Date
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   courses Course[]
 
@@ -470,17 +472,19 @@ model Slot {
 // sin el string frágil). Se ELIGE al crear un salón y se materializa en sus
 // Slot; NO participa en la generación de sesiones (solo alimenta el selector).
 model HorarioCatalogo {
-  id        String     @id @default(uuid()) @db.Uuid
-  tipoCurso CourseTipo @map("tipo_curso")
-  etiqueta  String // nombre legible, ej. "Lun-Mié 16:00"
-  activo    Boolean    @default(true) // desactivar en vez de borrar
-  orden     Int        @default(0)
-  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id          String     @id @default(uuid()) @db.Uuid
+  tipoCurso   CourseTipo @map("tipo_curso")
+  grupoPais   String     @default("01") @map("grupo_pais") // 01=Chile; 02=Colombia, Ecuador y Perú
+  salonNumero String     @default("01") @map("salon_numero") // salón del horario completo (todos sus días)
+  etiqueta    String // nombre legible, ej. "Lun-Mié 16:00"
+  activo      Boolean    @default(true) // desactivar en vez de borrar
+  orden       Int        @default(0)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   slots HorarioCatalogoSlot[]
 
-  @@unique([tipoCurso, etiqueta])
+  @@unique([tipoCurso, grupoPais, salonNumero, etiqueta])
   @@index([tipoCurso, activo])
   @@map("scheduling_horario")
 }

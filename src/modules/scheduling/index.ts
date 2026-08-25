@@ -14,6 +14,7 @@ export {
   sincronizarFeriados,
   listarSalones,
   detalleSalon,
+  editarSalon,
   agenda,
   obtenerDetalleSesion,
   cambiarGuia,
@@ -21,6 +22,8 @@ export {
 export type { SlotInput, DetalleSalon } from "./application/gestion-salones";
 export {
   crearHorario,
+  actualizarHorario,
+  eliminarHorario,
   listarHorarios,
   cambiarActivoHorario,
 } from "./application/horarios-catalogo";
@@ -32,11 +35,13 @@ export type {
   HorarioSlotInput,
   ClassroomListItem,
   NinoDeGuia,
+  SalonCampania,
 } from "./infrastructure/scheduling-repository";
 export {
   crearSalonHandler,
   listarSalonesHandler,
   detalleSalonHandler,
+  editarSalonHandler,
   regenerarHandler,
   suspenderHandler,
   agendaHandler,
@@ -44,6 +49,8 @@ export {
   cambiarGuiaHandler,
   listarHorariosHandler,
   crearHorarioHandler,
+  actualizarHorarioHandler,
+  eliminarHorarioHandler,
   toggleHorarioHandler,
   agendaGuiaHandler,
   misSalonesHandler,

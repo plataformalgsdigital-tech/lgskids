@@ -4,7 +4,7 @@ import type { EstadoCampania } from "../domain/campania";
 import type { CursoTipo, NivelCodigo } from "../domain/curriculo";
 
 export interface CampaignGraph {
-  campaign: { id: string; nombre: string; inicio: string; fin: string };
+  campaign: { id: string; nombre: string; inicio: string; fin: string; finalVenta: string };
   courses: {
     id: string;
     tipo: CursoTipo;
@@ -26,6 +26,8 @@ export interface CampaignListItem {
   nombre: string;
   inicio: string;
   fin: string;
+  finalVenta: string;
+  cursoInicio: string | null;
   estado: EstadoCampania;
   cursos: number;
 }
@@ -35,6 +37,7 @@ export interface CampaignDetail {
   nombre: string;
   inicio: string;
   fin: string;
+  finalVenta: string;
   estado: EstadoCampania;
   courses: {
     id: string;

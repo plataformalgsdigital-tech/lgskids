@@ -18,6 +18,10 @@ export interface HorarioSlotInput {
 export interface HorarioCatalogoRecord {
   id: string;
   tipoCurso: string;
+  /** Grupo de país: '01' = Chile; '02' = Colombia, Ecuador y Perú. */
+  grupoPais: string;
+  /** Salón del horario completo (todos sus días son el mismo salón), ej. '01'. */
+  salonNumero: string;
   etiqueta: string;
   activo: boolean;
   orden: number;
@@ -27,13 +31,21 @@ export interface HorarioCatalogoRecord {
 /** Inserta un horario del catálogo con sus slots (dentro de una transacción). */
 export async function insertHorarioCatalogo(
   tx: Queryable,
-  input: { tipoCurso: string; etiqueta: string; orden: number; slots: HorarioSlotInput[] },
+  input: {
+    tipoCurso: string;
+    grupoPais: string;
+    salonNumero: string;
+    etiqueta: string;
+    orden: number;
+    slots: HorarioSlotInput[];
+  },
 ): Promise<string> {
   const id = newId();
   await execute(
-    `INSERT INTO scheduling_horario (id, tipo_curso, etiqueta, orden, updated_at)
-     VALUES ($1, $2::catalog_course_tipo, $3, $4, now())`,
-    [id, input.tipoCurso, input.etiqueta.trim(), input.orden],
+    `INSERT INTO scheduling_horario
+       (id, tipo_curso, grupo_pais, salon_numero, etiqueta, orden, updated_at)
+     VALUES ($1, $2::catalog_course_tipo, $3, $4, $5, $6, now())`,
+    [id, input.tipoCurso, input.grupoPais, input.salonNumero, input.etiqueta.trim(), input.orden],
     tx,
   );
   for (const slot of input.slots) {
@@ -48,8 +60,9 @@ export async function insertHorarioCatalogo(
   return id;
 }
 
-const SELECT_HORARIO = `SELECT h.id, h.tipo_curso::text AS "tipoCurso", h.etiqueta,
-    h.activo, h.orden,
+const SELECT_HORARIO = `SELECT h.id, h.tipo_curso::text AS "tipoCurso",
+    h.grupo_pais AS "grupoPais", h.salon_numero AS "salonNumero",
+    h.etiqueta, h.activo, h.orden,
     COALESCE(
       (SELECT json_agg(json_build_object(
                 'tipo', s.tipo, 'diaSemana', s.dia_semana,
@@ -61,6 +74,7 @@ const SELECT_HORARIO = `SELECT h.id, h.tipo_curso::text AS "tipoCurso", h.etique
 
 export async function listHorariosCatalogo(filtros?: {
   tipoCurso?: string | undefined;
+  grupoPais?: string | undefined;
   soloActivos?: boolean | undefined;
 }): Promise<HorarioCatalogoRecord[]> {
   const where: string[] = [];
@@ -69,13 +83,17 @@ export async function listHorariosCatalogo(filtros?: {
     values.push(filtros.tipoCurso);
     where.push(`h.tipo_curso = $${values.length}::catalog_course_tipo`);
   }
+  if (filtros?.grupoPais !== undefined && filtros.grupoPais !== "") {
+    values.push(filtros.grupoPais);
+    where.push(`h.grupo_pais = $${values.length}`);
+  }
   if (filtros?.soloActivos === true) {
     where.push(`h.activo = true`);
   }
   return queryRows<HorarioCatalogoRecord>(
     `${SELECT_HORARIO}
       ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
-      ORDER BY h.tipo_curso, h.orden, h.etiqueta`,
+      ORDER BY h.tipo_curso, h.grupo_pais, h.salon_numero, h.orden, h.etiqueta`,
     values,
   );
 }
@@ -86,14 +104,64 @@ export async function getHorarioCatalogo(id: string): Promise<HorarioCatalogoRec
 
 export async function existsHorarioEtiqueta(
   tipoCurso: string,
+  grupoPais: string,
+  salonNumero: string,
   etiqueta: string,
+  exceptId?: string,
 ): Promise<boolean> {
+  const values: unknown[] = [tipoCurso, grupoPais, salonNumero, etiqueta.trim()];
+  let extra = "";
+  if (exceptId !== undefined) {
+    values.push(exceptId);
+    extra = ` AND id <> $${values.length}`;
+  }
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM scheduling_horario
-      WHERE tipo_curso = $1::catalog_course_tipo AND lower(etiqueta) = lower($2)`,
-    [tipoCurso, etiqueta.trim()],
+      WHERE tipo_curso = $1::catalog_course_tipo AND grupo_pais = $2
+        AND salon_numero = $3 AND lower(etiqueta) = lower($4)${extra}`,
+    values,
   );
   return row !== null;
+}
+
+/** Actualiza un horario del catálogo y REEMPLAZA sus slots (en una transacción). */
+export async function updateHorarioCatalogo(
+  tx: Queryable,
+  input: {
+    id: string;
+    tipoCurso: string;
+    grupoPais: string;
+    salonNumero: string;
+    etiqueta: string;
+    orden: number;
+    slots: HorarioSlotInput[];
+  },
+): Promise<void> {
+  await execute(
+    `UPDATE scheduling_horario
+        SET tipo_curso = $2::catalog_course_tipo, grupo_pais = $3, salon_numero = $4,
+            etiqueta = $5, orden = $6, updated_at = now()
+      WHERE id = $1`,
+    [
+      input.id,
+      input.tipoCurso,
+      input.grupoPais,
+      input.salonNumero,
+      input.etiqueta.trim(),
+      input.orden,
+    ],
+    tx,
+  );
+  await execute(`DELETE FROM scheduling_horario_slot WHERE horario_id = $1`, [input.id], tx);
+  for (const slot of input.slots) {
+    await execute(
+      `INSERT INTO scheduling_horario_slot
+         (id, horario_id, tipo, dia_semana, hora_local, duracion_min)
+       VALUES ($1, $2, $3::scheduling_slot_tipo, $4, $5, $6)`,
+      [newId(), input.id, slot.tipo, slot.diaSemana, slot.horaLocal, slot.duracionMin ?? 60],
+      tx,
+    );
+  }
 }
 
 export async function setHorarioActivo(id: string, activo: boolean): Promise<void> {
@@ -101,6 +169,11 @@ export async function setHorarioActivo(id: string, activo: boolean): Promise<voi
     `UPDATE scheduling_horario SET activo = $2, updated_at = now() WHERE id = $1`,
     [id, activo],
   );
+}
+
+/** Borra un horario del catálogo. Sus slots caen por cascada (FK ON DELETE CASCADE). */
+export async function deleteHorarioCatalogo(id: string): Promise<void> {
+  await execute(`DELETE FROM scheduling_horario WHERE id = $1`, [id]);
 }
 
 export interface ClassroomRecord {
@@ -554,6 +627,43 @@ export async function updateGuiaSalon(
     `UPDATE scheduling_classroom SET guia_user_id = $2, updated_at = now() WHERE id = $1`,
     [classroomId, guiaUserId],
     client,
+  );
+}
+
+/** Edita cupo, guía y activo del salón (no toca el horario ni las sesiones). */
+export async function updateClassroom(
+  classroomId: string,
+  datos: { cupo: number; guiaUserId: string | null; activo: boolean },
+): Promise<void> {
+  await execute(
+    `UPDATE scheduling_classroom
+        SET cupo = $2, guia_user_id = $3, activo = $4, updated_at = now()
+      WHERE id = $1`,
+    [classroomId, datos.cupo, datos.guiaUserId, datos.activo],
+  );
+}
+
+export interface SalonCampania {
+  campaignId: string;
+  campaignNombre: string;
+  campaignInicio: string;
+  fin: string;
+  finalVenta: string;
+  cursoInicio: string;
+  finalCurso: string;
+}
+
+/** Fechas de la campaña/curso de un salón (para mostrarlas en su detalle). */
+export async function getSalonCampania(courseId: string): Promise<SalonCampania | null> {
+  return queryOne<SalonCampania>(
+    `SELECT ca.id AS "campaignId", ca.nombre AS "campaignNombre",
+            ca.inicio::text AS "campaignInicio", ca.fin::text AS fin,
+            ca.final_venta::text AS "finalVenta",
+            cu.inicio::text AS "cursoInicio", cu.final_curso::text AS "finalCurso"
+       FROM catalog_course cu
+       JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+      WHERE cu.id = $1`,
+    [courseId],
   );
 }
 

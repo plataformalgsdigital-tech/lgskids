@@ -11,6 +11,7 @@ export {
   crearCampaniaHandler,
   listarCampaniasHandler,
   detalleCampaniaHandler,
+  actualizarCampaniaHandler,
 } from "./api/handlers";
 export { crearCampania } from "./application/crear-campania";
 export { derivarEstadoCampania, ETIQUETA_ESTADO } from "./domain/campania";

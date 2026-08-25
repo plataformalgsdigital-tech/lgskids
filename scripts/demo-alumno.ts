@@ -32,7 +32,7 @@ async function main(): Promise<void> {
     actorUserId: ADMIN,
     nombre: `DEMO ${sufijo}`,
     inicio: "2026-08-03",
-    duracionSemanas: 12,
+    cursoInicio: "2026-08-17",
   });
   const curso = await queryOne<{ id: string }>(
     `SELECT id FROM catalog_course WHERE campaign_id = $1 AND tipo = 'JUNIOR'`,

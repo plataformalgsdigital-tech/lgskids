@@ -10,8 +10,26 @@ interface Campania {
   nombre: string;
   inicio: string;
   fin: string;
+  finalVenta: string;
+  cursoInicio: string | null;
   estado: "EN_MATRICULA" | "ACTIVA" | "CERRADA";
   cursos: number;
+}
+
+/** Suma meses calendario a una fecha YYYY-MM-DD (UTC puro). "" si vacía. */
+function sumarMeses(fecha: string, meses: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return "";
+  const [y, m, d] = fecha.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  dt.setUTCMonth(dt.getUTCMonth() + meses);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Suma días a una fecha YYYY-MM-DD (UTC puro). "" si vacía. */
+function sumarDias(fecha: string, dias: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return "";
+  const [y, m, d] = fecha.split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d!) + dias * 86400000).toISOString().slice(0, 10);
 }
 
 interface Guia {
@@ -47,7 +65,7 @@ interface ProgresoSalon {
 const ESTILO_ESTADO: Record<Campania["estado"], { texto: string; color: string; fondo: string }> = {
   EN_MATRICULA: { texto: "En matrícula", color: "#0d47a1", fondo: "#e3f2fd" },
   ACTIVA: { texto: "Activa", color: "#1b5e20", fondo: "#e8f5e9" },
-  CERRADA: { texto: "Cerrada", color: "#5a6172", fondo: "#eceff1" },
+  CERRADA: { texto: "Inactiva", color: "#5a6172", fondo: "#eceff1" },
 };
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -76,38 +94,45 @@ const btnPrimario: CSSProperties = {
   cursor: "pointer",
 };
 
-/** Patrón de días → índices (Lun=1, Mar=2, Mié=3, Jue=4). */
-function slotsDesde(patron: "LUN-MIE" | "MAR-JUE", hora: string): SlotForm[] {
-  const dias = patron === "LUN-MIE" ? [1, 3] : [2, 4];
-  return dias.map((d) => ({ tipo: "SESION", diaSemana: d, horaLocal: hora, duracionMin: 50 }));
+/** Un horario del catálogo (/panel/horarios): fuente de los salones a crear. */
+interface CatHorario {
+  id: string;
+  tipoCurso: TipoCurso;
+  grupoPais: string; // 01=Chile; 02=Colombia/Ecuador/Perú
+  salonNumero: string; // 01..12
+  etiqueta: string;
+  activo: boolean;
+  slots: SlotForm[];
 }
 
-/** Los 12 salones estándar con su horario fijo (01–06 Chile, 07–12 Colombia). */
-const PLANTILLA: { nombre: string; pais: string; patron: "LUN-MIE" | "MAR-JUE"; hora: string }[] = [
-  { nombre: "Salón 01", pais: "CL", patron: "LUN-MIE", hora: "16:00" },
-  { nombre: "Salón 02", pais: "CL", patron: "LUN-MIE", hora: "17:00" },
-  { nombre: "Salón 03", pais: "CL", patron: "LUN-MIE", hora: "18:00" },
-  { nombre: "Salón 04", pais: "CL", patron: "MAR-JUE", hora: "16:00" },
-  { nombre: "Salón 05", pais: "CL", patron: "MAR-JUE", hora: "17:00" },
-  { nombre: "Salón 06", pais: "CL", patron: "MAR-JUE", hora: "18:00" },
-  { nombre: "Salón 07", pais: "CO", patron: "LUN-MIE", hora: "17:00" },
-  { nombre: "Salón 08", pais: "CO", patron: "LUN-MIE", hora: "18:00" },
-  { nombre: "Salón 09", pais: "CO", patron: "LUN-MIE", hora: "19:00" },
-  { nombre: "Salón 10", pais: "CO", patron: "MAR-JUE", hora: "17:00" },
-  { nombre: "Salón 11", pais: "CO", patron: "MAR-JUE", hora: "18:00" },
-  { nombre: "Salón 12", pais: "CO", patron: "MAR-JUE", hora: "19:00" },
+const GRUPOS_SALON: { codigo: string; nombre: string; pais: string }[] = [
+  { codigo: "01", nombre: "Chile", pais: "CL" },
+  { codigo: "02", nombre: "Colombia · Ecuador · Perú", pais: "CO" },
 ];
+const PAIS_DE_GRUPO: Record<string, string> = { "01": "CL", "02": "CO" };
 
-function plantillaInicial(tipo: TipoCurso): SalonForm[] {
-  return PLANTILLA.map((p) => ({
-    nombre: p.nombre,
-    tipo,
-    guiaUserId: "",
-    cupo: "15",
-    pais: p.pais,
-    meetingUrl: "",
-    slots: slotsDesde(p.patron, p.hora),
-  }));
+/**
+ * Salones a crear DESDE EL CATÁLOGO: un salón por horario del catálogo del
+ * tipo y grupo elegidos (JUNIOR/YOUNGSTER Salón 01..06). El horario (bloques)
+ * y el país salen del catálogo; guía y cupo se ajustan aquí.
+ */
+function salonesDesdeCatalogo(
+  tipo: TipoCurso,
+  grupo: string,
+  catalogo: CatHorario[],
+): SalonForm[] {
+  return catalogo
+    .filter((h) => h.tipoCurso === tipo && h.grupoPais === grupo && h.activo)
+    .sort((a, b) => a.salonNumero.localeCompare(b.salonNumero))
+    .map((h) => ({
+      nombre: `${tipo} Salón ${h.salonNumero}`,
+      tipo,
+      guiaUserId: "",
+      cupo: "15",
+      pais: PAIS_DE_GRUPO[grupo] ?? "CL",
+      meetingUrl: "",
+      slots: h.slots.map((s) => ({ ...s })),
+    }));
 }
 
 type SetLista = React.Dispatch<React.SetStateAction<SalonForm[]>>;
@@ -291,12 +316,16 @@ export default function CampaniasPage() {
 
   // Paso 1 — campaña
   const [nombre, setNombre] = useState("");
-  const [inicio, setInicio] = useState("");
-  const [semanas, setSemanas] = useState("52"); // ~1 año (duración típica de una campaña)
+  const [inicio, setInicio] = useState(""); // inicio de campaña (comercial)
+  const [cursoInicio, setCursoInicio] = useState(""); // inicio del curso (arranque de clases)
+  const [fin, setFin] = useState(""); // vigencia; se autocompleta a inicio + 12 meses (editable)
+  const [finTocado, setFinTocado] = useState(false); // si el usuario editó el fin a mano
 
-  // Pasos 2 y 3 — salones por tipo
-  const [salonesJr, setSalonesJr] = useState<SalonForm[]>(() => plantillaInicial("JUNIOR"));
-  const [salonesYg, setSalonesYg] = useState<SalonForm[]>(() => plantillaInicial("YOUNGSTER"));
+  // Pasos 2 y 3 — salones por tipo, generados DESDE EL CATÁLOGO
+  const [catalogo, setCatalogo] = useState<CatHorario[]>([]);
+  const [grupoSalones, setGrupoSalones] = useState("01");
+  const [salonesJr, setSalonesJr] = useState<SalonForm[]>([]);
+  const [salonesYg, setSalonesYg] = useState<SalonForm[]>([]);
 
   // Estado de creación (la campaña nace una sola vez, en el paso 2).
   const [campaignId, setCampaignId] = useState<string | null>(null);
@@ -329,10 +358,19 @@ export default function CampaniasPage() {
         setPuedeGestionar(codes.has("catalogo.gestionar"));
         setPuedeSalones(codes.has("salones.gestionar"));
         if (codes.has("salones.gestionar")) {
-          const g = await apiFetch("/api/identity/guides");
+          const [g, h] = await Promise.all([
+            apiFetch("/api/identity/guides"),
+            apiFetch("/api/scheduling/horarios?activos=1"),
+          ]);
           if (g.ok) {
             const data: { guias: Guia[] } = await g.json();
             setGuias(data.guias);
+          }
+          if (h.ok) {
+            const data: { horarios: CatHorario[] } = await h.json();
+            setCatalogo(data.horarios);
+            setSalonesJr(salonesDesdeCatalogo("JUNIOR", "01", data.horarios));
+            setSalonesYg(salonesDesdeCatalogo("YOUNGSTER", "01", data.horarios));
           }
         }
       }
@@ -340,13 +378,23 @@ export default function CampaniasPage() {
     void inicial();
   }, [cargar]);
 
+  /** Cambia el grupo país y reconstruye ambas listas desde el catálogo. */
+  function cambiarGrupoSalones(grupo: string) {
+    setGrupoSalones(grupo);
+    setSalonesJr(salonesDesdeCatalogo("JUNIOR", grupo, catalogo));
+    setSalonesYg(salonesDesdeCatalogo("YOUNGSTER", grupo, catalogo));
+  }
+
   function resetForm() {
     setPaso(1);
     setNombre("");
     setInicio("");
-    setSemanas("52");
-    setSalonesJr(plantillaInicial("JUNIOR"));
-    setSalonesYg(plantillaInicial("YOUNGSTER"));
+    setCursoInicio("");
+    setFin("");
+    setFinTocado(false);
+    setGrupoSalones("01");
+    setSalonesJr(salonesDesdeCatalogo("JUNIOR", "01", catalogo));
+    setSalonesYg(salonesDesdeCatalogo("YOUNGSTER", "01", catalogo));
     setCampaignId(null);
     setCourseByTipo({});
     setJuniorHecho(false);
@@ -360,7 +408,7 @@ export default function CampaniasPage() {
     const resC = await apiFetch("/api/catalog/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre, inicio, duracionSemanas: Number(semanas) }),
+      body: JSON.stringify({ nombre, inicio, cursoInicio, fin: fin || undefined }),
     });
     const dataC: { campania?: { id: string }; error?: { message: string } } = await resC.json();
     if (!resC.ok || dataC.campania === undefined) {
@@ -435,7 +483,8 @@ export default function CampaniasPage() {
   }
 
   function validarLista(lista: SalonForm[]): string | null {
-    if (lista.length < 1) return "Agrega al menos un salón.";
+    // Se permite 0 salones (la campaña se crea igual; los salones se pueden
+    // agregar luego). Solo se validan los bloques de los que sí haya.
     for (const s of lista) {
       if (s.slots.length < 1) return `El salón "${s.nombre}" necesita al menos un bloque de horario.`;
     }
@@ -584,34 +633,61 @@ export default function CampaniasPage() {
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Inicio</span>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Inicio de campaña</span>
             <input
               type="date"
               value={inicio}
-              onChange={(e) => setInicio(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setInicio(v);
+                if (!finTocado) setFin(sumarMeses(v, 12)); // vigencia = inicio + 12 meses
+              }}
               required
               style={inputStyle}
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Duración (semanas · 52 ≈ 1 año)</span>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Inicio del curso</span>
             <input
-              type="number"
-              min={1}
-              max={52}
-              value={semanas}
-              onChange={(e) => setSemanas(e.target.value)}
+              type="date"
+              value={cursoInicio}
+              onChange={(e) => setCursoInicio(e.target.value)}
               required
-              style={{ ...inputStyle, width: "8rem" }}
+              style={inputStyle}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Fin de campaña (12 meses · editable)</span>
+            <input
+              type="date"
+              value={fin}
+              onChange={(e) => {
+                setFin(e.target.value);
+                setFinTocado(true);
+              }}
+              required
+              style={inputStyle}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Cierre de matrícula</span>
+            <input
+              type="text"
+              value={cursoInicio ? `${sumarDias(cursoInicio, 21)} (curso + 3 sem.)` : "—"}
+              readOnly
+              title="Inicio del curso + 3 semanas"
+              style={{ ...inputStyle, background: "#f4f6fa", color: "var(--texto-suave)" }}
             />
           </label>
           <button type="submit" disabled={creando} style={btnPrimario}>
             {puedeSalones ? "Siguiente: salones Junior →" : creando ? "Creando…" : "Crear campaña"}
           </button>
           <p style={{ width: "100%", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-            Se generarán automáticamente los cursos Junior y Youngster, cada uno con sus 4 niveles
-            (Rookie → Champion → Elite → Legendary), 4 lecciones por nivel con cuestionario de
-            práctica y su Level Up. Los salones se crean después: primero Junior, luego Youngster.
+            La campaña dura 12 meses (fin editable). Las sesiones del curso corren desde el inicio del
+            curso hasta el fin de la campaña; el cierre de matrícula es 3 semanas después del inicio
+            del curso (hasta ahí es visible en el wizard de contratos). Se generan los cursos Junior y
+            Youngster con sus 4 niveles, 4 lecciones por nivel y su Level Up. Los salones se crean
+            después: primero Junior, luego Youngster.
           </p>
           {error !== null && (
             <p role="alert" style={{ width: "100%", color: "#c62828", fontSize: "0.9rem" }}>
@@ -654,14 +730,29 @@ export default function CampaniasPage() {
                     Paso {esJunior ? 2 : 3} de {totalPasos} · Salones {tipoTexto} de «{nombre}» (
                     {lista.length})
                   </p>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8rem" }}>
+                      <span style={{ fontWeight: 600 }}>País:</span>
+                      <select
+                        value={grupoSalones}
+                        onChange={(e) => cambiarGrupoSalones(e.target.value)}
+                        disabled={creando || juniorHecho}
+                        style={{ ...inputStyle, padding: "0.35rem 0.5rem" }}
+                      >
+                        {GRUPOS_SALON.map((g) => (
+                          <option key={g.codigo} value={g.codigo}>
+                            {g.codigo} · {g.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <button
                       type="button"
-                      onClick={() => setLista(plantillaInicial(plantillaTipo))}
+                      onClick={() => setLista(salonesDesdeCatalogo(plantillaTipo, grupoSalones, catalogo))}
                       disabled={creando}
                       style={{ ...inputStyle, cursor: "pointer" }}
                     >
-                      Restaurar plantilla
+                      Recargar del catálogo
                     </button>
                     <button
                       type="button"
@@ -669,13 +760,13 @@ export default function CampaniasPage() {
                         setLista((prev) => [
                           ...prev,
                           {
-                            nombre: `Salón ${String(prev.length + 1).padStart(2, "0")}`,
+                            nombre: `${plantillaTipo} Salón ${String(prev.length + 1).padStart(2, "0")}`,
                             tipo: plantillaTipo,
                             guiaUserId: "",
                             cupo: "15",
-                            pais: "CL",
+                            pais: PAIS_DE_GRUPO[grupoSalones] ?? "CL",
                             meetingUrl: "",
-                            slots: slotsDesde("LUN-MIE", "18:00"),
+                            slots: [{ tipo: "SESION", diaSemana: 1, horaLocal: "18:00", duracionMin: 60 }],
                           },
                         ])
                       }
@@ -688,9 +779,11 @@ export default function CampaniasPage() {
                 </div>
 
                 <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                  {esJunior
-                    ? "Salones JUNIOR (curso 6–9 años). Horarios fijos precargados; asigna la guía de cada uno. 01–06 base Chile · 07–12 base Colombia."
-                    : "Salones YOUNGSTER (curso 10–13 años). La campaña y los salones Junior ya se crearon. Ajusta y crea los Youngster para finalizar."}
+                  {lista.length === 0
+                    ? `No hay horarios en el catálogo para ${tipoTexto} · grupo ${grupoSalones}. Créalos en Horarios (/panel/horarios) o agrega salones manualmente; también puedes crear la campaña sin salones y añadirlos luego.`
+                    : esJunior
+                      ? `Salones JUNIOR (6–9 años) tomados del catálogo del grupo ${grupoSalones}: asigna la guía de cada uno.`
+                      : "Salones YOUNGSTER (10–13 años). La campaña y los salones Junior ya se crearon. Ajusta y crea los Youngster para finalizar."}
                 </p>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>

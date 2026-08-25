@@ -32,7 +32,7 @@ export async function listarCampanias(): Promise<CampaignListItem[]> {
   const rows = await listCampaigns();
   return rows.map((row) => ({
     ...row,
-    estado: derivarEstadoCampania(row.inicio, row.fin, hoy),
+    estado: derivarEstadoCampania(row.finalVenta, row.fin, hoy),
   }));
 }
 
@@ -93,7 +93,7 @@ export async function detalleCampania(id: string): Promise<CampaignDetail> {
 
   return {
     ...header,
-    estado: derivarEstadoCampania(header.inicio, header.fin, hoyOperativo()),
+    estado: derivarEstadoCampania(header.finalVenta, header.fin, hoyOperativo()),
     courses: [...coursesMap.values()],
   };
 }

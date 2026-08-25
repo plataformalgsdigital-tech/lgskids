@@ -20,9 +20,9 @@ export async function campaignNombreExists(nombre: string): Promise<boolean> {
 export async function insertCampaignGraph(tx: PoolClient, graph: CampaignGraph): Promise<void> {
   const { campaign } = graph;
   await execute(
-    `INSERT INTO catalog_campaign (id, nombre, inicio, fin, updated_at)
-     VALUES ($1, $2, $3::date, $4::date, now())`,
-    [campaign.id, campaign.nombre, campaign.inicio, campaign.fin],
+    `INSERT INTO catalog_campaign (id, nombre, inicio, fin, final_venta, updated_at)
+     VALUES ($1, $2, $3::date, $4::date, $5::date, now())`,
+    [campaign.id, campaign.nombre, campaign.inicio, campaign.fin, campaign.finalVenta],
     tx,
   );
   for (const course of graph.courses) {
@@ -68,6 +68,8 @@ export interface CampaignRow {
   nombre: string;
   inicio: string;
   fin: string;
+  finalVenta: string;
+  cursoInicio: string | null;
   cursos: number;
 }
 
@@ -77,9 +79,13 @@ export async function listCampaigns(): Promise<CampaignRow[]> {
     nombre: string;
     inicio: string;
     fin: string;
+    finalVenta: string;
+    cursoInicio: string | null;
     cursos: string;
   }>(
     `SELECT c.id, c.nombre, c.inicio::text AS inicio, c.fin::text AS fin,
+            c.final_venta::text AS "finalVenta",
+            min(cu.inicio)::text AS "cursoInicio",
             count(cu.id)::text AS cursos
        FROM catalog_campaign c
        LEFT JOIN catalog_course cu ON cu.campaign_id = c.id
@@ -94,13 +100,30 @@ export interface CampaignHeaderRow {
   nombre: string;
   inicio: string;
   fin: string;
+  finalVenta: string;
 }
 
 export async function getCampaignHeader(id: string): Promise<CampaignHeaderRow | null> {
   return queryOne<CampaignHeaderRow>(
-    `SELECT id, nombre, inicio::text AS inicio, fin::text AS fin
+    `SELECT id, nombre, inicio::text AS inicio, fin::text AS fin,
+            final_venta::text AS "finalVenta"
        FROM catalog_campaign WHERE id = $1`,
     [id],
+  );
+}
+
+/** Edita SOLO la vigencia (fin) y el cierre de matrícula (final_venta) de la
+ * campaña. NO toca `catalog_course.final_curso` (regla dura 1: nunca se
+ * reescribe; las sesiones ya generadas no se ven afectadas). */
+export async function updateCampaignFechas(
+  id: string,
+  fechas: { fin: string; finalVenta: string },
+): Promise<void> {
+  await execute(
+    `UPDATE catalog_campaign
+        SET fin = $2::date, final_venta = $3::date, updated_at = now()
+      WHERE id = $1`,
+    [id, fechas.fin, fechas.finalVenta],
   );
 }
 
