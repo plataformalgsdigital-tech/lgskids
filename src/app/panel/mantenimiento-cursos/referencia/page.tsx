@@ -323,7 +323,7 @@ export default function ReferenciaCursosPage() {
   return (
     <main style={{ padding: "2rem", maxWidth: "70rem", margin: "0 auto" }}>
       <Link href="/panel/mantenimiento-cursos" style={{ fontSize: "0.9rem" }}>
-        ← Mantenimiento de cursos
+        ← Mantenimiento Académico
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Referencia de cursos</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>

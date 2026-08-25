@@ -34,13 +34,6 @@ const TARJETAS: Tarjeta[] = [
     href: "/panel/horarios",
   },
   {
-    titulo: "Calendario",
-    desc: "Calendario de sesiones de los salones (por campaña).",
-    emoji: "📅",
-    color: "var(--lgs-verde)",
-    href: "/panel/salones",
-  },
-  {
     titulo: "Subir curso (CSV)",
     desc: "Importar la referencia de un curso completo desde un archivo.",
     emoji: "⬆️",
@@ -69,7 +62,7 @@ const cardBase: CSSProperties = {
 export default function MantenimientoCursosPage() {
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Mantenimiento de cursos</h1>
+      <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Mantenimiento Académico</h1>
       <p style={{ color: "var(--texto-suave)", marginTop: "0.25rem" }}>
         Gestiona la referencia curricular y la estructura académica. Estas acciones generan
         registros de auditoría.

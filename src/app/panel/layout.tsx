@@ -52,7 +52,7 @@ const MENU: {
   {
     seccion: "Académica",
     permiso: "catalogo.ver",
-    etiqueta: "Mantenimiento de cursos",
+    etiqueta: "Mantenimiento Académico",
     color: "var(--lgs-purpura)",
     href: "/panel/mantenimiento-cursos",
   },
