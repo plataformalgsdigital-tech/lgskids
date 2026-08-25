@@ -671,6 +671,26 @@ export interface SalonCampania {
   finalCurso: string;
 }
 
+/** Cursos (id + tipo) de una campaña — para generar sus salones desde el catálogo. */
+export async function coursesDeCampania(
+  campaignId: string,
+): Promise<{ courseId: string; tipo: string }[]> {
+  return queryRows<{ courseId: string; tipo: string }>(
+    `SELECT id AS "courseId", tipo::text AS tipo FROM catalog_course WHERE campaign_id = $1
+      ORDER BY tipo`,
+    [campaignId],
+  );
+}
+
+/** ¿Ya existe un salón con ese nombre en el curso? (idempotencia de la generación). */
+export async function classroomExisteNombre(courseId: string, nombre: string): Promise<boolean> {
+  const row = await queryOne<{ id: string }>(
+    `SELECT id FROM scheduling_classroom WHERE course_id = $1 AND lower(nombre) = lower($2)`,
+    [courseId, nombre.trim()],
+  );
+  return row !== null;
+}
+
 /** Fechas de la campaña/curso de un salón (para mostrarlas en su detalle). */
 export async function getSalonCampania(courseId: string): Promise<SalonCampania | null> {
   return queryOne<SalonCampania>(

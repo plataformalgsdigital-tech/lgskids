@@ -147,6 +147,33 @@ export default function DetalleCampaniaPage() {
     void inicial();
   }, [cargar]);
 
+  async function generarSalones() {
+    setError(null);
+    setAviso(null);
+    setOcupado(true);
+    try {
+      const res = await apiFetch(`/api/scheduling/campaigns/${params.id}/generate`, {
+        method: "POST",
+      });
+      const data: { creados?: number; omitidos?: number; error?: { message: string } } =
+        await res.json();
+      if (!res.ok) {
+        setError(data.error?.message ?? "No se pudieron generar los salones.");
+        return;
+      }
+      setAviso(
+        `Salones generados: ${data.creados} nuevos${
+          (data.omitidos ?? 0) > 0 ? `, ${data.omitidos} ya existían` : ""
+        }. La guía queda pendiente de asignar.`,
+      );
+      await cargar();
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   async function eliminarSalon(s: Salon) {
     if (!window.confirm(`¿Eliminar el salón "${s.nombre}"? Esta acción no se puede deshacer.`)) {
       return;
@@ -253,19 +280,39 @@ export default function DetalleCampaniaPage() {
           <h2 style={{ fontSize: "1.15rem", margin: 0 }}>
             Cursos de {detalle.nombre} ({filas.length} {filas.length === 1 ? "salón" : "salones"})
           </h2>
-          <Link
-            href="/panel/salones"
-            style={{
-              padding: "0.5rem 1rem",
-              borderRadius: "0.6rem",
-              background: "var(--lgs-azul)",
-              color: "white",
-              fontWeight: 700,
-              fontSize: "0.85rem",
-            }}
-          >
-            + Agregar salón
-          </Link>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => void generarSalones()}
+              disabled={ocupado}
+              title="Crea los salones de la campaña a partir del catálogo de horarios (guía pendiente)"
+              style={{
+                padding: "0.5rem 1rem",
+                borderRadius: "0.6rem",
+                border: "1.5px solid var(--lgs-azul)",
+                background: "white",
+                color: "var(--lgs-azul-oscuro)",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: ocupado ? "wait" : "pointer",
+              }}
+            >
+              {ocupado ? "Generando…" : "⚙️ Generar salones del catálogo"}
+            </button>
+            <Link
+              href="/panel/salones"
+              style={{
+                padding: "0.5rem 1rem",
+                borderRadius: "0.6rem",
+                background: "var(--lgs-azul)",
+                color: "white",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+              }}
+            >
+              + Agregar salón
+            </Link>
+          </div>
         </div>
 
         {cargandoSalones ? (

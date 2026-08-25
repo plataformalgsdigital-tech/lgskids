@@ -8,6 +8,7 @@ import {
   detalleSalon,
   editarSalon,
   eliminarSalon,
+  generarSalonesDesdeCatalogo,
   listarSalones,
   misNinosDeGuia,
   obtenerDetalleSesion,
@@ -211,6 +212,20 @@ export const eliminarSalonHandler = handlerWithAuth(async (request, auth, contex
   const id = await idFromContext(context);
   await eliminarSalon({ actorUserId: auth.userId, classroomId: id, ip: ip(request) });
   return json({ ok: true });
+});
+
+/** POST /api/scheduling/campaigns/[id]/generate — crea los salones de la campaña
+ * desde el catálogo de horarios (guía pendiente). Idempotente. */
+export const generarSalonesHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const resultado = await generarSalonesDesdeCatalogo({
+    actorUserId: auth.userId,
+    campaignId: id,
+    ip: ip(request),
+  });
+  return json(resultado, { status: 201 });
 });
 
 // ---- Catálogo de horarios (mantenimiento) ----

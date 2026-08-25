@@ -49,7 +49,7 @@ const MENU: {
   },
   {
     permiso: "salones.ver",
-    etiqueta: "Salones",
+    etiqueta: "Calendario",
     color: "var(--lgs-verde)",
     href: "/panel/salones",
   },

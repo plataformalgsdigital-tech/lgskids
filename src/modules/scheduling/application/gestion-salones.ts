@@ -7,11 +7,14 @@ import { feriadosDelPais } from "../domain/feriados";
 import { generarFechasSlot } from "../domain/generacion";
 import {
   agendaSesiones,
+  classroomExisteNombre,
   classroomTieneMatriculas,
+  coursesDeCampania,
   deleteClassroom,
   deleteSessions,
   detalleSesion,
   findClassroomById,
+  listHorariosCatalogo,
   getCourseWindow,
   getHolidayDates,
   getSessions,
@@ -397,6 +400,73 @@ export async function editarSalon(input: {
     payload: { cupo, guiaUserId, activo },
     ip: input.ip ?? null,
   });
+}
+
+const TZ_POR_GRUPO: Record<string, string> = {
+  "01": "America/Santiago",
+  "02": "America/Bogota", // CO/EC/PE comparten UTC-5
+};
+const PAIS_POR_GRUPO: Record<string, string> = { "01": "CL", "02": "CO" };
+
+/**
+ * Crea los salones de una campaña DESDE EL CATÁLOGO de horarios: un salón por
+ * cada horario activo del tipo de curso (ambos grupos de país), con la GUÍA
+ * PENDIENTE (null) y cupo por defecto. Idempotente: omite los salones que ya
+ * existan (por nombre). Cada salón genera sus sesiones.
+ */
+export async function generarSalonesDesdeCatalogo(input: {
+  actorUserId: string;
+  campaignId: string;
+  cupo?: number | undefined;
+  ip?: string | null;
+}): Promise<{ creados: number; omitidos: number; salones: string[] }> {
+  const courses = await coursesDeCampania(input.campaignId);
+  if (courses.length === 0) {
+    throw new NotFoundError("La campaña no existe o no tiene cursos.");
+  }
+  const horarios = await listHorariosCatalogo({ soloActivos: true });
+  const cupo = input.cupo ?? 12;
+  let creados = 0;
+  let omitidos = 0;
+  const salones: string[] = [];
+
+  for (const course of courses) {
+    for (const h of horarios.filter((x) => x.tipoCurso === course.tipo)) {
+      const nombre = `${course.tipo} Salón ${h.salonNumero}`;
+      if (await classroomExisteNombre(course.courseId, nombre)) {
+        omitidos += 1;
+        continue;
+      }
+      await crearSalon({
+        actorUserId: input.actorUserId,
+        courseId: course.courseId,
+        nombre,
+        guiaUserId: null, // guía PENDIENTE de asignar
+        cupo,
+        timezone: TZ_POR_GRUPO[h.grupoPais] ?? "America/Santiago",
+        holidayCountry: PAIS_POR_GRUPO[h.grupoPais] ?? "CL",
+        slots: h.slots.map((s) => ({
+          tipo: s.tipo as "SESION" | "CLUB",
+          diaSemana: s.diaSemana,
+          horaLocal: s.horaLocal,
+          duracionMin: s.duracionMin,
+        })),
+        ip: input.ip ?? null,
+      });
+      creados += 1;
+      salones.push(nombre);
+    }
+  }
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.salones_generados_catalogo",
+    entidad: "catalog_campaign",
+    entidadId: input.campaignId,
+    payload: { creados, omitidos },
+    ip: input.ip ?? null,
+  });
+  return { creados, omitidos, salones };
 }
 
 /** Elimina un salón (y sus sesiones/slots/suspensiones). Se BLOQUEA si el salón

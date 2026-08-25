@@ -250,7 +250,11 @@ de contratos y del intake (ambos filtran `activo`). `DELETE` → `eliminarSalon`
 matrículas — desactivar en su lugar). Su detalle muestra las fechas de la campaña
 (editar fin/cierre desde ahí afecta a TODA la campaña). El **detalle de campaña**
 (`/panel/campanias/[id]`) lista todos los salones en una tabla (Tipo, Salón,
-Guía, Horario, Inicio/Final curso, Cierre matríc., Cupos, Estado, Acciones).
+Guía, Horario, Inicio/Final curso, Cierre matríc., Cupos, Estado, Acciones) y
+tiene **"Generar salones del catálogo"** (`POST /api/scheduling/campaigns/[id]/generate`
+→ `generarSalonesDesdeCatalogo`): crea un salón por cada horario activo del
+catálogo (ambos grupos, ambos tipos) con **guía pendiente** y cupo 12,
+idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salones`.
 
 ## Pendientes conocidos
 
