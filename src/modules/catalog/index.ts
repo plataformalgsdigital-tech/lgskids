@@ -12,7 +12,26 @@ export {
   listarCampaniasHandler,
   detalleCampaniaHandler,
   actualizarCampaniaHandler,
+  referenciaLeccionGetHandler,
+  referenciaLeccionPutHandler,
+  referenciaNivelGetHandler,
+  referenciaNivelPutHandler,
+  referenciaQuizGetHandler,
+  referenciaQuizPutHandler,
 } from "./api/handlers";
+export {
+  obtenerReferenciaLeccion,
+  actualizarReferenciaLeccion,
+  obtenerReferenciaNivel,
+  actualizarReferenciaNivel,
+  obtenerReferenciaQuiz,
+  actualizarReferenciaQuiz,
+} from "./application/referencia-curricular";
+export type {
+  ReferenciaLeccion,
+  ReferenciaNivel,
+  ReferenciaQuiz,
+} from "./application/referencia-curricular";
 export { crearCampania } from "./application/crear-campania";
 export { derivarEstadoCampania, ETIQUETA_ESTADO } from "./domain/campania";
 export type { EstadoCampania } from "./domain/campania";

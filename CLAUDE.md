@@ -46,6 +46,15 @@ del salón, nunca de una acción del estudiante.
   Permisos: `catalogo.gestionar` (admin, coordinador) y `catalogo.ver`
   (+ guía). UI: /panel/campanias (wizard: campaña + crea JUNIOR/YOUNGSTER
   Salón 1–6 DESDE EL CATÁLOGO de horarios por número/grupo).
+- **Referencia curricular (2026-08-25, migración `20260825000000`)**: adaptación
+  NORMALIZADA de la tabla plana `NIVELES` de MOSAICO (evaluada, NO copiada). El
+  material cuelga de las tablas que ya existen: `catalog_lesson` (+`contenido`
+  markdown, `video_url`, `material`/`material_usuario`/`actividades` JSONB),
+  `catalog_level` (+`descripcion`, `recursos` JSONB) y `catalog_quiz`
+  (+`modo` IA|MANUAL, `minutos`; las preguntas viven en `contenido` JSONB).
+  API por entidad (`referencia-curricular.ts`, MERGE): `GET|PUT /api/catalog/
+  {lessons|levels|quizzes}/[id]/referencia` (ver=catalogo.ver, escribir=
+  catalogo.gestionar). Aún SIN UI ni consumo (alumno/guía/quiz real) — pendiente.
 - **Fase 5 (`people` + `contracts`) completada**: migración
   `20260725000000_people_contracts`. Persona (doc único por país+tipo+número,
   SIN unique de email), apoderado–niño, contrato con país (ADR-0009).

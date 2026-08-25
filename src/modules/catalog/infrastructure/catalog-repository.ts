@@ -127,6 +127,90 @@ export async function updateCampaignFechas(
   );
 }
 
+// ============================================================
+// Referencia curricular (material/video/actividades/evaluación)
+// ============================================================
+
+export interface ReferenciaLeccion {
+  contenido: string | null;
+  videoUrl: string | null;
+  material: unknown[];
+  materialUsuario: unknown[];
+  actividades: unknown[];
+}
+
+export async function getReferenciaLeccion(lessonId: string): Promise<ReferenciaLeccion | null> {
+  return queryOne<ReferenciaLeccion>(
+    `SELECT contenido, video_url AS "videoUrl",
+            COALESCE(material, '[]'::jsonb) AS material,
+            COALESCE(material_usuario, '[]'::jsonb) AS "materialUsuario",
+            COALESCE(actividades, '[]'::jsonb) AS actividades
+       FROM catalog_lesson WHERE id = $1`,
+    [lessonId],
+  );
+}
+
+export async function updateReferenciaLeccion(
+  lessonId: string,
+  ref: ReferenciaLeccion,
+): Promise<void> {
+  await execute(
+    `UPDATE catalog_lesson
+        SET contenido = $2, video_url = $3,
+            material = $4::jsonb, material_usuario = $5::jsonb, actividades = $6::jsonb
+      WHERE id = $1`,
+    [
+      lessonId,
+      ref.contenido,
+      ref.videoUrl,
+      JSON.stringify(ref.material),
+      JSON.stringify(ref.materialUsuario),
+      JSON.stringify(ref.actividades),
+    ],
+  );
+}
+
+export interface ReferenciaNivel {
+  descripcion: string | null;
+  recursos: unknown[];
+}
+
+export async function getReferenciaNivel(levelId: string): Promise<ReferenciaNivel | null> {
+  return queryOne<ReferenciaNivel>(
+    `SELECT descripcion, COALESCE(recursos, '[]'::jsonb) AS recursos
+       FROM catalog_level WHERE id = $1`,
+    [levelId],
+  );
+}
+
+export async function updateReferenciaNivel(levelId: string, ref: ReferenciaNivel): Promise<void> {
+  await execute(
+    `UPDATE catalog_level SET descripcion = $2, recursos = $3::jsonb WHERE id = $1`,
+    [levelId, ref.descripcion, JSON.stringify(ref.recursos)],
+  );
+}
+
+export interface ReferenciaQuiz {
+  modo: string;
+  minutos: number | null;
+  preguntas: unknown[];
+}
+
+export async function getReferenciaQuiz(quizId: string): Promise<ReferenciaQuiz | null> {
+  return queryOne<ReferenciaQuiz>(
+    `SELECT modo, minutos, COALESCE(contenido, '[]'::jsonb) AS preguntas
+       FROM catalog_quiz WHERE id = $1`,
+    [quizId],
+  );
+}
+
+export async function updateReferenciaQuiz(quizId: string, ref: ReferenciaQuiz): Promise<void> {
+  await execute(
+    `UPDATE catalog_quiz SET modo = $2, minutos = $3, contenido = $4::jsonb WHERE id = $1`,
+    [quizId, ref.modo, ref.minutos, JSON.stringify(ref.preguntas)],
+  );
+}
+
 export interface CourseTreeRow {
   course_id: string;
   tipo: string;

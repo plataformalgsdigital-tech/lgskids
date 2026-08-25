@@ -213,6 +213,8 @@ model Level {
   orden       Int // 1..5
   nombre      String
   duracionMeses Int @default(2) @map("duracion_meses") // Rookie/Champion/Ultimate 2, Elite/Legendary 3
+  descripcion String? // referencia del nivel
+  recursos    Json? // [{nombre,link}] a nivel de nivel
 
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
@@ -230,6 +232,12 @@ model Lesson {
   levelId String @map("level_id") @db.Uuid
   orden   Int // 1..4 (4 lecciones por nivel)
   titulo  String
+  // Referencia curricular (2026-08-25): temario, video y material.
+  contenido       String? // temario en markdown
+  videoUrl        String? @map("video_url") // key de storage o URL
+  material        Json? // guías del guía: [{nombre,url}]
+  materialUsuario Json?   @map("material_usuario") // libros del alumno: [{nombre,url}]
+  actividades     Json? // WordWall/links: [{nombre,link}]
 
   level Level @relation(fields: [levelId], references: [id], onDelete: Cascade)
   quizzes Quiz[]
@@ -246,8 +254,10 @@ model Quiz {
   lessonId String?  @map("lesson_id") @db.Uuid
   tipo     QuizTipo
   titulo   String
-  // Las preguntas llegan con `assessment` (Fase 8); aquí vive la estructura.
+  // Preguntas del cuestionario (referencia): [{enunciado,opciones[],correcta,explicacion?}].
   contenido Json?
+  modo     String @default("MANUAL") // IA | MANUAL
+  minutos  Int? // tiempo del alumno para el examen
 
   level  Level   @relation(fields: [levelId], references: [id], onDelete: Cascade)
   lesson Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
