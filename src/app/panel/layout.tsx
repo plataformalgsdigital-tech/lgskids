@@ -27,27 +27,13 @@ const MENU: {
   href?: string;
   pronto?: boolean;
 }[] = [
-  // ── Académica ──────────────────────────────────────────────
-  {
-    seccion: "Académica",
-    permiso: "catalogo.ver",
-    etiqueta: "Campañas",
-    color: "var(--lgs-azul)",
-    href: "/panel/campanias",
-  },
+  // ── Académica (Campañas y Horarios viven dentro de Mantenimiento Académico) ──
   {
     seccion: "Académica",
     permiso: "salones.ver",
     etiqueta: "Calendario",
     color: "var(--lgs-verde)",
     href: "/panel/salones",
-  },
-  {
-    seccion: "Académica",
-    permiso: "salones.ver",
-    etiqueta: "Horarios",
-    color: "var(--lgs-amarillo)",
-    href: "/panel/horarios",
   },
   {
     seccion: "Académica",
