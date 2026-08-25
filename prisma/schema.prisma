@@ -248,7 +248,8 @@ model CursoReferencia {
   id              String     @id @default(uuid()) @db.Uuid
   curso           CourseTipo // JUNIOR | YOUNGSTER
   nivel           String // ROOKIE | CHAMPION | ELITE | LEGENDARY | ULTIMATE
-  modulo          String?
+  unidad          String? // agrupa las unidades del nivel
+  quiz            Json? // cuestionario de la unidad/lección
   leccion         String
   orden           Int        @default(0)
   contenido       String? // temario (markdown)

@@ -48,10 +48,11 @@ del salón, nunca de una acción del estudiante.
   Salón 1–6 DESDE EL CATÁLOGO de horarios por número/grupo).
 - **Referencia curricular (2026-08-25)**: evaluada la tabla plana `NIVELES` de
   MOSAICO; en KIDS se materializa como **tabla MAESTRA `catalog_curso`**
-  (migración `20260825000001`), INDEPENDIENTE de campañas: una fila por
-  `(curso, nivel, modulo, leccion)` con `contenido` (temario md), `video`,
-  `clubes`/`material_usuario`/`material_guia`/`actividades`/`recursos` (JSONB) +
-  `orden`. El contenido de "Junior·Rookie·Lección 1" es el mismo en toda
+  (migraciones `20260825000001`/`...002`), INDEPENDIENTE de campañas: una fila
+  por `(curso, nivel, unidad, leccion)` (la **unidad** agrupa las unidades del
+  nivel) con `quiz` (JSONB, cuestionario, antes de `leccion`), `contenido`
+  (temario md), `video`, `clubes`/`material_usuario`/`material_guia`/
+  `actividades`/`recursos` (JSONB) + `orden`. El contenido de "Junior·Rookie·Lección 1" es el mismo en toda
   campaña → se carga UNA vez aquí. Es la fuente para paneles de alumno/guía y
   actividades de seguimiento (consumo aún pendiente). CRUD:
   `GET|POST /api/catalog/curso` + `GET|PUT|DELETE /api/catalog/curso/[id]`

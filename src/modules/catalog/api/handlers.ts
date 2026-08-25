@@ -111,7 +111,8 @@ const preguntaItem = z.object({
 const cursoBaseSchema = {
   curso: z.enum(["JUNIOR", "YOUNGSTER"]),
   nivel: z.enum(["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"]),
-  modulo: z.string().max(120).nullish(),
+  unidad: z.string().max(120).nullish(),
+  quiz: z.array(preguntaItem).max(100).nullish(), // cuestionario de la unidad/lección
   leccion: z.string().min(1).max(200),
   orden: z.number().int().min(0).max(999).optional(),
   contenido: z.string().max(20000).nullish(),

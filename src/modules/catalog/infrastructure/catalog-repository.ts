@@ -136,7 +136,8 @@ export async function updateCampaignFechas(
 export interface CursoReferenciaInput {
   curso: string; // JUNIOR | YOUNGSTER
   nivel: string; // ROOKIE | CHAMPION | ELITE | LEGENDARY | ULTIMATE
-  modulo: string | null;
+  unidad: string | null; // agrupa las unidades del nivel
+  quiz: unknown; // cuestionario de la unidad/lección (JSON)
   leccion: string;
   orden: number;
   contenido: string | null;
@@ -152,7 +153,7 @@ export interface CursoReferenciaRow extends CursoReferenciaInput {
   id: string;
 }
 
-const SELECT_CURSO = `SELECT id, curso::text AS curso, nivel, modulo, leccion, orden,
+const SELECT_CURSO = `SELECT id, curso::text AS curso, nivel, unidad, quiz, leccion, orden,
     contenido, video,
     COALESCE(clubes, '[]'::jsonb) AS clubes,
     COALESCE(material_usuario, '[]'::jsonb) AS "materialUsuario",
@@ -189,11 +190,11 @@ export async function getCursoReferencia(id: string): Promise<CursoReferenciaRow
 export async function existsCursoReferenciaKey(
   curso: string,
   nivel: string,
-  modulo: string | null,
+  unidad: string | null,
   leccion: string,
   exceptId?: string,
 ): Promise<boolean> {
-  const values: unknown[] = [curso, nivel, modulo ?? "", leccion.trim()];
+  const values: unknown[] = [curso, nivel, unidad ?? "", leccion.trim()];
   let extra = "";
   if (exceptId !== undefined) {
     values.push(exceptId);
@@ -202,7 +203,7 @@ export async function existsCursoReferenciaKey(
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM catalog_curso
       WHERE curso = $1::catalog_course_tipo AND nivel = $2
-        AND COALESCE(modulo, '') = $3 AND lower(leccion) = lower($4)${extra}`,
+        AND COALESCE(unidad, '') = $3 AND lower(leccion) = lower($4)${extra}`,
     values,
   );
   return row !== null;
@@ -212,7 +213,8 @@ function cursoParams(input: CursoReferenciaInput): unknown[] {
   return [
     input.curso,
     input.nivel,
-    input.modulo,
+    input.unidad,
+    input.quiz == null ? null : JSON.stringify(input.quiz),
     input.leccion.trim(),
     input.orden,
     input.contenido,
@@ -228,10 +230,10 @@ function cursoParams(input: CursoReferenciaInput): unknown[] {
 export async function insertCursoReferencia(id: string, input: CursoReferenciaInput): Promise<void> {
   await execute(
     `INSERT INTO catalog_curso
-       (id, curso, nivel, modulo, leccion, orden, contenido, video,
+       (id, curso, nivel, unidad, quiz, leccion, orden, contenido, video,
         clubes, material_usuario, material_guia, actividades, recursos, updated_at)
-     VALUES ($1, $2::catalog_course_tipo, $3, $4, $5, $6, $7, $8,
-             $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, now())`,
+     VALUES ($1, $2::catalog_course_tipo, $3, $4, $5::jsonb, $6, $7, $8, $9,
+             $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, now())`,
     [id, ...cursoParams(input)],
   );
 }
@@ -239,10 +241,10 @@ export async function insertCursoReferencia(id: string, input: CursoReferenciaIn
 export async function updateCursoReferencia(id: string, input: CursoReferenciaInput): Promise<void> {
   await execute(
     `UPDATE catalog_curso
-        SET curso = $2::catalog_course_tipo, nivel = $3, modulo = $4, leccion = $5,
-            orden = $6, contenido = $7, video = $8,
-            clubes = $9::jsonb, material_usuario = $10::jsonb, material_guia = $11::jsonb,
-            actividades = $12::jsonb, recursos = $13::jsonb, updated_at = now()
+        SET curso = $2::catalog_course_tipo, nivel = $3, unidad = $4, quiz = $5::jsonb,
+            leccion = $6, orden = $7, contenido = $8, video = $9,
+            clubes = $10::jsonb, material_usuario = $11::jsonb, material_guia = $12::jsonb,
+            actividades = $13::jsonb, recursos = $14::jsonb, updated_at = now()
       WHERE id = $1`,
     [id, ...cursoParams(input)],
   );

@@ -20,7 +20,7 @@ const NIVELES_CODIGO = NIVELES.map((n) => n.codigo) as readonly string[];
 
 /**
  * REFERENCIA MAESTRA de cursos (catalog_curso): una fila por
- * (curso, nivel, modulo, leccion) con el material/video/actividades/recursos.
+ * (curso, nivel, unidad, leccion) con el material/video/actividades/recursos.
  * Independiente de campañas — es la fuente para los paneles de alumno/guía y
  * las actividades de seguimiento.
  */
@@ -28,7 +28,8 @@ const NIVELES_CODIGO = NIVELES.map((n) => n.codigo) as readonly string[];
 interface DatosCurso {
   curso: string;
   nivel: string;
-  modulo?: string | null | undefined;
+  unidad?: string | null | undefined;
+  quiz?: unknown;
   leccion: string;
   orden?: number | undefined;
   contenido?: string | null | undefined;
@@ -53,7 +54,8 @@ function normalizar(d: DatosCurso): CursoReferenciaInput {
   return {
     curso: d.curso,
     nivel: d.nivel,
-    modulo: d.modulo?.trim() || null,
+    unidad: d.unidad?.trim() || null,
+    quiz: d.quiz ?? null,
     leccion: d.leccion.trim(),
     orden: d.orden ?? 0,
     contenido: d.contenido ?? null,
@@ -83,9 +85,9 @@ export async function crearCursoReferencia(
   input: { actorUserId: string; ip?: string | null } & DatosCurso,
 ): Promise<{ id: string }> {
   const datos = normalizar(input);
-  if (await existsCursoReferenciaKey(datos.curso, datos.nivel, datos.modulo, datos.leccion)) {
+  if (await existsCursoReferenciaKey(datos.curso, datos.nivel, datos.unidad, datos.leccion)) {
     throw new ConflictError(
-      `Ya existe "${datos.leccion}" para ${datos.curso} · ${datos.nivel}${datos.modulo ? ` · ${datos.modulo}` : ""}.`,
+      `Ya existe "${datos.leccion}" para ${datos.curso} · ${datos.nivel}${datos.unidad ? ` · ${datos.unidad}` : ""}.`,
     );
   }
   const id = newId();
@@ -108,10 +110,10 @@ export async function actualizarCursoReferencia(
   if (actual === null) throw new NotFoundError("La referencia de curso no existe.");
   const datos = normalizar(input);
   if (
-    await existsCursoReferenciaKey(datos.curso, datos.nivel, datos.modulo, datos.leccion, input.id)
+    await existsCursoReferenciaKey(datos.curso, datos.nivel, datos.unidad, datos.leccion, input.id)
   ) {
     throw new ConflictError(
-      `Ya existe "${datos.leccion}" para ${datos.curso} · ${datos.nivel}${datos.modulo ? ` · ${datos.modulo}` : ""}.`,
+      `Ya existe "${datos.leccion}" para ${datos.curso} · ${datos.nivel}${datos.unidad ? ` · ${datos.unidad}` : ""}.`,
     );
   }
   await updateCursoReferencia(input.id, datos);
