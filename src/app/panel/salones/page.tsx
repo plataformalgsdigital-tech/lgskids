@@ -567,7 +567,7 @@ export default function SalonesPage() {
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
-        <h1 style={{ fontSize: "1.6rem" }}>Salones</h1>
+        <h1 style={{ fontSize: "1.6rem" }}>Calendario</h1>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <div style={{ display: "flex", border: "1.5px solid #d8dce6", borderRadius: "0.6rem", overflow: "hidden" }}>
             {(["calendario", "lista"] as const).map((v) => (
