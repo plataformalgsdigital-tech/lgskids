@@ -96,6 +96,19 @@ const card: CSSProperties = {
   boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
 };
 
+// Barra de navegación bajo el encabezado (estilo MOSAICO). Los que tienen href
+// hacen scroll a la sección de la página; el resto queda como acceso futuro.
+const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean }[] = [
+  { label: "Actividades", emoji: "✨", menu: true },
+  { label: "Recursos", emoji: "🔗", menu: true },
+  { label: "Material", emoji: "📖" },
+  { label: "Historial", emoji: "📘", href: "#historial" },
+  { label: "Avance", emoji: "📈", href: "#avance" },
+  { label: "¿Cómo voy?", emoji: "📊", href: "#como-voy" },
+  { label: "Instructivos", emoji: "🎥" },
+  { label: "Perfil", emoji: "👤" },
+];
+
 function fechaLarga(iso: string): string {
   return new Date(iso).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
 }
@@ -304,6 +317,85 @@ export default function MiPanelPage() {
         </div>
       </header>
 
+      {/* Barra de secciones (estilo MOSAICO): un botón de Clubes + accesos hasta Perfil */}
+      <nav
+        aria-label="Secciones del panel"
+        style={{
+          background: "white",
+          borderTop: "1px solid #eef1f7",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+          padding: "0.5rem 1.5rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => document.getElementById("agenda")?.scrollIntoView({ behavior: "smooth" })}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.45rem",
+            padding: "0.5rem 1.1rem",
+            borderRadius: "0.6rem",
+            border: "none",
+            background: "var(--lgs-verde)",
+            color: "#1b2a10",
+            fontWeight: 800,
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          📅 Inscripción Clubes
+        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.15rem", marginLeft: "auto", flexWrap: "wrap" }}>
+          {NAV_ITEMS.map((it) => {
+            const base: CSSProperties = {
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              padding: "0.5rem 0.7rem",
+              borderRadius: "0.6rem",
+              color: "var(--texto-suave)",
+              fontWeight: 700,
+              fontSize: "0.85rem",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            };
+            const inner = (
+              <>
+                <span aria-hidden style={{ fontSize: "0.95rem" }}>
+                  {it.emoji}
+                </span>
+                <span>{it.label}</span>
+                {it.menu === true && (
+                  <span aria-hidden style={{ fontSize: "0.7rem", opacity: 0.7 }}>
+                    ▾
+                  </span>
+                )}
+              </>
+            );
+            return it.href !== undefined ? (
+              <a key={it.label} href={it.href} style={base}>
+                {inner}
+              </a>
+            ) : (
+              <button key={it.label} type="button" title="Próximamente" style={{ ...base, opacity: 0.6 }}>
+                {inner}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
       {data.matricula === null ? (
         <main style={{ padding: "3rem 1.5rem", textAlign: "center" }}>
           <p style={{ fontSize: "1.1rem", color: "var(--texto-suave)" }}>
@@ -481,7 +573,7 @@ export default function MiPanelPage() {
 
             {/* Columna derecha: sesiones + progreso */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              <section style={card}>
+              <section id="avance" style={{ ...card, scrollMarginTop: "1rem" }}>
                 <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>Sesiones</h2>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.6rem" }}>
                   {[
@@ -526,7 +618,7 @@ export default function MiPanelPage() {
               </section>
 
               {/* ¿Cómo voy? — niveles con medallas */}
-              <section style={card}>
+              <section id="como-voy" style={{ ...card, scrollMarginTop: "1rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <h2 style={{ fontSize: "1.1rem" }}>📈 ¿Cómo voy?</h2>
                   {data.progreso?.diploma === true && (
@@ -588,7 +680,7 @@ export default function MiPanelPage() {
           </div>
 
           {/* Agenda */}
-          <section style={card}>
+          <section id="agenda" style={{ ...card, scrollMarginTop: "1rem" }}>
             <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>🗓️ Mis próximas clases</h2>
             {data.agenda === undefined || data.agenda.length === 0 ? (
               <p style={{ color: "var(--texto-suave)" }}>Sin clases próximas.</p>
@@ -610,7 +702,7 @@ export default function MiPanelPage() {
           </section>
 
           {/* Historial */}
-          <section style={card}>
+          <section id="historial" style={{ ...card, scrollMarginTop: "1rem" }}>
             <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>📚 Historial de clases</h2>
             {data.historial === undefined || data.historial.length === 0 ? (
               <p style={{ color: "var(--texto-suave)" }}>Todavía no hay clases dictadas.</p>
