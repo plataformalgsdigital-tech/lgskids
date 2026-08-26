@@ -3,19 +3,30 @@ import { ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
 
 /**
- * Imagen de portada por (curso, nivel). Reutiliza el módulo `files` (storage +
- * validación de MIME/tamaño) — se guarda con entidad `catalog_imagen_curso` y
- * entidadId `CURSO:NIVEL`. La última subida es la vigente. Es arte curricular
- * (no dato de menores): el panel del alumno la muestra como banner del curso.
+ * Arte curricular (no dato de menores). Reutiliza el módulo `files` (storage +
+ * validación de MIME/tamaño). La última subida por clave es la vigente.
+ * Tipos:
+ *  - banner: imagen de portada por (curso, nivel) — banner del panel/mapa de isla.
+ *  - premio: imagen del premio por (curso, nivel) — brújula/llave/corona/…
+ *  - mapa:   mapa del curso completo (todas las islas) por curso.
+ *  - vobo:   sello "VoBo" global (marca de unidad vista).
  */
 
-const ENTIDAD = "catalog_imagen_curso";
+export type ArteTipo = "banner" | "premio" | "vobo" | "mapa";
+
+const ENTIDAD_POR_TIPO: Record<ArteTipo, string> = {
+  banner: "catalog_imagen_curso",
+  premio: "catalog_premio_nivel",
+  mapa: "catalog_mapa_curso",
+  vobo: "catalog_vobo",
+};
+
 const CURSOS = TIPOS_CURSO.map((c) => c.tipo) as readonly string[];
 const NIVELES_CODIGO = NIVELES.map((n) => n.codigo) as readonly string[];
 
 /**
- * Nivel especial: imagen de portada para TODO el curso (cubre todos los niveles).
- * Se usa como respaldo cuando un nivel concreto no tiene su propia imagen.
+ * Nivel especial: imagen de portada para TODO el curso (cubre los niveles sin
+ * imagen propia). Solo aplica al banner (respaldo).
  */
 export const NIVEL_TODOS = "TODOS";
 
@@ -23,14 +34,55 @@ function nivelValido(nivel: string): boolean {
   return nivel === NIVEL_TODOS || NIVELES_CODIGO.includes(nivel);
 }
 
-function clave(curso: string, nivel: string): string {
+/** entidadId (clave natural) por tipo, validando los parámetros que aplican. */
+function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string): string {
+  if (tipo === "vobo") return "GLOBAL";
+  if (!CURSOS.includes(curso ?? "")) throw new ValidationError(`Curso inválido: ${curso}.`);
+  if (tipo === "mapa") return curso as string;
+  // banner / premio → por (curso, nivel)
+  if (!nivelValido(nivel ?? "")) throw new ValidationError(`Nivel inválido: ${nivel}.`);
   return `${curso}:${nivel}`;
 }
 
-function validar(curso: string, nivel: string): void {
-  if (!CURSOS.includes(curso)) throw new ValidationError(`Curso inválido: ${curso}.`);
-  if (!nivelValido(nivel)) throw new ValidationError(`Nivel inválido: ${nivel}.`);
+/** ¿los parámetros forman una clave válida para el tipo? (sin lanzar). */
+function claveValida(tipo: ArteTipo, curso?: string, nivel?: string): boolean {
+  if (tipo === "vobo") return true;
+  if (!CURSOS.includes(curso ?? "")) return false;
+  if (tipo === "mapa") return true;
+  return nivelValido(nivel ?? "");
 }
+
+export async function subirArte(input: {
+  actorUserId: string;
+  tipo: ArteTipo;
+  curso?: string;
+  nivel?: string;
+  nombreOriginal: string;
+  mime: string;
+  bytes: Buffer;
+}): Promise<{ id: string }> {
+  return subirArchivo({
+    actorUserId: input.actorUserId,
+    nombreOriginal: input.nombreOriginal,
+    mime: input.mime,
+    bytes: input.bytes,
+    entidad: ENTIDAD_POR_TIPO[input.tipo],
+    entidadId: entidadIdArte(input.tipo, input.curso, input.nivel),
+  });
+}
+
+/** id del arte vigente para la clave del tipo, o null si no hay. */
+export async function arteId(tipo: ArteTipo, curso?: string, nivel?: string): Promise<string | null> {
+  if (!claveValida(tipo, curso, nivel)) return null;
+  const archivos = await listarArchivos({
+    entidad: ENTIDAD_POR_TIPO[tipo],
+    entidadId: entidadIdArte(tipo, curso, nivel),
+    limit: 1,
+  });
+  return archivos[0]?.id ?? null;
+}
+
+// —— Banner (compatibilidad con lo existente) ——————————————————————————
 
 export async function subirImagenCurso(input: {
   actorUserId: string;
@@ -40,32 +92,39 @@ export async function subirImagenCurso(input: {
   mime: string;
   bytes: Buffer;
 }): Promise<{ id: string }> {
-  validar(input.curso, input.nivel);
-  return subirArchivo({
-    actorUserId: input.actorUserId,
-    nombreOriginal: input.nombreOriginal,
-    mime: input.mime,
-    bytes: input.bytes,
-    entidad: ENTIDAD,
-    entidadId: clave(input.curso, input.nivel),
-  });
+  return subirArte({ ...input, tipo: "banner" });
 }
 
-/** id de la imagen vigente para (curso, nivel), o null si no hay. Acepta NIVEL_TODOS. */
+/** id del banner vigente para (curso, nivel), o null. Acepta NIVEL_TODOS. */
 export async function imagenCursoId(curso: string, nivel: string): Promise<string | null> {
-  if (!CURSOS.includes(curso) || !nivelValido(nivel)) return null;
-  const archivos = await listarArchivos({ entidad: ENTIDAD, entidadId: clave(curso, nivel), limit: 1 });
-  return archivos[0]?.id ?? null;
+  return arteId("banner", curso, nivel);
 }
 
 /**
- * id de la imagen a mostrar en el panel del alumno: la del nivel concreto y, si
- * no existe, la imagen de TODO el curso (respaldo). null si no hay ninguna.
+ * id del banner a mostrar: el del nivel concreto y, si no existe, el de TODO el
+ * curso (respaldo). null si no hay ninguno.
  */
 export async function imagenCursoIdResuelto(curso: string, nivel: string): Promise<string | null> {
   const propia = await imagenCursoId(curso, nivel);
   if (propia !== null) return propia;
   return imagenCursoId(curso, NIVEL_TODOS);
+}
+
+// —— Premio por nivel (Fase A: "¿Cómo voy?") ——————————————————————————
+
+/** id de la imagen del premio para (curso, nivel), o null. */
+export async function premioNivelId(curso: string, nivel: string): Promise<string | null> {
+  return arteId("premio", curso, nivel);
+}
+
+// —— Mapa del curso y VoBo (Fase B: pantalla "Avance") ————————————————
+
+export async function mapaCursoId(curso: string): Promise<string | null> {
+  return arteId("mapa", curso);
+}
+
+export async function voboId(): Promise<string | null> {
+  return arteId("vobo");
 }
 
 export async function descargarImagenCurso(id: string): Promise<{

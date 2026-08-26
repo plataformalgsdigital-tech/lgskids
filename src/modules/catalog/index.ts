@@ -26,7 +26,14 @@ export {
   imagenCursoInfoHandler,
   imagenCursoServeHandler,
 } from "./api/handlers";
-export { imagenCursoId, imagenCursoIdResuelto, NIVEL_TODOS } from "./application/imagen-curso";
+export {
+  imagenCursoId,
+  imagenCursoIdResuelto,
+  premioNivelId,
+  mapaCursoId,
+  voboId,
+  NIVEL_TODOS,
+} from "./application/imagen-curso";
 export {
   obtenerReferenciaNivel,
   actualizarReferenciaNivel,

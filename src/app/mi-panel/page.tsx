@@ -57,6 +57,10 @@ interface Dashboard {
     estado: "PRESENTE" | "AUSENTE" | "JUSTIFICADO" | null;
   }[];
   imagenCursoUrl?: string | null;
+  premios?: Record<string, string | null>; // premio por código de nivel (imagen)
+  bannersNivel?: Record<string, string | null>; // mapa de isla por código de nivel
+  mapaCursoUrl?: string | null; // mapa del curso completo
+  voboUrl?: string | null; // sello VoBo
 }
 
 const COLOR_NIVEL: Record<string, string> = {
@@ -319,22 +323,36 @@ export default function MiPanelPage() {
                 textAlign: "left",
               }}
             >
-              {/* Premio del mapa: sombreado hasta completar, vivo al completar */}
-              <span
-                aria-hidden
-                title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
-                style={{
+              {/* Premio del mapa: imagen si existe (respaldo emoji); sombreado hasta completar, vivo al completar */}
+              {(() => {
+                const premioUrl = data.premios?.[nivel.codigo] ?? null;
+                const estilo: CSSProperties = {
                   flex: "none",
-                  fontSize: "1.9rem",
-                  lineHeight: 1,
+                  width: "1.9rem",
+                  height: "1.9rem",
                   filter: completado ? "none" : "grayscale(1)",
                   opacity: completado ? 1 : 0.35,
                   transform: completado ? "scale(1)" : "scale(0.92)",
                   transition: "opacity .2s, filter .2s, transform .2s",
-                }}
-              >
-                {PREMIO_NIVEL[nivel.codigo] ?? "🏅"}
-              </span>
+                };
+                return premioUrl !== null ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={premioUrl}
+                    alt={`Premio ${nivel.nombre}`}
+                    title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
+                    style={{ ...estilo, objectFit: "contain" }}
+                  />
+                ) : (
+                  <span
+                    aria-hidden
+                    title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
+                    style={{ ...estilo, fontSize: "1.7rem", lineHeight: "1.9rem", textAlign: "center" }}
+                  >
+                    {PREMIO_NIVEL[nivel.codigo] ?? "🏅"}
+                  </span>
+                );
+              })()}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                   <strong>{nivel.nombre}</strong>

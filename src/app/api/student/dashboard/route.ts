@@ -1,6 +1,13 @@
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { agendaProximas, historialAsistencia, resumenAsistencia } from "@/modules/attendance";
-import { NIVEL_TODOS, imagenCursoIdResuelto } from "@/modules/catalog";
+import {
+  NIVEL_TODOS,
+  imagenCursoId,
+  imagenCursoIdResuelto,
+  mapaCursoId,
+  premioNivelId,
+  voboId,
+} from "@/modules/catalog";
 import { matriculaDeNino } from "@/modules/enrollment";
 import { bootstrapIdentity } from "@/modules/identity";
 import { findPersonByUserId } from "@/modules/people";
@@ -44,7 +51,19 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     progreso.niveles.find((n) => n.estado === "EN_CURSO") ??
     progreso.niveles.find((n) => n.estado !== "COMPLETADO") ??
     progreso.niveles[0];
-  const imgId = await imagenCursoIdResuelto(matricula.tipoCurso, nivelActual?.codigo ?? NIVEL_TODOS);
+
+  // Arte curricular: banner del nivel actual + premios/mapas/vobo para "¿Cómo voy?" y "Avance".
+  const niveles = progreso.niveles;
+  const url = (id: string | null) => (id !== null ? `/api/catalog/imagen-curso/${id}` : null);
+  const [imgId, premioIds, bannerIds, mapaId, vId] = await Promise.all([
+    imagenCursoIdResuelto(matricula.tipoCurso, nivelActual?.codigo ?? NIVEL_TODOS),
+    Promise.all(niveles.map((n) => premioNivelId(matricula.tipoCurso, n.codigo))),
+    Promise.all(niveles.map((n) => imagenCursoId(matricula.tipoCurso, n.codigo))),
+    mapaCursoId(matricula.tipoCurso),
+    voboId(),
+  ]);
+  const premios = Object.fromEntries(niveles.map((n, i) => [n.codigo, url(premioIds[i] ?? null)]));
+  const bannersNivel = Object.fromEntries(niveles.map((n, i) => [n.codigo, url(bannerIds[i] ?? null)]));
 
   return json({
     alumno: { nombre: `${persona.nombres} ${persona.apellidos}` },
@@ -54,6 +73,10 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     agenda,
     progreso,
     historial,
-    imagenCursoUrl: imgId !== null ? `/api/catalog/imagen-curso/${imgId}` : null,
+    imagenCursoUrl: url(imgId),
+    premios, // { [nivelCodigo]: url | null }  → íconos de "¿Cómo voy?"
+    bannersNivel, // { [nivelCodigo]: url | null } → mapas de isla en "Avance"
+    mapaCursoUrl: url(mapaId), // mapa del curso completo (todas las islas)
+    voboUrl: url(vId), // sello "VoBo"
   });
 });

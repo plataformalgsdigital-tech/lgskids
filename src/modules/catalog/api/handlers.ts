@@ -4,9 +4,10 @@ import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 import { ValidationError } from "@/platform/errors";
 import {
+  arteId,
   descargarImagenCurso,
-  imagenCursoId,
-  subirImagenCurso,
+  subirArte,
+  type ArteTipo,
 } from "../application/imagen-curso";
 import { crearCampania } from "../application/crear-campania";
 import { actualizarFechasCampania } from "../application/editar-campania";
@@ -248,24 +249,31 @@ export const referenciaQuizPutHandler = handlerWithAuth(async (request, auth, co
 });
 
 // ============================================================
-// Imagen de curso (banner por curso · nivel)
+// Arte curricular (banner · premio · mapa · vobo) por curso/nivel
 // ============================================================
 
-/** POST /api/catalog/imagen-curso — multipart (curso, nivel, archivo). */
+const TIPOS_ARTE: readonly ArteTipo[] = ["banner", "premio", "mapa", "vobo"];
+function tipoArte(v: string | null | undefined): ArteTipo {
+  return (TIPOS_ARTE as readonly string[]).includes(v ?? "") ? (v as ArteTipo) : "banner";
+}
+
+/** POST /api/catalog/imagen-curso — multipart (tipo?, curso?, nivel?, archivo). */
 export const imagenCursoSubirHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
   const form = await request.formData().catch(() => null);
   const archivo = form?.get("archivo");
-  const curso = form?.get("curso");
-  const nivel = form?.get("nivel");
-  if (form === null || !(archivo instanceof File) || typeof curso !== "string" || typeof nivel !== "string") {
-    throw new ValidationError("Envía multipart/form-data con 'curso', 'nivel' y 'archivo'.");
+  if (form === null || !(archivo instanceof File)) {
+    throw new ValidationError("Envía multipart/form-data con 'archivo' (y curso/nivel según el tipo).");
   }
-  const r = await subirImagenCurso({
+  const tipo = tipoArte(typeof form.get("tipo") === "string" ? (form.get("tipo") as string) : null);
+  const curso = typeof form.get("curso") === "string" ? (form.get("curso") as string) : undefined;
+  const nivel = typeof form.get("nivel") === "string" ? (form.get("nivel") as string) : undefined;
+  const r = await subirArte({
     actorUserId: auth.userId,
-    curso,
-    nivel,
+    tipo,
+    ...(curso !== undefined && { curso }),
+    ...(nivel !== undefined && { nivel }),
     nombreOriginal: archivo.name,
     mime: archivo.type,
     bytes: Buffer.from(await archivo.arrayBuffer()),
@@ -273,12 +281,12 @@ export const imagenCursoSubirHandler = handlerWithAuth(async (request, auth) => 
   return json(r, { status: 201 });
 });
 
-/** GET /api/catalog/imagen-curso?curso=&nivel= — id de la imagen vigente (o null). */
+/** GET /api/catalog/imagen-curso?tipo=&curso=&nivel= — id del arte vigente (o null). */
 export const imagenCursoInfoHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
   const q = request.nextUrl.searchParams;
-  const id = await imagenCursoId(q.get("curso") ?? "", q.get("nivel") ?? "");
+  const id = await arteId(tipoArte(q.get("tipo")), q.get("curso") ?? undefined, q.get("nivel") ?? undefined);
   return json({ id, url: id !== null ? `/api/catalog/imagen-curso/${id}` : null });
 });
 
