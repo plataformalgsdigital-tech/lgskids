@@ -507,6 +507,26 @@ export default function MiPanelPage() {
     </div>
   );
 
+  // Línea de ruta (dotted) que une las unidades y termina en el premio/centro,
+  // con puntos que se MUEVEN a lo largo del camino (animación). Coordenadas en %.
+  const rutaSVG = (puntos: { x: number; y: number }[]) => {
+    if (puntos.length < 2) return null;
+    const pts = puntos.map((p) => `${p.x},${p.y}`).join(" ");
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 1, pointerEvents: "none" }}
+      >
+        {/* Realce suave para contraste sobre el mapa */}
+        <polyline points={pts} fill="none" stroke="rgba(20,25,50,0.35)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {/* Ruta punteada animada */}
+        <polyline className="lgs-ruta" points={pts} fill="none" stroke="#ffe27a" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0.1 9" vectorEffect="non-scaling-stroke" />
+      </svg>
+    );
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #eef4ff 0%, #f7f0ff 100%)" }}>
       {/* Animaciones (Fase C): VoBo flota, premio brilla, unidad actual late. Respeta reduce-motion. */}
@@ -514,10 +534,12 @@ export default function MiPanelPage() {
         @keyframes lgsFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes lgsPulse{0%{transform:scale(.7);opacity:.9}100%{transform:scale(1.9);opacity:0}}
         @keyframes lgsShine{0%,100%{filter:drop-shadow(0 0 1px rgba(255,214,0,.45))}50%{filter:drop-shadow(0 0 9px rgba(255,214,0,.95))}}
+        @keyframes lgsRuta{to{stroke-dashoffset:-90}}
         .lgs-float{animation:lgsFloat 2.6s ease-in-out infinite}
         .lgs-ring{animation:lgsPulse 1.4s ease-out infinite}
         .lgs-shine{animation:lgsShine 1.8s ease-in-out infinite}
-        @media (prefers-reduced-motion:reduce){.lgs-float,.lgs-ring,.lgs-shine{animation:none}}
+        .lgs-ruta{animation:lgsRuta 3s linear infinite}
+        @media (prefers-reduced-motion:reduce){.lgs-float,.lgs-ring,.lgs-shine,.lgs-ruta{animation:none}}
       `}</style>
       {/* Barra superior */}
       <header
@@ -1283,6 +1305,7 @@ export default function MiPanelPage() {
                           const completo = n.estado === "COMPLETADO";
                           return (
                             <span key={n.codigo}>
+                              {rutaSVG([...hs.unidades, ...(hs.centro != null ? [hs.centro] : [])])}
                               {hs.unidades.slice(0, done).map((p, i) => marca(`${n.codigo}-u${i}`, p, voboEl("1.6rem")))}
                               {completo && hs.centro != null && marca(`${n.codigo}-c`, hs.centro, voboEl("3.2rem"))}
                             </span>
@@ -1324,6 +1347,7 @@ export default function MiPanelPage() {
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img src={banner} alt={`Isla ${n.nombre}`} style={{ display: "block", width: "100%", height: "auto" }} />
                           )}
+                          {hs !== undefined && rutaSVG([...hs.unidades, ...(hs.premio != null ? [hs.premio] : [])])}
                           {!bloqueado && hs !== undefined && (
                             <>
                               {hs.unidades.slice(0, n.leccionesCompletadas).map((p, i) => marca(`u${i}`, p, voboEl("2rem")))}
