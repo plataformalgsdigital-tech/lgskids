@@ -181,6 +181,36 @@ del salón, nunca de una acción del estudiante.
   última subida es la vigente); subir=`catalogo.gestionar`, servir=cualquier
   autenticado (arte curricular, no dato de menores). El dashboard resuelve
   `imagenCursoUrl` según el nivel actual; si falta, banner de color por nivel.
+- **Nav superior + modales (2026-08-26, estilo MOSAICO)**: bajo el encabezado hay
+  una barra (`NAV_ITEMS`) con botón verde **Inscripción Clubes** y accesos
+  Actividades/Recursos/Material/**Historial**/**Avance**/**¿Cómo voy?**/Instructivos/
+  Perfil. **¿Cómo voy?**, **Historial** y **Avance** abren MODAL (no viven en el
+  cuerpo); el resto es acceso futuro. "¿Cómo voy?" = progreso del nivel + acordeón
+  de niveles→Stages. El banner del curso ya no lleva texto (va en un encabezado
+  aparte, 16:9) y hace lightbox al clic. **Mis próximas clases** vive en la columna
+  derecha y muestra la **ventana de 14 días** (`agendaProximas(classroom, dias=14)`,
+  incluye clubes). **Pie** con soporte por WhatsApp (Soporte Usuario/Académico/
+  Finanzas; números en la constante `SOPORTE`, hoy placeholder).
+- **Arte curricular por TIPO (2026-08-26)**: `imagen-curso.ts` se generalizó a
+  `subirArte`/`arteId` con tipos **banner** (`catalog_imagen_curso` por CURSO:NIVEL,
+  admite `NIVEL_TODOS`), **premio** (`catalog_premio_nivel` por CURSO:NIVEL),
+  **mapa** (`catalog_mapa_curso` por curso) y **vobo** (`catalog_vobo`, GLOBAL).
+  Todo se sirve por `/api/catalog/imagen-curso/[id]`. UI `/panel/mantenimiento-cursos/imagenes`
+  gana selector de Tipo (previo cuadrado con tablero para PNG transparentes). En
+  "¿Cómo voy?" el premio de cada nivel se muestra como imagen (respaldo emoji),
+  sombreado→a color al completar.
+- **Pantalla "Avance" + hotspots (2026-08-26, Fase B)**: migración
+  `20260826000000_catalog_hotspots` (`catalog_arte_hotspot`, una fila por
+  scope/curso/nivel, `data` JSONB con coordenadas % de unidades/premio/centro;
+  scope **ISLA**=sobre el banner del nivel, **MAPA**=posición de esa isla sobre el
+  mapa del curso). CRUD `GET|PUT /api/catalog/hotspots` (ver/gestionar catálogo);
+  `getHotspotsCurso` alimenta el dashboard. **Editor** `/panel/mantenimiento-cursos/mapa`:
+  clic sobre la imagen para marcar cada unidad 1–4 y el premio (ISLA) o el centro
+  (MAPA). El **modal Avance** (ítem del nav) muestra el mapa del curso con VoBos en
+  unidades vistas y VoBo grande en el centro de islas completas; clic a una isla la
+  abre grande (bloqueada=sombreada, actual=VoBos en lo visto, completa=VoBo sobre el
+  premio). El VoBo usa la imagen `vobo` (respaldo: check verde). Movimiento = CSS
+  sobre los marcadores (no se anima el raster).
 - **Acceso a Zoom (2026-08-25, replicado de MOSAICO)**: lógica PURA en
   `src/ui/zoom-window.ts` (cliente): ventana de ingreso `[inicio − 5 min,
   inicio + 15 min]`; tras entrar, **reconexión** hasta 10 min antes del fin
