@@ -406,7 +406,7 @@ export default function MiPanelPage() {
                       }}
                     >
                       <span aria-hidden style={{ fontSize: "1rem" }}>{hecha ? "✅" : enCurso ? "▶️" : "🔒"}</span>
-                      <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>Stage {n}</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>Unidad {n}</span>
                       <span style={{ marginLeft: "auto", fontSize: "0.76rem", color: "var(--texto-suave)" }}>
                         {hecha ? "Completada" : enCurso ? "En curso" : "Bloqueada"}
                       </span>
@@ -1164,7 +1164,7 @@ export default function MiPanelPage() {
               {/* Niveles → Stages (clic para desplegar/colapsar) */}
               <div>
                 <p style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)", marginBottom: "0.6rem" }}>
-                  NIVELES DEL CURSO · toca un nivel para ver sus Stages
+                  NIVELES DEL CURSO · toca un nivel para ver sus Unidades
                 </p>
                 {listaNiveles}
               </div>
