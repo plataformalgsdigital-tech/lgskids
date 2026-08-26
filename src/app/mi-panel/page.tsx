@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 
@@ -61,6 +61,16 @@ interface Dashboard {
   bannersNivel?: Record<string, string | null>; // mapa de isla por código de nivel
   mapaCursoUrl?: string | null; // mapa del curso completo
   voboUrl?: string | null; // sello VoBo
+  hotspots?: {
+    isla: Record<string, HotspotData>;
+    mapa: Record<string, HotspotData>;
+  };
+}
+
+interface HotspotData {
+  unidades: { x: number; y: number }[];
+  premio: { x: number; y: number } | null;
+  centro: { x: number; y: number } | null;
 }
 
 const COLOR_NIVEL: Record<string, string> = {
@@ -113,12 +123,12 @@ const SOPORTE: { label: string; tel: string; color: string; msg: string }[] = [
 
 // Barra de navegación bajo el encabezado (estilo MOSAICO). Los que tienen href
 // hacen scroll a la sección de la página; el resto queda como acceso futuro.
-const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" | "historial" }[] = [
+const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" | "historial" | "avance" }[] = [
   { label: "Actividades", emoji: "✨", menu: true },
   { label: "Recursos", emoji: "🔗", menu: true },
   { label: "Material", emoji: "📖" },
   { label: "Historial", emoji: "📘", action: "historial" },
-  { label: "Avance", emoji: "📈", href: "#avance" },
+  { label: "Avance", emoji: "🗺️", action: "avance" },
   { label: "¿Cómo voy?", emoji: "📊", action: "comovoy" },
   { label: "Instructivos", emoji: "🎥" },
   { label: "Perfil", emoji: "👤" },
@@ -139,6 +149,8 @@ export default function MiPanelPage() {
   const [verImagen, setVerImagen] = useState(false); // lightbox del banner del curso
   const [verComoVoy, setVerComoVoy] = useState(false); // modal "¿Cómo voy?"
   const [verHistorial, setVerHistorial] = useState(false); // modal "Historial de clases"
+  const [verAvance, setVerAvance] = useState(false); // modal "Avance" (mapa del curso)
+  const [avanceNivel, setAvanceNivel] = useState<string | null>(null); // isla abierta (código de nivel) o null = mapa
   const [nivelesAbiertos, setNivelesAbiertos] = useState<Set<string>>(() => new Set()); // acordeón de niveles
 
   function toggleNivel(levelId: string) {
@@ -157,17 +169,19 @@ export default function MiPanelPage() {
 
   // Cerrar overlays (lightbox / modales) con la tecla Escape
   useEffect(() => {
-    if (!verImagen && !verComoVoy && !verHistorial) return;
+    if (!verImagen && !verComoVoy && !verHistorial && !verAvance) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setVerImagen(false);
         setVerComoVoy(false);
         setVerHistorial(false);
+        if (avanceNivel !== null) setAvanceNivel(null);
+        else setVerAvance(false);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [verImagen, verComoVoy, verHistorial]);
+  }, [verImagen, verComoVoy, verHistorial, verAvance, avanceNivel]);
 
   useEffect(() => {
     let cancelado = false;
@@ -452,6 +466,43 @@ export default function MiPanelPage() {
       </div>
     );
 
+  // Sello VoBo (imagen subida o respaldo con check verde)
+  const voboEl = (size: string) =>
+    data.voboUrl != null ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={data.voboUrl}
+        alt="VoBo"
+        style={{ width: size, height: size, objectFit: "contain", filter: "drop-shadow(0 2px 4px rgba(0,0,0,.35))" }}
+      />
+    ) : (
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background: "#fff",
+          border: "2px solid var(--lgs-verde)",
+          display: "grid",
+          placeItems: "center",
+          fontSize: `calc(${size} * 0.58)`,
+          boxShadow: "0 2px 6px rgba(0,0,0,.3)",
+        }}
+      >
+        ✅
+      </span>
+    );
+
+  // Marcador posicionado por hotspot (%). `node` es el contenido (VoBo, premio…).
+  const marca = (key: string, p: { x: number; y: number }, node: ReactNode) => (
+    <div
+      key={key}
+      style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 2 }}
+    >
+      {node}
+    </div>
+  );
+
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #eef4ff 0%, #f7f0ff 100%)" }}>
       {/* Barra superior */}
@@ -609,6 +660,13 @@ export default function MiPanelPage() {
             if (it.action === "historial") {
               return (
                 <button key={it.label} type="button" onClick={() => setVerHistorial(true)} style={base}>
+                  {inner}
+                </button>
+              );
+            }
+            if (it.action === "avance") {
+              return (
+                <button key={it.label} type="button" onClick={() => { setAvanceNivel(null); setVerAvance(true); }} style={base}>
                   {inner}
                 </button>
               );
@@ -1164,6 +1222,129 @@ export default function MiPanelPage() {
           </div>
         </div>
       )}
+
+      {/* Modal "Avance": mapa del curso → islas con VoBos y premios (hotspots) */}
+      {verAvance && (() => {
+        const nivelIsla = avanceNivel !== null ? niveles.find((n) => n.codigo === avanceNivel) : null;
+        const hsMapa = data.hotspots?.mapa ?? {};
+        const hsIsla = data.hotspots?.isla ?? {};
+        return (
+          <div
+            onClick={() => (avanceNivel !== null ? setAvanceNivel(null) : setVerAvance(false))}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Avance del curso"
+            style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(8,11,24,0.7)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}
+          >
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "56rem", background: "white", borderRadius: "1rem", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", overflow: "hidden" }}>
+              {/* Encabezado */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", padding: "1rem 1.25rem", borderBottom: "1px solid #eef1f7" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
+                  {nivelIsla != null && (
+                    <button type="button" onClick={() => setAvanceNivel(null)} aria-label="Volver al mapa" style={{ border: "1px solid #e3e7f0", background: "white", borderRadius: "0.5rem", padding: "0.3rem 0.6rem", cursor: "pointer", fontWeight: 700 }}>
+                      ← Mapa
+                    </button>
+                  )}
+                  <h2 style={{ fontSize: "1.2rem", fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    🗺️ {nivelIsla != null ? `Isla ${nivelIsla.nombre}` : `Mapa del curso · ${tipo}`}
+                  </h2>
+                </div>
+                <button type="button" onClick={() => setVerAvance(false)} aria-label="Cerrar" style={{ width: "2.2rem", height: "2.2rem", borderRadius: "50%", border: "1px solid #e3e7f0", background: "white", cursor: "pointer", fontSize: "1.1rem", color: "var(--texto-suave)" }}>
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ padding: "1.1rem 1.25rem 1.4rem" }}>
+                {nivelIsla == null ? (
+                  /* —— Vista mapa del curso —— */
+                  <>
+                    {data.mapaCursoUrl != null ? (
+                      <div style={{ position: "relative", borderRadius: "0.9rem", overflow: "hidden", border: "1px solid #e3e7f0" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={data.mapaCursoUrl} alt={`Mapa del curso ${tipo}`} style={{ display: "block", width: "100%", height: "auto" }} />
+                        {niveles.map((n) => {
+                          const hs = hsMapa[n.codigo];
+                          if (hs === undefined) return null;
+                          const done = n.leccionesCompletadas;
+                          const completo = n.estado === "COMPLETADO";
+                          return (
+                            <span key={n.codigo}>
+                              {hs.unidades.slice(0, done).map((p, i) => marca(`${n.codigo}-u${i}`, p, voboEl("1.6rem")))}
+                              {completo && hs.centro != null && marca(`${n.codigo}-c`, hs.centro, voboEl("3.2rem"))}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed #d8dce6", borderRadius: "0.9rem", color: "var(--texto-suave)" }}>
+                        Aún no hay “Mapa del curso completo” cargado. (Lo sube tu equipo en Mantenimiento Académico.)
+                      </div>
+                    )}
+                    {/* Islas: botones para abrir cada nivel */}
+                    <div style={{ marginTop: "0.9rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      {niveles.map((n) => {
+                        const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
+                        const icon = n.estado === "COMPLETADO" ? "🏅" : n.estado === "EN_CURSO" ? "▶️" : "🔒";
+                        return (
+                          <button key={n.codigo} type="button" onClick={() => setAvanceNivel(n.codigo)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.45rem 0.8rem", borderRadius: "0.6rem", border: `1px solid ${c}`, borderLeft: `5px solid ${c}`, background: "white", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", opacity: n.estado === "PENDIENTE" ? 0.7 : 1 }}>
+                            {icon} {n.nombre} <span style={{ color: "var(--texto-suave)", fontWeight: 600 }}>{n.leccionesCompletadas}/{n.totalLecciones}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  /* —— Vista isla del nivel —— */
+                  (() => {
+                    const n = nivelIsla;
+                    const banner = data.bannersNivel?.[n.codigo] ?? data.imagenCursoUrl ?? null;
+                    const bloqueado = n.estado === "PENDIENTE";
+                    const completo = n.estado === "COMPLETADO";
+                    const hs = hsIsla[n.codigo];
+                    const premioUrl = data.premios?.[n.codigo] ?? null;
+                    const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
+                    return (
+                      <>
+                        <div style={{ position: "relative", borderRadius: "0.9rem", overflow: "hidden", border: "1px solid #e3e7f0", background: banner == null ? `linear-gradient(140deg, ${c} 0%, #1b2140 130%)` : "#0a0e1e", aspectRatio: banner == null ? "16 / 9" : undefined, filter: bloqueado ? "grayscale(1) brightness(0.92)" : "none" }}>
+                          {banner != null && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={banner} alt={`Isla ${n.nombre}`} style={{ display: "block", width: "100%", height: "auto" }} />
+                          )}
+                          {!bloqueado && hs !== undefined && (
+                            <>
+                              {hs.unidades.slice(0, n.leccionesCompletadas).map((p, i) => marca(`u${i}`, p, voboEl("2rem")))}
+                              {hs.premio != null &&
+                                (completo
+                                  ? marca("prem", hs.premio, voboEl("2.8rem"))
+                                  : premioUrl != null
+                                    ? // eslint-disable-next-line @next/next/no-img-element
+                                      marca("prem", hs.premio, <img src={premioUrl} alt="Premio" style={{ width: "2.4rem", height: "2.4rem", objectFit: "contain", opacity: n.estado === "EN_CURSO" ? 1 : 0.5 }} />)
+                                    : null)}
+                            </>
+                          )}
+                          {bloqueado && (
+                            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", zIndex: 2 }}>
+                              <span style={{ fontSize: "2.5rem" }}>🔒</span>
+                            </div>
+                          )}
+                        </div>
+                        <p style={{ marginTop: "0.7rem", fontSize: "0.9rem", color: "var(--texto-suave)" }}>
+                          {bloqueado
+                            ? "Aún no llegas a este nivel."
+                            : completo
+                              ? "¡Nivel completado! El VoBo corona el premio."
+                              : `Vas ${n.leccionesCompletadas}/${n.totalLecciones} unidades. Las vistas llevan un VoBo.`}
+                          {hs === undefined && !bloqueado && " (Las posiciones se configuran en el editor de mapa.)"}
+                        </p>
+                      </>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
