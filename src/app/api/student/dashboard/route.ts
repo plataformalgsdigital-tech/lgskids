@@ -1,6 +1,6 @@
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { agendaProximas, historialAsistencia, resumenAsistencia } from "@/modules/attendance";
-import { imagenCursoId } from "@/modules/catalog";
+import { NIVEL_TODOS, imagenCursoIdResuelto } from "@/modules/catalog";
 import { matriculaDeNino } from "@/modules/enrollment";
 import { bootstrapIdentity } from "@/modules/identity";
 import { findPersonByUserId } from "@/modules/people";
@@ -39,12 +39,12 @@ export const GET = handlerWithAuth(async (_request, auth) => {
   ]);
 
   // Imagen de portada del curso según el nivel actual (o el primero no completado).
+  // Si el nivel no tiene imagen propia, cae a la imagen de TODO el curso (respaldo).
   const nivelActual =
     progreso.niveles.find((n) => n.estado === "EN_CURSO") ??
     progreso.niveles.find((n) => n.estado !== "COMPLETADO") ??
     progreso.niveles[0];
-  const imgId =
-    nivelActual !== undefined ? await imagenCursoId(matricula.tipoCurso, nivelActual.codigo) : null;
+  const imgId = await imagenCursoIdResuelto(matricula.tipoCurso, nivelActual?.codigo ?? NIVEL_TODOS);
 
   return json({
     alumno: { nombre: `${persona.nombres} ${persona.apellidos}` },

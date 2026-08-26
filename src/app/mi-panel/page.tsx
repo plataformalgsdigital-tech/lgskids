@@ -368,7 +368,7 @@ export default function MiPanelPage() {
                   position: "relative",
                   borderRadius: "1rem",
                   overflow: "hidden",
-                  aspectRatio: "5 / 2",
+                  aspectRatio: "16 / 9",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",

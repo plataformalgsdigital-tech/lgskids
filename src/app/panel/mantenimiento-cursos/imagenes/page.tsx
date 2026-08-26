@@ -6,7 +6,15 @@ import { apiFetch } from "@/ui/api-fetch";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
-const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"] as const;
+// "TODOS" = imagen para TODO el curso (respaldo de los niveles sin imagen propia).
+const NIVELES = [
+  { valor: "TODOS", etiqueta: "Todo el curso (todos los niveles)" },
+  { valor: "ROOKIE", etiqueta: "ROOKIE" },
+  { valor: "CHAMPION", etiqueta: "CHAMPION" },
+  { valor: "ELITE", etiqueta: "ELITE" },
+  { valor: "LEGENDARY", etiqueta: "LEGENDARY" },
+  { valor: "ULTIMATE", etiqueta: "ULTIMATE" },
+] as const;
 
 const input: CSSProperties = {
   padding: "0.5rem 0.65rem",
@@ -91,8 +99,12 @@ export default function ImagenesCursoPage() {
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Imágenes de curso</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-        Una imagen de portada por <strong>curso y nivel</strong>. Se muestra como banner en el panel
-        del alumno. JPG/PNG/WebP, máx. 10 MB.
+        Una imagen de portada por <strong>curso y nivel</strong> (o una para <strong>todo el curso</strong>,
+        que cubre los niveles sin imagen propia). Se muestra como banner en el panel del alumno.
+      </p>
+      <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem", marginTop: "0.3rem" }}>
+        📐 Genera la imagen en <strong>16:9</strong> para que no se recorte — recomendado{" "}
+        <strong>1600×900 px</strong> (o 1920×1080). JPG/PNG/WebP, máx. 10 MB.
       </p>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
@@ -108,10 +120,10 @@ export default function ImagenesCursoPage() {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Nivel</span>
-          <select value={nivel} onChange={(e) => setNivel(e.target.value)} style={{ ...input, width: "12rem" }}>
+          <select value={nivel} onChange={(e) => setNivel(e.target.value)} style={{ ...input, width: "16rem" }}>
             {NIVELES.map((n) => (
-              <option key={n} value={n}>
-                {n}
+              <option key={n.valor} value={n.valor}>
+                {n.etiqueta}
               </option>
             ))}
           </select>
@@ -123,42 +135,41 @@ export default function ImagenesCursoPage() {
         <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--texto-suave)" }}>
           {previo !== null ? "PREVIO (a subir)" : "IMAGEN ACTUAL"}
         </p>
+        {/* El previo usa la MISMA proporción que el banner del panel del alumno (16:9). */}
         <div
           style={{
             marginTop: "0.4rem",
             position: "relative",
             width: "100%",
-            maxWidth: "26rem",
-            aspectRatio: "16 / 10",
+            maxWidth: "28rem",
+            aspectRatio: "16 / 9",
             borderRadius: "1rem",
             overflow: "hidden",
             border: "1px solid #e3e7f0",
-            background: "linear-gradient(140deg, var(--lgs-azul) 0%, #1b2140 130%)",
+            background: muestraUrl !== null ? "#0a0e1e" : "linear-gradient(140deg, var(--lgs-azul) 0%, #1b2140 130%)",
             display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-            padding: "1.1rem",
+            alignItems: "center",
+            justifyContent: "center",
             color: "white",
           }}
         >
-          {muestraUrl !== null && (
+          {muestraUrl !== null ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={muestraUrl} alt="Previo del curso" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,14,30,0.72) 10%, rgba(10,14,30,0.1) 70%)" }} />
             </>
+          ) : (
+            <div style={{ textAlign: "center", opacity: 0.9 }}>
+              <div style={{ fontSize: "2.4rem", lineHeight: 1 }}>{curso === "YOUNGSTER" ? "🚀" : "🧩"}</div>
+              <div style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>Sin imagen aún</div>
+            </div>
           )}
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <div style={{ fontSize: "0.72rem", fontWeight: 700, opacity: 0.9 }}>LGS KIDS</div>
-            <div style={{ fontSize: "1.8rem", fontWeight: 900, lineHeight: 1 }}>{curso}</div>
-            <span style={{ display: "inline-block", marginTop: "0.35rem", padding: "0.15rem 0.6rem", borderRadius: "1rem", background: "rgba(255,255,255,0.22)", fontWeight: 800, fontSize: "0.78rem" }}>
-              Nivel {nivel}
-            </span>
-          </div>
         </div>
         {muestraUrl === null && (
           <p style={{ fontSize: "0.82rem", color: "var(--texto-suave)", marginTop: "0.4rem" }}>
-            Sin imagen para {curso} · {nivel}. Se muestra el banner de color por defecto.
+            {nivel === "TODOS"
+              ? `Sin imagen para todo el curso ${curso}. Se usa la de cada nivel o el color por defecto.`
+              : `Sin imagen para ${curso} · ${nivel}. Se usa la imagen de "todo el curso" o el color por defecto.`}
           </p>
         )}
       </div>
