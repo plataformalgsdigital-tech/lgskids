@@ -49,10 +49,17 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     titulo: "Imágenes de curso",
-    desc: "Una imagen de portada por curso y nivel (se ve en el panel del alumno).",
+    desc: "Banners de nivel, premios, mapa del curso y sello VoBo (se ven en el panel del alumno).",
     emoji: "🖼️",
     color: "var(--lgs-magenta)",
     href: "/panel/mantenimiento-cursos/imagenes",
+  },
+  {
+    titulo: "Editor de mapa (hotspots)",
+    desc: "Marca dónde va cada unidad y el premio sobre las islas y el mapa (pantalla Avance).",
+    emoji: "📍",
+    color: "var(--lgs-purpura)",
+    href: "/panel/mantenimiento-cursos/mapa",
   },
 ];
 
