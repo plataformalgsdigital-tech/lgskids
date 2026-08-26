@@ -98,11 +98,11 @@ const card: CSSProperties = {
 
 // Barra de navegación bajo el encabezado (estilo MOSAICO). Los que tienen href
 // hacen scroll a la sección de la página; el resto queda como acceso futuro.
-const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" }[] = [
+const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" | "historial" }[] = [
   { label: "Actividades", emoji: "✨", menu: true },
   { label: "Recursos", emoji: "🔗", menu: true },
   { label: "Material", emoji: "📖" },
-  { label: "Historial", emoji: "📘", href: "#historial" },
+  { label: "Historial", emoji: "📘", action: "historial" },
   { label: "Avance", emoji: "📈", href: "#avance" },
   { label: "¿Cómo voy?", emoji: "📊", action: "comovoy" },
   { label: "Instructivos", emoji: "🎥" },
@@ -123,6 +123,7 @@ export default function MiPanelPage() {
   const [ingreso, setIngreso] = useState(false); // ya entró a la clase (reconexión)
   const [verImagen, setVerImagen] = useState(false); // lightbox del banner del curso
   const [verComoVoy, setVerComoVoy] = useState(false); // modal "¿Cómo voy?"
+  const [verHistorial, setVerHistorial] = useState(false); // modal "Historial de clases"
   const [nivelesAbiertos, setNivelesAbiertos] = useState<Set<string>>(() => new Set()); // acordeón de niveles
 
   function toggleNivel(levelId: string) {
@@ -139,18 +140,19 @@ export default function MiPanelPage() {
     return () => clearInterval(id);
   }, []);
 
-  // Cerrar overlays (lightbox / modal "¿Cómo voy?") con la tecla Escape
+  // Cerrar overlays (lightbox / modales) con la tecla Escape
   useEffect(() => {
-    if (!verImagen && !verComoVoy) return;
+    if (!verImagen && !verComoVoy && !verHistorial) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setVerImagen(false);
         setVerComoVoy(false);
+        setVerHistorial(false);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [verImagen, verComoVoy]);
+  }, [verImagen, verComoVoy, verHistorial]);
 
   useEffect(() => {
     let cancelado = false;
@@ -392,6 +394,35 @@ export default function MiPanelPage() {
     </div>
   );
 
+  // Contenido del historial de clases (se muestra dentro del modal "Historial")
+  const listaHistorial =
+    data.historial === undefined || data.historial.length === 0 ? (
+      <p style={{ color: "var(--texto-suave)" }}>Todavía no hay clases dictadas.</p>
+    ) : (
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        {data.historial.map((h) => {
+          const b =
+            h.estado === "PRESENTE"
+              ? { txt: "✔ Asistió", c: "#1b5e20", bg: "#e8f5e9" }
+              : h.estado === "AUSENTE"
+                ? { txt: "✘ Ausente", c: "#c62828", bg: "#ffebee" }
+                : h.estado === "JUSTIFICADO"
+                  ? { txt: "📝 Justificado", c: "#8a6d00", bg: "#fff8e1" }
+                  : { txt: "— sin registro —", c: "#9e9e9e", bg: "#f5f5f5" };
+          return (
+            <div key={h.sessionId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0.9rem", borderRadius: "0.6rem", background: "#fafbfe", flexWrap: "wrap", gap: "0.3rem" }}>
+              <span style={{ fontWeight: 600 }}>
+                {h.tipo === "CLUB" ? "🎉 Club" : `📘 Sesión ${h.numero}`} · {fechaLarga(`${h.fecha}T12:00:00`)}
+              </span>
+              <span style={{ fontSize: "0.78rem", fontWeight: 700, color: b.c, background: b.bg, padding: "0.15rem 0.6rem", borderRadius: "1rem" }}>
+                {b.txt}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #eef4ff 0%, #f7f0ff 100%)" }}>
       {/* Barra superior */}
@@ -542,6 +573,13 @@ export default function MiPanelPage() {
             if (it.action === "comovoy") {
               return (
                 <button key={it.label} type="button" onClick={() => setVerComoVoy(true)} style={base}>
+                  {inner}
+                </button>
+              );
+            }
+            if (it.action === "historial") {
+              return (
+                <button key={it.label} type="button" onClick={() => setVerHistorial(true)} style={base}>
                   {inner}
                 </button>
               );
@@ -801,36 +839,6 @@ export default function MiPanelPage() {
             </div>
           </div>
 
-          {/* Historial */}
-          <section id="historial" style={{ ...card, scrollMarginTop: "1rem" }}>
-            <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>📚 Historial de clases</h2>
-            {data.historial === undefined || data.historial.length === 0 ? (
-              <p style={{ color: "var(--texto-suave)" }}>Todavía no hay clases dictadas.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                {data.historial.map((h) => {
-                  const b =
-                    h.estado === "PRESENTE"
-                      ? { txt: "✔ Asistió", c: "#1b5e20", bg: "#e8f5e9" }
-                      : h.estado === "AUSENTE"
-                        ? { txt: "✘ Ausente", c: "#c62828", bg: "#ffebee" }
-                        : h.estado === "JUSTIFICADO"
-                          ? { txt: "📝 Justificado", c: "#8a6d00", bg: "#fff8e1" }
-                          : { txt: "— sin registro —", c: "#9e9e9e", bg: "#f5f5f5" };
-                  return (
-                    <div key={h.sessionId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0.9rem", borderRadius: "0.6rem", background: "#fafbfe", flexWrap: "wrap", gap: "0.3rem" }}>
-                      <span style={{ fontWeight: 600 }}>
-                        {h.tipo === "CLUB" ? "🎉 Club" : `📘 Sesión ${h.numero}`} · {fechaLarga(`${h.fecha}T12:00:00`)}
-                      </span>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: b.c, background: b.bg, padding: "0.15rem 0.6rem", borderRadius: "1rem" }}>
-                        {b.txt}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
         </main>
       )}
 
@@ -989,6 +997,70 @@ export default function MiPanelPage() {
                 {listaNiveles}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal "Historial de clases" (se abre desde el ítem Historial del nav) */}
+      {verHistorial && (
+        <div
+          onClick={() => setVerHistorial(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Historial de clases"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(8,11,24,0.55)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "2rem 1rem",
+            overflowY: "auto",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "40rem",
+              background: "white",
+              borderRadius: "1rem",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "1.1rem 1.25rem",
+                borderBottom: "1px solid #eef1f7",
+              }}
+            >
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>📚 Historial de clases</h2>
+              <button
+                type="button"
+                onClick={() => setVerHistorial(false)}
+                aria-label="Cerrar"
+                style={{
+                  width: "2.2rem",
+                  height: "2.2rem",
+                  borderRadius: "50%",
+                  border: "1px solid #e3e7f0",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: "1.1rem",
+                  lineHeight: 1,
+                  color: "var(--texto-suave)",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: "1.25rem" }}>{listaHistorial}</div>
           </div>
         </div>
       )}
