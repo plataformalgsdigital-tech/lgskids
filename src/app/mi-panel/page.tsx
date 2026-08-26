@@ -1338,7 +1338,6 @@ export default function MiPanelPage() {
                     const bloqueado = n.estado === "PENDIENTE";
                     const completo = n.estado === "COMPLETADO";
                     const hs = hsIsla[n.codigo];
-                    const premioUrl = data.premios?.[n.codigo] ?? null;
                     const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
                     return (
                       <>
@@ -1359,13 +1358,8 @@ export default function MiPanelPage() {
                                   hs.unidades[n.leccionesCompletadas]!,
                                   <span className="lgs-ring" style={{ display: "block", width: "1.9rem", height: "1.9rem", borderRadius: "50%", border: "3px solid var(--lgs-purpura)" }} />,
                                 )}
-                              {hs.premio != null &&
-                                (completo
-                                  ? marca("prem", hs.premio, voboEl("2.8rem"))
-                                  : premioUrl != null
-                                    ? // eslint-disable-next-line @next/next/no-img-element
-                                      marca("prem", hs.premio, <img className={n.estado === "EN_CURSO" ? "lgs-shine" : undefined} src={premioUrl} alt="Premio" style={{ width: "2.4rem", height: "2.4rem", objectFit: "contain", opacity: n.estado === "EN_CURSO" ? 1 : 0.5 }} />)
-                                    : null)}
+                              {/* Premio: solo VoBo cuando el nivel está COMPLETO (el banner ya muestra el premio) */}
+                              {completo && hs.premio != null && marca("prem", hs.premio, voboEl("2.8rem"))}
                             </>
                           )}
                           {bloqueado && (
