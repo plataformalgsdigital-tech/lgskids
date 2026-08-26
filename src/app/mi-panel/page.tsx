@@ -352,6 +352,7 @@ export default function MiPanelPage() {
                 return premioUrl !== null ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
+                    className={completado ? "lgs-shine" : undefined}
                     src={premioUrl}
                     alt={`Premio ${nivel.nombre}`}
                     title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
@@ -360,6 +361,7 @@ export default function MiPanelPage() {
                 ) : (
                   <span
                     aria-hidden
+                    className={completado ? "lgs-shine" : undefined}
                     title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
                     style={{ ...estilo, fontSize: "1.7rem", lineHeight: "1.9rem", textAlign: "center" }}
                   >
@@ -471,12 +473,14 @@ export default function MiPanelPage() {
     data.voboUrl != null ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        className="lgs-float"
         src={data.voboUrl}
         alt="VoBo"
         style={{ width: size, height: size, objectFit: "contain", filter: "drop-shadow(0 2px 4px rgba(0,0,0,.35))" }}
       />
     ) : (
       <span
+        className="lgs-float"
         style={{
           width: size,
           height: size,
@@ -505,6 +509,16 @@ export default function MiPanelPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #eef4ff 0%, #f7f0ff 100%)" }}>
+      {/* Animaciones (Fase C): VoBo flota, premio brilla, unidad actual late. Respeta reduce-motion. */}
+      <style>{`
+        @keyframes lgsFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+        @keyframes lgsPulse{0%{transform:scale(.7);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+        @keyframes lgsShine{0%,100%{filter:drop-shadow(0 0 1px rgba(255,214,0,.45))}50%{filter:drop-shadow(0 0 9px rgba(255,214,0,.95))}}
+        .lgs-float{animation:lgsFloat 2.6s ease-in-out infinite}
+        .lgs-ring{animation:lgsPulse 1.4s ease-out infinite}
+        .lgs-shine{animation:lgsShine 1.8s ease-in-out infinite}
+        @media (prefers-reduced-motion:reduce){.lgs-float,.lgs-ring,.lgs-shine{animation:none}}
+      `}</style>
       {/* Barra superior */}
       <header
         style={{
@@ -1313,12 +1327,20 @@ export default function MiPanelPage() {
                           {!bloqueado && hs !== undefined && (
                             <>
                               {hs.unidades.slice(0, n.leccionesCompletadas).map((p, i) => marca(`u${i}`, p, voboEl("2rem")))}
+                              {/* Unidad actual: aro que late */}
+                              {n.estado === "EN_CURSO" &&
+                                hs.unidades[n.leccionesCompletadas] != null &&
+                                marca(
+                                  "cur",
+                                  hs.unidades[n.leccionesCompletadas]!,
+                                  <span className="lgs-ring" style={{ display: "block", width: "1.9rem", height: "1.9rem", borderRadius: "50%", border: "3px solid var(--lgs-purpura)" }} />,
+                                )}
                               {hs.premio != null &&
                                 (completo
                                   ? marca("prem", hs.premio, voboEl("2.8rem"))
                                   : premioUrl != null
                                     ? // eslint-disable-next-line @next/next/no-img-element
-                                      marca("prem", hs.premio, <img src={premioUrl} alt="Premio" style={{ width: "2.4rem", height: "2.4rem", objectFit: "contain", opacity: n.estado === "EN_CURSO" ? 1 : 0.5 }} />)
+                                      marca("prem", hs.premio, <img className={n.estado === "EN_CURSO" ? "lgs-shine" : undefined} src={premioUrl} alt="Premio" style={{ width: "2.4rem", height: "2.4rem", objectFit: "contain", opacity: n.estado === "EN_CURSO" ? 1 : 0.5 }} />)
                                     : null)}
                             </>
                           )}
