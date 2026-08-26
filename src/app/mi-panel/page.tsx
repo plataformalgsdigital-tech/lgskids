@@ -98,13 +98,13 @@ const card: CSSProperties = {
 
 // Barra de navegación bajo el encabezado (estilo MOSAICO). Los que tienen href
 // hacen scroll a la sección de la página; el resto queda como acceso futuro.
-const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean }[] = [
+const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" }[] = [
   { label: "Actividades", emoji: "✨", menu: true },
   { label: "Recursos", emoji: "🔗", menu: true },
   { label: "Material", emoji: "📖" },
   { label: "Historial", emoji: "📘", href: "#historial" },
   { label: "Avance", emoji: "📈", href: "#avance" },
-  { label: "¿Cómo voy?", emoji: "📊", href: "#como-voy" },
+  { label: "¿Cómo voy?", emoji: "📊", action: "comovoy" },
   { label: "Instructivos", emoji: "🎥" },
   { label: "Perfil", emoji: "👤" },
 ];
@@ -122,21 +122,35 @@ export default function MiPanelPage() {
   const [ahora, setAhora] = useState<number>(() => Date.now());
   const [ingreso, setIngreso] = useState(false); // ya entró a la clase (reconexión)
   const [verImagen, setVerImagen] = useState(false); // lightbox del banner del curso
+  const [verComoVoy, setVerComoVoy] = useState(false); // modal "¿Cómo voy?"
+  const [nivelesAbiertos, setNivelesAbiertos] = useState<Set<string>>(() => new Set()); // acordeón de niveles
+
+  function toggleNivel(levelId: string) {
+    setNivelesAbiertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(levelId)) next.delete(levelId);
+      else next.add(levelId);
+      return next;
+    });
+  }
 
   useEffect(() => {
     const id = setInterval(() => setAhora(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
 
-  // Cerrar el lightbox del banner con la tecla Escape
+  // Cerrar overlays (lightbox / modal "¿Cómo voy?") con la tecla Escape
   useEffect(() => {
-    if (!verImagen) return;
+    if (!verImagen && !verComoVoy) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setVerImagen(false);
+      if (e.key === "Escape") {
+        setVerImagen(false);
+        setVerComoVoy(false);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [verImagen]);
+  }, [verImagen, verComoVoy]);
 
   useEffect(() => {
     let cancelado = false;
@@ -242,6 +256,141 @@ export default function MiPanelPage() {
     border: "1px solid #e3e7f0",
     background: "#fafbfe",
   };
+
+  // Métricas del nivel actual para el modal "¿Cómo voy?"
+  const pctNivelActual =
+    nivelActual !== undefined
+      ? Math.round((nivelActual.leccionesCompletadas / Math.max(nivelActual.totalLecciones, 1)) * 100)
+      : 0;
+  const faltanNivel =
+    nivelActual !== undefined ? Math.max(nivelActual.totalLecciones - nivelActual.leccionesCompletadas, 0) : 0;
+  const asistPct =
+    data.asistencia != null && data.asistencia.totalSesiones > 0
+      ? Math.round((data.asistencia.asistidas / data.asistencia.totalSesiones) * 100)
+      : 0;
+  const nivelesCompletados = niveles.filter((n) => n.estado === "COMPLETADO").length;
+
+  // Acordeón de niveles → Stages (se muestra dentro del modal "¿Cómo voy?")
+  const listaNiveles = (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+      {niveles.map((nivel) => {
+        const completado = nivel.estado === "COMPLETADO";
+        const abierto = nivelesAbiertos.has(nivel.levelId);
+        const colorN = COLOR_NIVEL[nivel.codigo] ?? "var(--lgs-azul)";
+        return (
+          <div
+            key={nivel.levelId}
+            style={{
+              border: "1px solid #edf0f6",
+              borderLeft: `5px solid ${colorN}`,
+              borderRadius: "0.7rem",
+              overflow: "hidden",
+              opacity: nivel.estado === "PENDIENTE" ? 0.7 : 1,
+            }}
+          >
+            {/* Header clicable: despliega/colapsa las Stages */}
+            <button
+              type="button"
+              onClick={() => toggleNivel(nivel.levelId)}
+              aria-expanded={abierto}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.7rem 0.9rem",
+                background: abierto ? "#fafbfe" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                font: "inherit",
+                textAlign: "left",
+              }}
+            >
+              {/* Premio del mapa: sombreado hasta completar, vivo al completar */}
+              <span
+                aria-hidden
+                title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
+                style={{
+                  flex: "none",
+                  fontSize: "1.9rem",
+                  lineHeight: 1,
+                  filter: completado ? "none" : "grayscale(1)",
+                  opacity: completado ? 1 : 0.35,
+                  transform: completado ? "scale(1)" : "scale(0.92)",
+                  transition: "opacity .2s, filter .2s, transform .2s",
+                }}
+              >
+                {PREMIO_NIVEL[nivel.codigo] ?? "🏅"}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
+                  <strong>{nivel.nombre}</strong>
+                  <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    {nivel.leccionesCompletadas}/{nivel.totalLecciones} · {nivel.levelUpAprobado ? "Level Up ✅" : "Level Up ⏳"}
+                    <span aria-hidden style={{ fontSize: "0.7rem", transition: "transform .2s", transform: abierto ? "rotate(90deg)" : "none", color: colorN, fontWeight: 900 }}>
+                      ▸
+                    </span>
+                  </span>
+                </div>
+                <div style={{ marginTop: "0.4rem", height: "0.45rem", borderRadius: "0.25rem", background: "#eef1f7", overflow: "hidden" }}>
+                  <div style={{ width: `${(nivel.leccionesCompletadas / Math.max(nivel.totalLecciones, 1)) * 100}%`, height: "100%", background: colorN }} />
+                </div>
+              </div>
+            </button>
+
+            {/* Stages del nivel (Stage 1..N + Level Up) */}
+            {abierto && (
+              <div style={{ padding: "0.2rem 0.9rem 0.8rem 0.9rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                {Array.from({ length: nivel.totalLecciones }).map((_, i) => {
+                  const n = i + 1;
+                  const hecha = n <= nivel.leccionesCompletadas;
+                  const enCurso = n === nivel.leccionesCompletadas + 1 && nivel.estado !== "COMPLETADO";
+                  return (
+                    <div
+                      key={n}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.6rem",
+                        padding: "0.4rem 0.6rem",
+                        borderRadius: "0.5rem",
+                        background: enCurso ? "#f3eefc" : "#fafbfe",
+                        border: `1px solid ${enCurso ? colorN : "#edf0f6"}`,
+                      }}
+                    >
+                      <span aria-hidden style={{ fontSize: "1rem" }}>{hecha ? "✅" : enCurso ? "▶️" : "🔒"}</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>Stage {n}</span>
+                      <span style={{ marginLeft: "auto", fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                        {hecha ? "Completada" : enCurso ? "En curso" : "Bloqueada"}
+                      </span>
+                    </div>
+                  );
+                })}
+                {/* Level Up final del nivel */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.6rem",
+                    padding: "0.4rem 0.6rem",
+                    borderRadius: "0.5rem",
+                    background: "#fff8e1",
+                    border: "1px solid var(--lgs-amarillo)",
+                  }}
+                >
+                  <span aria-hidden style={{ fontSize: "1rem" }}>{nivel.levelUpAprobado ? "🏆" : "⏳"}</span>
+                  <span style={{ fontWeight: 800, fontSize: "0.88rem" }}>Level Up</span>
+                  <span style={{ marginLeft: "auto", fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                    {nivel.levelUpAprobado ? "Aprobado" : "Pendiente"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #eef4ff 0%, #f7f0ff 100%)" }}>
@@ -383,11 +532,21 @@ export default function MiPanelPage() {
                 )}
               </>
             );
-            return it.href !== undefined ? (
-              <a key={it.label} href={it.href} style={base}>
-                {inner}
-              </a>
-            ) : (
+            if (it.href !== undefined) {
+              return (
+                <a key={it.label} href={it.href} style={base}>
+                  {inner}
+                </a>
+              );
+            }
+            if (it.action === "comovoy") {
+              return (
+                <button key={it.label} type="button" onClick={() => setVerComoVoy(true)} style={base}>
+                  {inner}
+                </button>
+              );
+            }
+            return (
               <button key={it.label} type="button" title="Próximamente" style={{ ...base, opacity: 0.6 }}>
                 {inner}
               </button>
@@ -617,89 +776,30 @@ export default function MiPanelPage() {
                 </div>
               </section>
 
-              {/* ¿Cómo voy? — niveles con medallas */}
-              <section id="como-voy" style={{ ...card, scrollMarginTop: "1rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h2 style={{ fontSize: "1.1rem" }}>📈 ¿Cómo voy?</h2>
-                  {data.progreso?.diploma === true && (
-                    <span style={{ padding: "0.3rem 0.8rem", borderRadius: "1rem", background: "#fff8e1", border: "2px solid var(--lgs-amarillo)", fontWeight: 800, fontSize: "0.82rem" }}>
-                      🎓 ¡Diploma!
-                    </span>
-                  )}
-                </div>
-                <div style={{ marginTop: "0.8rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                  {niveles.map((nivel) => {
-                    const completado = nivel.estado === "COMPLETADO";
-                    return (
-                      <div
-                        key={nivel.levelId}
-                        style={{
-                          border: "1px solid #edf0f6",
-                          borderLeft: `5px solid ${COLOR_NIVEL[nivel.codigo] ?? "var(--lgs-azul)"}`,
-                          borderRadius: "0.7rem",
-                          padding: "0.7rem 0.9rem",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.75rem",
-                          opacity: nivel.estado === "PENDIENTE" ? 0.7 : 1,
-                        }}
-                      >
-                        {/* Premio del mapa: sombreado hasta completar, vivo al completar */}
-                        <span
-                          aria-hidden
-                          title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
-                          style={{
-                            flex: "none",
-                            fontSize: "1.9rem",
-                            lineHeight: 1,
-                            filter: completado ? "none" : "grayscale(1)",
-                            opacity: completado ? 1 : 0.35,
-                            transform: completado ? "scale(1)" : "scale(0.92)",
-                            transition: "opacity .2s, filter .2s, transform .2s",
-                          }}
-                        >
-                          {PREMIO_NIVEL[nivel.codigo] ?? "🏅"}
+              {/* Mis próximas clases (en el lugar del antiguo "¿Cómo voy?") */}
+              <section id="agenda" style={{ ...card, scrollMarginTop: "1rem" }}>
+                <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>🗓️ Mis próximas clases</h2>
+                {data.agenda === undefined || data.agenda.length === 0 ? (
+                  <p style={{ color: "var(--texto-suave)" }}>Sin clases próximas.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                    {data.agenda.map((ev) => (
+                      <div key={ev.sessionId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem 0.9rem", borderRadius: "0.6rem", borderLeft: `4px solid ${ev.tipo === "CLUB" ? "var(--lgs-amarillo)" : "var(--lgs-azul)"}`, background: "#fafbfe", flexWrap: "wrap", gap: "0.3rem" }}>
+                        <span style={{ fontWeight: 600 }}>
+                          {ev.tipo === "CLUB" ? "🎉 Club" : "📘 Sesión"} · {fechaLarga(ev.startsAt)}
                         </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-                            <strong>{nivel.nombre}</strong>
-                            <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", whiteSpace: "nowrap" }}>
-                              {nivel.leccionesCompletadas}/{nivel.totalLecciones} · {nivel.levelUpAprobado ? "Level Up ✅" : "Level Up ⏳"}
-                            </span>
-                          </div>
-                          <div style={{ marginTop: "0.4rem", height: "0.45rem", borderRadius: "0.25rem", background: "#eef1f7", overflow: "hidden" }}>
-                            <div style={{ width: `${(nivel.leccionesCompletadas / Math.max(nivel.totalLecciones, 1)) * 100}%`, height: "100%", background: COLOR_NIVEL[nivel.codigo] ?? "var(--lgs-azul)" }} />
-                          </div>
-                        </div>
+                        <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                          {hora(ev.startsAt)}
+                          {ev.guia !== null && ` · ${ev.guia}`}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </section>
+
             </div>
           </div>
-
-          {/* Agenda */}
-          <section id="agenda" style={{ ...card, scrollMarginTop: "1rem" }}>
-            <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>🗓️ Mis próximas clases</h2>
-            {data.agenda === undefined || data.agenda.length === 0 ? (
-              <p style={{ color: "var(--texto-suave)" }}>Sin clases próximas.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {data.agenda.map((ev) => (
-                  <div key={ev.sessionId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem 0.9rem", borderRadius: "0.6rem", borderLeft: `4px solid ${ev.tipo === "CLUB" ? "var(--lgs-amarillo)" : "var(--lgs-azul)"}`, background: "#fafbfe", flexWrap: "wrap", gap: "0.3rem" }}>
-                    <span style={{ fontWeight: 600 }}>
-                      {ev.tipo === "CLUB" ? "🎉 Club" : "📘 Sesión"} · {fechaLarga(ev.startsAt)}
-                    </span>
-                    <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-                      {hora(ev.startsAt)}
-                      {ev.guia !== null && ` · ${ev.guia}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
 
           {/* Historial */}
           <section id="historial" style={{ ...card, scrollMarginTop: "1rem" }}>
@@ -787,6 +887,109 @@ export default function MiPanelPage() {
               cursor: "default",
             }}
           />
+        </div>
+      )}
+
+      {/* Modal "¿Cómo voy?" (estilo MOSAICO): progreso del nivel + Stages por nivel */}
+      {verComoVoy && (
+        <div
+          onClick={() => setVerComoVoy(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="¿Cómo voy?"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(8,11,24,0.55)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "2rem 1rem",
+            overflowY: "auto",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "40rem",
+              background: "white",
+              borderRadius: "1rem",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              overflow: "hidden",
+            }}
+          >
+            {/* Encabezado del modal */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "1.1rem 1.25rem",
+                borderBottom: "1px solid #eef1f7",
+              }}
+            >
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>📈 ¿Cómo voy?</h2>
+              <button
+                type="button"
+                onClick={() => setVerComoVoy(false)}
+                aria-label="Cerrar"
+                style={{
+                  width: "2.2rem",
+                  height: "2.2rem",
+                  borderRadius: "50%",
+                  border: "1px solid #e3e7f0",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: "1.1rem",
+                  lineHeight: 1,
+                  color: "var(--texto-suave)",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {/* PROGRESO del nivel actual */}
+              <div style={{ ...card, boxShadow: "none", border: "1px solid #eef1f7" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)" }}>
+                    PROGRESO — NIVEL {(nivelActual?.nombre ?? "").toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: "1.5rem", fontWeight: 900, color: colorNivel }}>{pctNivelActual}%</span>
+                </div>
+                <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}>
+                  Curso {tipo} · Nivel {nivelesCompletados}/{niveles.length} completados
+                </p>
+                <div style={{ marginTop: "0.6rem", height: "0.55rem", borderRadius: "0.3rem", background: "#eef1f7", overflow: "hidden" }}>
+                  <div style={{ width: `${pctNivelActual}%`, height: "100%", background: colorNivel }} />
+                </div>
+                <div style={{ marginTop: "0.5rem", display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                  <span>
+                    {nivelActual?.leccionesCompletadas ?? 0} de {nivelActual?.totalLecciones ?? 0} lecciones
+                  </span>
+                  <span>{asistPct}% asistencia</span>
+                </div>
+                <div style={{ marginTop: "0.7rem", padding: "0.7rem 0.9rem", borderRadius: "0.6rem", background: "#f4f6fb", fontSize: "0.88rem" }}>
+                  {data.progreso?.diploma === true
+                    ? "🎓 ¡Completaste todos los niveles! Diploma conseguido."
+                    : faltanNivel > 0
+                      ? `Te faltan ${faltanNivel} ${faltanNivel === 1 ? "sesión" : "sesiones"} para completar el nivel y avanzar.`
+                      : "¡Completaste las sesiones del nivel! Falta aprobar el Level Up para avanzar."}
+                </div>
+              </div>
+
+              {/* Niveles → Stages (clic para desplegar/colapsar) */}
+              <div>
+                <p style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)", marginBottom: "0.6rem" }}>
+                  NIVELES DEL CURSO · toca un nivel para ver sus Stages
+                </p>
+                {listaNiveles}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
