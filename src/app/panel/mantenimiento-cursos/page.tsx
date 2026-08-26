@@ -13,10 +13,17 @@ interface Tarjeta {
 
 const TARJETAS: Tarjeta[] = [
   {
+    titulo: "Gestión de Contenido",
+    desc: "Temario y evaluación (varios cuestionarios) por lección. Guiado por curso y nivel.",
+    emoji: "📝",
+    color: "var(--lgs-purpura)",
+    href: "/panel/mantenimiento-cursos/gestion-contenido",
+  },
+  {
     titulo: "Referencia de cursos",
     desc: "Temario, material (alumno/guía), video, actividades, recursos y quiz por curso · nivel · unidad · lección.",
     emoji: "📚",
-    color: "var(--lgs-purpura)",
+    color: "var(--lgs-cian)",
     href: "/panel/mantenimiento-cursos/referencia",
   },
   {

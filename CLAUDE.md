@@ -60,7 +60,14 @@ del salón, nunca de una acción del estudiante.
   escribir=catalogo.gestionar). **Import CSV** (`POST /api/catalog/curso/bulk` →
   `importarCursoReferencia`, UPSERT por clave natural): UI `/panel/mantenimiento-cursos/subir-curso`
   parsea el CSV en el navegador, muestra un PREVIO validado (✔/✘ por fila) y solo
-  al confirmar sube las válidas. Listas en CSV: ítems `Nombre|enlace` separados por `;`. La migración `20260825000000` había puesto la
+  al confirmar sube las válidas. Listas en CSV: ítems `Nombre|enlace` separados por `;`.
+  **Gestión de Contenido** (`/panel/mantenimiento-cursos/gestion-contenido`, estilo
+  MOSAICO): editor guiado por Curso→Nivel que edita el temario y la **evaluación de
+  cada lección con VARIOS cuestionarios** (`quiz = { cuestionarios: [{titulo, minutos,
+  preguntas: [{tipo: opcion_multiple|verdadero_falso|respuesta_escrita, enunciado,
+  opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada editor
+  define su forma (Referencia guarda un arreglo de preguntas; Gestión de Contenido, los
+  cuestionarios). La migración `20260825000000` había puesto la
   referencia en `catalog_lesson` (por campaña) — se RETIRÓ (superada por
   `catalog_curso`); quedan como PENDIENTE (¿se necesitan?) las referencias de
   `catalog_level` (`descripcion`,`recursos`) y `catalog_quiz` (`modo`,`minutos`,
