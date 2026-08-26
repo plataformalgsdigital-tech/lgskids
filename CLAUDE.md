@@ -173,6 +173,14 @@ del salón, nunca de una acción del estudiante.
   justificadas/total), progreso por nivel con medallas y diploma, y agenda
   de próximas sesiones. Requiere permiso `panel.alumno`. El login enruta a
   /mi-panel si el usuario es alumno (y no staff), al /panel en otro caso.
+- **Diseño (2026-08-25, estilo MOSAICO)**: /mi-panel a 2 columnas — izquierda:
+  banner del curso + info + sesión próxima (link Zoom); derecha: Sesiones (tiles)
+  + progreso + nivel anterior/actual/próximo + "¿Cómo voy?". **Imagen de portada
+  por (curso, nivel)** (`/panel/mantenimiento-cursos/imagenes`): reutiliza el
+  módulo `files` (entidad `catalog_imagen_curso`, entidadId `CURSO:NIVEL`, la
+  última subida es la vigente); subir=`catalogo.gestionar`, servir=cualquier
+  autenticado (arte curricular, no dato de menores). El dashboard resuelve
+  `imagenCursoUrl` según el nivel actual; si falta, banner de color por nivel.
 - **Acceso a Zoom (2026-08-25, replicado de MOSAICO)**: lógica PURA en
   `src/ui/zoom-window.ts` (cliente): ventana de ingreso `[inicio − 5 min,
   inicio + 15 min]`; tras entrar, **reconexión** hasta 10 min antes del fin

@@ -1,6 +1,13 @@
 import { z } from "zod";
+import { NextResponse } from "next/server";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
+import { ValidationError } from "@/platform/errors";
+import {
+  descargarImagenCurso,
+  imagenCursoId,
+  subirImagenCurso,
+} from "../application/imagen-curso";
 import { crearCampania } from "../application/crear-campania";
 import { actualizarFechasCampania } from "../application/editar-campania";
 import { detalleCampania, listarCampanias } from "../application/consultas";
@@ -238,4 +245,52 @@ export const referenciaQuizPutHandler = handlerWithAuth(async (request, auth, co
   const body = refQuizSchema.parse(await request.json());
   await actualizarReferenciaQuiz({ actorUserId: auth.userId, quizId: id, ...body, ip: ipDe(request) });
   return json({ ok: true });
+});
+
+// ============================================================
+// Imagen de curso (banner por curso · nivel)
+// ============================================================
+
+/** POST /api/catalog/imagen-curso — multipart (curso, nivel, archivo). */
+export const imagenCursoSubirHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const form = await request.formData().catch(() => null);
+  const archivo = form?.get("archivo");
+  const curso = form?.get("curso");
+  const nivel = form?.get("nivel");
+  if (form === null || !(archivo instanceof File) || typeof curso !== "string" || typeof nivel !== "string") {
+    throw new ValidationError("Envía multipart/form-data con 'curso', 'nivel' y 'archivo'.");
+  }
+  const r = await subirImagenCurso({
+    actorUserId: auth.userId,
+    curso,
+    nivel,
+    nombreOriginal: archivo.name,
+    mime: archivo.type,
+    bytes: Buffer.from(await archivo.arrayBuffer()),
+  });
+  return json(r, { status: 201 });
+});
+
+/** GET /api/catalog/imagen-curso?curso=&nivel= — id de la imagen vigente (o null). */
+export const imagenCursoInfoHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_VER);
+  const q = request.nextUrl.searchParams;
+  const id = await imagenCursoId(q.get("curso") ?? "", q.get("nivel") ?? "");
+  return json({ id, url: id !== null ? `/api/catalog/imagen-curso/${id}` : null });
+});
+
+/** GET /api/catalog/imagen-curso/[id] — sirve la imagen (autenticado; arte curricular). */
+export const imagenCursoServeHandler = handlerWithAuth(async (_request, _auth, context) => {
+  const id = await idParam(context);
+  const { meta, bytes } = await descargarImagenCurso(id);
+  return new NextResponse(new Uint8Array(bytes), {
+    headers: {
+      "Content-Type": meta.mime,
+      "Content-Disposition": "inline",
+      "Cache-Control": "private, max-age=300",
+    },
+  });
 });

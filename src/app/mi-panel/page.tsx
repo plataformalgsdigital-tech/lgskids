@@ -57,6 +57,7 @@ interface Dashboard {
     numero: number;
     estado: "PRESENTE" | "AUSENTE" | "JUSTIFICADO" | null;
   }[];
+  imagenCursoUrl?: string | null;
 }
 
 const COLOR_NIVEL: Record<string, string> = {
@@ -300,19 +301,34 @@ export default function MiPanelPage() {
                   boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
                 }}
               >
-                <span aria-hidden style={{ position: "absolute", top: "-1.5rem", right: "0.5rem", fontSize: "9rem", opacity: 0.16, lineHeight: 1 }}>
-                  {tipo === "YOUNGSTER" ? "🚀" : "🧩"}
-                </span>
-                <span style={{ fontSize: "0.8rem", fontWeight: 700, opacity: 0.9, letterSpacing: "0.08em" }}>
-                  LGS KIDS · {curso.edad}
-                </span>
-                <h2 style={{ fontSize: "2.4rem", fontWeight: 900, lineHeight: 1, margin: "0.2rem 0" }}>{curso.titulo}</h2>
-                {nivelActual !== undefined && (
-                  <span style={{ display: "inline-block", alignSelf: "flex-start", padding: "0.2rem 0.7rem", borderRadius: "1rem", background: "rgba(255,255,255,0.22)", fontWeight: 800, fontSize: "0.85rem", marginBottom: "0.5rem" }}>
-                    Nivel {nivelActual.nombre}
+                {data.imagenCursoUrl != null && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={data.imagenCursoUrl}
+                      alt={`Curso ${curso.titulo}`}
+                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,14,30,0.72) 10%, rgba(10,14,30,0.15) 70%)" }} />
+                  </>
+                )}
+                {data.imagenCursoUrl == null && (
+                  <span aria-hidden style={{ position: "absolute", top: "-1.5rem", right: "0.5rem", fontSize: "9rem", opacity: 0.16, lineHeight: 1 }}>
+                    {tipo === "YOUNGSTER" ? "🚀" : "🧩"}
                   </span>
                 )}
-                <p style={{ fontSize: "0.9rem", opacity: 0.95, maxWidth: "26rem" }}>{curso.desc}</p>
+                <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 700, opacity: 0.9, letterSpacing: "0.08em" }}>
+                    LGS KIDS · {curso.edad}
+                  </span>
+                  <h2 style={{ fontSize: "2.4rem", fontWeight: 900, lineHeight: 1, margin: "0.2rem 0" }}>{curso.titulo}</h2>
+                  {nivelActual !== undefined && (
+                    <span style={{ display: "inline-block", alignSelf: "flex-start", padding: "0.2rem 0.7rem", borderRadius: "1rem", background: "rgba(255,255,255,0.22)", fontWeight: 800, fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+                      Nivel {nivelActual.nombre}
+                    </span>
+                  )}
+                  <p style={{ fontSize: "0.9rem", opacity: 0.95, maxWidth: "26rem" }}>{curso.desc}</p>
+                </div>
               </div>
 
               {/* Info del curso */}

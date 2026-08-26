@@ -49,9 +49,10 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     titulo: "Imágenes de curso",
-    desc: "Una imagen por tipo de curso.",
+    desc: "Una imagen de portada por curso y nivel (se ve en el panel del alumno).",
     emoji: "🖼️",
     color: "var(--lgs-magenta)",
+    href: "/panel/mantenimiento-cursos/imagenes",
   },
 ];
 
