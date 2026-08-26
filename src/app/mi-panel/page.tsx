@@ -99,11 +99,22 @@ export default function MiPanelPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [ahora, setAhora] = useState<number>(() => Date.now());
   const [ingreso, setIngreso] = useState(false); // ya entró a la clase (reconexión)
+  const [verImagen, setVerImagen] = useState(false); // lightbox del banner del curso
 
   useEffect(() => {
     const id = setInterval(() => setAhora(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // Cerrar el lightbox del banner con la tecla Escape
+  useEffect(() => {
+    if (!verImagen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setVerImagen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [verImagen]);
 
   useEffect(() => {
     let cancelado = false;
@@ -336,8 +347,23 @@ export default function MiPanelPage() {
           <div style={{ display: "grid", gap: "1.25rem", gridTemplateColumns: "repeat(auto-fit, minmax(20rem, 1fr))" }}>
             {/* Columna izquierda: imagen del curso + info + sesión próxima */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              {/* Banner del curso: imagen LIMPIA (el texto vive en el encabezado, arriba) */}
+              {/* Banner del curso: imagen LIMPIA (el texto vive en el encabezado, arriba). Clic → verla en grande. */}
               <div
+                onClick={data.imagenCursoUrl != null ? () => setVerImagen(true) : undefined}
+                role={data.imagenCursoUrl != null ? "button" : undefined}
+                tabIndex={data.imagenCursoUrl != null ? 0 : undefined}
+                onKeyDown={
+                  data.imagenCursoUrl != null
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setVerImagen(true);
+                        }
+                      }
+                    : undefined
+                }
+                aria-label={data.imagenCursoUrl != null ? "Ver la imagen del curso en grande" : undefined}
+                title={data.imagenCursoUrl != null ? "Clic para ver más grande" : undefined}
                 style={{
                   position: "relative",
                   borderRadius: "1rem",
@@ -346,6 +372,7 @@ export default function MiPanelPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  cursor: data.imagenCursoUrl != null ? "zoom-in" : "default",
                   background:
                     data.imagenCursoUrl == null
                       ? `linear-gradient(140deg, ${colorNivel} 0%, #1b2140 130%)`
@@ -361,6 +388,25 @@ export default function MiPanelPage() {
                       alt={`Curso ${curso.titulo}${nivelActual !== undefined ? ` · Nivel ${nivelActual.nombre}` : ""}`}
                       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
                     />
+                    <span
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        bottom: "0.5rem",
+                        right: "0.6rem",
+                        padding: "0.2rem 0.55rem",
+                        borderRadius: "1rem",
+                        background: "rgba(10,14,30,0.55)",
+                        color: "white",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                      }}
+                    >
+                      🔍 Ver grande
+                    </span>
                   </>
                 ) : (
                   <span aria-hidden style={{ fontSize: "3.5rem", opacity: 0.85, lineHeight: 1 }}>
@@ -553,6 +599,62 @@ export default function MiPanelPage() {
             )}
           </section>
         </main>
+      )}
+
+      {/* Lightbox del banner del curso */}
+      {verImagen && data.imagenCursoUrl != null && (
+        <div
+          onClick={() => setVerImagen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Imagen del curso ${curso.titulo}`}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            background: "rgba(8,11,24,0.86)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1.5rem",
+            cursor: "zoom-out",
+          }}
+        >
+          <button
+            onClick={() => setVerImagen(false)}
+            aria-label="Cerrar"
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              width: "2.6rem",
+              height: "2.6rem",
+              borderRadius: "50%",
+              border: "none",
+              background: "rgba(255,255,255,0.15)",
+              color: "white",
+              fontSize: "1.3rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={data.imagenCursoUrl}
+            alt={`Curso ${curso.titulo}${nivelActual !== undefined ? ` · Nivel ${nivelActual.nombre}` : ""}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              borderRadius: "0.9rem",
+              boxShadow: "0 12px 48px rgba(0,0,0,0.5)",
+              cursor: "default",
+            }}
+          />
+        </div>
       )}
     </div>
   );
