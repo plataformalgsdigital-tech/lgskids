@@ -512,7 +512,7 @@ export default function MiPanelPage() {
                 <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
                   <div style={moduloBox}>
                     <div style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}>NIVEL ANTERIOR</div>
-                    <div style={{ fontWeight: 800 }}>{nivelAnterior?.nombre ?? "—"}</div>
+                    <div style={{ fontWeight: 800 }}>{nivelAnterior?.nombre ?? "Welcome"}</div>
                   </div>
                   <div style={{ ...moduloBox, borderColor: colorNivel, background: "#f3eefc" }}>
                     <div style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}>NIVEL ACTUAL</div>
