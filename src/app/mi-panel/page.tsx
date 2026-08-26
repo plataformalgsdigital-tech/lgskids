@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
@@ -226,12 +225,13 @@ export default function MiPanelPage() {
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
           <span
             aria-hidden
             style={{
-              width: "3rem",
-              height: "3rem",
+              width: "2.9rem",
+              height: "2.9rem",
+              flex: "none",
               borderRadius: "50%",
               display: "grid",
               placeItems: "center",
@@ -242,22 +242,32 @@ export default function MiPanelPage() {
           >
             {iniciales}
           </span>
-          <div>
-            <h1 style={{ fontSize: "1.3rem", lineHeight: 1.1 }}>¡Hola, {nombreAlumno || "campeón"}! 👋</h1>
-            <p style={{ fontSize: "0.82rem", color: "var(--texto-suave)" }}>Tu espacio en LGS Kids</p>
+          <div style={{ minWidth: 0 }}>
+            <h1
+              style={{
+                fontSize: "1.25rem",
+                lineHeight: 1.1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ¡Hola, {nombreAlumno || "campeón"}! 👋
+            </h1>
+            <p style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>Panel del estudiante</p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <Image src="/logo.jpg" alt="LGS Kids" width={40} height={36} style={{ height: "auto" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flex: "none" }}>
           {nivelActual !== undefined && (
             <span
               style={{
                 padding: "0.4rem 0.9rem",
                 borderRadius: "1rem",
-                fontWeight: 700,
+                fontWeight: 800,
                 fontSize: "0.82rem",
                 color: "white",
                 background: colorNivel,
+                whiteSpace: "nowrap",
               }}
             >
               {nivelActual.nombre}
@@ -266,7 +276,8 @@ export default function MiPanelPage() {
           )}
           <button
             onClick={() => void salir()}
-            style={{ padding: "0.5rem 1rem", borderRadius: "0.6rem", border: "1px solid #e3e7f0", background: "white", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }}
+            title="Cerrar sesión"
+            style={{ padding: "0.5rem 1rem", borderRadius: "0.6rem", border: "1px solid #e3e7f0", background: "white", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", whiteSpace: "nowrap" }}
           >
             Salir
           </button>
