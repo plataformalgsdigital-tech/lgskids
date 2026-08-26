@@ -2,6 +2,7 @@ import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { agendaProximas, historialAsistencia, resumenAsistencia } from "@/modules/attendance";
 import {
   NIVEL_TODOS,
+  getHotspotsCurso,
   imagenCursoId,
   imagenCursoIdResuelto,
   mapaCursoId,
@@ -55,12 +56,13 @@ export const GET = handlerWithAuth(async (_request, auth) => {
   // Arte curricular: banner del nivel actual + premios/mapas/vobo para "¿Cómo voy?" y "Avance".
   const niveles = progreso.niveles;
   const url = (id: string | null) => (id !== null ? `/api/catalog/imagen-curso/${id}` : null);
-  const [imgId, premioIds, bannerIds, mapaId, vId] = await Promise.all([
+  const [imgId, premioIds, bannerIds, mapaId, vId, hotspots] = await Promise.all([
     imagenCursoIdResuelto(matricula.tipoCurso, nivelActual?.codigo ?? NIVEL_TODOS),
     Promise.all(niveles.map((n) => premioNivelId(matricula.tipoCurso, n.codigo))),
     Promise.all(niveles.map((n) => imagenCursoId(matricula.tipoCurso, n.codigo))),
     mapaCursoId(matricula.tipoCurso),
     voboId(),
+    getHotspotsCurso(matricula.tipoCurso),
   ]);
   const premios = Object.fromEntries(niveles.map((n, i) => [n.codigo, url(premioIds[i] ?? null)]));
   const bannersNivel = Object.fromEntries(niveles.map((n, i) => [n.codigo, url(bannerIds[i] ?? null)]));
@@ -78,5 +80,6 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     bannersNivel, // { [nivelCodigo]: url | null } → mapas de isla en "Avance"
     mapaCursoUrl: url(mapaId), // mapa del curso completo (todas las islas)
     voboUrl: url(vId), // sello "VoBo"
+    hotspots, // { isla: {nivel: {unidades,premio}}, mapa: {nivel: {unidades,centro}} }
   });
 });

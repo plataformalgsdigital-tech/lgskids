@@ -25,7 +25,11 @@ export {
   imagenCursoSubirHandler,
   imagenCursoInfoHandler,
   imagenCursoServeHandler,
+  hotspotsInfoHandler,
+  hotspotsGuardarHandler,
 } from "./api/handlers";
+export { getHotspotsCurso } from "./application/hotspots";
+export type { HotspotData, Punto, HotspotScope } from "./application/hotspots";
 export {
   imagenCursoId,
   imagenCursoIdResuelto,

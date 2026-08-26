@@ -9,6 +9,7 @@ import {
   subirArte,
   type ArteTipo,
 } from "../application/imagen-curso";
+import { getHotspots, setHotspots } from "../application/hotspots";
 import { crearCampania } from "../application/crear-campania";
 import { actualizarFechasCampania } from "../application/editar-campania";
 import { detalleCampania, listarCampanias } from "../application/consultas";
@@ -301,4 +302,33 @@ export const imagenCursoServeHandler = handlerWithAuth(async (_request, _auth, c
       "Cache-Control": "private, max-age=300",
     },
   });
+});
+
+// ============================================================
+// Hotspots del arte (posiciones de unidades/premio/centro para "Avance")
+// ============================================================
+
+/** GET /api/catalog/hotspots?scope=&curso=&nivel= — hotspots normalizados. */
+export const hotspotsInfoHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_VER);
+  const q = request.nextUrl.searchParams;
+  const data = await getHotspots(q.get("scope") ?? "ISLA", q.get("curso") ?? "", q.get("nivel") ?? "");
+  return json(data);
+});
+
+const hotspotsBodySchema = z.object({
+  scope: z.enum(["ISLA", "MAPA"]),
+  curso: z.string(),
+  nivel: z.string(),
+  data: z.unknown(),
+});
+
+/** PUT /api/catalog/hotspots — guarda (upsert) los hotspots de (scope, curso, nivel). */
+export const hotspotsGuardarHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const body = hotspotsBodySchema.parse(await request.json());
+  const data = await setHotspots({ actorUserId: auth.userId, ...body });
+  return json(data);
 });
