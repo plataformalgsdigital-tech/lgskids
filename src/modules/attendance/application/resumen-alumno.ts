@@ -72,8 +72,12 @@ export async function historialAsistencia(
   );
 }
 
-/** Próximas sesiones del salón (agenda del niño), con el guía. */
-export async function agendaProximas(classroomId: string, limit = 8): Promise<EventoAgenda[]> {
+/**
+ * Próximas sesiones del salón (agenda del niño) dentro de una ventana de días
+ * —por defecto las DOS SEMANAS siguientes—, con el guía. Incluye TODOS los
+ * tipos (sesiones y clubes/talleres); no filtra por tipo.
+ */
+export async function agendaProximas(classroomId: string, dias = 14): Promise<EventoAgenda[]> {
   return queryRows<EventoAgenda>(
     `SELECT s.id AS "sessionId", s.tipo::text AS tipo, s.fecha::text AS fecha,
             s.starts_at AS "startsAt", s.duracion_min AS "duracionMin",
@@ -82,9 +86,11 @@ export async function agendaProximas(classroomId: string, limit = 8): Promise<Ev
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
        LEFT JOIN people_person gp ON gp.user_id = gu.id
-      WHERE s.classroom_id = $1 AND s.starts_at >= now()
+      WHERE s.classroom_id = $1
+        AND s.starts_at >= now()
+        AND s.starts_at < now() + ($2 || ' days')::interval
       ORDER BY s.starts_at
-      LIMIT $2`,
-    [classroomId, limit],
+      LIMIT 60`,
+    [classroomId, String(dias)],
   );
 }

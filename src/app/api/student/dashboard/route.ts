@@ -33,7 +33,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
 
   const [asistencia, agenda, progreso, historial] = await Promise.all([
     resumenAsistencia(persona.id, matricula.classroomId),
-    agendaProximas(matricula.classroomId, 8),
+    agendaProximas(matricula.classroomId, 14), // próximas 2 semanas (incluye clubes/talleres)
     progresoDeNino(persona.id),
     historialAsistencia(persona.id, matricula.classroomId, 30),
   ]);
