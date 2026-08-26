@@ -293,53 +293,80 @@ export default function MiPanelPage() {
         </main>
       ) : (
         <main style={{ maxWidth: "72rem", margin: "0 auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Encabezado del curso: el texto vive AQUÍ (no sobre la imagen) para que el banner se vea limpio */}
+          <section
+            style={{
+              ...card,
+              padding: "0.75rem 1rem",
+              borderLeft: `5px solid ${colorNivel}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "var(--texto-suave)", letterSpacing: "0.08em" }}>
+                LGS KIDS · {curso.edad}
+              </span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: 900, lineHeight: 1.1, margin: 0 }}>{curso.titulo}</h2>
+                <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>{curso.desc}</span>
+              </div>
+            </div>
+            {nivelActual !== undefined && (
+              <span
+                style={{
+                  flex: "none",
+                  padding: "0.3rem 0.8rem",
+                  borderRadius: "1rem",
+                  background: colorNivel,
+                  color: "white",
+                  fontWeight: 800,
+                  fontSize: "0.8rem",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Nivel {nivelActual.nombre}
+              </span>
+            )}
+          </section>
+
           <div style={{ display: "grid", gap: "1.25rem", gridTemplateColumns: "repeat(auto-fit, minmax(20rem, 1fr))" }}>
             {/* Columna izquierda: imagen del curso + info + sesión próxima */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              {/* Banner del curso (según curso y nivel) */}
+              {/* Banner del curso: imagen LIMPIA (el texto vive en el encabezado, arriba) */}
               <div
                 style={{
                   position: "relative",
                   borderRadius: "1rem",
                   overflow: "hidden",
-                  minHeight: "15rem",
-                  padding: "1.4rem",
+                  aspectRatio: "5 / 2",
                   display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  color: "white",
-                  background: `linear-gradient(140deg, ${colorNivel} 0%, #1b2140 130%)`,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background:
+                    data.imagenCursoUrl == null
+                      ? `linear-gradient(140deg, ${colorNivel} 0%, #1b2140 130%)`
+                      : "#0a0e1e",
                   boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
                 }}
               >
-                {data.imagenCursoUrl != null && (
+                {data.imagenCursoUrl != null ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={data.imagenCursoUrl}
-                      alt={`Curso ${curso.titulo}`}
+                      alt={`Curso ${curso.titulo}${nivelActual !== undefined ? ` · Nivel ${nivelActual.nombre}` : ""}`}
                       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
                     />
-                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,14,30,0.72) 10%, rgba(10,14,30,0.15) 70%)" }} />
                   </>
-                )}
-                {data.imagenCursoUrl == null && (
-                  <span aria-hidden style={{ position: "absolute", top: "-1.5rem", right: "0.5rem", fontSize: "9rem", opacity: 0.16, lineHeight: 1 }}>
+                ) : (
+                  <span aria-hidden style={{ fontSize: "3.5rem", opacity: 0.85, lineHeight: 1 }}>
                     {tipo === "YOUNGSTER" ? "🚀" : "🧩"}
                   </span>
                 )}
-                <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: "0.8rem", fontWeight: 700, opacity: 0.9, letterSpacing: "0.08em" }}>
-                    LGS KIDS · {curso.edad}
-                  </span>
-                  <h2 style={{ fontSize: "2.4rem", fontWeight: 900, lineHeight: 1, margin: "0.2rem 0" }}>{curso.titulo}</h2>
-                  {nivelActual !== undefined && (
-                    <span style={{ display: "inline-block", alignSelf: "flex-start", padding: "0.2rem 0.7rem", borderRadius: "1rem", background: "rgba(255,255,255,0.22)", fontWeight: 800, fontSize: "0.85rem", marginBottom: "0.5rem" }}>
-                      Nivel {nivelActual.nombre}
-                    </span>
-                  )}
-                  <p style={{ fontSize: "0.9rem", opacity: 0.95, maxWidth: "26rem" }}>{curso.desc}</p>
-                </div>
               </div>
 
               {/* Info del curso */}
