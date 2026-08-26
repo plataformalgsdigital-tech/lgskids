@@ -67,6 +67,15 @@ const COLOR_NIVEL: Record<string, string> = {
   ULTIMATE: "var(--lgs-purpura)",
 };
 
+// Premio al final del mapa de cada nivel (icono): sombreado hasta completar, vivo al completar.
+const PREMIO_NIVEL: Record<string, string> = {
+  ROOKIE: "🧭",
+  CHAMPION: "🔑",
+  ELITE: "👑",
+  LEGENDARY: "⭐",
+  ULTIMATE: "💰",
+};
+
 const DESC_CURSO: Record<string, { titulo: string; edad: string; desc: string }> = {
   JUNIOR: {
     titulo: "JUNIOR",
@@ -527,20 +536,52 @@ export default function MiPanelPage() {
                   )}
                 </div>
                 <div style={{ marginTop: "0.8rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                  {niveles.map((nivel) => (
-                    <div key={nivel.levelId} style={{ border: "1px solid #edf0f6", borderLeft: `5px solid ${COLOR_NIVEL[nivel.codigo] ?? "var(--lgs-azul)"}`, borderRadius: "0.7rem", padding: "0.7rem 0.9rem", opacity: nivel.estado === "PENDIENTE" ? 0.6 : 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <strong>{nivel.nombre}</strong>
-                        <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                          {nivel.medalla && "🏅 "}
-                          {nivel.leccionesCompletadas}/{nivel.totalLecciones} · {nivel.levelUpAprobado ? "Level Up ✅" : "Level Up ⏳"}
+                  {niveles.map((nivel) => {
+                    const completado = nivel.estado === "COMPLETADO";
+                    return (
+                      <div
+                        key={nivel.levelId}
+                        style={{
+                          border: "1px solid #edf0f6",
+                          borderLeft: `5px solid ${COLOR_NIVEL[nivel.codigo] ?? "var(--lgs-azul)"}`,
+                          borderRadius: "0.7rem",
+                          padding: "0.7rem 0.9rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.75rem",
+                          opacity: nivel.estado === "PENDIENTE" ? 0.7 : 1,
+                        }}
+                      >
+                        {/* Premio del mapa: sombreado hasta completar, vivo al completar */}
+                        <span
+                          aria-hidden
+                          title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
+                          style={{
+                            flex: "none",
+                            fontSize: "1.9rem",
+                            lineHeight: 1,
+                            filter: completado ? "none" : "grayscale(1)",
+                            opacity: completado ? 1 : 0.35,
+                            transform: completado ? "scale(1)" : "scale(0.92)",
+                            transition: "opacity .2s, filter .2s, transform .2s",
+                          }}
+                        >
+                          {PREMIO_NIVEL[nivel.codigo] ?? "🏅"}
                         </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
+                            <strong>{nivel.nombre}</strong>
+                            <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", whiteSpace: "nowrap" }}>
+                              {nivel.leccionesCompletadas}/{nivel.totalLecciones} · {nivel.levelUpAprobado ? "Level Up ✅" : "Level Up ⏳"}
+                            </span>
+                          </div>
+                          <div style={{ marginTop: "0.4rem", height: "0.45rem", borderRadius: "0.25rem", background: "#eef1f7", overflow: "hidden" }}>
+                            <div style={{ width: `${(nivel.leccionesCompletadas / Math.max(nivel.totalLecciones, 1)) * 100}%`, height: "100%", background: COLOR_NIVEL[nivel.codigo] ?? "var(--lgs-azul)" }} />
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ marginTop: "0.4rem", height: "0.45rem", borderRadius: "0.25rem", background: "#eef1f7", overflow: "hidden" }}>
-                        <div style={{ width: `${(nivel.leccionesCompletadas / Math.max(nivel.totalLecciones, 1)) * 100}%`, height: "100%", background: COLOR_NIVEL[nivel.codigo] ?? "var(--lgs-azul)" }} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             </div>
