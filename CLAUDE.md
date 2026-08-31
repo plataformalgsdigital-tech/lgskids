@@ -60,7 +60,10 @@ del salón, nunca de una acción del estudiante.
   escribir=catalogo.gestionar). **Import CSV** (`POST /api/catalog/curso/bulk` →
   `importarCursoReferencia`, UPSERT por clave natural): UI `/panel/mantenimiento-cursos/subir-curso`
   parsea el CSV en el navegador, muestra un PREVIO validado (✔/✘ por fila) y solo
-  al confirmar sube las válidas. Listas en CSV: ítems `Nombre|enlace` separados por `;`.
+  al confirmar sube las válidas. **Separador autodetectado** (`detectarSeparador`
+  cuenta `,` vs `;` SOLO en el encabezado: el Excel en español exporta con `;`) y
+  `ULTIMATE STAGE` se acepta como `ULTIMATE`. Columnas obligatorias: **curso,
+  nivel, unidad, leccion, orden**. Listas en CSV: ítems `Nombre|enlace` separados por `;`.
   **Gestión de Contenido** (`/panel/mantenimiento-cursos/gestion-contenido`, estilo
   MOSAICO): editor guiado por Curso→Nivel que edita el temario y la **evaluación de
   cada lección con VARIOS cuestionarios** (`quiz = { cuestionarios: [{titulo, minutos,
@@ -161,6 +164,8 @@ del salón, nunca de una acción del estudiante.
   los permisos; la app y el seed lo fuerzan). El seed llena permisos de un
   rol NO-superadmin solo si está vacío → respeta ediciones del panel.
   Editar permisos de un rol invalida toda la caché de perfiles.
+- Desde 2026-08-26 el árbol de permisos incluye los del MENÚ (`seccion.*` y
+  `menu.*`), separados de los funcionales — ver "Menú por secciones y Tablero".
 
 ## Panel del alumno (2026-07-23)
 
@@ -211,6 +216,29 @@ del salón, nunca de una acción del estudiante.
   abre grande (bloqueada=sombreada, actual=VoBos en lo visto, completa=VoBo sobre el
   premio). El VoBo usa la imagen `vobo` (respaldo: check verde). Movimiento = CSS
   sobre los marcadores (no se anima el raster).
+  **VoBo (2026-08-29)**: el sello dejó de ser un cuadrado (250×250) y pasó a ser el
+  personaje con el visto verde, VERTICAL (2:3). Como se pinta con `objectFit: contain`
+  en caja cuadrada, los tamaños de `voboEl(...)` en /mi-panel se subieron ~1,35×
+  (2.2/4.2rem en el mapa, 2.8/3.8rem en la isla) para conservar la misma presencia.
+  El PNG original traía el tablero de transparencia INCRUSTADO (colorType 2, sin
+  alfa): se recortó por relleno desde el borde (candidato = min canal ≥ 232 y
+  max−min ≤ 16, que puentea los dos grises del tablero sin comerse la ropa).
+- **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
+  reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:
+  la `nota_privada` de la misma fila es del equipo y NUNCA viaja al panel del niño.
+- **Perfil (2026-08-26)**: foto (la primera vez pide subirla), apoderado, correo,
+  teléfono y cumpleaños. La foto se sirve solo al dueño de la sesión, sin parámetro
+  de id (regla 9: datos de menores).
+- **Personajes (2026-08-26)**: `src/ui/Personaje.tsx` con 19 poses tipadas servidas
+  desde `public/personajes/*.webp` (solo WebP, sin respaldo PNG). `poseZoom(estado)`
+  traduce el estado de la ventana de Zoom a la pose de Rocky; `VacioConPersonaje`
+  ilustra los estados vacíos. El arte de ORIGEN vive fuera del repositorio
+  (ver `arte/README.md`).
+- **Reinicio al entrar (2026-08-26)**: `src/ui/sesion.ts`. `cerrarSesion()` usa
+  `window.location.replace`, NO `router.replace`: este último solo reemplaza la
+  entrada actual del historial y el Router Cache de Next repintaba el panel anterior
+  al volver. Se suma una guardia `pageshow` contra el bfcache y el login navega con
+  `replace`. No volver a poner `router.replace` en el cierre de sesión.
 - **Acceso a Zoom (2026-08-25, replicado de MOSAICO)**: lógica PURA en
   `src/ui/zoom-window.ts` (cliente): ventana de ingreso `[inicio − 5 min,
   inicio + 15 min]`; tras entrar, **reconexión** hasta 10 min antes del fin
@@ -238,6 +266,23 @@ del salón, nunca de una acción del estudiante.
   un HTML autocontenido para subir a **Hostinger** (hosting compartido) en
   lgskidsplataforma.com. La plataforma completa (Node + Postgres) irá a
   DigitalOcean, previsiblemente en `app.lgskidsplataforma.com`.
+- **Tema WordPress (2026-08-25/26)**: lo que corre HOY en lgskidsplataforma.com es
+  `landing-estatica/wp-theme/lgs-kids-landing/` — el mismo diseño como tema, para
+  que la landing siga siendo mantenible desde WordPress (textos por el Customizer)
+  en vez de un HTML plano. Se despliega con el **CLI de Hostinger** (`hostinger`,
+  token en `~/.hostinger.yaml`).
+  - `hostinger wordpress themes deploy` RENOMBRA el destino a `<slug>-old-<hash>`
+    antes de mover; si algo falla queda un tema duplicado. Subir a la ruta limpia y
+    activar con `wordpress themes activate`.
+  - **Trampa de caché**: el hCDN cachea POR `Accept-Encoding`, así que un cambio de
+    CSS puede seguir viéndose viejo en brotli aunque en gzip ya esté nuevo. Subir la
+    `Version:` del tema (la URL del CSS la arma `wp_get_theme()->get('Version')`) y
+    `hosting cache clear-website`. Verificar con `curl --compressed` y un perfil
+    temporal de Chrome (`--user-data-dir`), no con recarga forzada.
+- **Personajes en la landing (2026-08-25/26)**: cuatro personajes de **cuerpo entero**
+  repartidos por el cuerpo de la página (la perrita se llama **Simba**). El arte
+  desplegado vive en `wp-theme/lgs-kids-landing/assets/personajes/` (WebP + respaldo
+  PNG); el de origen NO está en el repositorio (ver `arte/README.md`).
 - **Sesión en el cliente**: las páginas del panel usan `@/ui/api-fetch`
   (`apiFetch`), que ante un 401 rota el refresh token y reintenta —así la
   sesión no se cae a los 15 min del access token. NO volver a poner
@@ -335,6 +380,120 @@ tiene **"Generar salones del catálogo"** (`POST /api/scheduling/campaigns/[id]/
 catálogo (ambos grupos, ambos tipos) con **guía pendiente** y cupo 12,
 idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salones`.
 
+## Alta del guía por enlace (2026-08-29)
+
+- La CUENTA del guía se sigue creando en **Usuarios y roles** (usuario + rol con
+  alcance por país). Lo nuevo es que administración no tiene que llenarle la ficha:
+  desde **/panel/guias** emite un **enlace** y el guía carga sus propios datos en el
+  wizard público **`/nuevo-guia`** (3 pasos, como MOSAICO): datos básicos → contacto
+  → Zoom y foto.
+- **Diferencia deliberada con MOSAICO**: allí `/nuevo-guia` es una página ABIERTA
+  (cualquiera con la URL se da de alta como guía y crea su usuario). Aquí la página
+  es pública pero la credencial es el **token del enlace**: 32 bytes al azar, ligado
+  a UN guía activo, de **un solo uso** y con vencimiento (`DIAS_VIGENCIA_INVITACION`
+  = 7). Migración `20260829000000_invitacion_guia` (`scheduling_guia_invitacion`).
+- De la base solo sale el **hash** del token; el token vive únicamente en la URL. Por
+  eso el enlace se muestra UNA vez, al emitirlo. Índice único parcial
+  `scheduling_guia_invitacion_vigente`: **un solo enlace vivo por guía** — emitir uno
+  nuevo revoca el anterior en la misma transacción.
+- Reglas puras en `scheduling/domain/invitacion.ts` (token, hash, estado
+  VIGENTE|USADA|REVOCADA|VENCIDA, vencimiento, armado del enlace) con pruebas en
+  `tests/invitacion.test.ts`. Aplicación en `application/invitacion-guia.ts`.
+- **Guardar la ficha y consumir el token van en la MISMA transacción**: si la ficha
+  falla (por ejemplo, la sala de Zoom ya es de otro guía), el enlace tiene que seguir
+  sirviendo. `guardarFichaGuia` acepta `client` para poder sumarse a esa transacción.
+- Endpoints: `POST|DELETE /api/scheduling/guias/invitacion` (emitir/revocar,
+  `usuarios.gestionar`) y la puerta pública `GET|POST /api/public/guia-invitacion`
+  (sin sesión; el POST es multipart y acepta la **foto**, restringida a JPG/PNG/WebP
+  porque `files` admite además PDF). La foto va al módulo `files`
+  (entidad `scheduling_guia_foto`) y llena `scheduling_guia.foto_file_id`.
+- `GET /api/scheduling/guias` devuelve además `enlaces` (estado del último por guía)
+  y `diasVigencia`, para que la UI no copie la constante del dominio.
+
+## Menú por secciones y Tablero (2026-08-26)
+
+- El menú lateral se declara UNA vez en `SECCIONES_MENU` (`access/domain/permisos.ts`)
+  como árbol padre→hijos: **Tablero** (suelto, primero) · **Académica** (Calendario,
+  Mantenimiento Académico) · **Operación** (Kids, Contratos, Reservas LGS) ·
+  **Administración** (Usuarios y roles, Reportes, Auditoría, Guías, Aviso de login) ·
+  **Guía** (Mis clases, Mis salones, Mis niños).
+- **Cada ítem exige DOS permisos**: el funcional (lo que la pantalla hace) y el de
+  menú (`menu.*`); el grupo se prende con `seccion.*`. Esto no es redundancia: antes
+  la visibilidad colgaba del permiso funcional y "Mantenimiento Académico" no se le
+  podía apagar al guía sin quitarle `catalogo.ver`, que necesita para los
+  cuestionarios. Por lo mismo "Reservas (LGS)" tiene `menu.reservas` propio.
+- El seed AÑADE permisos, nunca quita (respeta lo editado en el panel);
+  `menu.mantenimiento` se siembra desde `catalogo.gestionar` para que el guía no lo
+  herede. `superadmin` sigue teniendo todo por la fuerza.
+- Al entrar al panel se aterriza en **/panel/tablero**.
+- Consultas del tablero en `reporting/application/tablero.ts`: `resumenTablero`,
+  `salonesSinGuia`, `clasesDeHoy`, `sesionesSinMarcar`. "Hoy" se resuelve con
+  `AT TIME ZONE` de la zona DEL SALÓN, no la del servidor (ADR-0007).
+- **Trampa ya pagada**: para separar al guía PURO de coordinación se usa
+  `salones.gestionar`, **NO** `salones.ver` — el guía tiene `salones.ver` (lo
+  necesita para su calendario), y usarlo aquí le mostraba el tablero de TODA la
+  plataforma. Mismo criterio en `agendaHandler` y `listarSalonesHandler`.
+
+## Calendario: registro de sesión y eventos (2026-08-27/28)
+
+- `/panel/salones` se renombró a **/panel/calendario**; `next.config.ts` mantiene
+  redirecciones permanentes, incluidas las de detalle y sesión.
+- Un evento abre **MODAL** (`calendario/SesionModal.tsx`), no una página. El nombre
+  del guía SIEMPRE se ve; "Cambiar guía" y "Suspender" solo con `salones.gestionar`.
+- **NO se creó una base "booking"**: `attendance_attendance` ya es el registro por
+  (sesión, niño) y `scheduling_session` ya es el calendario. Una tabla paralela
+  abriría un segundo camino de escritura invisible para la función central de
+  progresión (regla 4). Se le agregaron columnas: participación, comentario para el
+  alumno, nota privada y "requiere atención". `upsertMarca` usa `COALESCE` para que
+  el marcado masivo no borre lo que el guía escribió.
+- **Registro de sesión** (`application/registro-sesion.ts`, migraciones
+  `20260827000000/…001`): el guía cierra la sesión con la **hora de pared** del salón
+  (se sugiere la actual) y una nota. Si no hay ninguna marca, exige confirmación
+  explícita (`sin_asistentes`): "vino cero niños" y "el guía olvidó marcar" no son lo
+  mismo en el reporte. Cerrar fija `guia_user_id` si estaba vacío — el salón puede
+  cambiar de guía y el histórico debe recordar quién la dictó. `hora_real` es TIME
+  (hora de pared) y `cerrada_en` es el instante: dos cosas distintas, dos columnas.
+- **Repetición**: el guía la SOLICITA; aprobarla o rechazarla es del coordinador
+  (`salones.gestionar`).
+- **Estadística mensual del guía** (`reporting/application/guia-mes.ts`,
+  `reporting_guia_mes`): `calcularGuiaMes` es la consulta viva y `consolidarGuiaMes`
+  la congela con UPSERT idempotente — necesario porque regenerar un salón es
+  destructivo y recrea las sesiones. Período `YYYY-MM` en la zona del salón;
+  `leerGuiaMes()` sin período devuelve el histórico completo, que es lo que se extrae.
+- **Eventos sueltos** (`application/crear-evento.ts`, `20260828000000`): una sesión
+  extra, un club o un taller creado a mano NO tiene slot. Por eso `deleteSessions`
+  borra solo `slot_id IS NOT NULL` y la regeneración destructiva no se los lleva.
+  Hasta **3 salones** compartidos (`MAX_SALONES_COMPARTIDOS`, `grupo_id` común). El
+  enlace de Zoom se HEREDA del guía asignado, nunca se copia al evento.
+- **Evento ADMINISTRATIVO** (`scheduling_evento_admin` + `…_guia`, `20260828000001`):
+  reunión o capacitación cuya audiencia son GUÍAS. Vive en tabla propia a propósito:
+  en `scheduling_session` arrastraría lista de matriculados, asistencia y progresión,
+  y aparecería en la agenda de los alumnos. Se pinta **NARANJA** en el calendario y
+  solo lo ven los guías de su audiencia.
+- Crear eventos exige `eventos.crear` (solo admin); el guía tampoco ve "+ Nuevo
+  salón" (`salones.gestionar`).
+- **Alcance del guía**: agenda y lista de salones filtran por `guia_user_id` cuando
+  el actor tiene `panel.guia` y no `salones.gestionar`. La lista va agrupada por
+  campaña de la más reciente a la más antigua, con título **Curso · País · Salón** +
+  horario, inicio/final y advisor, igual en el panel de admin y en el del guía.
+- **Sala de Zoom** (`domain/zoom-link.ts`, portado de MOSAICO): normaliza el enlace
+  de anfitrión (`/s/N` → `/j/N`), quita `#success` y RECHAZA el de chat o contacto
+  (al alumno le abre "Enviar solicitud de contacto" en vez de la clase). Índice único:
+  dos guías no pueden compartir sala.
+
+## Aviso de la pantalla de login (2026-08-26)
+
+- Imagen que administración CAMBIA y PRENDE/APAGA sin despliegue (`/panel/aviso-login`,
+  `menu.aviso_login`). Replica el banner de MOSAICO2026 y LGS2026 con dos diferencias:
+  la imagen NO se guarda en base64 en la tabla de configuración (va por `files`,
+  entidad `login_aviso`, con validación de MIME y tope de 10 MB), y el interruptor sí
+  vive en `platform_config` (clave/valor, migración `20260826000001`) porque es un
+  ajuste, no un archivo.
+- La ruta pública `GET /api/public/login-aviso` resuelve ELLA MISMA cuál es el aviso
+  vigente y **no acepta un id de archivo**: si lo aceptara, cualquiera podría pedir
+  archivos privados de menores sin sesión. Apagarlo deja de EXPONER la imagen, no
+  solo de mostrarla.
+
 ## Pendientes conocidos
 
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
@@ -355,3 +514,22 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   `verificarAccesoGuia`). El intento no lleva sesión/salón, así que hay que
   derivar la matrícula ACTIVA del niño y comparar `guia_user_id` con el actor
   cuando este no tenga `salones.gestionar`.
+- **No hay restablecimiento de contraseña**: ni el admin puede resetear la de un
+  guía, ni el guía pedirla. El enlace de `/nuevo-guia` completa la ficha pero NO
+  fija contraseña — se dejó fuera a propósito: un enlace que fija clave es, en la
+  práctica, un enlace de recuperación, y eso amplía la superficie de seguridad.
+  Decisión abierta con el negocio.
+- **Arte de ORIGEN fuera del repositorio**: `arte/personajes-fuente/` (~34 MB) e
+  `imagenes/` (~96 MB) están en `.gitignore` — git carga los binarios para siempre.
+  Se conservan en disco; si se necesitan versionados, van a Drive o a Git LFS. Lo
+  que SÍ está versionado es lo derivado que la app sirve (`public/personajes/`,
+  `wp-theme/.../assets/`).
+- **Hotspots del MAPA de YOUNGSTER** sin cargar: la pantalla "Avance" dibuja el mapa
+  sin marcadores hasta que se marquen en `/panel/mantenimiento-cursos/mapa`.
+- Restos en Hostinger: el título del sitio WordPress sigue siendo
+  "lgskidsplataforma", el `/index.html` viejo sigue alcanzable y quedó el tema
+  duplicado `lgs-kids-landing-old-6a8f390177c2e`.
+- `prisma/schema.prisma` va DETRÁS de la base: las tablas desde `catalog_curso`
+  (agosto) se crearon con SQL a mano en `prisma/migrations/` y no se reflejaron en
+  el schema. `migrate deploy` funciona igual; **no correr `migrate dev`**, que
+  diffea contra el schema y querría borrarlas.
