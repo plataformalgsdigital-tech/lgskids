@@ -9,3 +9,19 @@
  */
 export { asistenciaPorSalonMes, ocupacionSalones, contratosPorPais } from "./application/reportes";
 export type { AsistenciaSalonMes, OcupacionSalon, ContratosPais } from "./application/reportes";
+export {
+  resumenTablero,
+  salonesSinGuia,
+  clasesDeHoy,
+  sesionesSinMarcar,
+  resumenGuia,
+} from "./application/tablero";
+export type {
+  ResumenTablero,
+  SalonSinGuia,
+  ClaseDeHoy,
+  SesionSinMarcar,
+  ResumenGuia,
+} from "./application/tablero";
+export { calcularGuiaMes, consolidarGuiaMes, leerGuiaMes } from "./application/guia-mes";
+export type { GuiaMes } from "./application/guia-mes";
