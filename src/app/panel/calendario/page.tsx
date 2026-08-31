@@ -10,12 +10,17 @@ import {
   type FormEvent,
 } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { SesionModal } from "./SesionModal";
+import { NuevoEventoModal } from "./NuevoEventoModal";
 
 interface Salon {
   id: string;
   nombre: string;
   curso: string;
   campania: string;
+  campaniaInicio: string;
+  guia: string | null;
+  horario: { tipo: string; diaSemana: number; horaLocal: string; duracionMin: number }[];
   cupo: number;
   timezone: string;
   holidayCountry: string;
@@ -60,6 +65,17 @@ interface HorarioCat {
   slots: { tipo: "SESION" | "CLUB"; diaSemana: number; horaLocal: string; duracionMin: number }[];
 }
 
+interface EventoAdmin {
+  id: string;
+  tipo: string;
+  titulo: string | null;
+  fecha: string;
+  startsAt: string;
+  duracionMin: number;
+  observaciones: string | null;
+  guias: number;
+}
+
 interface AgendaSesion {
   id: string;
   fecha: string;
@@ -90,6 +106,8 @@ const MESES = [
   "diciembre",
 ];
 const DOW = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+/** Índice = diaSemana de `scheduling_slot` (0 = domingo). */
+const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const COLOR_CURSO: Record<string, { bg: string; fg: string }> = {
   JUNIOR: { bg: "#e3f2fd", fg: "#0d47a1" },
   YOUNGSTER: { bg: "#f3e5f5", fg: "#6a1b9a" },
@@ -115,9 +133,24 @@ function CalendarioSalones() {
   const [y, setY] = useState<number>(() => new Date().getFullYear());
   const [m, setM] = useState<number>(() => new Date().getMonth()); // 0-based
   const [sesiones, setSesiones] = useState<AgendaSesion[] | null>(null);
+  // Eventos administrativos: se pintan en NARANJA, mezclados con las sesiones.
+  const [eventosAdmin, setEventosAdmin] = useState<EventoAdmin[]>([]);
   const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
   const [campaniaId, setCampaniaId] = useState("");
   const [diaAbierto, setDiaAbierto] = useState<string | null>(null);
+  // Evento abierto en MODAL: antes se navegaba a una página aparte.
+  const [sesionAbierta, setSesionAbierta] = useState<string | null>(null);
+  const [puedeGestionarSalones, setPuedeGestionarSalones] = useState(false);
+
+  useEffect(() => {
+    async function permisos() {
+      const res = await fetch("/api/auth/me");
+      if (!res.ok) return;
+      const me = (await res.json()) as { permisos: { code: string }[] };
+      setPuedeGestionarSalones(me.permisos.some((p) => p.code === "salones.gestionar"));
+    }
+    void permisos();
+  }, []);
 
   useEffect(() => {
     async function cargarCampanias() {
@@ -137,16 +170,31 @@ function CalendarioSalones() {
       const from = `${y}-${pad2(m + 1)}-01`;
       const to = `${y}-${pad2(m + 1)}-${pad2(diasMes)}`;
       const filtro = campaniaId !== "" ? `&campaignId=${campaniaId}` : "";
-      const res = await apiFetch(`/api/scheduling/agenda?from=${from}&to=${to}${filtro}`);
+      const [res, resAdmin] = await Promise.all([
+        apiFetch(`/api/scheduling/agenda?from=${from}&to=${to}${filtro}`),
+        apiFetch(`/api/scheduling/eventos-admin?from=${from}&to=${to}`),
+      ]);
       if (res.ok) {
         const data: { sesiones: AgendaSesion[] } = await res.json();
         setSesiones(data.sesiones);
       } else {
         setSesiones([]);
       }
+      // El endpoint ya acota por audiencia: un guía solo recibe los suyos.
+      setEventosAdmin(resAdmin.ok ? ((await resAdmin.json()) as { eventos: EventoAdmin[] }).eventos : []);
     }
     void cargar();
   }, [y, m, campaniaId]);
+
+  const adminPorDia = useMemo(() => {
+    const mapa = new Map<string, EventoAdmin[]>();
+    for (const e of eventosAdmin) {
+      const lista = mapa.get(e.fecha) ?? [];
+      lista.push(e);
+      mapa.set(e.fecha, lista);
+    }
+    return mapa;
+  }, [eventosAdmin]);
 
   const porDia = useMemo(() => {
     const mapa = new Map<string, AgendaSesion[]>();
@@ -254,7 +302,10 @@ function CalendarioSalones() {
           const delDia = (porDia.get(fecha) ?? []).sort((a, b) =>
             a.horaLocal.localeCompare(b.horaLocal),
           );
-          const visibles = delDia.slice(0, MAX_VISIBLE);
+          const adminDelDia = adminPorDia.get(fecha) ?? [];
+          // Los administrativos van PRIMERO y no compiten por el cupo visible:
+          // son pocos y afectan al equipo, así que no deben quedar bajo "+N más".
+          const visibles = delDia.slice(0, Math.max(0, MAX_VISIBLE - adminDelDia.length));
           const ocultos = delDia.length - visibles.length;
           return (
             <div
@@ -287,14 +338,41 @@ function CalendarioSalones() {
               >
                 {dia}
               </button>
+              {adminDelDia.map((e) => (
+                <div
+                  key={e.id}
+                  title={`${e.titulo ?? "Evento administrativo"} · ${String(e.guias)} guías${e.observaciones !== null ? ` · ${e.observaciones}` : ""}`}
+                  style={{
+                    background: "#fff3e0",
+                    color: "#e65100",
+                    border: "1px solid #ffcc80",
+                    borderRadius: "0.35rem",
+                    padding: "0.15rem 0.35rem",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  🏛️ {new Date(e.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
+                  {e.titulo ?? "Administrativo"}
+                </div>
+              ))}
               {visibles.map((s) => {
                 const color = COLOR_CURSO[s.cursoTipo] ?? { bg: "#eceff1", fg: "#37474f" };
                 return (
-                  <Link
+                  <button
+                    type="button"
                     key={s.id}
-                    href={`/panel/salones/sesion/${s.id}`}
+                    onClick={() => setSesionAbierta(s.id)}
                     title={`${s.horaLocal} · ${s.cursoTipo} · ${s.salon} · ${s.ocupados}/${s.cupo}`}
                     style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
+                      font: "inherit",
+                      cursor: "pointer",
                       display: "block",
                       background: color.bg,
                       color: color.fg,
@@ -310,7 +388,7 @@ function CalendarioSalones() {
                   >
                     {s.horaLocal} {s.tipo === "CLUB" ? "Club " : ""}
                     {s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"} · {s.salon}
-                  </Link>
+                  </button>
                 );
               })}
               {ocultos > 0 && (
@@ -398,10 +476,14 @@ function CalendarioSalones() {
                 .map((s) => {
                   const color = COLOR_CURSO[s.cursoTipo] ?? { bg: "#eceff1", fg: "#37474f" };
                   return (
-                    <Link
+                    <button
+                      type="button"
                       key={s.id}
-                      href={`/panel/salones/sesion/${s.id}`}
+                      onClick={() => { setDiaAbierto(null); setSesionAbierta(s.id); }}
                       style={{
+                        width: "100%",
+                        font: "inherit",
+                        cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
@@ -439,12 +521,22 @@ function CalendarioSalones() {
                       <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", whiteSpace: "nowrap" }}>
                         {s.ocupados}/{s.cupo} →
                       </span>
-                    </Link>
+                    </button>
                   );
                 })}
             </div>
           </div>
         </div>
+      )}
+
+      {/* Evento en MODAL: reemplaza la navegación a /calendario/sesion/[id],
+          que sigue viva como enlace profundo. */}
+      {sesionAbierta !== null && (
+        <SesionModal
+          sessionId={sesionAbierta}
+          puedeGestionarSalones={puedeGestionarSalones}
+          onCerrar={() => setSesionAbierta(null)}
+        />
       )}
     </div>
   );
@@ -470,6 +562,22 @@ export default function SalonesPage() {
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [vista, setVista] = useState<"calendario" | "lista">("calendario");
+  // Crear eventos tiene permiso PROPIO: no basta con ver el calendario.
+  const [puedeCrearEventos, setPuedeCrearEventos] = useState(false);
+  // Crear salones es de coordinación: el guía no debe ver el botón.
+  const [puedeGestionarSalonesPagina, setPuedeGestionarSalonesPagina] = useState(false);
+  const [nuevoEvento, setNuevoEvento] = useState<"academico" | "administrativo" | null>(null);
+
+  useEffect(() => {
+    async function permisos() {
+      const res = await fetch("/api/auth/me");
+      if (!res.ok) return;
+      const me = (await res.json()) as { permisos: { code: string }[] };
+      setPuedeCrearEventos(me.permisos.some((p) => p.code === "eventos.crear"));
+      setPuedeGestionarSalonesPagina(me.permisos.some((p) => p.code === "salones.gestionar"));
+    }
+    void permisos();
+  }, []);
   const [horariosCat, setHorariosCat] = useState<HorarioCat[]>([]);
 
   const cargarSalones = useCallback(async () => {
@@ -587,7 +695,39 @@ export default function SalonesPage() {
               </button>
             ))}
           </div>
-          {vista === "lista" && (
+          {puedeCrearEventos && (
+            <>
+              <button
+                onClick={() => setNuevoEvento("academico")}
+                style={{
+                  padding: "0.55rem 1.2rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  background: "var(--lgs-purpura)",
+                  color: "white",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                + Evento académico
+              </button>
+              <button
+                onClick={() => setNuevoEvento("administrativo")}
+                style={{
+                  padding: "0.55rem 1.2rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  background: "var(--lgs-cian)",
+                  color: "#08343f",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                + Evento administrativo
+              </button>
+            </>
+          )}
+          {vista === "lista" && puedeGestionarSalonesPagina && (
             <button
               onClick={() => setMostrarForm((v) => !v)}
               style={{
@@ -864,6 +1004,18 @@ export default function SalonesPage() {
         </form>
       )}
 
+      {nuevoEvento !== null && salones !== null && (
+        <NuevoEventoModal
+          salones={salones}
+          modo={nuevoEvento}
+          onCerrar={() => setNuevoEvento(null)}
+          onCreado={() => {
+            setNuevoEvento(null);
+            void cargarSalones();
+          }}
+        />
+      )}
+
       {vista === "lista" && (
       <section
         style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
@@ -876,10 +1028,29 @@ export default function SalonesPage() {
             curso.
           </p>
         ) : (
-          salones.map((s) => (
+          (() => {
+            // El servidor ya viene ordenado por campaña más reciente primero;
+            // aquí solo se cortan los grupos, sin reordenar.
+            const grupos: { campania: string; inicio: string; items: Salon[] }[] = [];
+            for (const s of salones) {
+              const ultimo = grupos[grupos.length - 1];
+              if (ultimo !== undefined && ultimo.campania === s.campania) ultimo.items.push(s);
+              else grupos.push({ campania: s.campania, inicio: s.campaniaInicio, items: [s] });
+            }
+            return grupos.map((g) => (
+              <div key={g.campania} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.4rem" }}>
+                  <h2 style={{ fontSize: "0.95rem", fontWeight: 800 }}>{g.campania}</h2>
+                  <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                    desde {new Date(`${g.inicio}T12:00:00`).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })}
+                    {" · "}
+                    {g.items.length} {g.items.length === 1 ? "salón" : "salones"}
+                  </span>
+                </div>
+                {g.items.map((s) => (
             <Link
               key={s.id}
-              href={`/panel/salones/${s.id}`}
+              href={`/panel/calendario/${s.id}`}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -893,13 +1064,30 @@ export default function SalonesPage() {
               }}
             >
               <div>
-                <strong>{s.nombre}</strong>{" "}
-                <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                  {s.campania} · {s.curso} · cupo {s.cupo}
-                </span>
+                {/* Título: Curso · País · Salón */}
+                <strong>
+                  {s.curso} · {s.holidayCountry} · {s.nombre}
+                </strong>
+                <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}>
+                  <span style={{ fontWeight: 700 }}>Horario:</span>{" "}
+                  {s.horario.length === 0
+                    ? "sin horario"
+                    : s.horario
+                        .map(
+                          (h) =>
+                            `${DIAS_CORTOS[h.diaSemana] ?? "?"} ${h.horaLocal}${h.tipo === "CLUB" ? " (club)" : ""}`,
+                        )
+                        .join(" · ")}
+                </div>
                 <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                  {s.timezone} · feriados {s.holidayCountry}
-                  {s.primeraSesion !== null && ` · ${s.primeraSesion} → ${s.ultimaSesion}`}
+                  <span style={{ fontWeight: 700 }}>Inicio:</span>{" "}
+                  {s.primeraSesion ?? "—"}
+                  {"  "}
+                  <span style={{ fontWeight: 700 }}>Final:</span> {s.ultimaSesion ?? "—"}
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                  <span style={{ fontWeight: 700 }}>Advisor:</span>{" "}
+                  {s.guia ?? <em>sin asignar</em>}
                 </div>
               </div>
               <span
@@ -915,7 +1103,10 @@ export default function SalonesPage() {
                 {s.sesiones} sesiones
               </span>
             </Link>
-          ))
+                ))}
+              </div>
+            ));
+          })()
         )}
       </section>
       )}

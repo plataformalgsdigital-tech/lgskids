@@ -201,7 +201,7 @@ export default function DetalleSalonPage() {
 
   return (
     <main style={{ padding: "2rem", maxWidth: "60rem", margin: "0 auto" }}>
-      <Link href="/panel/salones" style={{ fontSize: "0.9rem" }}>
+      <Link href="/panel/calendario" style={{ fontSize: "0.9rem" }}>
         ← Volver a salones
       </Link>
       <div
@@ -465,7 +465,7 @@ export default function DetalleSalonPage() {
               }}
             >
               <Link
-                href={`/panel/salones/${params.id}/sesion/${s.id}`}
+                href={`/panel/calendario/${params.id}/sesion/${s.id}`}
                 style={{ color: "inherit", flex: 1 }}
                 title="Abrir asistencia de esta sesión"
               >

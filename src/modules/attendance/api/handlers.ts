@@ -29,6 +29,12 @@ const marcarSchema = z.object({
         childPersonId: z.uuid(),
         estado: z.enum(["PRESENTE", "AUSENTE", "JUSTIFICADO"]),
         justificacion: z.string().max(300).nullish(),
+        // Ficha del alumno. Omitida = no se toca (la marca masiva no borra
+        // los comentarios que el guía ya escribió).
+        participo: z.boolean().optional(),
+        comentarioUsuario: z.string().max(2000).nullish(),
+        notaPrivada: z.string().max(2000).nullish(),
+        requiereAtencion: z.boolean().optional(),
       }),
     )
     .min(1)
@@ -52,6 +58,10 @@ export const marcarAsistenciaHandler = handlerWithAuth(async (request, auth, con
       childPersonId: m.childPersonId,
       estado: m.estado,
       justificacion: m.justificacion ?? null,
+      participo: m.participo,
+      comentarioUsuario: m.comentarioUsuario ?? undefined,
+      notaPrivada: m.notaPrivada ?? undefined,
+      requiereAtencion: m.requiereAtencion,
     })),
     ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
   });

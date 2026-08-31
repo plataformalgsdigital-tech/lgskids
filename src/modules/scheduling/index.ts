@@ -62,3 +62,44 @@ export {
 } from "./api/handlers";
 export { feriadosDelPais, domingoPascua } from "./domain/feriados";
 export type { Feriado } from "./domain/feriados";
+
+export {
+  cerrarSesion,
+  reabrirSesion,
+  solicitarRepeticion,
+  resolverRepeticion,
+  repeticionesDeSesion,
+  repeticionesPendientes,
+} from "./application/registro-sesion";
+export type { RegistroSesion, Repeticion } from "./application/registro-sesion";
+export {
+  crearEvento,
+  guiasConZoom,
+  guardarFichaGuia,
+  fichasDeGuias,
+  MAX_SALONES_COMPARTIDOS,
+} from "./application/crear-evento";
+export { crearEventoAdmin, eventosAdmin } from "./application/crear-evento";
+export type {
+  TipoEvento,
+  EventoCreado,
+  GuiaConZoom,
+  FichaGuia,
+  EventoAdmin,
+  EventoAdminCreado,
+} from "./application/crear-evento";
+export {
+  crearInvitacionGuia,
+  revocarInvitacionGuia,
+  enlacesDeGuias,
+  fichaPorInvitacion,
+  completarInvitacionGuia,
+} from "./application/invitacion-guia";
+export type {
+  InvitacionEmitida,
+  EstadoEnlaceGuia,
+  FichaPrellenada,
+  DatosWizard,
+} from "./application/invitacion-guia";
+export { DIAS_VIGENCIA_INVITACION } from "./domain/invitacion";
+export type { EstadoInvitacion } from "./domain/invitacion";

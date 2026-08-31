@@ -25,7 +25,15 @@ export interface FilaLista {
    * que sí habría suspendido la sesión). El Guía puede marcar JUSTIFICADO.
    */
   feriadoEnSuPais: boolean;
-  marca: { estado: EstadoAsistencia; justificacion: string | null } | null;
+  marca: {
+    estado: EstadoAsistencia;
+    justificacion: string | null;
+    /** Ficha que el guía llena por alumno (participación, comentarios, aviso). */
+    participo: boolean;
+    comentarioUsuario: string | null;
+    notaPrivada: string | null;
+    requiereAtencion: boolean;
+  } | null;
 }
 
 export interface ListaDeSesion {
@@ -62,7 +70,14 @@ export async function listaDeSesion(sessionId: string): Promise<ListaDeSesion> {
   const marcas = new Map(
     (await getMarcasDeSesion(sessionId)).map((m) => [
       m.childPersonId,
-      { estado: m.estado as EstadoAsistencia, justificacion: m.justificacion },
+      {
+        estado: m.estado as EstadoAsistencia,
+        justificacion: m.justificacion,
+        participo: m.participo,
+        comentarioUsuario: m.comentarioUsuario,
+        notaPrivada: m.notaPrivada,
+        requiereAtencion: m.requiereAtencion,
+      },
     ]),
   );
 
@@ -87,7 +102,19 @@ export async function listaDeSesion(sessionId: string): Promise<ListaDeSesion> {
 export async function marcarAsistencia(input: {
   actorUserId: string;
   sessionId: string;
-  marcas: { childPersonId: string; estado: EstadoAsistencia; justificacion?: string | null }[];
+  marcas: {
+    childPersonId: string;
+    estado: EstadoAsistencia;
+    justificacion?: string | null;
+    /**
+     * Campos de la ficha. Se omiten en la marca masiva: lo que no llega,
+     * no se toca (el upsert conserva el valor anterior).
+     */
+    participo?: boolean | undefined;
+    comentarioUsuario?: string | null | undefined;
+    notaPrivada?: string | null | undefined;
+    requiereAtencion?: boolean | undefined;
+  }[];
   ip?: string | null;
 }): Promise<{ marcadas: number }> {
   if (input.marcas.length === 0) {
@@ -116,6 +143,10 @@ export async function marcarAsistencia(input: {
         estado: marca.estado,
         justificacion: marca.justificacion?.trim() || null,
         marcadoPor: input.actorUserId,
+        participo: marca.participo,
+        comentarioUsuario: marca.comentarioUsuario,
+        notaPrivada: marca.notaPrivada,
+        requiereAtencion: marca.requiereAtencion,
       });
     }
   });

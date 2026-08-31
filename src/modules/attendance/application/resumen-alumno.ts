@@ -72,6 +72,43 @@ export async function historialAsistencia(
   );
 }
 
+export interface ComentarioGuia {
+  sessionId: string;
+  fecha: string;
+  tipo: string;
+  numero: number;
+  guia: string | null;
+  comentario: string;
+}
+
+/**
+ * Comentarios que el guía escribió PARA EL ALUMNO en sus sesiones, del más
+ * reciente al más antiguo.
+ *
+ * Devuelve SOLO `comentario_usuario`. La `nota_privada` de la misma fila es
+ * del equipo y NUNCA sale por aquí: este dato viaja al panel del niño.
+ */
+export async function comentariosDeGuia(
+  childPersonId: string,
+  limit = 20,
+): Promise<ComentarioGuia[]> {
+  return queryRows<ComentarioGuia>(
+    `SELECT s.id AS "sessionId", s.fecha::text AS fecha, s.tipo::text AS tipo, s.numero,
+            COALESCE(u.username, cl.nombre) AS guia,
+            a.comentario_usuario AS comentario
+       FROM attendance_attendance a
+       JOIN scheduling_session s ON s.id = a.session_id
+       JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+       LEFT JOIN identity_user u ON u.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+      WHERE a.child_person_id = $1
+        AND a.comentario_usuario IS NOT NULL
+        AND TRIM(a.comentario_usuario) <> ''
+      ORDER BY s.starts_at DESC
+      LIMIT $2`,
+    [childPersonId, limit],
+  );
+}
+
 /**
  * Próximas sesiones del salón (agenda del niño) dentro de una ventana de días
  * —por defecto las DOS SEMANAS siguientes—, con el guía. Incluye TODOS los

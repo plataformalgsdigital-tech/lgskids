@@ -193,7 +193,7 @@ export default function SesionPage() {
 
   return (
     <main style={{ padding: "2rem", maxWidth: "58rem", margin: "0 auto" }}>
-      <Link href={`/panel/salones/${params.id}`} style={{ fontSize: "0.9rem" }}>
+      <Link href={`/panel/calendario/${params.id}`} style={{ fontSize: "0.9rem" }}>
         ← Volver al salón
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>

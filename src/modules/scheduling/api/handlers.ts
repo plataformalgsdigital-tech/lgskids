@@ -75,8 +75,14 @@ export const listarSalonesHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_VER);
   const courseId = request.nextUrl.searchParams.get("courseId");
+  // ALCANCE DEL GUÍA: en la lista solo ve SUS salones. Misma regla que la
+  // agenda del calendario; se aplica en el SERVIDOR, no ocultando en la UI.
+  const soloSuyos =
+    profile.hasPermission(PERMISOS.PANEL_GUIA) &&
+    !profile.hasPermission(PERMISOS.SALONES_GESTIONAR);
   const salones = await listarSalones(
     courseId !== null && courseId !== "" ? z.uuid().parse(courseId) : undefined,
+    soloSuyos ? auth.userId : undefined,
   );
   return json({ salones });
 });
@@ -134,7 +140,20 @@ export const agendaHandler = handlerWithAuth(async (request, auth) => {
   const campaignRaw = q.get("campaignId");
   const campaignId =
     campaignRaw !== null && campaignRaw !== "" ? z.uuid().parse(campaignRaw) : undefined;
-  return json({ sesiones: await agenda({ desde, hasta, campaignId }) });
+  // ALCANCE DEL GUÍA: en el calendario solo ve las sesiones de SUS salones.
+  // Lo que distingue a un guía puro de coordinación es no poder gestionar
+  // cualquier salón; el filtro se aplica en el SERVIDOR, no ocultando en la UI.
+  const soloSuyas =
+    profile.hasPermission(PERMISOS.PANEL_GUIA) &&
+    !profile.hasPermission(PERMISOS.SALONES_GESTIONAR);
+  return json({
+    sesiones: await agenda({
+      desde,
+      hasta,
+      campaignId,
+      ...(soloSuyas && { guiaUserId: auth.userId }),
+    }),
+  });
 });
 
 /** GET /api/scheduling/sessions/[sessionId] — detalle de sesión (evento + salón + guía). */

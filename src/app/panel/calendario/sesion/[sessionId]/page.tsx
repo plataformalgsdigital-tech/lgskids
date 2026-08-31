@@ -195,7 +195,7 @@ export default function ResumenSesionPage() {
         <p role="alert" style={{ color: "#c62828" }}>
           {error}
         </p>
-        <Link href="/panel/salones">← Volver a salones</Link>
+        <Link href="/panel/calendario">← Volver a salones</Link>
       </main>
     );
   }
@@ -215,7 +215,7 @@ export default function ResumenSesionPage() {
 
   return (
     <main style={{ padding: "2rem", maxWidth: "62rem", margin: "0 auto" }}>
-      <Link href="/panel/salones" style={{ fontSize: "0.9rem" }}>
+      <Link href="/panel/calendario" style={{ fontSize: "0.9rem" }}>
         ← Volver a salones
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>📅 Detalles de la sesión</h1>
@@ -343,7 +343,7 @@ export default function ResumenSesionPage() {
           </a>
         )}
         <Link
-          href={`/panel/salones/${detalle.salon.id}/sesion/${detalle.sesion.id}`}
+          href={`/panel/calendario/${detalle.salon.id}/sesion/${detalle.sesion.id}`}
           style={{ ...boton, borderColor: "var(--lgs-azul)" }}
         >
           ✔ Gestionar asistencia

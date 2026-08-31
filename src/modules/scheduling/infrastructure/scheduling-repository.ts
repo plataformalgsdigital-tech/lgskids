@@ -280,9 +280,19 @@ export async function insertSlot(
   return id;
 }
 
-/** La regeneración es DESTRUCTIVA: borra todas las sesiones del salón. */
+/**
+ * La regeneración es DESTRUCTIVA: borra las sesiones GENERADAS del salón.
+ *
+ * Respeta los eventos creados a mano (`slot_id IS NULL`): no vienen del
+ * horario, así que regenerar el curso no debe hacerlos desaparecer. Borrarlos
+ * aquí perdería un taller o una sesión extra sin que nadie se enterara.
+ */
 export async function deleteSessions(tx: Queryable, classroomId: string): Promise<number> {
-  return execute(`DELETE FROM scheduling_session WHERE classroom_id = $1`, [classroomId], tx);
+  return execute(
+    `DELETE FROM scheduling_session WHERE classroom_id = $1 AND slot_id IS NOT NULL`,
+    [classroomId],
+    tx,
+  );
 }
 
 export interface SessionRow {
@@ -389,6 +399,8 @@ export interface SlotResumen {
 export interface ClassroomListItem extends ClassroomRecord {
   curso: string;
   campania: string;
+  /** Inicio de la campaña: ordena y agrupa de la más reciente a la más antigua. */
+  campaniaInicio: string;
   guia: string | null;
   horario: SlotResumen[];
   ocupados: number;
@@ -417,6 +429,7 @@ export async function listClassrooms(
             cl.guia_user_id AS "guiaUserId", cl.cupo, cl.meeting_url AS "meetingUrl",
             cl.timezone, cl.holiday_country AS "holidayCountry", cl.activo,
             cu.tipo::text AS curso, ca.nombre AS campania,
+            ca.inicio::text AS "campaniaInicio",
             COALESCE(NULLIF(TRIM(gp.nombres || ' ' || gp.apellidos), ''), gu.username) AS guia,
             (SELECT json_agg(json_build_object(
                        'tipo', sl.tipo, 'diaSemana', sl.dia_semana,
@@ -435,8 +448,10 @@ export async function listClassrooms(
        LEFT JOIN people_person gp ON gp.user_id = gu.id
        LEFT JOIN scheduling_session s ON s.classroom_id = cl.id
       ${where}
-      GROUP BY cl.id, cu.tipo, ca.nombre, gu.username, gp.nombres, gp.apellidos
-      ORDER BY ca.nombre, cu.tipo, cl.nombre`,
+      GROUP BY cl.id, cu.tipo, ca.nombre, ca.inicio, gu.username, gp.nombres, gp.apellidos
+      -- Campaña más RECIENTE primero: por fecha de inicio, no por nombre
+      -- (alfabéticamente "AGOSTO" iría antes que "SEPTIEMBRE" sin significar nada).
+      ORDER BY ca.inicio DESC, ca.nombre, cu.tipo, cl.nombre`,
     values,
   );
   return rows.map((r) => ({ ...r, horario: r.horario ?? [] }));
