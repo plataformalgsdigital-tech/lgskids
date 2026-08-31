@@ -5,3 +5,8 @@ pnpm-lock.yaml
 *.jpg
 *.png
 .storage/
+
+# Artefacto de despliegue, no fuente de la app: el HTML estático y el tema
+# WordPress se publican tal cual en Hostinger (y el index.html ni siquiera
+# parsea con el analizador HTML de Prettier).
+landing-estatica/

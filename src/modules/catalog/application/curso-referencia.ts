@@ -137,7 +137,11 @@ export async function importarCursoReferencia(input: {
   actorUserId: string;
   filas: DatosCurso[];
   ip?: string | null;
-}): Promise<{ creados: number; actualizados: number; errores: { fila: number; motivo: string }[] }> {
+}): Promise<{
+  creados: number;
+  actualizados: number;
+  errores: { fila: number; motivo: string }[];
+}> {
   let creados = 0;
   let actualizados = 0;
   const errores: { fila: number; motivo: string }[] = [];

@@ -168,9 +168,7 @@ export default function PersonasPage() {
             borderRadius: "0.6rem",
             border: "none",
             background:
-              descargando || ninos === null || ninos.length === 0
-                ? "#9e9e9e"
-                : "var(--lgs-verde)",
+              descargando || ninos === null || ninos.length === 0 ? "#9e9e9e" : "var(--lgs-verde)",
             color: "#1b2a10",
             fontWeight: 700,
             cursor: descargando ? "wait" : "pointer",
@@ -273,9 +271,7 @@ export default function PersonasPage() {
         {ninos === null ? (
           <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
         ) : ninos.length === 0 ? (
-          <p style={{ color: "var(--texto-suave)" }}>
-            No hay niños que coincidan con los filtros.
-          </p>
+          <p style={{ color: "var(--texto-suave)" }}>No hay niños que coincidan con los filtros.</p>
         ) : (
           ninos.map((n) => (
             <div

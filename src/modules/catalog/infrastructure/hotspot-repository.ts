@@ -5,7 +5,11 @@ import { execute, queryOne, queryRows } from "@/platform/db/query";
  * aplicación lo normaliza). Una fila por (scope, curso, nivel).
  */
 
-export async function getHotspotData(scope: string, curso: string, nivel: string): Promise<unknown | null> {
+export async function getHotspotData(
+  scope: string,
+  curso: string,
+  nivel: string,
+): Promise<unknown | null> {
   const row = await queryOne<{ data: unknown }>(
     `SELECT data FROM catalog_arte_hotspot
       WHERE scope = $1 AND curso = $2::catalog_course_tipo AND nivel = $3`,

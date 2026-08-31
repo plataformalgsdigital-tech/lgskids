@@ -79,24 +79,46 @@ function nuevaPregunta(): Pregunta {
 }
 
 /** Editor de una pregunta según su tipo. */
-function PreguntaEditor(props: { p: Pregunta; onChange: (p: Pregunta) => void; onRemove: () => void }) {
+function PreguntaEditor(props: {
+  p: Pregunta;
+  onChange: (p: Pregunta) => void;
+  onRemove: () => void;
+}) {
   const { p, onChange, onRemove } = props;
   function setTipo(tipo: TipoPregunta) {
-    if (tipo === "verdadero_falso") onChange({ ...p, tipo, opciones: ["Verdadero", "Falso"], correcta: 0 });
+    if (tipo === "verdadero_falso")
+      onChange({ ...p, tipo, opciones: ["Verdadero", "Falso"], correcta: 0 });
     else if (tipo === "respuesta_escrita") onChange({ ...p, tipo, opciones: [], correcta: 0 });
     else onChange({ ...p, tipo, opciones: p.opciones.length >= 2 ? p.opciones : ["", ""] });
   }
   return (
-    <div style={{ border: "1px solid #edf0f6", borderRadius: "0.6rem", padding: "0.6rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+    <div
+      style={{
+        border: "1px solid #edf0f6",
+        borderRadius: "0.6rem",
+        padding: "0.6rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.4rem",
+      }}
+    >
       <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-        <select value={p.tipo} onChange={(e) => setTipo(e.target.value as TipoPregunta)} style={{ ...input, width: "12rem" }}>
+        <select
+          value={p.tipo}
+          onChange={(e) => setTipo(e.target.value as TipoPregunta)}
+          style={{ ...input, width: "12rem" }}
+        >
           {(Object.keys(NOMBRE_TIPO) as TipoPregunta[]).map((t) => (
             <option key={t} value={t}>
               {NOMBRE_TIPO[t]}
             </option>
           ))}
         </select>
-        <button type="button" onClick={onRemove} style={{ ...btn, color: "#c62828", marginLeft: "auto" }}>
+        <button
+          type="button"
+          onClick={onRemove}
+          style={{ ...btn, color: "#c62828", marginLeft: "auto" }}
+        >
           Eliminar
         </button>
       </div>
@@ -127,20 +149,33 @@ function PreguntaEditor(props: { p: Pregunta; onChange: (p: Pregunta) => void; o
               />
               <input
                 value={op}
-                onChange={(e) => onChange({ ...p, opciones: p.opciones.map((o, m) => (m === k ? e.target.value : o)) })}
+                onChange={(e) =>
+                  onChange({
+                    ...p,
+                    opciones: p.opciones.map((o, m) => (m === k ? e.target.value : o)),
+                  })
+                }
                 readOnly={p.tipo === "verdadero_falso"}
                 placeholder={`Opción ${k + 1}`}
                 style={input}
               />
               {p.tipo === "opcion_multiple" && p.opciones.length > 2 && (
-                <button type="button" onClick={() => onChange({ ...p, opciones: p.opciones.filter((_, m) => m !== k) })} style={{ ...btn, padding: "0.25rem 0.5rem" }}>
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...p, opciones: p.opciones.filter((_, m) => m !== k) })}
+                  style={{ ...btn, padding: "0.25rem 0.5rem" }}
+                >
                   ✕
                 </button>
               )}
             </div>
           ))}
           {p.tipo === "opcion_multiple" && p.opciones.length < 6 && (
-            <button type="button" onClick={() => onChange({ ...p, opciones: [...p.opciones, ""] })} style={{ ...btn, alignSelf: "flex-start" }}>
+            <button
+              type="button"
+              onClick={() => onChange({ ...p, opciones: [...p.opciones, ""] })}
+              style={{ ...btn, alignSelf: "flex-start" }}
+            >
               + opción
             </button>
           )}
@@ -151,14 +186,41 @@ function PreguntaEditor(props: { p: Pregunta; onChange: (p: Pregunta) => void; o
 }
 
 /** Editor de un cuestionario (título + minutos + preguntas). */
-function CuestionarioEditor(props: { c: Cuestionario; idx: number; onChange: (c: Cuestionario) => void; onRemove: () => void }) {
+function CuestionarioEditor(props: {
+  c: Cuestionario;
+  idx: number;
+  onChange: (c: Cuestionario) => void;
+  onRemove: () => void;
+}) {
   const { c, idx, onChange, onRemove } = props;
   return (
-    <div style={{ border: "1.5px solid #e0d4f0", borderRadius: "0.7rem", padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+    <div
+      style={{
+        border: "1.5px solid #e0d4f0",
+        borderRadius: "0.7rem",
+        padding: "0.75rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.5rem",
+      }}
+    >
       <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
         <strong style={{ color: "var(--lgs-purpura)" }}>Cuestionario {idx + 1}</strong>
-        <input value={c.titulo} onChange={(e) => onChange({ ...c, titulo: e.target.value })} placeholder="Título" style={{ ...input, flex: 1, minWidth: "10rem" }} />
-        <input type="number" min={1} max={180} value={c.minutos} onChange={(e) => onChange({ ...c, minutos: Number(e.target.value) || 0 })} style={{ ...input, width: "5rem" }} title="Minutos" />
+        <input
+          value={c.titulo}
+          onChange={(e) => onChange({ ...c, titulo: e.target.value })}
+          placeholder="Título"
+          style={{ ...input, flex: 1, minWidth: "10rem" }}
+        />
+        <input
+          type="number"
+          min={1}
+          max={180}
+          value={c.minutos}
+          onChange={(e) => onChange({ ...c, minutos: Number(e.target.value) || 0 })}
+          style={{ ...input, width: "5rem" }}
+          title="Minutos"
+        />
         <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>min</span>
         <button type="button" onClick={onRemove} style={{ ...btn, color: "#c62828" }}>
           Eliminar cuestionario
@@ -168,11 +230,17 @@ function CuestionarioEditor(props: { c: Cuestionario; idx: number; onChange: (c:
         <PreguntaEditor
           key={i}
           p={p}
-          onChange={(np) => onChange({ ...c, preguntas: c.preguntas.map((x, j) => (j === i ? np : x)) })}
+          onChange={(np) =>
+            onChange({ ...c, preguntas: c.preguntas.map((x, j) => (j === i ? np : x)) })
+          }
           onRemove={() => onChange({ ...c, preguntas: c.preguntas.filter((_, j) => j !== i) })}
         />
       ))}
-      <button type="button" onClick={() => onChange({ ...c, preguntas: [...c.preguntas, nuevaPregunta()] })} style={{ ...btn, alignSelf: "flex-start" }}>
+      <button
+        type="button"
+        onClick={() => onChange({ ...c, preguntas: [...c.preguntas, nuevaPregunta()] })}
+        style={{ ...btn, alignSelf: "flex-start" }}
+      >
         + pregunta
       </button>
     </div>
@@ -188,7 +256,9 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
   const [contenido, setContenido] = useState(row.contenido ?? "");
   const [video, setVideo] = useState(row.video ?? "");
   const [actividades, setActividades] = useState<LinkItem[]>(row.actividades ?? []);
-  const [cuestionarios, setCuestionarios] = useState<Cuestionario[]>(() => normalizarQuiz(row.quiz));
+  const [cuestionarios, setCuestionarios] = useState<Cuestionario[]>(() =>
+    normalizarQuiz(row.quiz),
+  );
   const [verPreview, setVerPreview] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -227,39 +297,81 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
   }
 
   return (
-    <div style={{ border: "1px solid #e3e7f0", borderRadius: "0.9rem", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+    <div
+      style={{
+        border: "1px solid #e3e7f0",
+        borderRadius: "0.9rem",
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.6rem",
+      }}
+    >
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "2 1 12rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "2 1 12rem" }}
+        >
           <span style={label}>Lección (título)</span>
           <input value={leccion} onChange={(e) => setLeccion(e.target.value)} style={input} />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 8rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 8rem" }}
+        >
           <span style={label}>Unidad</span>
-          <input value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad 1" style={input} />
+          <input
+            value={unidad}
+            onChange={(e) => setUnidad(e.target.value)}
+            placeholder="Unidad 1"
+            style={input}
+          />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem", width: "5rem" }}>
           <span style={label}>Orden</span>
-          <input type="number" min={0} value={orden} onChange={(e) => setOrden(e.target.value)} style={input} />
+          <input
+            type="number"
+            min={0}
+            value={orden}
+            onChange={(e) => setOrden(e.target.value)}
+            style={input}
+          />
         </label>
       </div>
 
       <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
         <span style={{ ...label, display: "flex", justifyContent: "space-between" }}>
           Contenido / temario
-          <button type="button" onClick={() => setVerPreview((v) => !v)} style={{ ...btn, padding: "0.15rem 0.5rem" }}>
+          <button
+            type="button"
+            onClick={() => setVerPreview((v) => !v)}
+            style={{ ...btn, padding: "0.15rem 0.5rem" }}
+          >
             {verPreview ? "Editar" : "Vista previa"}
           </button>
         </span>
         {verPreview ? (
-          <div style={{ ...input, minHeight: "5rem", whiteSpace: "pre-wrap", background: "#f9fafc" }}>{contenido || "—"}</div>
+          <div
+            style={{ ...input, minHeight: "5rem", whiteSpace: "pre-wrap", background: "#f9fafc" }}
+          >
+            {contenido || "—"}
+          </div>
         ) : (
-          <textarea value={contenido} onChange={(e) => setContenido(e.target.value)} rows={4} style={{ ...input, resize: "vertical", fontFamily: "inherit" }} />
+          <textarea
+            value={contenido}
+            onChange={(e) => setContenido(e.target.value)}
+            rows={4}
+            style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
+          />
         )}
       </label>
 
       <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
         <span style={label}>Video (URL o key)</span>
-        <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="videos/…mp4" style={input} />
+        <input
+          value={video}
+          onChange={(e) => setVideo(e.target.value)}
+          placeholder="videos/…mp4"
+          style={input}
+        />
       </label>
 
       {/* Actividades WordWall de la lección */}
@@ -267,21 +379,63 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
         <span style={label}>Actividades WordWall (de la lección)</span>
         {actividades.map((a, i) => (
           <div key={i} style={{ display: "flex", gap: "0.35rem" }}>
-            <input placeholder="Nombre visible" value={a.nombre} onChange={(e) => setActividades(actividades.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)))} style={{ ...input, flex: "1 1 8rem" }} />
-            <input placeholder="https://wordwall.net/…" value={a.link} onChange={(e) => setActividades(actividades.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)))} style={{ ...input, flex: "2 1 12rem" }} />
-            <button type="button" onClick={() => setActividades(actividades.filter((_, j) => j !== i))} style={{ ...btn, color: "#c62828" }}>
+            <input
+              placeholder="Nombre visible"
+              value={a.nombre}
+              onChange={(e) =>
+                setActividades(
+                  actividades.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)),
+                )
+              }
+              style={{ ...input, flex: "1 1 8rem" }}
+            />
+            <input
+              placeholder="https://wordwall.net/…"
+              value={a.link}
+              onChange={(e) =>
+                setActividades(
+                  actividades.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)),
+                )
+              }
+              style={{ ...input, flex: "2 1 12rem" }}
+            />
+            <button
+              type="button"
+              onClick={() => setActividades(actividades.filter((_, j) => j !== i))}
+              style={{ ...btn, color: "#c62828" }}
+            >
               ✕
             </button>
           </div>
         ))}
-        <button type="button" onClick={() => setActividades([...actividades, { nombre: "", link: "" }])} style={{ ...btn, alignSelf: "flex-start" }}>
+        <button
+          type="button"
+          onClick={() => setActividades([...actividades, { nombre: "", link: "" }])}
+          style={{ ...btn, alignSelf: "flex-start" }}
+        >
           + agregar actividad
         </button>
       </div>
 
       {/* Evaluación (varios cuestionarios) */}
-      <div style={{ border: "1px dashed #d8cef0", borderRadius: "0.7rem", padding: "0.7rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+      <div
+        style={{
+          border: "1px dashed #d8cef0",
+          borderRadius: "0.7rem",
+          padding: "0.7rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.5rem",
+          }}
+        >
           <strong>Evaluación</strong>
           <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
             varios cuestionarios · se presentan en orden · se autocalifican
@@ -298,8 +452,22 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
         ))}
         <button
           type="button"
-          onClick={() => setCuestionarios([...cuestionarios, { titulo: `Cuestionario ${cuestionarios.length + 1}`, minutos: 15, preguntas: [nuevaPregunta()] }])}
-          style={{ ...btn, alignSelf: "flex-start", borderColor: "var(--lgs-purpura)", color: "var(--lgs-purpura)" }}
+          onClick={() =>
+            setCuestionarios([
+              ...cuestionarios,
+              {
+                titulo: `Cuestionario ${cuestionarios.length + 1}`,
+                minutos: 15,
+                preguntas: [nuevaPregunta()],
+              },
+            ])
+          }
+          style={{
+            ...btn,
+            alignSelf: "flex-start",
+            borderColor: "var(--lgs-purpura)",
+            color: "var(--lgs-purpura)",
+          }}
         >
           + cuestionario
         </button>
@@ -310,11 +478,22 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
           type="button"
           onClick={() => void guardar()}
           disabled={ocupado || leccion.trim() === ""}
-          style={{ ...btn, background: "var(--lgs-verde)", borderColor: "var(--lgs-verde)", color: "#1b2a10", padding: "0.5rem 1.3rem", fontSize: "0.88rem" }}
+          style={{
+            ...btn,
+            background: "var(--lgs-verde)",
+            borderColor: "var(--lgs-verde)",
+            color: "#1b2a10",
+            padding: "0.5rem 1.3rem",
+            fontSize: "0.88rem",
+          }}
         >
           {ocupado ? "Guardando…" : "Guardar lección"}
         </button>
-        {msg !== null && <span style={{ fontSize: "0.85rem", color: msg.startsWith("✔") ? "#1b5e20" : "#c62828" }}>{msg}</span>}
+        {msg !== null && (
+          <span style={{ fontSize: "0.85rem", color: msg.startsWith("✔") ? "#1b5e20" : "#c62828" }}>
+            {msg}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -382,13 +561,18 @@ export default function GestionContenidoPage() {
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Gestión de Contenido</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-        Edita el temario de cada lección y su evaluación (varios cuestionarios). Elige curso y nivel.
+        Edita el temario de cada lección y su evaluación (varios cuestionarios). Elige curso y
+        nivel.
       </p>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={label}>Curso</span>
-          <select value={fCurso} onChange={(e) => setFCurso(e.target.value as Curso)} style={{ ...input, width: "12rem" }}>
+          <select
+            value={fCurso}
+            onChange={(e) => setFCurso(e.target.value as Curso)}
+            style={{ ...input, width: "12rem" }}
+          >
             {CURSOS.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -398,7 +582,11 @@ export default function GestionContenidoPage() {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={label}>Nivel</span>
-          <select value={fNivel} onChange={(e) => setFNivel(e.target.value)} style={{ ...input, width: "12rem" }}>
+          <select
+            value={fNivel}
+            onChange={(e) => setFNivel(e.target.value)}
+            style={{ ...input, width: "12rem" }}
+          >
             {NIVELES.map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -409,20 +597,57 @@ export default function GestionContenidoPage() {
       </div>
 
       {/* Agregar lección */}
-      <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "2 1 12rem" }}>
+      <div
+        style={{
+          marginTop: "1rem",
+          display: "flex",
+          gap: "0.5rem",
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+        }}
+      >
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "2 1 12rem" }}
+        >
           <span style={label}>Nueva lección</span>
-          <input value={nuevaLeccion} onChange={(e) => setNuevaLeccion(e.target.value)} placeholder="Lección 1" style={input} />
+          <input
+            value={nuevaLeccion}
+            onChange={(e) => setNuevaLeccion(e.target.value)}
+            placeholder="Lección 1"
+            style={input}
+          />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 8rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 8rem" }}
+        >
           <span style={label}>Unidad</span>
-          <input value={nuevaUnidad} onChange={(e) => setNuevaUnidad(e.target.value)} placeholder="Unidad 1" style={input} />
+          <input
+            value={nuevaUnidad}
+            onChange={(e) => setNuevaUnidad(e.target.value)}
+            placeholder="Unidad 1"
+            style={input}
+          />
         </label>
-        <button type="button" onClick={() => void agregar()} disabled={creando || nuevaLeccion.trim() === ""} style={{ ...btn, background: "var(--lgs-azul)", borderColor: "var(--lgs-azul)", color: "white", padding: "0.5rem 1.2rem" }}>
+        <button
+          type="button"
+          onClick={() => void agregar()}
+          disabled={creando || nuevaLeccion.trim() === ""}
+          style={{
+            ...btn,
+            background: "var(--lgs-azul)",
+            borderColor: "var(--lgs-azul)",
+            color: "white",
+            padding: "0.5rem 1.2rem",
+          }}
+        >
           {creando ? "Agregando…" : "+ Agregar lección"}
         </button>
       </div>
-      {error !== null && <p role="alert" style={{ color: "#c62828" }}>{error}</p>}
+      {error !== null && (
+        <p role="alert" style={{ color: "#c62828" }}>
+          {error}
+        </p>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1.25rem" }}>
         {filas === null ? (

@@ -59,7 +59,8 @@ export function enlaceInvitacion(appUrl: string, token: string): string {
 
 /** Mensaje único por estado: la puerta pública no explica de más. */
 export const MENSAJE_INVITACION: Record<Exclude<EstadoInvitacion, "VIGENTE">, string> = {
-  USADA: "Este enlace ya se usó. Si necesitas corregir tus datos, pídele a tu coordinación uno nuevo.",
+  USADA:
+    "Este enlace ya se usó. Si necesitas corregir tus datos, pídele a tu coordinación uno nuevo.",
   REVOCADA: "Este enlace ya no está disponible. Pídele a tu coordinación uno nuevo.",
   VENCIDA: "Este enlace venció. Pídele a tu coordinación uno nuevo.",
 };

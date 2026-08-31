@@ -101,7 +101,9 @@ function ipDe(request: Request): string | null {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 }
 
-async function idParam(context: { params: Promise<Record<string, string | string[]>> }): Promise<string> {
+async function idParam(context: {
+  params: Promise<Record<string, string | string[]>>;
+}): Promise<string> {
   return z.uuid().parse((await context.params)["id"]);
 }
 
@@ -233,7 +235,12 @@ export const referenciaNivelPutHandler = handlerWithAuth(async (request, auth, c
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
   const id = await idParam(context);
   const body = refNivelSchema.parse(await request.json());
-  await actualizarReferenciaNivel({ actorUserId: auth.userId, levelId: id, ...body, ip: ipDe(request) });
+  await actualizarReferenciaNivel({
+    actorUserId: auth.userId,
+    levelId: id,
+    ...body,
+    ip: ipDe(request),
+  });
   return json({ ok: true });
 });
 
@@ -250,7 +257,12 @@ export const referenciaQuizPutHandler = handlerWithAuth(async (request, auth, co
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
   const id = await idParam(context);
   const body = refQuizSchema.parse(await request.json());
-  await actualizarReferenciaQuiz({ actorUserId: auth.userId, quizId: id, ...body, ip: ipDe(request) });
+  await actualizarReferenciaQuiz({
+    actorUserId: auth.userId,
+    quizId: id,
+    ...body,
+    ip: ipDe(request),
+  });
   return json({ ok: true });
 });
 
@@ -270,7 +282,9 @@ export const imagenCursoSubirHandler = handlerWithAuth(async (request, auth) => 
   const form = await request.formData().catch(() => null);
   const archivo = form?.get("archivo");
   if (form === null || !(archivo instanceof File)) {
-    throw new ValidationError("Envía multipart/form-data con 'archivo' (y curso/nivel según el tipo).");
+    throw new ValidationError(
+      "Envía multipart/form-data con 'archivo' (y curso/nivel según el tipo).",
+    );
   }
   const tipo = tipoArte(typeof form.get("tipo") === "string" ? (form.get("tipo") as string) : null);
   const curso = typeof form.get("curso") === "string" ? (form.get("curso") as string) : undefined;
@@ -292,7 +306,11 @@ export const imagenCursoInfoHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
   const q = request.nextUrl.searchParams;
-  const id = await arteId(tipoArte(q.get("tipo")), q.get("curso") ?? undefined, q.get("nivel") ?? undefined);
+  const id = await arteId(
+    tipoArte(q.get("tipo")),
+    q.get("curso") ?? undefined,
+    q.get("nivel") ?? undefined,
+  );
   return json({ id, url: id !== null ? `/api/catalog/imagen-curso/${id}` : null });
 });
 
@@ -318,7 +336,11 @@ export const hotspotsInfoHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
   const q = request.nextUrl.searchParams;
-  const data = await getHotspots(q.get("scope") ?? "ISLA", q.get("curso") ?? "", q.get("nivel") ?? "");
+  const data = await getHotspots(
+    q.get("scope") ?? "ISLA",
+    q.get("curso") ?? "",
+    q.get("nivel") ?? "",
+  );
   return json(data);
 });
 

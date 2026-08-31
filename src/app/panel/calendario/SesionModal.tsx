@@ -139,7 +139,9 @@ export function SesionModal({
   const [motivoSuspension, setMotivoSuspension] = useState("");
   // Contenido del curso: libros, material y recursos.
   const [contenido, setContenido] = useState<CursoRef[] | null>(null);
-  const [pestana, setPestana] = useState<"material_usuario" | "material_guia" | "recursos" | null>(null);
+  const [pestana, setPestana] = useState<"material_usuario" | "material_guia" | "recursos" | null>(
+    null,
+  );
   const [motivo, setMotivo] = useState("");
   const [repetirLeccion, setRepetirLeccion] = useState(false);
 
@@ -208,7 +210,8 @@ export function SesionModal({
               estado: ficha.estado,
               justificacion: ficha.justificacion.trim() === "" ? null : ficha.justificacion,
               participo: ficha.participo,
-              comentarioUsuario: ficha.comentarioUsuario.trim() === "" ? null : ficha.comentarioUsuario,
+              comentarioUsuario:
+                ficha.comentarioUsuario.trim() === "" ? null : ficha.comentarioUsuario,
               notaPrivada: ficha.notaPrivada.trim() === "" ? null : ficha.notaPrivada,
               requiereAtencion: ficha.requiereAtencion,
             },
@@ -258,7 +261,8 @@ export function SesionModal({
     setCambiandoGuia((v) => !v);
     if (guias.length === 0) {
       const res = await apiFetch("/api/identity/guides");
-      if (res.ok) setGuias(((await res.json()) as { guias: { id: string; username: string }[] }).guias);
+      if (res.ok)
+        setGuias(((await res.json()) as { guias: { id: string; username: string }[] }).guias);
     }
   }
 
@@ -317,7 +321,8 @@ export function SesionModal({
     setPestana(cual);
     if (contenido === null && sesion !== null) {
       const res = await apiFetch(`/api/catalog/curso?curso=${sesion.cursoTipo ?? ""}`);
-      if (res.ok) setContenido(((await res.json()) as { referencias: CursoRef[] }).referencias ?? []);
+      if (res.ok)
+        setContenido(((await res.json()) as { referencias: CursoRef[] }).referencias ?? []);
       else setContenido([]);
     }
   }
@@ -383,33 +388,92 @@ export function SesionModal({
           }}
         >
           <h2 style={{ fontSize: "1.2rem", fontWeight: 800 }}>
-            🗓️ {sesion === null ? "Cargando…" : `${sesion.tipo === "CLUB" ? "Club" : `Sesión ${String(sesion.numero)}`} · ${sesion.salon}`}
+            🗓️{" "}
+            {sesion === null
+              ? "Cargando…"
+              : `${sesion.tipo === "CLUB" ? "Club" : `Sesión ${String(sesion.numero)}`} · ${sesion.salon}`}
             {cerrada && (
-              <span style={{ marginLeft: "0.6rem", fontSize: "0.7rem", fontWeight: 800, color: "#1b5e20", background: "#e8f5e9", padding: "0.15rem 0.55rem", borderRadius: "999px" }}>
+              <span
+                style={{
+                  marginLeft: "0.6rem",
+                  fontSize: "0.7rem",
+                  fontWeight: 800,
+                  color: "#1b5e20",
+                  background: "#e8f5e9",
+                  padding: "0.15rem 0.55rem",
+                  borderRadius: "999px",
+                }}
+              >
                 REGISTRADA
               </span>
             )}
           </h2>
-          <button type="button" onClick={onCerrar} aria-label="Cerrar" style={{ ...boton, borderRadius: "50%", width: "2.2rem", height: "2.2rem", padding: 0 }}>
+          <button
+            type="button"
+            onClick={onCerrar}
+            aria-label="Cerrar"
+            style={{ ...boton, borderRadius: "50%", width: "2.2rem", height: "2.2rem", padding: 0 }}
+          >
             ✕
           </button>
         </div>
 
-        <div style={{ padding: "1.1rem 1.25rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.9rem" }}>
-          {error !== null && <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>{error}</p>}
+        <div
+          style={{
+            padding: "1.1rem 1.25rem 1.4rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.9rem",
+          }}
+        >
+          {error !== null && (
+            <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>
+              {error}
+            </p>
+          )}
           {aviso !== null && <p style={{ color: "#1b5e20", fontWeight: 600 }}>{aviso}</p>}
 
           {/* ── Información del evento + guía ───────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "0.9rem" }} className="ses-dos">
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "0.9rem" }}
+            className="ses-dos"
+          >
             <section style={caja}>
-              <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>Información del evento</h3>
+              <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>
+                Información del evento
+              </h3>
               {sesion !== null && (
-                <div style={{ fontSize: "0.88rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                  <span>📅 {new Date(`${sesion.fecha}T12:00:00`).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
-                  <span>🕐 {new Date(sesion.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                  <span>👥 Cupo {sesion.cupo} · {sesion.cursoTipo} · Campaña {sesion.campania}</span>
+                <div
+                  style={{
+                    fontSize: "0.88rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.2rem",
+                  }}
+                >
+                  <span>
+                    📅{" "}
+                    {new Date(`${sesion.fecha}T12:00:00`).toLocaleDateString("es", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span>
+                    🕐{" "}
+                    {new Date(sesion.startsAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span>
+                    👥 Cupo {sesion.cupo} · {sesion.cursoTipo} · Campaña {sesion.campania}
+                  </span>
                   {/* La LECCIÓN entra aquí cuando exista el módulo de Niveles. */}
-                  <span style={{ color: "var(--texto-suave)" }}>📘 Lección: se asignará desde Niveles</span>
+                  <span style={{ color: "var(--texto-suave)" }}>
+                    📘 Lección: se asignará desde Niveles
+                  </span>
                   <span>🔗 {sesion.meetingUrl ?? "Sin enlace configurado"}</span>
                 </div>
               )}
@@ -418,23 +482,52 @@ export function SesionModal({
             <section style={caja}>
               <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>Guía</h3>
               {/* El NOMBRE siempre se ve; cambiarlo es de coordinación. */}
-              <p style={{ fontSize: "0.95rem", fontWeight: 700 }}>{sesion?.guia ?? "Sin guía asignado"}</p>
+              <p style={{ fontSize: "0.95rem", fontWeight: 700 }}>
+                {sesion?.guia ?? "Sin guía asignado"}
+              </p>
               {puedeGestionarSalones && (
                 <>
-                  <button type="button" style={{ ...boton, marginTop: "0.6rem" }} disabled={ocupado}
-                    onClick={() => void abrirCambioGuia()}>
+                  <button
+                    type="button"
+                    style={{ ...boton, marginTop: "0.6rem" }}
+                    disabled={ocupado}
+                    onClick={() => void abrirCambioGuia()}
+                  >
                     🔀 Cambiar guía
                   </button>
                   {cambiandoGuia && (
-                    <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                      <select value={nuevoGuia} onChange={(e) => setNuevoGuia(e.target.value)}
-                        style={{ flex: 1, minWidth: "9rem", padding: "0.45rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6" }}>
+                    <div
+                      style={{
+                        marginTop: "0.6rem",
+                        display: "flex",
+                        gap: "0.4rem",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <select
+                        value={nuevoGuia}
+                        onChange={(e) => setNuevoGuia(e.target.value)}
+                        style={{
+                          flex: 1,
+                          minWidth: "9rem",
+                          padding: "0.45rem",
+                          borderRadius: "0.5rem",
+                          border: "1.5px solid #d8dce6",
+                        }}
+                      >
                         <option value="">— Sin guía —</option>
                         {guias.map((g) => (
-                          <option key={g.id} value={g.id}>{g.username}</option>
+                          <option key={g.id} value={g.id}>
+                            {g.username}
+                          </option>
                         ))}
                       </select>
-                      <button type="button" style={botonPrimario} disabled={ocupado} onClick={() => void cambiarGuia()}>
+                      <button
+                        type="button"
+                        style={botonPrimario}
+                        disabled={ocupado}
+                        onClick={() => void cambiarGuia()}
+                      >
                         Guardar
                       </button>
                     </div>
@@ -446,79 +539,179 @@ export function SesionModal({
 
           {/* ── Acciones ────────────────────────────────────────── */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button type="button" style={botonPrimario} disabled={ocupado || cerrada}
-              onClick={abrirRegistro}>
+            <button
+              type="button"
+              style={botonPrimario}
+              disabled={ocupado || cerrada}
+              onClick={abrirRegistro}
+            >
               ✔ Registrar sesión
             </button>
             {puedeGestionarSalones && cerrada && (
-              <button type="button" style={boton} disabled={ocupado}
-                onClick={() => void accionRegistro({ accion: "reabrir" }, "Sesión reabierta.")}>
+              <button
+                type="button"
+                style={boton}
+                disabled={ocupado}
+                onClick={() => void accionRegistro({ accion: "reabrir" }, "Sesión reabierta.")}
+              >
                 ↩ Reabrir
               </button>
             )}
-            <button type="button" style={boton} disabled={ocupado || pendiente !== null}
-              onClick={() => setPidiendoRepeticion((v) => !v)}>
+            <button
+              type="button"
+              style={boton}
+              disabled={ocupado || pendiente !== null}
+              onClick={() => setPidiendoRepeticion((v) => !v)}
+            >
               🔁 {pendiente !== null ? "Repetición solicitada" : "Solicitar repetir sesión"}
             </button>
             {puedeGestionarSalones && (
-              <button type="button" style={boton} disabled={ocupado}
-                onClick={() => setSuspendiendo((v) => !v)}>
+              <button
+                type="button"
+                style={boton}
+                disabled={ocupado}
+                onClick={() => setSuspendiendo((v) => !v)}
+              >
                 ⏸ Suspender este día
               </button>
             )}
             <span style={{ flex: 1 }} />
-            <button type="button" style={{ ...boton, background: pestana === "material_usuario" ? "#eef2ff" : "white" }}
-              onClick={() => void abrirContenido("material_usuario")}>📚 Libros</button>
-            <button type="button" style={{ ...boton, background: pestana === "material_guia" ? "#eef2ff" : "white" }}
-              onClick={() => void abrirContenido("material_guia")}>📖 Material</button>
-            <button type="button" style={{ ...boton, background: pestana === "recursos" ? "#eef2ff" : "white" }}
-              onClick={() => void abrirContenido("recursos")}>🔗 Recursos</button>
+            <button
+              type="button"
+              style={{ ...boton, background: pestana === "material_usuario" ? "#eef2ff" : "white" }}
+              onClick={() => void abrirContenido("material_usuario")}
+            >
+              📚 Libros
+            </button>
+            <button
+              type="button"
+              style={{ ...boton, background: pestana === "material_guia" ? "#eef2ff" : "white" }}
+              onClick={() => void abrirContenido("material_guia")}
+            >
+              📖 Material
+            </button>
+            <button
+              type="button"
+              style={{ ...boton, background: pestana === "recursos" ? "#eef2ff" : "white" }}
+              onClick={() => void abrirContenido("recursos")}
+            >
+              🔗 Recursos
+            </button>
           </div>
 
           {registrando && (
             <section style={{ ...caja, borderColor: "var(--lgs-azul)" }}>
-              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.6rem" }}>Registrar la sesión</h3>
+              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.6rem" }}>
+                Registrar la sesión
+              </h3>
 
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, marginBottom: "0.2rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                  marginBottom: "0.2rem",
+                }}
+              >
                 ¿A qué hora se dictó?
               </label>
-              <input type="time" value={horaReal} onChange={(e) => setHoraReal(e.target.value)}
-                style={{ padding: "0.45rem 0.6rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6", fontSize: "0.95rem" }} />
+              <input
+                type="time"
+                value={horaReal}
+                onChange={(e) => setHoraReal(e.target.value)}
+                style={{
+                  padding: "0.45rem 0.6rem",
+                  borderRadius: "0.5rem",
+                  border: "1.5px solid #d8dce6",
+                  fontSize: "0.95rem",
+                }}
+              />
               <p style={{ fontSize: "0.75rem", color: "var(--texto-suave)", marginTop: "0.2rem" }}>
                 Se propuso la hora actual. Cámbiala si la clase fue a otra hora.
               </p>
 
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, margin: "0.7rem 0 0.2rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                  margin: "0.7rem 0 0.2rem",
+                }}
+              >
                 Nota sobre la sesión
               </label>
-              <textarea value={notaSesion} onChange={(e) => setNotaSesion(e.target.value)} rows={2}
+              <textarea
+                value={notaSesion}
+                onChange={(e) => setNotaSesion(e.target.value)}
+                rows={2}
                 placeholder="¿Cómo fue la clase? (opcional)"
-                style={{ width: "100%", padding: "0.6rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6", fontFamily: "inherit", fontSize: "0.88rem" }} />
+                style={{
+                  width: "100%",
+                  padding: "0.6rem",
+                  borderRadius: "0.5rem",
+                  border: "1.5px solid #d8dce6",
+                  fontFamily: "inherit",
+                  fontSize: "0.88rem",
+                }}
+              />
 
               {/* Sin ninguna marca: confirmar a propósito que no vino nadie. */}
               {sinNingunaMarca && (
-                <div style={{ marginTop: "0.7rem", padding: "0.7rem 0.9rem", borderRadius: "0.6rem", background: "#fff8e1", border: "1px solid var(--lgs-amarillo)" }}>
+                <div
+                  style={{
+                    marginTop: "0.7rem",
+                    padding: "0.7rem 0.9rem",
+                    borderRadius: "0.6rem",
+                    background: "#fff8e1",
+                    border: "1px solid var(--lgs-amarillo)",
+                  }}
+                >
                   <p style={{ fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.35rem" }}>
                     ⚠️ No marcaste asistencia de ningún estudiante.
                   </p>
-                  <label style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.85rem" }}>
-                    <input type="checkbox" checked={confirmoSinNadie}
-                      onChange={(e) => setConfirmoSinNadie(e.target.checked)} />
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.45rem",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={confirmoSinNadie}
+                      onChange={(e) => setConfirmoSinNadie(e.target.checked)}
+                    />
                     Confirmo que <b>no asistió ningún estudiante</b> a esta sesión.
                   </label>
                 </div>
               )}
 
               <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.8rem" }}>
-                <button type="button" style={botonPrimario}
+                <button
+                  type="button"
+                  style={botonPrimario}
                   disabled={ocupado || horaReal === "" || (sinNingunaMarca && !confirmoSinNadie)}
-                  onClick={() => void accionRegistro(
-                    { accion: "cerrar", horaReal, nota: notaSesion, sinAsistentes: confirmoSinNadie },
-                    "Sesión registrada.",
-                  )}>
+                  onClick={() =>
+                    void accionRegistro(
+                      {
+                        accion: "cerrar",
+                        horaReal,
+                        nota: notaSesion,
+                        sinAsistentes: confirmoSinNadie,
+                      },
+                      "Sesión registrada.",
+                    )
+                  }
+                >
                   Confirmar registro
                 </button>
-                <button type="button" style={boton} disabled={ocupado} onClick={() => setRegistrando(false)}>
+                <button
+                  type="button"
+                  style={boton}
+                  disabled={ocupado}
+                  onClick={() => setRegistrando(false)}
+                >
                   Cancelar
                 </button>
               </div>
@@ -527,16 +720,33 @@ export function SesionModal({
 
           {suspendiendo && (
             <section style={{ ...caja, borderColor: "var(--lgs-magenta)" }}>
-              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>Suspender este día</h3>
-              <p style={{ fontSize: "0.8rem", color: "var(--texto-suave)", marginBottom: "0.5rem" }}>
-                La sesión se corre AL FINAL del curso: el total no cambia y `final_curso` no se reescribe.
+              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>
+                Suspender este día
+              </h3>
+              <p
+                style={{ fontSize: "0.8rem", color: "var(--texto-suave)", marginBottom: "0.5rem" }}
+              >
+                La sesión se corre AL FINAL del curso: el total no cambia y `final_curso` no se
+                reescribe.
               </p>
-              <input value={motivoSuspension} onChange={(e) => setMotivoSuspension(e.target.value)}
+              <input
+                value={motivoSuspension}
+                onChange={(e) => setMotivoSuspension(e.target.value)}
                 placeholder="Motivo (obligatorio)"
-                style={{ width: "100%", padding: "0.55rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6", fontSize: "0.88rem" }} />
-              <button type="button" style={{ ...botonPrimario, marginTop: "0.5rem", background: "var(--lgs-magenta)" }}
+                style={{
+                  width: "100%",
+                  padding: "0.55rem",
+                  borderRadius: "0.5rem",
+                  border: "1.5px solid #d8dce6",
+                  fontSize: "0.88rem",
+                }}
+              />
+              <button
+                type="button"
+                style={{ ...botonPrimario, marginTop: "0.5rem", background: "var(--lgs-magenta)" }}
                 disabled={ocupado || motivoSuspension.trim() === ""}
-                onClick={() => void suspenderDia()}>
+                onClick={() => void suspenderDia()}
+              >
                 Suspender
               </button>
             </section>
@@ -545,28 +755,52 @@ export function SesionModal({
           {pestana !== null && (
             <section style={caja}>
               <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>
-                {pestana === "material_usuario" ? "📚 Libros del estudiante" : pestana === "material_guia" ? "📖 Material del guía" : "🔗 Recursos"}
+                {pestana === "material_usuario"
+                  ? "📚 Libros del estudiante"
+                  : pestana === "material_guia"
+                    ? "📖 Material del guía"
+                    : "🔗 Recursos"}
               </h3>
               {contenido === null ? (
                 <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando…</p>
               ) : contenido.length === 0 ? (
                 <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
-                  Todavía no hay contenido cargado para {sesion?.cursoTipo ?? "este curso"}. Se sube en
-                  Mantenimiento Académico › Gestión de Contenido.
+                  Todavía no hay contenido cargado para {sesion?.cursoTipo ?? "este curso"}. Se sube
+                  en Mantenimiento Académico › Gestión de Contenido.
                 </p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", maxHeight: "16rem", overflowY: "auto" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.3rem",
+                    maxHeight: "16rem",
+                    overflowY: "auto",
+                  }}
+                >
                   {contenido.map((c) => {
                     const items = c[pestana] ?? [];
                     if (items.length === 0) return null;
                     return (
-                      <div key={c.id} style={{ padding: "0.4rem 0.6rem", background: "#fafbfe", borderRadius: "0.5rem", fontSize: "0.84rem" }}>
-                        <b>{c.nivel} · Unidad {c.unidad} · Lección {c.leccion}</b>
+                      <div
+                        key={c.id}
+                        style={{
+                          padding: "0.4rem 0.6rem",
+                          background: "#fafbfe",
+                          borderRadius: "0.5rem",
+                          fontSize: "0.84rem",
+                        }}
+                      >
+                        <b>
+                          {c.nivel} · Unidad {c.unidad} · Lección {c.leccion}
+                        </b>
                         <ul style={{ margin: "0.25rem 0 0 1rem" }}>
                           {items.map((it, i) => (
                             <li key={i}>
                               {typeof it.enlace === "string" || typeof it.url === "string" ? (
-                                <a href={it.enlace ?? it.url} target="_blank" rel="noreferrer">{it.nombre ?? it.enlace ?? it.url}</a>
+                                <a href={it.enlace ?? it.url} target="_blank" rel="noreferrer">
+                                  {it.nombre ?? it.enlace ?? it.url}
+                                </a>
                               ) : (
                                 (it.nombre ?? "—")
                               )}
@@ -583,19 +817,55 @@ export function SesionModal({
 
           {pidiendoRepeticion && (
             <section style={{ ...caja, borderColor: "var(--lgs-amarillo)" }}>
-              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>Solicitar repetición</h3>
-              <p style={{ fontSize: "0.8rem", color: "var(--texto-suave)", marginBottom: "0.5rem" }}>
+              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>
+                Solicitar repetición
+              </h3>
+              <p
+                style={{ fontSize: "0.8rem", color: "var(--texto-suave)", marginBottom: "0.5rem" }}
+              >
                 La aprueba coordinación. Queda registrada en este evento.
               </p>
-              <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2}
+              <textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={2}
                 placeholder="¿Por qué hay que repetirla?"
-                style={{ width: "100%", padding: "0.6rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6", fontFamily: "inherit", fontSize: "0.88rem" }} />
-              <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: "0.5rem 0", fontSize: "0.85rem" }}>
-                <input type="checkbox" checked={repetirLeccion} onChange={(e) => setRepetirLeccion(e.target.checked)} />
+                style={{
+                  width: "100%",
+                  padding: "0.6rem",
+                  borderRadius: "0.5rem",
+                  border: "1.5px solid #d8dce6",
+                  fontFamily: "inherit",
+                  fontSize: "0.88rem",
+                }}
+              />
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  margin: "0.5rem 0",
+                  fontSize: "0.85rem",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={repetirLeccion}
+                  onChange={(e) => setRepetirLeccion(e.target.checked)}
+                />
                 Repetir también la lección
               </label>
-              <button type="button" style={botonPrimario} disabled={ocupado || motivo.trim().length < 5}
-                onClick={() => void accionRegistro({ accion: "solicitar_repeticion", motivo, repetirLeccion }, "Solicitud enviada a coordinación.")}>
+              <button
+                type="button"
+                style={botonPrimario}
+                disabled={ocupado || motivo.trim().length < 5}
+                onClick={() =>
+                  void accionRegistro(
+                    { accion: "solicitar_repeticion", motivo, repetirLeccion },
+                    "Solicitud enviada a coordinación.",
+                  )
+                }
+              >
                 Enviar solicitud
               </button>
             </section>
@@ -603,9 +873,18 @@ export function SesionModal({
 
           {repeticiones.length > 0 && (
             <section style={caja}>
-              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>Solicitudes de repetición</h3>
+              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>
+                Solicitudes de repetición
+              </h3>
               {repeticiones.map((r) => (
-                <div key={r.id} style={{ fontSize: "0.84rem", padding: "0.4rem 0", borderBottom: "1px solid #eef1f7" }}>
+                <div
+                  key={r.id}
+                  style={{
+                    fontSize: "0.84rem",
+                    padding: "0.4rem 0",
+                    borderBottom: "1px solid #eef1f7",
+                  }}
+                >
                   <b>{r.estado}</b> · {r.motivo}
                   {r.repetirLeccion && " (con lección)"}
                   <span style={{ color: "var(--texto-suave)" }}> — {r.solicitante ?? "—"}</span>
@@ -615,13 +894,22 @@ export function SesionModal({
           )}
 
           {/* ── Lista + ficha del alumno ────────────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.15fr", gap: "0.9rem" }} className="ses-dos">
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1.15fr", gap: "0.9rem" }}
+            className="ses-dos"
+          >
             {/* Caja 1: lista. La asistencia se marca en la ficha, no aquí. */}
             <section style={caja}>
               <h3 style={{ fontSize: "0.96rem", fontWeight: 800 }}>
                 Estudiantes inscritos ({lista.length}/{sesion?.cupo ?? 0})
               </h3>
-              <p style={{ fontSize: "0.76rem", color: "var(--texto-suave)", margin: "0.15rem 0 0.7rem" }}>
+              <p
+                style={{
+                  fontSize: "0.76rem",
+                  color: "var(--texto-suave)",
+                  margin: "0.15rem 0 0.7rem",
+                }}
+              >
                 Haz clic en un estudiante para marcar su asistencia y dejar su registro.
               </p>
               {lista.length === 0 ? (
@@ -631,30 +919,82 @@ export function SesionModal({
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                   {lista.map((f) => (
-                    <div key={f.childPersonId}
+                    <div
+                      key={f.childPersonId}
                       style={{
-                        display: "flex", alignItems: "center", gap: "0.6rem",
-                        padding: "0.5rem 0.6rem", borderRadius: "0.5rem",
-                        background: alumno?.childPersonId === f.childPersonId ? "#eef2ff" : "#fafbfe",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.6rem",
+                        padding: "0.5rem 0.6rem",
+                        borderRadius: "0.5rem",
+                        background:
+                          alumno?.childPersonId === f.childPersonId ? "#eef2ff" : "#fafbfe",
                         borderLeft: `3px solid ${f.marca === null ? "#e3e7f0" : f.marca.estado === "PRESENTE" ? "var(--lgs-verde)" : "var(--lgs-magenta)"}`,
-                      }}>
-                      <button type="button" onClick={() => abrirAlumno(f)}
-                        style={{ flex: 1, textAlign: "left", border: "none", background: "none", cursor: "pointer", padding: 0, font: "inherit" }}>
-                        <span style={{ fontWeight: 600 }}>{f.nombres} {f.apellidos}</span>
-                        <span style={{ display: "block", fontSize: "0.72rem", color: "var(--texto-suave)" }}>
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => abrirAlumno(f)}
+                        style={{
+                          flex: 1,
+                          textAlign: "left",
+                          border: "none",
+                          background: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                          font: "inherit",
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>
+                          {f.nombres} {f.apellidos}
+                        </span>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "0.72rem",
+                            color: "var(--texto-suave)",
+                          }}
+                        >
                           {f.paisContrato}
                           {f.feriadoEnSuPais && " · feriado en su país"}
                         </span>
                       </button>
                       {f.marca?.participo === true && <span title="Participó">💬</span>}
-                      {f.marca?.requiereAtencion === true && <span title="Requiere atención">⚠️</span>}
-                      <span style={{
-                        fontSize: "0.68rem", fontWeight: 800, padding: "0.15rem 0.5rem",
-                        borderRadius: "999px", whiteSpace: "nowrap",
-                        color: f.marca === null ? "#9e9e9e" : f.marca.estado === "PRESENTE" ? "#1b5e20" : f.marca.estado === "AUSENTE" ? "#c62828" : "#8a6d00",
-                        background: f.marca === null ? "#f5f5f5" : f.marca.estado === "PRESENTE" ? "#e8f5e9" : f.marca.estado === "AUSENTE" ? "#ffebee" : "#fff8e1",
-                      }}>
-                        {f.marca === null ? "sin marcar" : f.marca.estado === "PRESENTE" ? "✔ asistió" : f.marca.estado === "AUSENTE" ? "✘ ausente" : "📝 justificado"}
+                      {f.marca?.requiereAtencion === true && (
+                        <span title="Requiere atención">⚠️</span>
+                      )}
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          padding: "0.15rem 0.5rem",
+                          borderRadius: "999px",
+                          whiteSpace: "nowrap",
+                          color:
+                            f.marca === null
+                              ? "#9e9e9e"
+                              : f.marca.estado === "PRESENTE"
+                                ? "#1b5e20"
+                                : f.marca.estado === "AUSENTE"
+                                  ? "#c62828"
+                                  : "#8a6d00",
+                          background:
+                            f.marca === null
+                              ? "#f5f5f5"
+                              : f.marca.estado === "PRESENTE"
+                                ? "#e8f5e9"
+                                : f.marca.estado === "AUSENTE"
+                                  ? "#ffebee"
+                                  : "#fff8e1",
+                        }}
+                      >
+                        {f.marca === null
+                          ? "sin marcar"
+                          : f.marca.estado === "PRESENTE"
+                            ? "✔ asistió"
+                            : f.marca.estado === "AUSENTE"
+                              ? "✘ ausente"
+                              : "📝 justificado"}
                       </span>
                     </div>
                   ))}
@@ -670,54 +1010,163 @@ export function SesionModal({
                 </p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
-                  <h3 style={{ fontSize: "1.05rem", fontWeight: 800 }}>{alumno.nombres} {alumno.apellidos}</h3>
+                  <h3 style={{ fontSize: "1.05rem", fontWeight: 800 }}>
+                    {alumno.nombres} {alumno.apellidos}
+                  </h3>
 
                   <div>
-                    <p style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--texto-suave)" }}>ASISTENCIA</p>
-                    <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.35rem" }}>
+                    <p
+                      style={{
+                        fontSize: "0.8rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.05em",
+                        color: "var(--texto-suave)",
+                      }}
+                    >
+                      ASISTENCIA
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.4rem",
+                        flexWrap: "wrap",
+                        marginTop: "0.35rem",
+                      }}
+                    >
                       {(["PRESENTE", "AUSENTE", "JUSTIFICADO"] as EstadoAsistencia[]).map((e) => (
-                        <button key={e} type="button" onClick={() => setFicha((f) => ({ ...f, estado: e }))}
-                          style={{ ...boton, background: ficha.estado === e ? "var(--lgs-azul)" : "white", color: ficha.estado === e ? "white" : "inherit", border: ficha.estado === e ? "none" : boton.border }}>
-                          {e === "PRESENTE" ? "✔ Asistió" : e === "AUSENTE" ? "✘ Ausente" : "📝 Justificado"}
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => setFicha((f) => ({ ...f, estado: e }))}
+                          style={{
+                            ...boton,
+                            background: ficha.estado === e ? "var(--lgs-azul)" : "white",
+                            color: ficha.estado === e ? "white" : "inherit",
+                            border: ficha.estado === e ? "none" : boton.border,
+                          }}
+                        >
+                          {e === "PRESENTE"
+                            ? "✔ Asistió"
+                            : e === "AUSENTE"
+                              ? "✘ Ausente"
+                              : "📝 Justificado"}
                         </button>
                       ))}
                     </div>
                     {ficha.estado === "JUSTIFICADO" && (
-                      <input value={ficha.justificacion} onChange={(e) => setFicha((f) => ({ ...f, justificacion: e.target.value }))}
+                      <input
+                        value={ficha.justificacion}
+                        onChange={(e) => setFicha((f) => ({ ...f, justificacion: e.target.value }))}
                         placeholder="Justificación (obligatoria)"
-                        style={{ width: "100%", marginTop: "0.4rem", padding: "0.5rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6", fontSize: "0.88rem" }} />
+                        style={{
+                          width: "100%",
+                          marginTop: "0.4rem",
+                          padding: "0.5rem",
+                          borderRadius: "0.5rem",
+                          border: "1.5px solid #d8dce6",
+                          fontSize: "0.88rem",
+                        }}
+                      />
                     )}
                   </div>
 
-                  <label style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.9rem", fontWeight: 600 }}>
-                    <input type="checkbox" checked={ficha.participo}
-                      onChange={(e) => setFicha((f) => ({ ...f, participo: e.target.checked }))} />
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.45rem",
+                      fontSize: "0.9rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={ficha.participo}
+                      onChange={(e) => setFicha((f) => ({ ...f, participo: e.target.checked }))}
+                    />
                     Participó activamente
                   </label>
 
                   <div>
-                    <p style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--texto-suave)", marginBottom: "0.3rem" }}>💬 COMENTARIOS PARA EL USUARIO</p>
-                    <textarea value={ficha.comentarioUsuario} rows={3}
-                      onChange={(e) => setFicha((f) => ({ ...f, comentarioUsuario: e.target.value }))}
+                    <p
+                      style={{
+                        fontSize: "0.8rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.05em",
+                        color: "var(--texto-suave)",
+                        marginBottom: "0.3rem",
+                      }}
+                    >
+                      💬 COMENTARIOS PARA EL USUARIO
+                    </p>
+                    <textarea
+                      value={ficha.comentarioUsuario}
+                      rows={3}
+                      onChange={(e) =>
+                        setFicha((f) => ({ ...f, comentarioUsuario: e.target.value }))
+                      }
                       placeholder="Lo verá el estudiante en su panel…"
-                      style={{ width: "100%", padding: "0.6rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6", fontFamily: "inherit", fontSize: "0.88rem" }} />
+                      style={{
+                        width: "100%",
+                        padding: "0.6rem",
+                        borderRadius: "0.5rem",
+                        border: "1.5px solid #d8dce6",
+                        fontFamily: "inherit",
+                        fontSize: "0.88rem",
+                      }}
+                    />
                   </div>
 
                   <div>
-                    <p style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--texto-suave)", marginBottom: "0.3rem" }}>📄 ANOTACIONES PRIVADAS</p>
-                    <textarea value={ficha.notaPrivada} rows={3}
+                    <p
+                      style={{
+                        fontSize: "0.8rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.05em",
+                        color: "var(--texto-suave)",
+                        marginBottom: "0.3rem",
+                      }}
+                    >
+                      📄 ANOTACIONES PRIVADAS
+                    </p>
+                    <textarea
+                      value={ficha.notaPrivada}
+                      rows={3}
                       onChange={(e) => setFicha((f) => ({ ...f, notaPrivada: e.target.value }))}
                       placeholder="Solo lo ve el equipo. El estudiante nunca lo lee."
-                      style={{ width: "100%", padding: "0.6rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6", fontFamily: "inherit", fontSize: "0.88rem" }} />
+                      style={{
+                        width: "100%",
+                        padding: "0.6rem",
+                        borderRadius: "0.5rem",
+                        border: "1.5px solid #d8dce6",
+                        fontFamily: "inherit",
+                        fontSize: "0.88rem",
+                      }}
+                    />
                   </div>
 
-                  <button type="button"
-                    onClick={() => setFicha((f) => ({ ...f, requiereAtencion: !f.requiereAtencion }))}
-                    style={{ ...boton, alignSelf: "flex-start", background: ficha.requiereAtencion ? "#ffebee" : "white", borderColor: ficha.requiereAtencion ? "#c62828" : "#e3e7f0", color: ficha.requiereAtencion ? "#c62828" : "inherit" }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFicha((f) => ({ ...f, requiereAtencion: !f.requiereAtencion }))
+                    }
+                    style={{
+                      ...boton,
+                      alignSelf: "flex-start",
+                      background: ficha.requiereAtencion ? "#ffebee" : "white",
+                      borderColor: ficha.requiereAtencion ? "#c62828" : "#e3e7f0",
+                      color: ficha.requiereAtencion ? "#c62828" : "inherit",
+                    }}
+                  >
                     ⚠️ {ficha.requiereAtencion ? "Marcado: requiere atención" : "Requiere atención"}
                   </button>
 
-                  <button type="button" style={botonPrimario} disabled={ocupado} onClick={() => void guardarRegistro()}>
+                  <button
+                    type="button"
+                    style={botonPrimario}
+                    disabled={ocupado}
+                    onClick={() => void guardarRegistro()}
+                  >
                     💾 Guardar registro
                   </button>
                 </div>

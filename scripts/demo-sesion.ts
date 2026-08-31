@@ -137,10 +137,10 @@ async function main(): Promise<void> {
 
   // El salón queda sellado como dictado por el guía, para el reporte mensual.
   if (sesion !== undefined && guia !== null) {
-    await execute(
-      `UPDATE scheduling_session SET guia_user_id = $2 WHERE classroom_id = $1`,
-      [salon.id, guia.id],
-    );
+    await execute(`UPDATE scheduling_session SET guia_user_id = $2 WHERE classroom_id = $1`, [
+      salon.id,
+      guia.id,
+    ]);
   }
 
   logger.info("═══════════════════════════════════════════════");

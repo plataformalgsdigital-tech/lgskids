@@ -181,7 +181,9 @@ function CalendarioSalones() {
         setSesiones([]);
       }
       // El endpoint ya acota por audiencia: un guía solo recibe los suyos.
-      setEventosAdmin(resAdmin.ok ? ((await resAdmin.json()) as { eventos: EventoAdmin[] }).eventos : []);
+      setEventosAdmin(
+        resAdmin.ok ? ((await resAdmin.json()) as { eventos: EventoAdmin[] }).eventos : [],
+      );
     }
     void cargar();
   }, [y, m, campaniaId]);
@@ -355,7 +357,11 @@ function CalendarioSalones() {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  🏛️ {new Date(e.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
+                  🏛️{" "}
+                  {new Date(e.startsAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
                   {e.titulo ?? "Administrativo"}
                 </div>
               ))}
@@ -479,7 +485,10 @@ function CalendarioSalones() {
                     <button
                       type="button"
                       key={s.id}
-                      onClick={() => { setDiaAbierto(null); setSesionAbierta(s.id); }}
+                      onClick={() => {
+                        setDiaAbierto(null);
+                        setSesionAbierta(s.id);
+                      }}
                       style={{
                         width: "100%",
                         font: "inherit",
@@ -518,7 +527,13 @@ function CalendarioSalones() {
                           </span>
                         )}
                       </span>
-                      <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", whiteSpace: "nowrap" }}>
+                      <span
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "var(--texto-suave)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {s.ocupados}/{s.cupo} →
                       </span>
                     </button>
@@ -674,10 +689,25 @@ export default function SalonesPage() {
 
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "0.5rem",
+        }}
+      >
         <h1 style={{ fontSize: "1.6rem" }}>Calendario</h1>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <div style={{ display: "flex", border: "1.5px solid #d8dce6", borderRadius: "0.6rem", overflow: "hidden" }}>
+          <div
+            style={{
+              display: "flex",
+              border: "1.5px solid #d8dce6",
+              borderRadius: "0.6rem",
+              overflow: "hidden",
+            }}
+          >
             {(["calendario", "lista"] as const).map((v) => (
               <button
                 key={v}
@@ -1017,98 +1047,118 @@ export default function SalonesPage() {
       )}
 
       {vista === "lista" && (
-      <section
-        style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
-      >
-        {salones === null ? (
-          <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
-        ) : salones.length === 0 ? (
-          <p style={{ color: "var(--texto-suave)" }}>
-            Sin salones. Necesitas una campaña creada (sección Campañas) para colgar el salón de su
-            curso.
-          </p>
-        ) : (
-          (() => {
-            // El servidor ya viene ordenado por campaña más reciente primero;
-            // aquí solo se cortan los grupos, sin reordenar.
-            const grupos: { campania: string; inicio: string; items: Salon[] }[] = [];
-            for (const s of salones) {
-              const ultimo = grupos[grupos.length - 1];
-              if (ultimo !== undefined && ultimo.campania === s.campania) ultimo.items.push(s);
-              else grupos.push({ campania: s.campania, inicio: s.campaniaInicio, items: [s] });
-            }
-            return grupos.map((g) => (
-              <div key={g.campania} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.4rem" }}>
-                  <h2 style={{ fontSize: "0.95rem", fontWeight: 800 }}>{g.campania}</h2>
-                  <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
-                    desde {new Date(`${g.inicio}T12:00:00`).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })}
-                    {" · "}
-                    {g.items.length} {g.items.length === 1 ? "salón" : "salones"}
-                  </span>
+        <section
+          style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
+        >
+          {salones === null ? (
+            <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
+          ) : salones.length === 0 ? (
+            <p style={{ color: "var(--texto-suave)" }}>
+              Sin salones. Necesitas una campaña creada (sección Campañas) para colgar el salón de
+              su curso.
+            </p>
+          ) : (
+            (() => {
+              // El servidor ya viene ordenado por campaña más reciente primero;
+              // aquí solo se cortan los grupos, sin reordenar.
+              const grupos: { campania: string; inicio: string; items: Salon[] }[] = [];
+              for (const s of salones) {
+                const ultimo = grupos[grupos.length - 1];
+                if (ultimo !== undefined && ultimo.campania === s.campania) ultimo.items.push(s);
+                else grupos.push({ campania: s.campania, inicio: s.campaniaInicio, items: [s] });
+              }
+              return grupos.map((g) => (
+                <div
+                  key={g.campania}
+                  style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: "0.5rem",
+                      marginTop: "0.4rem",
+                    }}
+                  >
+                    <h2 style={{ fontSize: "0.95rem", fontWeight: 800 }}>{g.campania}</h2>
+                    <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                      desde{" "}
+                      {new Date(`${g.inicio}T12:00:00`).toLocaleDateString("es", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                      {" · "}
+                      {g.items.length} {g.items.length === 1 ? "salón" : "salones"}
+                    </span>
+                  </div>
+                  {g.items.map((s) => (
+                    <Link
+                      key={s.id}
+                      href={`/panel/calendario/${s.id}`}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "0.85rem 1rem",
+                        border: "1px solid #e3e7f0",
+                        borderRadius: "0.7rem",
+                        color: "inherit",
+                        flexWrap: "wrap",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <div>
+                        {/* Título: Curso · País · Salón */}
+                        <strong>
+                          {s.curso} · {s.holidayCountry} · {s.nombre}
+                        </strong>
+                        <div
+                          style={{
+                            fontSize: "0.8rem",
+                            color: "var(--texto-suave)",
+                            marginTop: "0.15rem",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700 }}>Horario:</span>{" "}
+                          {s.horario.length === 0
+                            ? "sin horario"
+                            : s.horario
+                                .map(
+                                  (h) =>
+                                    `${DIAS_CORTOS[h.diaSemana] ?? "?"} ${h.horaLocal}${h.tipo === "CLUB" ? " (club)" : ""}`,
+                                )
+                                .join(" · ")}
+                        </div>
+                        <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                          <span style={{ fontWeight: 700 }}>Inicio:</span> {s.primeraSesion ?? "—"}
+                          {"  "}
+                          <span style={{ fontWeight: 700 }}>Final:</span> {s.ultimaSesion ?? "—"}
+                        </div>
+                        <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                          <span style={{ fontWeight: 700 }}>Advisor:</span>{" "}
+                          {s.guia ?? <em>sin asignar</em>}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "0.8rem",
+                          fontWeight: 700,
+                          padding: "0.22rem 0.6rem",
+                          borderRadius: "1rem",
+                          background: "#e3f2fd",
+                          color: "#0d47a1",
+                        }}
+                      >
+                        {s.sesiones} sesiones
+                      </span>
+                    </Link>
+                  ))}
                 </div>
-                {g.items.map((s) => (
-            <Link
-              key={s.id}
-              href={`/panel/calendario/${s.id}`}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "0.85rem 1rem",
-                border: "1px solid #e3e7f0",
-                borderRadius: "0.7rem",
-                color: "inherit",
-                flexWrap: "wrap",
-                gap: "0.5rem",
-              }}
-            >
-              <div>
-                {/* Título: Curso · País · Salón */}
-                <strong>
-                  {s.curso} · {s.holidayCountry} · {s.nombre}
-                </strong>
-                <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}>
-                  <span style={{ fontWeight: 700 }}>Horario:</span>{" "}
-                  {s.horario.length === 0
-                    ? "sin horario"
-                    : s.horario
-                        .map(
-                          (h) =>
-                            `${DIAS_CORTOS[h.diaSemana] ?? "?"} ${h.horaLocal}${h.tipo === "CLUB" ? " (club)" : ""}`,
-                        )
-                        .join(" · ")}
-                </div>
-                <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                  <span style={{ fontWeight: 700 }}>Inicio:</span>{" "}
-                  {s.primeraSesion ?? "—"}
-                  {"  "}
-                  <span style={{ fontWeight: 700 }}>Final:</span> {s.ultimaSesion ?? "—"}
-                </div>
-                <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                  <span style={{ fontWeight: 700 }}>Advisor:</span>{" "}
-                  {s.guia ?? <em>sin asignar</em>}
-                </div>
-              </div>
-              <span
-                style={{
-                  fontSize: "0.8rem",
-                  fontWeight: 700,
-                  padding: "0.22rem 0.6rem",
-                  borderRadius: "1rem",
-                  background: "#e3f2fd",
-                  color: "#0d47a1",
-                }}
-              >
-                {s.sesiones} sesiones
-              </span>
-            </Link>
-                ))}
-              </div>
-            ));
-          })()
-        )}
-      </section>
+              ));
+            })()
+          )}
+        </section>
       )}
     </main>
   );

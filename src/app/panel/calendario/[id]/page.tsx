@@ -106,7 +106,11 @@ export default function DetalleSalonPage() {
     void inicial();
   }, [cargar]);
 
-  async function guardarSalon(patch: { cupo?: number; guiaUserId?: string | null; activo?: boolean }) {
+  async function guardarSalon(patch: {
+    cupo?: number;
+    guiaUserId?: string | null;
+    activo?: boolean;
+  }) {
     setError(null);
     setAviso(null);
     setOcupado(true);
@@ -296,7 +300,9 @@ export default function DetalleSalonPage() {
             style={{ padding: "0.45rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6" }}
           />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 14rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 14rem" }}
+        >
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Guía</span>
           <select
             value={guiaEdit}
@@ -312,7 +318,12 @@ export default function DetalleSalonPage() {
           </select>
         </label>
         <button
-          style={{ ...boton, borderColor: "var(--lgs-verde)", background: "var(--lgs-verde)", color: "#1b2a10" }}
+          style={{
+            ...boton,
+            borderColor: "var(--lgs-verde)",
+            background: "var(--lgs-verde)",
+            color: "#1b2a10",
+          }}
           disabled={ocupado}
           onClick={() =>
             void guardarSalon({ cupo: Number(cupoEdit), guiaUserId: guiaEdit || null })
@@ -342,8 +353,8 @@ export default function DetalleSalonPage() {
             </strong>
             <p style={{ margin: "0.15rem 0 0", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
               Inicio campaña {detalle.campania.campaignInicio} · Inicio curso{" "}
-              {detalle.campania.cursoInicio} · Fin curso nominal {detalle.campania.finalCurso}. Editar
-              estas fechas afecta a <strong>todos los salones</strong> de la campaña.
+              {detalle.campania.cursoInicio} · Fin curso nominal {detalle.campania.finalCurso}.
+              Editar estas fechas afecta a <strong>todos los salones</strong> de la campaña.
             </p>
           </div>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>

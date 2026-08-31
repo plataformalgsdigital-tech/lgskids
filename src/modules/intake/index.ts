@@ -14,8 +14,4 @@ export type {
   CursoDisponible,
   SalonDisponible,
 } from "./application/disponibilidad";
-export {
-  disponibilidadHandler,
-  reservarIntakeHandler,
-  aprobarIntakeHandler,
-} from "./api/handlers";
+export { disponibilidadHandler, reservarIntakeHandler, aprobarIntakeHandler } from "./api/handlers";

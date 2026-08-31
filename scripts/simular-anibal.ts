@@ -76,7 +76,9 @@ async function main(): Promise<void> {
   logger.info("═══════════════════════════════════════════════");
   logger.info(`  Rookie: ${quizzes.length} unidad(es) completada(s) para ${alumno.nombre}.`);
   logger.info(`  Progresión: ${JSON.stringify(progresionFinal)}`);
-  logger.info(`  Entra a /mi-panel como ${alumno.username ?? "(su usuario)"} y abre "¿Cómo voy?" / "Avance".`);
+  logger.info(
+    `  Entra a /mi-panel como ${alumno.username ?? "(su usuario)"} y abre "¿Cómo voy?" / "Avance".`,
+  );
   logger.info("═══════════════════════════════════════════════");
 }
 

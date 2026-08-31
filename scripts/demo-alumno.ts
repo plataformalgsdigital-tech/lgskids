@@ -31,7 +31,8 @@ const PASSWORD_DEMO = "DemoAlumno123";
  * JUNIOR). La fecha de nacimiento se ajusta al tramo de edad del curso —
  * Junior 6–9, Youngster 10–13—; con la edad equivocada el contrato se rechaza.
  */
-const TIPO_CURSO = (process.argv[2] ?? "JUNIOR").toUpperCase() === "YOUNGSTER" ? "YOUNGSTER" : "JUNIOR";
+const TIPO_CURSO =
+  (process.argv[2] ?? "JUNIOR").toUpperCase() === "YOUNGSTER" ? "YOUNGSTER" : "JUNIOR";
 const NACIMIENTO = TIPO_CURSO === "YOUNGSTER" ? "2014-06-01" : "2018-06-01";
 const NOMBRE_NINO = TIPO_CURSO === "YOUNGSTER" ? "Matías" : "Sofía";
 

@@ -72,7 +72,15 @@ function Cifra({
 }) {
   return (
     <div style={{ ...tarjeta, borderTop: `3px solid ${color}` }}>
-      <div style={{ fontSize: "1.85rem", fontWeight: 800, color, fontVariantNumeric: "tabular-nums", lineHeight: 1.15 }}>
+      <div
+        style={{
+          fontSize: "1.85rem",
+          fontWeight: 800,
+          color,
+          fontVariantNumeric: "tabular-nums",
+          lineHeight: 1.15,
+        }}
+      >
         {n}
       </div>
       <div style={{ fontSize: "0.82rem", fontWeight: 700 }}>{titulo}</div>
@@ -131,7 +139,8 @@ export default function TableroPage() {
         style={{
           borderRadius: "0.9rem",
           padding: "1.3rem 1.4rem",
-          background: "linear-gradient(120deg, var(--lgs-purpura), var(--lgs-azul) 58%, var(--lgs-cian))",
+          background:
+            "linear-gradient(120deg, var(--lgs-purpura), var(--lgs-azul) 58%, var(--lgs-cian))",
           color: "white",
           display: "grid",
           gridTemplateColumns: "1fr auto",
@@ -141,7 +150,9 @@ export default function TableroPage() {
         }}
       >
         <div>
-          <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.12em", opacity: 0.85 }}>
+          <span
+            style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.12em", opacity: 0.85 }}
+          >
             {destacada !== null ? "CAMPAÑA EN CURSO" : "CAMPAÑAS"}
           </span>
           <h1 style={{ margin: "0.15rem 0 0.3rem", fontSize: "1.45rem", fontWeight: 900 }}>
@@ -161,7 +172,9 @@ export default function TableroPage() {
               <>
                 <span style={pastilla}>Inicio · {fechaCorta(destacada.inicio)}</span>
                 {destacada.finalVenta !== null && (
-                  <span style={pastilla}>Cierre matrícula · {fechaCorta(destacada.finalVenta)}</span>
+                  <span style={pastilla}>
+                    Cierre matrícula · {fechaCorta(destacada.finalVenta)}
+                  </span>
                 )}
                 <span style={pastilla}>Fin · {fechaCorta(destacada.fin)}</span>
               </>
@@ -190,7 +203,13 @@ export default function TableroPage() {
 
       {/* ── Cifras de operación ───────────────────────────────── */}
       {data.resumen !== null && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(11rem, 1fr))", gap: "0.75rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(11rem, 1fr))",
+            gap: "0.75rem",
+          }}
+        >
           {data.contratos.length > 0 && (
             <Cifra
               n={contratosVigentes}
@@ -222,7 +241,13 @@ export default function TableroPage() {
 
       {/* ── Cifras del guía ───────────────────────────────────── */}
       {data.guia !== null && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(11rem, 1fr))", gap: "0.75rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(11rem, 1fr))",
+            gap: "0.75rem",
+          }}
+        >
           <Cifra n={data.guia.clasesHoy} titulo="Clases hoy" color="var(--lgs-azul)" />
           <Cifra
             n={data.guia.sesionesSinMarcar}
@@ -235,7 +260,10 @@ export default function TableroPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: "0.9rem" }} className="tablero-dos">
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: "0.9rem" }}
+        className="tablero-dos"
+      >
         {/* ── Clases de hoy ───────────────────────────────────── */}
         <section style={tarjeta}>
           <h2 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.8rem" }}>
@@ -334,19 +362,52 @@ export default function TableroPage() {
             {data.ocupacion.map((o) => {
               const pct = o.cupo > 0 ? Math.round((o.activas / o.cupo) * 100) : 0;
               const color =
-                pct >= 70 ? "var(--lgs-verde)" : pct >= 35 ? "var(--lgs-amarillo)" : "var(--lgs-magenta)";
+                pct >= 70
+                  ? "var(--lgs-verde)"
+                  : pct >= 35
+                    ? "var(--lgs-amarillo)"
+                    : "var(--lgs-magenta)";
               return (
                 <div
                   key={o.salon}
-                  style={{ display: "grid", gridTemplateColumns: "10rem 1fr 3rem", gap: "0.6rem", alignItems: "center", fontSize: "0.82rem" }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "10rem 1fr 3rem",
+                    gap: "0.6rem",
+                    alignItems: "center",
+                    fontSize: "0.82rem",
+                  }}
                 >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span
+                    style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  >
                     {o.salon}
                   </span>
-                  <span style={{ height: "0.5rem", borderRadius: "0.25rem", background: "#eef1f7", overflow: "hidden" }}>
-                    <span style={{ display: "block", height: "100%", width: `${String(pct)}%`, background: color, borderRadius: "0.25rem" }} />
+                  <span
+                    style={{
+                      height: "0.5rem",
+                      borderRadius: "0.25rem",
+                      background: "#eef1f7",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "block",
+                        height: "100%",
+                        width: `${String(pct)}%`,
+                        background: color,
+                        borderRadius: "0.25rem",
+                      }}
+                    />
                   </span>
-                  <span style={{ textAlign: "right", color: "var(--texto-suave)", fontVariantNumeric: "tabular-nums" }}>
+                  <span
+                    style={{
+                      textAlign: "right",
+                      color: "var(--texto-suave)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
                     {o.activas}/{o.cupo}
                   </span>
                 </div>

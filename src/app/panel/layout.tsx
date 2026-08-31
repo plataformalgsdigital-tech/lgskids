@@ -132,9 +132,30 @@ const MENU: {
     permisoMenu: "menu.aviso_login",
   },
   // ── Guía (restringido a sus salones/sesiones/niños) ────────
-  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis clases", color: "var(--lgs-verde)", href: "/panel/mis-clases", permisoMenu: "menu.mis_clases" },
-  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", href: "/panel/mis-salones", permisoMenu: "menu.mis_salones" },
-  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis niños", color: "var(--lgs-magenta)", href: "/panel/mis-ninos", permisoMenu: "menu.mis_ninos" },
+  {
+    seccion: "Guía",
+    permiso: "panel.guia",
+    etiqueta: "Mis clases",
+    color: "var(--lgs-verde)",
+    href: "/panel/mis-clases",
+    permisoMenu: "menu.mis_clases",
+  },
+  {
+    seccion: "Guía",
+    permiso: "panel.guia",
+    etiqueta: "Mis salones",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/mis-salones",
+    permisoMenu: "menu.mis_salones",
+  },
+  {
+    seccion: "Guía",
+    permiso: "panel.guia",
+    etiqueta: "Mis niños",
+    color: "var(--lgs-magenta)",
+    href: "/panel/mis-ninos",
+    permisoMenu: "menu.mis_ninos",
+  },
 ];
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
@@ -279,7 +300,9 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
                     title="Disponible próximamente"
                   >
                     {item.etiqueta}{" "}
-                    <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)" }}>(pronto)</span>
+                    <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)" }}>
+                      (pronto)
+                    </span>
                   </div>
                 );
               })}

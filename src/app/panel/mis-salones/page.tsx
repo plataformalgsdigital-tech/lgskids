@@ -90,58 +90,80 @@ export default function MisSalonesPage() {
               else grupos.push({ campania: s.campania, inicio: s.campaniaInicio, items: [s] });
             }
             return grupos.map((g) => (
-              <div key={g.campania} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.4rem" }}>
+              <div
+                key={g.campania}
+                style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: "0.5rem",
+                    marginTop: "0.4rem",
+                  }}
+                >
                   <h2 style={{ fontSize: "0.95rem", fontWeight: 800 }}>{g.campania}</h2>
                   <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
-                    desde {new Date(`${g.inicio}T12:00:00`).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })}
+                    desde{" "}
+                    {new Date(`${g.inicio}T12:00:00`).toLocaleDateString("es", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
                     {" · "}
                     {g.items.length} {g.items.length === 1 ? "salón" : "salones"}
                   </span>
                 </div>
                 {g.items.map((s) => (
-            <Link
-              key={s.id}
-              href={`/panel/calendario/${s.id}`}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "0.75rem",
-                padding: "0.9rem 1.1rem",
-                border: "1px solid #e3e7f0",
-                borderRadius: "0.8rem",
-                color: "inherit",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                {/* Título: Curso · País · Salón (igual que en administración) */}
-                <strong style={{ fontSize: "1.05rem" }}>
-                  {s.curso} · {s.holidayCountry} · {s.nombre}
-                </strong>
-                <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}>
-                  <span style={{ fontWeight: 700 }}>Horario:</span> {resumenHorario(s.horario)}
-                </div>
-                <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-                  <span style={{ fontWeight: 700 }}>Inicio:</span> {s.primeraSesion ?? "—"}
-                  {"  "}
-                  <span style={{ fontWeight: 700 }}>Final:</span> {s.ultimaSesion ?? "—"}
-                </div>
-                <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-                  <span style={{ fontWeight: 700 }}>Advisor:</span> {s.guia ?? "sin asignar"}
-                </div>
-              </div>
-              <span
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  color: s.ocupados >= s.cupo ? "#c62828" : "#1b5e20",
-                }}
-              >
-                {s.ocupados}/{s.cupo} cupos
-              </span>
-            </Link>
+                  <Link
+                    key={s.id}
+                    href={`/panel/calendario/${s.id}`}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      padding: "0.9rem 1.1rem",
+                      border: "1px solid #e3e7f0",
+                      borderRadius: "0.8rem",
+                      color: "inherit",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      {/* Título: Curso · País · Salón (igual que en administración) */}
+                      <strong style={{ fontSize: "1.05rem" }}>
+                        {s.curso} · {s.holidayCountry} · {s.nombre}
+                      </strong>
+                      <div
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--texto-suave)",
+                          marginTop: "0.15rem",
+                        }}
+                      >
+                        <span style={{ fontWeight: 700 }}>Horario:</span>{" "}
+                        {resumenHorario(s.horario)}
+                      </div>
+                      <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                        <span style={{ fontWeight: 700 }}>Inicio:</span> {s.primeraSesion ?? "—"}
+                        {"  "}
+                        <span style={{ fontWeight: 700 }}>Final:</span> {s.ultimaSesion ?? "—"}
+                      </div>
+                      <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                        <span style={{ fontWeight: 700 }}>Advisor:</span> {s.guia ?? "sin asignar"}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        fontWeight: 700,
+                        color: s.ocupados >= s.cupo ? "#c62828" : "#1b5e20",
+                      }}
+                    >
+                      {s.ocupados}/{s.cupo} cupos
+                    </span>
+                  </Link>
                 ))}
               </div>
             ));

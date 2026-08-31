@@ -72,7 +72,9 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     getHotspotsCurso(matricula.tipoCurso),
   ]);
   const premios = Object.fromEntries(niveles.map((n, i) => [n.codigo, url(premioIds[i] ?? null)]));
-  const bannersNivel = Object.fromEntries(niveles.map((n, i) => [n.codigo, url(bannerIds[i] ?? null)]));
+  const bannersNivel = Object.fromEntries(
+    niveles.map((n, i) => [n.codigo, url(bannerIds[i] ?? null)]),
+  );
 
   return json({
     alumno: { nombre: `${persona.nombres} ${persona.apellidos}` },

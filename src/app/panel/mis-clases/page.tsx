@@ -123,10 +123,18 @@ export default function MisClasesPage() {
           <strong style={{ textTransform: "capitalize", minWidth: "9rem", textAlign: "right" }}>
             {MESES[m]} {y}
           </strong>
-          <button type="button" onClick={() => mover(-1)} style={{ ...inputStyle, cursor: "pointer" }}>
+          <button
+            type="button"
+            onClick={() => mover(-1)}
+            style={{ ...inputStyle, cursor: "pointer" }}
+          >
             ‹
           </button>
-          <button type="button" onClick={() => mover(1)} style={{ ...inputStyle, cursor: "pointer" }}>
+          <button
+            type="button"
+            onClick={() => mover(1)}
+            style={{ ...inputStyle, cursor: "pointer" }}
+          >
             ›
           </button>
         </div>
@@ -136,7 +144,12 @@ export default function MisClasesPage() {
       </p>
 
       <div
-        style={{ marginTop: "0.75rem", display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px" }}
+        style={{
+          marginTop: "0.75rem",
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: "1px",
+        }}
       >
         {DOW.map((d) => (
           <div
@@ -307,7 +320,8 @@ export default function MisClasesPage() {
                     }}
                   >
                     <span>
-                      <strong>{s.horaLocal}</strong> · {s.salon} ({s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"})
+                      <strong>{s.horaLocal}</strong> · {s.salon} (
+                      {s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"})
                     </span>
                     <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                       {s.ocupados}/{s.cupo} →

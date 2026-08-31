@@ -105,7 +105,13 @@ export function ZoomAccessButton(props: {
   if (disponible) {
     return (
       <div style={wrap}>
-        <a href={meetingUrl} target="_blank" rel="noreferrer" onClick={onEntrar} title="Entrar a la clase">
+        <a
+          href={meetingUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={onEntrar}
+          title="Entrar a la clase"
+        >
           <IconoActivo />
         </a>
         <span style={texto}>🎥 {mensajeZoom(estado, tieneAcceso)}</span>
@@ -114,7 +120,10 @@ export function ZoomAccessButton(props: {
   }
   return (
     <div style={wrap}>
-      <span style={{ opacity: 0.9, cursor: "not-allowed" }} title={mensajeZoom(estado, tieneAcceso)}>
+      <span
+        style={{ opacity: 0.9, cursor: "not-allowed" }}
+        title={mensajeZoom(estado, tieneAcceso)}
+      >
         <IconoEspera />
       </span>
       <span style={texto}>{mensajeZoom(estado, tieneAcceso)}</span>

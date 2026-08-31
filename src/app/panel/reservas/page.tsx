@@ -83,7 +83,13 @@ function resumenHorario(h: Salon["horario"]): string {
     porHora.set(s.horaLocal, dias);
   }
   return [...porHora.entries()]
-    .map(([hora, dias]) => `${dias.sort((a, b) => a - b).map((d) => DIAS[d]?.toUpperCase()).join("-")} ${hora}`)
+    .map(
+      ([hora, dias]) =>
+        `${dias
+          .sort((a, b) => a - b)
+          .map((d) => DIAS[d]?.toUpperCase())
+          .join("-")} ${hora}`,
+    )
     .join(" · ");
 }
 
@@ -100,11 +106,21 @@ function CamposPersona({
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
       <label>
         <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Nombres</span>
-        <input value={p.nombres} onChange={(e) => onChange({ nombres: e.target.value })} required style={inputStyle} />
+        <input
+          value={p.nombres}
+          onChange={(e) => onChange({ nombres: e.target.value })}
+          required
+          style={inputStyle}
+        />
       </label>
       <label>
         <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Apellidos</span>
-        <input value={p.apellidos} onChange={(e) => onChange({ apellidos: e.target.value })} required style={inputStyle} />
+        <input
+          value={p.apellidos}
+          onChange={(e) => onChange({ apellidos: e.target.value })}
+          required
+          style={inputStyle}
+        />
       </label>
       {conFechaNac === true && (
         <label>
@@ -120,19 +136,39 @@ function CamposPersona({
       )}
       <label>
         <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Tipo doc.</span>
-        <input value={p.docTipo} onChange={(e) => onChange({ docTipo: e.target.value })} required placeholder="TI / RUT / DNI" style={inputStyle} />
+        <input
+          value={p.docTipo}
+          onChange={(e) => onChange({ docTipo: e.target.value })}
+          required
+          placeholder="TI / RUT / DNI"
+          style={inputStyle}
+        />
       </label>
       <label>
         <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>N° documento</span>
-        <input value={p.docNumero} onChange={(e) => onChange({ docNumero: e.target.value })} required style={inputStyle} />
+        <input
+          value={p.docNumero}
+          onChange={(e) => onChange({ docNumero: e.target.value })}
+          required
+          style={inputStyle}
+        />
       </label>
       <label>
         <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Email (opcional)</span>
-        <input type="email" value={p.email} onChange={(e) => onChange({ email: e.target.value })} style={inputStyle} />
+        <input
+          type="email"
+          value={p.email}
+          onChange={(e) => onChange({ email: e.target.value })}
+          style={inputStyle}
+        />
       </label>
       <label>
         <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Teléfono/WhatsApp</span>
-        <input value={p.telefono} onChange={(e) => onChange({ telefono: e.target.value })} style={inputStyle} />
+        <input
+          value={p.telefono}
+          onChange={(e) => onChange({ telefono: e.target.value })}
+          style={inputStyle}
+        />
       </label>
     </div>
   );
@@ -221,7 +257,9 @@ export default function ReservasPage() {
     setError(null);
     setOk(null);
     if (tipoCurso === null) {
-      setError("La edad del niño no corresponde a Junior (6–9) ni Youngster (10–13) a la fecha de inicio.");
+      setError(
+        "La edad del niño no corresponde a Junior (6–9) ni Youngster (10–13) a la fecha de inicio.",
+      );
       return;
     }
     if (classroomId === "") {
@@ -230,7 +268,12 @@ export default function ReservasPage() {
     }
     setOcupado(true);
     try {
-      const conPais = (p: Persona) => ({ ...p, countryCode: pais, email: p.email || null, telefono: p.telefono || null });
+      const conPais = (p: Persona) => ({
+        ...p,
+        countryCode: pais,
+        email: p.email || null,
+        telefono: p.telefono || null,
+      });
       const body = {
         externalRef: externalRef.trim(),
         countryCode: pais,
@@ -254,7 +297,9 @@ export default function ReservasPage() {
         setError(data.error?.message ?? "No se pudo crear la reserva.");
         return;
       }
-      setOk(`Reserva creada para el contrato LGS ${data.externalRef}. Queda RESERVADA hasta aprobar.`);
+      setOk(
+        `Reserva creada para el contrato LGS ${data.externalRef}. Queda RESERVADA hasta aprobar.`,
+      );
       setTimeout(() => router.push("/panel/contratos"), 1800);
     } catch {
       setError("Error de conexión.");
@@ -269,11 +314,20 @@ export default function ReservasPage() {
     <main style={{ padding: "2rem", maxWidth: "48rem", margin: "0 auto" }}>
       <h1 style={{ fontSize: "1.6rem" }}>Reserva de beneficiario (LGS)</h1>
       <p style={{ color: "var(--texto-suave)", marginTop: "0.25rem" }}>
-        Paso {paso} de 4 · el cupo queda <strong>reservado</strong> hasta que se apruebe el contrato.
+        Paso {paso} de 4 · el cupo queda <strong>reservado</strong> hasta que se apruebe el
+        contrato.
       </p>
 
       {ok !== null && (
-        <p style={{ marginTop: "1rem", color: "#1b5e20", background: "#e8f5e9", padding: "0.7rem 1rem", borderRadius: "0.6rem" }}>
+        <p
+          style={{
+            marginTop: "1rem",
+            color: "#1b5e20",
+            background: "#e8f5e9",
+            padding: "0.7rem 1rem",
+            borderRadius: "0.6rem",
+          }}
+        >
           {ok}
         </p>
       )}
@@ -283,14 +337,34 @@ export default function ReservasPage() {
         </p>
       )}
 
-      <div style={{ marginTop: "1.25rem", border: "1px solid #e3e7f0", borderRadius: "0.9rem", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+      <div
+        style={{
+          marginTop: "1.25rem",
+          border: "1px solid #e3e7f0",
+          borderRadius: "0.9rem",
+          padding: "1.25rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.9rem",
+        }}
+      >
         {paso === 1 && (
           <>
-            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>1 · Contrato LGS y titular</h2>
+            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>
+              1 · Contrato LGS y titular
+            </h2>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.6rem" }}>
               <label>
-                <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>N° contrato LGS (PP-NNNNN-YY)</span>
-                <input value={externalRef} onChange={(e) => setExternalRef(e.target.value)} required placeholder="01-16016-26" style={inputStyle} />
+                <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                  N° contrato LGS (PP-NNNNN-YY)
+                </span>
+                <input
+                  value={externalRef}
+                  onChange={(e) => setExternalRef(e.target.value)}
+                  required
+                  placeholder="01-16016-26"
+                  style={inputStyle}
+                />
               </label>
               <label>
                 <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>País</span>
@@ -300,20 +374,41 @@ export default function ReservasPage() {
                   ))}
                 </select>
               </label>
-              <span style={{ alignSelf: "end", fontSize: "0.78rem", color: "var(--texto-suave)" }}>Firmado, sin aprobar</span>
+              <span style={{ alignSelf: "end", fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+                Firmado, sin aprobar
+              </span>
               <label>
                 <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Inicio del curso</span>
-                <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} required style={inputStyle} />
+                <input
+                  type="date"
+                  value={inicio}
+                  onChange={(e) => setInicio(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
               </label>
               <label>
                 <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Fin del contrato</span>
-                <input type="date" value={finalContrato} onChange={(e) => setFinalContrato(e.target.value)} required style={inputStyle} />
+                <input
+                  type="date"
+                  value={finalContrato}
+                  onChange={(e) => setFinalContrato(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
               </label>
             </div>
             <h3 style={{ margin: "0.5rem 0 0", fontSize: "0.95rem" }}>Titular</h3>
-            <CamposPersona p={titular} onChange={(patch) => setTitular((prev) => ({ ...prev, ...patch }))} />
+            <CamposPersona
+              p={titular}
+              onChange={(patch) => setTitular((prev) => ({ ...prev, ...patch }))}
+            />
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button type="button" style={btnPrimario} onClick={() => validarPaso1() && setPaso(2)}>
+              <button
+                type="button"
+                style={btnPrimario}
+                onClick={() => validarPaso1() && setPaso(2)}
+              >
                 Siguiente →
               </button>
             </div>
@@ -322,17 +417,31 @@ export default function ReservasPage() {
 
         {paso === 2 && (
           <>
-            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>2 · Apoderado</h2>
+            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>
+              2 · Apoderado
+            </h2>
             <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-              <input type="checkbox" checked={titularEsApoderado} onChange={(e) => setTitularEsApoderado(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={titularEsApoderado}
+                onChange={(e) => setTitularEsApoderado(e.target.checked)}
+              />
               <span>El titular es también el apoderado</span>
             </label>
             {!titularEsApoderado && (
               <>
-                <CamposPersona p={apoderado} onChange={(patch) => setApoderado((prev) => ({ ...prev, ...patch }))} />
+                <CamposPersona
+                  p={apoderado}
+                  onChange={(patch) => setApoderado((prev) => ({ ...prev, ...patch }))}
+                />
                 <label style={{ maxWidth: "16rem" }}>
                   <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Parentesco</span>
-                  <input value={parentesco} onChange={(e) => setParentesco(e.target.value)} placeholder="madre / padre / tutor" style={inputStyle} />
+                  <input
+                    value={parentesco}
+                    onChange={(e) => setParentesco(e.target.value)}
+                    placeholder="madre / padre / tutor"
+                    style={inputStyle}
+                  />
                 </label>
               </>
             )}
@@ -349,10 +458,22 @@ export default function ReservasPage() {
 
         {paso === 3 && (
           <>
-            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>3 · Niño (beneficiario)</h2>
-            <CamposPersona p={nino} onChange={(patch) => setNino((prev) => ({ ...prev, ...patch }))} conFechaNac />
+            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>
+              3 · Niño (beneficiario)
+            </h2>
+            <CamposPersona
+              p={nino}
+              onChange={(patch) => setNino((prev) => ({ ...prev, ...patch }))}
+              conFechaNac
+            />
             {nino.fechaNacimiento !== "" && inicio !== "" && (
-              <p style={{ margin: 0, fontSize: "0.85rem", color: tipoCurso === null ? "#c62828" : "var(--texto-suave)" }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "0.85rem",
+                  color: tipoCurso === null ? "#c62828" : "var(--texto-suave)",
+                }}
+              >
                 Edad al inicio: {edadEnFecha(nino.fechaNacimiento, inicio)} años →{" "}
                 {tipoCurso === null ? "no corresponde a Junior ni Youngster" : `curso ${tipoCurso}`}
               </p>
@@ -375,13 +496,19 @@ export default function ReservasPage() {
 
         {paso === 4 && (
           <>
-            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>4 · Campaña, salón y horario</h2>
+            <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--lgs-azul)" }}>
+              4 · Campaña, salón y horario
+            </h2>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--texto-suave)" }}>
               Curso <strong>{tipoCurso}</strong> (por edad del niño). Solo campañas en matrícula.
             </p>
             <label>
               <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Campaña</span>
-              <select value={campaniaId} onChange={(e) => void elegirCampania(e.target.value)} style={inputStyle}>
+              <select
+                value={campaniaId}
+                onChange={(e) => void elegirCampania(e.target.value)}
+                style={inputStyle}
+              >
                 <option value="">— elegir campaña —</option>
                 {campanias.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -392,7 +519,9 @@ export default function ReservasPage() {
             </label>
             {campaniaId !== "" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Salón / horario (con cupo)</span>
+                <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                  Salón / horario (con cupo)
+                </span>
                 {salonesDisponibles.length === 0 ? (
                   <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
                     No hay salones {tipoCurso} con cupo en esta campaña.
@@ -411,10 +540,17 @@ export default function ReservasPage() {
                         cursor: "pointer",
                       }}
                     >
-                      <input type="radio" name="salon" checked={classroomId === s.id} onChange={() => setClassroomId(s.id)} />
+                      <input
+                        type="radio"
+                        name="salon"
+                        checked={classroomId === s.id}
+                        onChange={() => setClassroomId(s.id)}
+                      />
                       <span style={{ flex: 1 }}>
                         <strong>{s.nombre}</strong> · {resumenHorario(s.horario)}
-                        {s.guia !== null && <span style={{ color: "var(--texto-suave)" }}> · {s.guia}</span>}
+                        {s.guia !== null && (
+                          <span style={{ color: "var(--texto-suave)" }}> · {s.guia}</span>
+                        )}
                       </span>
                       <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                         {s.ocupados}/{s.cupo}

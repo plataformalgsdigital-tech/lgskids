@@ -154,7 +154,9 @@ export function VacioConPersonaje({
     >
       <Personaje quien={quien} alto={alto} className="lgs-float" />
       <div style={{ flex: "1 1 11rem", minWidth: 0 }}>
-        <p style={{ fontWeight: 700, marginBottom: detalle !== undefined ? "0.2rem" : 0 }}>{titulo}</p>
+        <p style={{ fontWeight: 700, marginBottom: detalle !== undefined ? "0.2rem" : 0 }}>
+          {titulo}
+        </p>
         {detalle !== undefined && (
           <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem", margin: 0 }}>{detalle}</p>
         )}

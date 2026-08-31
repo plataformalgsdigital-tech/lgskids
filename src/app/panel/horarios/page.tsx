@@ -134,11 +134,7 @@ export default function HorariosPage() {
     setGrupoPais(h.grupoPais);
     setSalonNumero(h.salonNumero);
     setEtiqueta(h.etiqueta);
-    setSlots(
-      h.slots.length > 0
-        ? h.slots.map((s) => ({ ...s }))
-        : [nuevoSlot()],
-    );
+    setSlots(h.slots.length > 0 ? h.slots.map((s) => ({ ...s })) : [nuevoSlot()]);
     setError(null);
     setMostrarForm(true);
   }
@@ -247,7 +243,9 @@ export default function HorariosPage() {
           <strong style={{ fontSize: "1rem" }}>
             {editandoId !== null ? "Editar horario" : "Nuevo horario"}
           </strong>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div
+            style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}
+          >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
               <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Tipo de curso</span>
               <select
@@ -287,7 +285,9 @@ export default function HorariosPage() {
                 ))}
               </select>
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 14rem" }}>
+            <label
+              style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 14rem" }}
+            >
               <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Etiqueta</span>
               <input
                 value={etiqueta}
@@ -304,7 +304,10 @@ export default function HorariosPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Bloques (1–4)</span>
             {slots.map((slot, i) => (
-              <div key={i} style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}>
+              <div
+                key={i}
+                style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}
+              >
                 <select
                   value={slot.diaSemana}
                   onChange={(e) => patchSlot(i, { diaSemana: Number(e.target.value) })}
@@ -344,7 +347,12 @@ export default function HorariosPage() {
                   <button
                     type="button"
                     onClick={() => setSlots((prev) => prev.filter((_, j) => j !== i))}
-                    style={{ ...inputStyle, padding: "0.4rem 0.6rem", cursor: "pointer", color: "#c62828" }}
+                    style={{
+                      ...inputStyle,
+                      padding: "0.4rem 0.6rem",
+                      cursor: "pointer",
+                      color: "#c62828",
+                    }}
                   >
                     ✕
                   </button>
@@ -381,11 +389,7 @@ export default function HorariosPage() {
               cursor: ocupado ? "wait" : "pointer",
             }}
           >
-            {ocupado
-              ? "Guardando…"
-              : editandoId !== null
-                ? "Guardar cambios"
-                : "Crear horario"}
+            {ocupado ? "Guardando…" : editandoId !== null ? "Guardar cambios" : "Crear horario"}
           </button>
         </form>
       )}
@@ -395,7 +399,9 @@ export default function HorariosPage() {
       ) : (
         (["JUNIOR", "YOUNGSTER"] as TipoCurso[]).map((t) => (
           <section key={t} style={{ marginTop: "1.5rem" }}>
-            <h2 style={{ fontSize: "1.15rem", color: "var(--lgs-azul-oscuro)" }}>{NOMBRE_TIPO[t]}</h2>
+            <h2 style={{ fontSize: "1.15rem", color: "var(--lgs-azul-oscuro)" }}>
+              {NOMBRE_TIPO[t]}
+            </h2>
             {porTipo(t).length === 0 ? (
               <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
                 Sin horarios para este curso.
@@ -453,7 +459,11 @@ export default function HorariosPage() {
                           {puedeGestionar && (
                             <button
                               onClick={() => abrirEdicion(h)}
-                              style={{ ...inputStyle, cursor: "pointer", padding: "0.35rem 0.7rem" }}
+                              style={{
+                                ...inputStyle,
+                                cursor: "pointer",
+                                padding: "0.35rem 0.7rem",
+                              }}
                             >
                               Editar
                             </button>
@@ -461,7 +471,11 @@ export default function HorariosPage() {
                           {puedeGestionar && (
                             <button
                               onClick={() => void toggle(h)}
-                              style={{ ...inputStyle, cursor: "pointer", padding: "0.35rem 0.7rem" }}
+                              style={{
+                                ...inputStyle,
+                                cursor: "pointer",
+                                padding: "0.35rem 0.7rem",
+                              }}
                             >
                               {h.activo ? "Desactivar" : "Reactivar"}
                             </button>

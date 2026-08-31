@@ -148,14 +148,35 @@ const WHATSAPP_PATH =
 
 // Canales de asistencia (WhatsApp). TODO: reemplazar `tel` por los números reales.
 const SOPORTE: { label: string; tel: string; color: string; msg: string }[] = [
-  { label: "Soporte Usuario", tel: "573000000000", color: "var(--lgs-azul)", msg: "Hola, necesito ayuda con mi cuenta de LGS Kids." },
-  { label: "Soporte Académico", tel: "573000000000", color: "var(--lgs-verde)", msg: "Hola, tengo una duda académica de LGS Kids." },
-  { label: "Finanzas", tel: "573000000000", color: "var(--lgs-magenta)", msg: "Hola, tengo una consulta de pagos de LGS Kids." },
+  {
+    label: "Soporte Usuario",
+    tel: "573000000000",
+    color: "var(--lgs-azul)",
+    msg: "Hola, necesito ayuda con mi cuenta de LGS Kids.",
+  },
+  {
+    label: "Soporte Académico",
+    tel: "573000000000",
+    color: "var(--lgs-verde)",
+    msg: "Hola, tengo una duda académica de LGS Kids.",
+  },
+  {
+    label: "Finanzas",
+    tel: "573000000000",
+    color: "var(--lgs-magenta)",
+    msg: "Hola, tengo una consulta de pagos de LGS Kids.",
+  },
 ];
 
 // Barra de navegación bajo el encabezado (estilo MOSAICO). Los que tienen href
 // hacen scroll a la sección de la página; el resto queda como acceso futuro.
-const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" | "historial" | "avance" | "perfil" }[] = [
+const NAV_ITEMS: {
+  label: string;
+  emoji: string;
+  href?: string;
+  menu?: boolean;
+  action?: "comovoy" | "historial" | "avance" | "perfil";
+}[] = [
   { label: "Actividades", emoji: "✨", menu: true },
   { label: "Recursos", emoji: "🔗", menu: true },
   { label: "Material", emoji: "📖" },
@@ -308,7 +329,9 @@ export default function MiPanelPage() {
   useEffect(() => {
     function sync() {
       try {
-        setIngreso(proxSessionId !== null && localStorage.getItem(`zoom-acceso-${proxSessionId}`) === "1");
+        setIngreso(
+          proxSessionId !== null && localStorage.getItem(`zoom-acceso-${proxSessionId}`) === "1",
+        );
       } catch {
         setIngreso(false);
       }
@@ -336,14 +359,19 @@ export default function MiPanelPage() {
   }
 
   const niveles = data.progreso?.niveles ?? [];
-  const nivelActual = niveles.find((n) => n.estado === "EN_CURSO") ?? niveles.find((n) => n.estado !== "COMPLETADO");
+  const nivelActual =
+    niveles.find((n) => n.estado === "EN_CURSO") ?? niveles.find((n) => n.estado !== "COMPLETADO");
   const ordenActual = nivelActual?.orden;
-  const nivelAnterior = ordenActual !== undefined ? niveles.find((n) => n.orden === ordenActual - 1) : undefined;
-  const nivelProximo = ordenActual !== undefined ? niveles.find((n) => n.orden === ordenActual + 1) : undefined;
+  const nivelAnterior =
+    ordenActual !== undefined ? niveles.find((n) => n.orden === ordenActual - 1) : undefined;
+  const nivelProximo =
+    ordenActual !== undefined ? niveles.find((n) => n.orden === ordenActual + 1) : undefined;
   const totalLecc = niveles.reduce((a, n) => a + n.totalLecciones, 0);
   const compl = niveles.reduce((a, n) => a + n.leccionesCompletadas, 0);
   const leccionActual =
-    nivelActual !== undefined ? Math.min(nivelActual.leccionesCompletadas + 1, nivelActual.totalLecciones) : null;
+    nivelActual !== undefined
+      ? Math.min(nivelActual.leccionesCompletadas + 1, nivelActual.totalLecciones)
+      : null;
 
   const inicioProxima = data.proxima != null ? new Date(data.proxima.startsAt).getTime() : null;
   const estadoZoomActual =
@@ -359,14 +387,19 @@ export default function MiPanelPage() {
   const nombreAlumno = data.alumno?.nombre ?? "";
   const partesNombre = nombreAlumno.split(" ").filter(Boolean);
   const iniciales =
-    ((partesNombre[0]?.[0] ?? "") + (partesNombre.length > 1 ? (partesNombre[partesNombre.length - 1]?.[0] ?? "") : "")).toUpperCase() ||
-    "🙂";
+    (
+      (partesNombre[0]?.[0] ?? "") +
+      (partesNombre.length > 1 ? (partesNombre[partesNombre.length - 1]?.[0] ?? "") : "")
+    ).toUpperCase() || "🙂";
 
   const tipo = data.matricula?.tipoCurso ?? "JUNIOR";
   const curso = DESC_CURSO[tipo] ?? DESC_CURSO["JUNIOR"]!;
   // Los personajes solo acompañan a JUNIOR; en Youngster resultan infantiles.
   const esJunior = tipo === "JUNIOR";
-  const colorNivel = nivelActual !== undefined ? (COLOR_NIVEL[nivelActual.codigo] ?? "var(--lgs-azul)") : "var(--lgs-azul)";
+  const colorNivel =
+    nivelActual !== undefined
+      ? (COLOR_NIVEL[nivelActual.codigo] ?? "var(--lgs-azul)")
+      : "var(--lgs-azul)";
 
   const moduloBox: CSSProperties = {
     flex: 1,
@@ -381,10 +414,14 @@ export default function MiPanelPage() {
   // Métricas del nivel actual para el modal "¿Cómo voy?"
   const pctNivelActual =
     nivelActual !== undefined
-      ? Math.round((nivelActual.leccionesCompletadas / Math.max(nivelActual.totalLecciones, 1)) * 100)
+      ? Math.round(
+          (nivelActual.leccionesCompletadas / Math.max(nivelActual.totalLecciones, 1)) * 100,
+        )
       : 0;
   const faltanNivel =
-    nivelActual !== undefined ? Math.max(nivelActual.totalLecciones - nivelActual.leccionesCompletadas, 0) : 0;
+    nivelActual !== undefined
+      ? Math.max(nivelActual.totalLecciones - nivelActual.leccionesCompletadas, 0)
+      : 0;
   const asistPct =
     data.asistencia != null && data.asistencia.totalSesiones > 0
       ? Math.round((data.asistencia.asistidas / data.asistencia.totalSesiones) * 100)
@@ -453,35 +490,88 @@ export default function MiPanelPage() {
                     aria-hidden
                     className={completado ? "lgs-shine" : undefined}
                     title={completado ? "¡Premio conseguido!" : "Premio por completar el nivel"}
-                    style={{ ...estilo, fontSize: "1.7rem", lineHeight: "1.9rem", textAlign: "center" }}
+                    style={{
+                      ...estilo,
+                      fontSize: "1.7rem",
+                      lineHeight: "1.9rem",
+                      textAlign: "center",
+                    }}
                   >
                     {PREMIO_NIVEL[nivel.codigo] ?? "🏅"}
                   </span>
                 );
               })()}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
                   <strong>{nivel.nombre}</strong>
-                  <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    {nivel.leccionesCompletadas}/{nivel.totalLecciones} · {nivel.levelUpAprobado ? "Level Up ✅" : "Level Up ⏳"}
-                    <span aria-hidden style={{ fontSize: "0.7rem", transition: "transform .2s", transform: abierto ? "rotate(90deg)" : "none", color: colorN, fontWeight: 900 }}>
+                  <span
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "var(--texto-suave)",
+                      whiteSpace: "nowrap",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                    }}
+                  >
+                    {nivel.leccionesCompletadas}/{nivel.totalLecciones} ·{" "}
+                    {nivel.levelUpAprobado ? "Level Up ✅" : "Level Up ⏳"}
+                    <span
+                      aria-hidden
+                      style={{
+                        fontSize: "0.7rem",
+                        transition: "transform .2s",
+                        transform: abierto ? "rotate(90deg)" : "none",
+                        color: colorN,
+                        fontWeight: 900,
+                      }}
+                    >
                       ▸
                     </span>
                   </span>
                 </div>
-                <div style={{ marginTop: "0.4rem", height: "0.45rem", borderRadius: "0.25rem", background: "#eef1f7", overflow: "hidden" }}>
-                  <div style={{ width: `${(nivel.leccionesCompletadas / Math.max(nivel.totalLecciones, 1)) * 100}%`, height: "100%", background: colorN }} />
+                <div
+                  style={{
+                    marginTop: "0.4rem",
+                    height: "0.45rem",
+                    borderRadius: "0.25rem",
+                    background: "#eef1f7",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${(nivel.leccionesCompletadas / Math.max(nivel.totalLecciones, 1)) * 100}%`,
+                      height: "100%",
+                      background: colorN,
+                    }}
+                  />
                 </div>
               </div>
             </button>
 
             {/* Stages del nivel (Stage 1..N + Level Up) */}
             {abierto && (
-              <div style={{ padding: "0.2rem 0.9rem 0.8rem 0.9rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+              <div
+                style={{
+                  padding: "0.2rem 0.9rem 0.8rem 0.9rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem",
+                }}
+              >
                 {Array.from({ length: nivel.totalLecciones }).map((_, i) => {
                   const n = i + 1;
                   const hecha = n <= nivel.leccionesCompletadas;
-                  const enCurso = n === nivel.leccionesCompletadas + 1 && nivel.estado !== "COMPLETADO";
+                  const enCurso =
+                    n === nivel.leccionesCompletadas + 1 && nivel.estado !== "COMPLETADO";
                   return (
                     <div
                       key={n}
@@ -495,9 +585,17 @@ export default function MiPanelPage() {
                         border: `1px solid ${enCurso ? colorN : "#edf0f6"}`,
                       }}
                     >
-                      <span aria-hidden style={{ fontSize: "1rem" }}>{hecha ? "✅" : enCurso ? "▶️" : "🔒"}</span>
+                      <span aria-hidden style={{ fontSize: "1rem" }}>
+                        {hecha ? "✅" : enCurso ? "▶️" : "🔒"}
+                      </span>
                       <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>Unidad {n}</span>
-                      <span style={{ marginLeft: "auto", fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          fontSize: "0.76rem",
+                          color: "var(--texto-suave)",
+                        }}
+                      >
                         {hecha ? "Completada" : enCurso ? "En curso" : "Bloqueada"}
                       </span>
                     </div>
@@ -515,9 +613,13 @@ export default function MiPanelPage() {
                     border: "1px solid var(--lgs-amarillo)",
                   }}
                 >
-                  <span aria-hidden style={{ fontSize: "1rem" }}>{nivel.levelUpAprobado ? "🏆" : "⏳"}</span>
+                  <span aria-hidden style={{ fontSize: "1rem" }}>
+                    {nivel.levelUpAprobado ? "🏆" : "⏳"}
+                  </span>
                   <span style={{ fontWeight: 800, fontSize: "0.88rem" }}>Level Up</span>
-                  <span style={{ marginLeft: "auto", fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                  <span
+                    style={{ marginLeft: "auto", fontSize: "0.76rem", color: "var(--texto-suave)" }}
+                  >
                     {nivel.levelUpAprobado ? "Aprobado" : "Pendiente"}
                   </span>
                 </div>
@@ -553,11 +655,33 @@ export default function MiPanelPage() {
                   ? { txt: "📝 Justificado", c: "#8a6d00", bg: "#fff8e1" }
                   : { txt: "— sin registro —", c: "#9e9e9e", bg: "#f5f5f5" };
           return (
-            <div key={h.sessionId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0.9rem", borderRadius: "0.6rem", background: "#fafbfe", flexWrap: "wrap", gap: "0.3rem" }}>
+            <div
+              key={h.sessionId}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0.5rem 0.9rem",
+                borderRadius: "0.6rem",
+                background: "#fafbfe",
+                flexWrap: "wrap",
+                gap: "0.3rem",
+              }}
+            >
               <span style={{ fontWeight: 600 }}>
-                {h.tipo === "CLUB" ? "🎉 Club" : `📘 Sesión ${h.numero}`} · {fechaLarga(`${h.fecha}T12:00:00`)}
+                {h.tipo === "CLUB" ? "🎉 Club" : `📘 Sesión ${h.numero}`} ·{" "}
+                {fechaLarga(`${h.fecha}T12:00:00`)}
               </span>
-              <span style={{ fontSize: "0.78rem", fontWeight: 700, color: b.c, background: b.bg, padding: "0.15rem 0.6rem", borderRadius: "1rem" }}>
+              <span
+                style={{
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                  color: b.c,
+                  background: b.bg,
+                  padding: "0.15rem 0.6rem",
+                  borderRadius: "1rem",
+                }}
+              >
                 {b.txt}
               </span>
             </div>
@@ -574,7 +698,12 @@ export default function MiPanelPage() {
         className="lgs-float"
         src={data.voboUrl}
         alt="VoBo"
-        style={{ width: size, height: size, objectFit: "contain", filter: "drop-shadow(0 2px 4px rgba(0,0,0,.35))" }}
+        style={{
+          width: size,
+          height: size,
+          objectFit: "contain",
+          filter: "drop-shadow(0 2px 4px rgba(0,0,0,.35))",
+        }}
       />
     ) : (
       <span
@@ -599,7 +728,14 @@ export default function MiPanelPage() {
   const marca = (key: string, p: { x: number; y: number }, node: ReactNode) => (
     <div
       key={key}
-      style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 2 }}
+      style={{
+        position: "absolute",
+        left: `${p.x}%`,
+        top: `${p.y}%`,
+        transform: "translate(-50%,-50%)",
+        pointerEvents: "none",
+        zIndex: 2,
+      }}
     >
       {node}
     </div>
@@ -615,18 +751,48 @@ export default function MiPanelPage() {
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         aria-hidden
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 1, pointerEvents: "none" }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
       >
         {/* Realce suave para contraste sobre el mapa */}
-        <polyline points={pts} fill="none" stroke="rgba(20,25,50,0.35)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        <polyline
+          points={pts}
+          fill="none"
+          stroke="rgba(20,25,50,0.35)"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
         {/* Ruta punteada animada */}
-        <polyline className="lgs-ruta" points={pts} fill="none" stroke="#ffe27a" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0.1 9" vectorEffect="non-scaling-stroke" />
+        <polyline
+          className="lgs-ruta"
+          points={pts}
+          fill="none"
+          stroke="#ffe27a"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="0.1 9"
+          vectorEffect="non-scaling-stroke"
+        />
       </svg>
     );
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #eef4ff 0%, #f7f0ff 100%)" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #eef4ff 0%, #f7f0ff 100%)",
+      }}
+    >
       {/* Animaciones (Fase C): VoBo flota, premio brilla, unidad actual late. Respeta reduce-motion. */}
       <style>{`
         @keyframes lgsFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
@@ -704,7 +870,16 @@ export default function MiPanelPage() {
           <button
             onClick={() => void salir()}
             title="Cerrar sesión"
-            style={{ padding: "0.5rem 1rem", borderRadius: "0.6rem", border: "1px solid #e3e7f0", background: "white", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", whiteSpace: "nowrap" }}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "0.6rem",
+              border: "1px solid #e3e7f0",
+              background: "white",
+              cursor: "pointer",
+              fontWeight: 700,
+              fontSize: "0.85rem",
+              whiteSpace: "nowrap",
+            }}
           >
             Salir
           </button>
@@ -746,7 +921,15 @@ export default function MiPanelPage() {
           📅 Inscripción Clubes
         </button>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "0.15rem", marginLeft: "auto", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.15rem",
+            marginLeft: "auto",
+            flexWrap: "wrap",
+          }}
+        >
           {NAV_ITEMS.map((it) => {
             const base: CSSProperties = {
               display: "inline-flex",
@@ -786,34 +969,62 @@ export default function MiPanelPage() {
             }
             if (it.action === "comovoy") {
               return (
-                <button key={it.label} type="button" onClick={() => setVerComoVoy(true)} style={base}>
+                <button
+                  key={it.label}
+                  type="button"
+                  onClick={() => setVerComoVoy(true)}
+                  style={base}
+                >
                   {inner}
                 </button>
               );
             }
             if (it.action === "historial") {
               return (
-                <button key={it.label} type="button" onClick={() => setVerHistorial(true)} style={base}>
+                <button
+                  key={it.label}
+                  type="button"
+                  onClick={() => setVerHistorial(true)}
+                  style={base}
+                >
                   {inner}
                 </button>
               );
             }
             if (it.action === "perfil") {
               return (
-                <button key={it.label} type="button" onClick={() => setVerPerfil(true)} style={base}>
+                <button
+                  key={it.label}
+                  type="button"
+                  onClick={() => setVerPerfil(true)}
+                  style={base}
+                >
                   {inner}
                 </button>
               );
             }
             if (it.action === "avance") {
               return (
-                <button key={it.label} type="button" onClick={() => { setAvanceNivel(null); setVerAvance(true); }} style={base}>
+                <button
+                  key={it.label}
+                  type="button"
+                  onClick={() => {
+                    setAvanceNivel(null);
+                    setVerAvance(true);
+                  }}
+                  style={base}
+                >
                   {inner}
                 </button>
               );
             }
             return (
-              <button key={it.label} type="button" title="Próximamente" style={{ ...base, opacity: 0.6 }}>
+              <button
+                key={it.label}
+                type="button"
+                title="Próximamente"
+                style={{ ...base, opacity: 0.6 }}
+              >
                 {inner}
               </button>
             );
@@ -824,12 +1035,21 @@ export default function MiPanelPage() {
       {data.matricula === null ? (
         <main style={{ padding: "3rem 1.5rem", textAlign: "center" }}>
           <p style={{ fontSize: "1.1rem", color: "var(--texto-suave)" }}>
-            Aún no estás matriculado en un salón. En cuanto tu apoderado complete la inscripción, aquí
-            verás tus clases. 🎒
+            Aún no estás matriculado en un salón. En cuanto tu apoderado complete la inscripción,
+            aquí verás tus clases. 🎒
           </p>
         </main>
       ) : (
-        <main style={{ maxWidth: "72rem", margin: "0 auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <main
+          style={{
+            maxWidth: "72rem",
+            margin: "0 auto",
+            padding: "1.5rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.25rem",
+          }}
+        >
           {/* Encabezado del curso: el texto vive AQUÍ (no sobre la imagen) para que el banner se vea limpio */}
           <section
             style={{
@@ -844,12 +1064,25 @@ export default function MiPanelPage() {
             }}
           >
             <div style={{ minWidth: 0 }}>
-              <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "var(--texto-suave)", letterSpacing: "0.08em" }}>
+              <span
+                style={{
+                  fontSize: "0.62rem",
+                  fontWeight: 800,
+                  color: "var(--texto-suave)",
+                  letterSpacing: "0.08em",
+                }}
+              >
                 LGS KIDS · {curso.edad}
               </span>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 900, lineHeight: 1.1, margin: 0 }}>{curso.titulo}</h2>
-                <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>{curso.desc}</span>
+              <div
+                style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}
+              >
+                <h2 style={{ fontSize: "1.25rem", fontWeight: 900, lineHeight: 1.1, margin: 0 }}>
+                  {curso.titulo}
+                </h2>
+                <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+                  {curso.desc}
+                </span>
               </div>
             </div>
             {nivelActual !== undefined && (
@@ -870,7 +1103,13 @@ export default function MiPanelPage() {
             )}
           </section>
 
-          <div style={{ display: "grid", gap: "1.25rem", gridTemplateColumns: "repeat(auto-fit, minmax(20rem, 1fr))" }}>
+          <div
+            style={{
+              display: "grid",
+              gap: "1.25rem",
+              gridTemplateColumns: "repeat(auto-fit, minmax(20rem, 1fr))",
+            }}
+          >
             {/* Columna izquierda: imagen del curso + info + sesión próxima */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               {/* Banner del curso: imagen LIMPIA (el texto vive en el encabezado, arriba). Clic → verla en grande. */}
@@ -888,7 +1127,9 @@ export default function MiPanelPage() {
                       }
                     : undefined
                 }
-                aria-label={data.imagenCursoUrl != null ? "Ver la imagen del curso en grande" : undefined}
+                aria-label={
+                  data.imagenCursoUrl != null ? "Ver la imagen del curso en grande" : undefined
+                }
                 title={data.imagenCursoUrl != null ? "Clic para ver más grande" : undefined}
                 style={{
                   position: "relative",
@@ -912,7 +1153,13 @@ export default function MiPanelPage() {
                     <img
                       src={data.imagenCursoUrl}
                       alt={`Curso ${curso.titulo}${nivelActual !== undefined ? ` · Nivel ${nivelActual.nombre}` : ""}`}
-                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
                     />
                     <span
                       aria-hidden
@@ -949,7 +1196,11 @@ export default function MiPanelPage() {
                 </p>
                 {data.matricula.guia !== null && (
                   <p style={{ marginTop: "0.6rem", fontSize: "0.9rem" }}>
-                    <span style={{ color: "var(--texto-suave)", fontSize: "0.78rem", fontWeight: 700 }}>GUÍA</span>
+                    <span
+                      style={{ color: "var(--texto-suave)", fontSize: "0.78rem", fontWeight: 700 }}
+                    >
+                      GUÍA
+                    </span>
                     <br />
                     {data.matricula.guia}
                   </p>
@@ -958,20 +1209,35 @@ export default function MiPanelPage() {
 
               {/* Sesión próxima */}
               <section style={card}>
-                <h2 style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--lgs-purpura)", letterSpacing: "0.05em" }}>
+                <h2
+                  style={{
+                    fontSize: "0.8rem",
+                    fontWeight: 800,
+                    color: "var(--lgs-purpura)",
+                    letterSpacing: "0.05em",
+                  }}
+                >
                   SESIÓN PRÓXIMA
                 </h2>
                 {data.proxima != null ? (
                   <>
                     <p style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: "0.35rem" }}>
-                      {data.proxima.tipo === "CLUB" ? "Club" : "Sesión"} · {fechaLarga(data.proxima.startsAt)}
+                      {data.proxima.tipo === "CLUB" ? "Club" : "Sesión"} ·{" "}
+                      {fechaLarga(data.proxima.startsAt)}
                     </p>
                     <p style={{ fontSize: "0.9rem", color: "var(--texto-suave)" }}>
                       {hora(data.proxima.startsAt)} (tu hora local)
                       {data.proxima.guia !== null && ` · con ${data.proxima.guia}`}
                     </p>
                     <div style={{ marginTop: "0.8rem" }}>
-                      <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--texto-suave)", marginBottom: "0.35rem" }}>
+                      <p
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          color: "var(--texto-suave)",
+                          marginBottom: "0.35rem",
+                        }}
+                      >
                         LINK DE INGRESO
                       </p>
                       {data.matricula.meetingUrl !== null && estadoZoomActual !== null ? (
@@ -1000,7 +1266,9 @@ export default function MiPanelPage() {
                     </div>
                   </>
                 ) : (
-                  <p style={{ fontSize: "1rem", marginTop: "0.35rem", color: "var(--texto-suave)" }}>
+                  <p
+                    style={{ fontSize: "1rem", marginTop: "0.35rem", color: "var(--texto-suave)" }}
+                  >
                     No hay próximas clases programadas.
                   </p>
                 )}
@@ -1011,14 +1279,44 @@ export default function MiPanelPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               <section id="avance" style={{ ...card, scrollMarginTop: "1rem" }}>
                 <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>Sesiones</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.6rem" }}>
+                <div
+                  style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.6rem" }}
+                >
                   {[
-                    { n: data.asistencia?.asistidas ?? 0, t: "Asistidas", c: "#1b5e20", bg: "#e8f5e9" },
-                    { n: data.asistencia?.ausentes ?? 0, t: "Ausentes", c: "#c62828", bg: "#ffebee" },
-                    { n: data.asistencia?.justificadas ?? 0, t: "Justificadas", c: "#8a6d00", bg: "#fff8e1" },
-                    { n: data.asistencia?.totalSesiones ?? 0, t: "Total", c: "#37474f", bg: "#eceff1" },
+                    {
+                      n: data.asistencia?.asistidas ?? 0,
+                      t: "Asistidas",
+                      c: "#1b5e20",
+                      bg: "#e8f5e9",
+                    },
+                    {
+                      n: data.asistencia?.ausentes ?? 0,
+                      t: "Ausentes",
+                      c: "#c62828",
+                      bg: "#ffebee",
+                    },
+                    {
+                      n: data.asistencia?.justificadas ?? 0,
+                      t: "Justificadas",
+                      c: "#8a6d00",
+                      bg: "#fff8e1",
+                    },
+                    {
+                      n: data.asistencia?.totalSesiones ?? 0,
+                      t: "Total",
+                      c: "#37474f",
+                      bg: "#eceff1",
+                    },
                   ].map((s) => (
-                    <div key={s.t} style={{ textAlign: "center", padding: "0.8rem 0.3rem", borderRadius: "0.8rem", background: s.bg }}>
+                    <div
+                      key={s.t}
+                      style={{
+                        textAlign: "center",
+                        padding: "0.8rem 0.3rem",
+                        borderRadius: "0.8rem",
+                        background: s.bg,
+                      }}
+                    >
                       <div style={{ fontSize: "1.7rem", fontWeight: 800, color: s.c }}>{s.n}</div>
                       <div style={{ fontSize: "0.68rem", fontWeight: 700, color: s.c }}>{s.t}</div>
                     </div>
@@ -1026,28 +1324,62 @@ export default function MiPanelPage() {
                 </div>
 
                 {/* Progreso del curso */}
-                <div style={{ marginTop: "1rem", display: "flex", justifyContent: "space-between", fontSize: "0.82rem", color: "var(--texto-suave)" }}>
+                <div
+                  style={{
+                    marginTop: "1rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "0.82rem",
+                    color: "var(--texto-suave)",
+                  }}
+                >
                   <span>Progreso del curso</span>
                   <span>
                     {compl} / {totalLecc} lecciones
                   </span>
                 </div>
-                <div style={{ marginTop: "0.35rem", height: "0.55rem", borderRadius: "0.3rem", background: "#eef1f7", overflow: "hidden" }}>
-                  <div style={{ width: `${totalLecc > 0 ? (compl / totalLecc) * 100 : 0}%`, height: "100%", background: colorNivel }} />
+                <div
+                  style={{
+                    marginTop: "0.35rem",
+                    height: "0.55rem",
+                    borderRadius: "0.3rem",
+                    background: "#eef1f7",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${totalLecc > 0 ? (compl / totalLecc) * 100 : 0}%`,
+                      height: "100%",
+                      background: colorNivel,
+                    }}
+                  />
                 </div>
 
                 {/* Nivel anterior / actual / próximo */}
                 <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
                   <div style={moduloBox}>
-                    <div style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}>NIVEL ANTERIOR</div>
+                    <div
+                      style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}
+                    >
+                      NIVEL ANTERIOR
+                    </div>
                     <div style={{ fontWeight: 800 }}>{nivelAnterior?.nombre ?? "Welcome"}</div>
                   </div>
                   <div style={{ ...moduloBox, borderColor: colorNivel, background: "#f3eefc" }}>
-                    <div style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}>NIVEL ACTUAL</div>
+                    <div
+                      style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}
+                    >
+                      NIVEL ACTUAL
+                    </div>
                     <div style={{ fontWeight: 800 }}>{nivelActual?.nombre ?? "—"}</div>
                   </div>
                   <div style={moduloBox}>
-                    <div style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}>NIVEL PRÓXIMO</div>
+                    <div
+                      style={{ fontSize: "0.66rem", fontWeight: 700, color: "var(--texto-suave)" }}
+                    >
+                      NIVEL PRÓXIMO
+                    </div>
                     <div style={{ fontWeight: 800 }}>{nivelProximo?.nombre ?? "—"}</div>
                   </div>
                 </div>
@@ -1055,8 +1387,16 @@ export default function MiPanelPage() {
 
               {/* Mis próximas clases (en el lugar del antiguo "¿Cómo voy?") */}
               <section id="agenda" style={{ ...card, scrollMarginTop: "1rem" }}>
-                <h2 style={{ fontSize: "1.1rem", marginBottom: "0.15rem" }}>🗓️ Mis próximas clases</h2>
-                <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", marginBottom: "0.75rem" }}>
+                <h2 style={{ fontSize: "1.1rem", marginBottom: "0.15rem" }}>
+                  🗓️ Mis próximas clases
+                </h2>
+                <p
+                  style={{
+                    fontSize: "0.78rem",
+                    color: "var(--texto-suave)",
+                    marginBottom: "0.75rem",
+                  }}
+                >
                   Sesiones y clubes de las próximas 2 semanas
                 </p>
                 {data.agenda === undefined || data.agenda.length === 0 ? (
@@ -1068,12 +1408,27 @@ export default function MiPanelPage() {
                       alto="4.5rem"
                     />
                   ) : (
-                    <p style={{ color: "var(--texto-suave)" }}>Sin clases en las próximas 2 semanas.</p>
+                    <p style={{ color: "var(--texto-suave)" }}>
+                      Sin clases en las próximas 2 semanas.
+                    </p>
                   )
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                     {data.agenda.map((ev) => (
-                      <div key={ev.sessionId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem 0.9rem", borderRadius: "0.6rem", borderLeft: `4px solid ${ev.tipo === "CLUB" ? "var(--lgs-amarillo)" : "var(--lgs-azul)"}`, background: "#fafbfe", flexWrap: "wrap", gap: "0.3rem" }}>
+                      <div
+                        key={ev.sessionId}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "0.6rem 0.9rem",
+                          borderRadius: "0.6rem",
+                          borderLeft: `4px solid ${ev.tipo === "CLUB" ? "var(--lgs-amarillo)" : "var(--lgs-azul)"}`,
+                          background: "#fafbfe",
+                          flexWrap: "wrap",
+                          gap: "0.3rem",
+                        }}
+                      >
                         <span style={{ fontWeight: 600 }}>
                           {ev.tipo === "CLUB" ? "🎉 Club" : "📘 Sesión"} · {fechaLarga(ev.startsAt)}
                         </span>
@@ -1091,8 +1446,16 @@ export default function MiPanelPage() {
                   al más antiguo. Solo el comentario para el alumno: las notas
                   privadas del equipo nunca llegan a esta pantalla. */}
               <section id="comentarios" style={{ ...card, scrollMarginTop: "1rem" }}>
-                <h2 style={{ fontSize: "1.1rem", marginBottom: "0.15rem" }}>💬 Lo que dice mi guía</h2>
-                <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", marginBottom: "0.75rem" }}>
+                <h2 style={{ fontSize: "1.1rem", marginBottom: "0.15rem" }}>
+                  💬 Lo que dice mi guía
+                </h2>
+                <p
+                  style={{
+                    fontSize: "0.78rem",
+                    color: "var(--texto-suave)",
+                    marginBottom: "0.75rem",
+                  }}
+                >
                   Comentarios de tus clases, del más reciente al más antiguo
                 </p>
                 {data.comentarios === undefined || data.comentarios.length === 0 ? (
@@ -1118,13 +1481,28 @@ export default function MiPanelPage() {
                           borderLeft: "4px solid var(--lgs-verde)",
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--texto-suave)" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: "0.5rem",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "0.78rem",
+                              fontWeight: 700,
+                              color: "var(--texto-suave)",
+                            }}
+                          >
                             {c.tipo === "CLUB" ? "🎉 Club" : `📘 Sesión ${String(c.numero)}`} ·{" "}
                             {fechaLarga(`${c.fecha}T12:00:00`)}
                           </span>
                           {c.guia !== null && (
-                            <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>{c.guia}</span>
+                            <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+                              {c.guia}
+                            </span>
                           )}
                         </div>
                         <p style={{ marginTop: "0.3rem", fontSize: "0.92rem" }}>{c.comentario}</p>
@@ -1133,10 +1511,8 @@ export default function MiPanelPage() {
                   </div>
                 )}
               </section>
-
             </div>
           </div>
-
         </main>
       )}
 
@@ -1153,7 +1529,16 @@ export default function MiPanelPage() {
           padding: "1.75rem 1.5rem 2.5rem",
         }}
       >
-        <p style={{ maxWidth: "72rem", margin: "0 auto", fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.1em", color: "var(--texto-suave)" }}>
+        <p
+          style={{
+            maxWidth: "72rem",
+            margin: "0 auto",
+            fontSize: "0.75rem",
+            fontWeight: 800,
+            letterSpacing: "0.1em",
+            color: "var(--texto-suave)",
+          }}
+        >
           🆘 ASISTENCIA LGS KIDS
         </p>
         <div
@@ -1198,12 +1583,22 @@ export default function MiPanelPage() {
                   <path d={WHATSAPP_PATH} />
                 </svg>
               </span>
-              <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#2a2f52" }}>{s.label}</span>
+              <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#2a2f52" }}>
+                {s.label}
+              </span>
               <span style={{ fontSize: "0.72rem", color: "var(--texto-suave)" }}>WhatsApp</span>
             </a>
           ))}
         </div>
-        <p style={{ maxWidth: "72rem", margin: "1.5rem auto 0", textAlign: "center", fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+        <p
+          style={{
+            maxWidth: "72rem",
+            margin: "1.5rem auto 0",
+            textAlign: "center",
+            fontSize: "0.75rem",
+            color: "var(--texto-suave)",
+          }}
+        >
           LGS Kids · lgskidsplataforma.com
         </p>
       </footer>
@@ -1325,28 +1720,78 @@ export default function MiPanelPage() {
               </button>
             </div>
 
-            <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div
+              style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}
+            >
               {/* PROGRESO del nivel actual */}
               <div style={{ ...card, boxShadow: "none", border: "1px solid #eef1f7" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "0.78rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.06em",
+                      color: "var(--texto-suave)",
+                    }}
+                  >
                     PROGRESO — NIVEL {(nivelActual?.nombre ?? "").toUpperCase()}
                   </span>
-                  <span style={{ fontSize: "1.5rem", fontWeight: 900, color: colorNivel }}>{pctNivelActual}%</span>
+                  <span style={{ fontSize: "1.5rem", fontWeight: 900, color: colorNivel }}>
+                    {pctNivelActual}%
+                  </span>
                 </div>
-                <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}>
+                <p
+                  style={{ fontSize: "0.85rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}
+                >
                   Curso {tipo} · Nivel {nivelesCompletados}/{niveles.length} completados
                 </p>
-                <div style={{ marginTop: "0.6rem", height: "0.55rem", borderRadius: "0.3rem", background: "#eef1f7", overflow: "hidden" }}>
-                  <div style={{ width: `${pctNivelActual}%`, height: "100%", background: colorNivel }} />
+                <div
+                  style={{
+                    marginTop: "0.6rem",
+                    height: "0.55rem",
+                    borderRadius: "0.3rem",
+                    background: "#eef1f7",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{ width: `${pctNivelActual}%`, height: "100%", background: colorNivel }}
+                  />
                 </div>
-                <div style={{ marginTop: "0.5rem", display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                <div
+                  style={{
+                    marginTop: "0.5rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "0.8rem",
+                    color: "var(--texto-suave)",
+                  }}
+                >
                   <span>
-                    {nivelActual?.leccionesCompletadas ?? 0} de {nivelActual?.totalLecciones ?? 0} lecciones
+                    {nivelActual?.leccionesCompletadas ?? 0} de {nivelActual?.totalLecciones ?? 0}{" "}
+                    lecciones
                   </span>
                   <span>{asistPct}% asistencia</span>
                 </div>
-                <div style={{ marginTop: "0.7rem", padding: "0.7rem 0.9rem", borderRadius: "0.6rem", background: "#f4f6fb", fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "0.7rem" }}>
+                <div
+                  style={{
+                    marginTop: "0.7rem",
+                    padding: "0.7rem 0.9rem",
+                    borderRadius: "0.6rem",
+                    background: "#f4f6fb",
+                    fontSize: "0.88rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.7rem",
+                  }}
+                >
                   {esJunior && (
                     /* La cara de Emma sigue al avance real: celebra, anima o piensa. */
                     <Personaje
@@ -1373,7 +1818,15 @@ export default function MiPanelPage() {
 
               {/* Niveles → Stages (clic para desplegar/colapsar) */}
               <div>
-                <p style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)", marginBottom: "0.6rem" }}>
+                <p
+                  style={{
+                    fontSize: "0.78rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    color: "var(--texto-suave)",
+                    marginBottom: "0.6rem",
+                  }}
+                >
                   NIVELES DEL CURSO · toca un nivel para ver sus Unidades
                 </p>
                 {listaNiveles}
@@ -1390,19 +1843,54 @@ export default function MiPanelPage() {
           role="dialog"
           aria-modal="true"
           aria-label="Mi perfil"
-          style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(8,11,24,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "2rem 1rem", overflowY: "auto" }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(8,11,24,0.55)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "2rem 1rem",
+            overflowY: "auto",
+          }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: "34rem", background: "white", borderRadius: "1rem", boxShadow: "0 20px 60px rgba(0,0,0,0.35)", overflow: "hidden" }}
+            style={{
+              width: "100%",
+              maxWidth: "34rem",
+              background: "white",
+              borderRadius: "1rem",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              overflow: "hidden",
+            }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.1rem 1.25rem", borderBottom: "1px solid #eef1f7" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "1.1rem 1.25rem",
+                borderBottom: "1px solid #eef1f7",
+              }}
+            >
               <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>👤 Mi perfil</h2>
               <button
                 type="button"
                 onClick={() => setVerPerfil(false)}
                 aria-label="Cerrar"
-                style={{ width: "2.2rem", height: "2.2rem", borderRadius: "50%", border: "1px solid #e3e7f0", background: "white", cursor: "pointer", fontSize: "1.1rem", lineHeight: 1, color: "var(--texto-suave)" }}
+                style={{
+                  width: "2.2rem",
+                  height: "2.2rem",
+                  borderRadius: "50%",
+                  border: "1px solid #e3e7f0",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: "1.1rem",
+                  lineHeight: 1,
+                  color: "var(--texto-suave)",
+                }}
               >
                 ✕
               </button>
@@ -1411,7 +1899,17 @@ export default function MiPanelPage() {
             <div style={{ padding: "1.25rem" }}>
               {/* Primera vez: se explica por qué aparece solo */}
               {fotoOfrecida && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1.1rem", padding: "0.8rem 1rem", borderRadius: "0.7rem", background: "#f4f6fb" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.8rem",
+                    marginBottom: "1.1rem",
+                    padding: "0.8rem 1rem",
+                    borderRadius: "0.7rem",
+                    background: "#f4f6fb",
+                  }}
+                >
                   {esJunior && <Personaje quien="rocky-picaro" alto="4rem" className="lgs-float" />}
                   <p style={{ fontSize: "0.9rem", fontWeight: 600 }}>
                     ¡Ponle una foto a tu perfil! Así tu guía y tus compañeros te reconocen.
@@ -1419,13 +1917,35 @@ export default function MiPanelPage() {
                 </div>
               )}
 
-              <div style={{ display: "flex", alignItems: "center", gap: "1.1rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "1.1rem",
+                  flexWrap: "wrap",
+                  marginBottom: "1.25rem",
+                }}
+              >
                 <div
-                  style={{ width: "6.5rem", height: "6.5rem", borderRadius: "50%", overflow: "hidden", background: "#eef1f7", display: "grid", placeItems: "center", flex: "0 0 auto", border: "3px solid var(--lgs-azul)" }}
+                  style={{
+                    width: "6.5rem",
+                    height: "6.5rem",
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    background: "#eef1f7",
+                    display: "grid",
+                    placeItems: "center",
+                    flex: "0 0 auto",
+                    border: "3px solid var(--lgs-azul)",
+                  }}
                 >
                   {perfil.fotoUrl !== null ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={perfil.fotoUrl} alt="Mi foto" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img
+                      src={perfil.fotoUrl}
+                      alt="Mi foto"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
                   ) : (
                     <span style={{ fontSize: "2.4rem" }} aria-hidden="true">
                       🙂
@@ -1436,12 +1956,28 @@ export default function MiPanelPage() {
                 <div style={{ flex: "1 1 12rem", minWidth: 0 }}>
                   <p style={{ fontSize: "1.15rem", fontWeight: 800 }}>{perfil.nombre}</p>
                   {perfil.usuario !== null && (
-                    <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>Usuario: {perfil.usuario}</p>
+                    <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                      Usuario: {perfil.usuario}
+                    </p>
                   )}
                   <label
-                    style={{ display: "inline-block", marginTop: "0.6rem", padding: "0.5rem 1rem", borderRadius: "0.6rem", border: "1.5px solid var(--lgs-azul)", color: "var(--lgs-azul)", fontWeight: 700, fontSize: "0.88rem", cursor: subiendoFoto ? "wait" : "pointer" }}
+                    style={{
+                      display: "inline-block",
+                      marginTop: "0.6rem",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "0.6rem",
+                      border: "1.5px solid var(--lgs-azul)",
+                      color: "var(--lgs-azul)",
+                      fontWeight: 700,
+                      fontSize: "0.88rem",
+                      cursor: subiendoFoto ? "wait" : "pointer",
+                    }}
                   >
-                    {subiendoFoto ? "Subiendo…" : perfil.tieneFoto ? "Cambiar foto" : "Subir mi foto"}
+                    {subiendoFoto
+                      ? "Subiendo…"
+                      : perfil.tieneFoto
+                        ? "Cambiar foto"
+                        : "Subir mi foto"}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -1455,27 +1991,64 @@ export default function MiPanelPage() {
                     />
                   </label>
                   {errorFoto !== null && (
-                    <p role="alert" style={{ color: "#c62828", fontSize: "0.85rem", marginTop: "0.4rem" }}>
+                    <p
+                      role="alert"
+                      style={{ color: "#c62828", fontSize: "0.85rem", marginTop: "0.4rem" }}
+                    >
                       {errorFoto}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", marginBottom: "1.25rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.4rem",
+                  marginBottom: "1.25rem",
+                }}
+              >
                 {[
-                  { t: "🎂 Cumpleaños", v: perfil.cumpleanos !== null ? fechaLarga(`${perfil.cumpleanos}T12:00:00`) : null },
+                  {
+                    t: "🎂 Cumpleaños",
+                    v:
+                      perfil.cumpleanos !== null
+                        ? fechaLarga(`${perfil.cumpleanos}T12:00:00`)
+                        : null,
+                  },
                   { t: "✉️ Correo", v: perfil.correo },
                   { t: "📞 Teléfono", v: perfil.telefono },
                 ].map((d) => (
-                  <div key={d.t} style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", padding: "0.6rem 0.9rem", borderRadius: "0.6rem", background: "#fafbfe", flexWrap: "wrap" }}>
+                  <div
+                    key={d.t}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "0.6rem",
+                      padding: "0.6rem 0.9rem",
+                      borderRadius: "0.6rem",
+                      background: "#fafbfe",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <span style={{ fontWeight: 600 }}>{d.t}</span>
-                    <span style={{ color: d.v !== null ? "inherit" : "var(--texto-suave)" }}>{d.v ?? "Sin registrar"}</span>
+                    <span style={{ color: d.v !== null ? "inherit" : "var(--texto-suave)" }}>
+                      {d.v ?? "Sin registrar"}
+                    </span>
                   </div>
                 ))}
               </div>
 
-              <p style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)", marginBottom: "0.5rem" }}>
+              <p
+                style={{
+                  fontSize: "0.78rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  color: "var(--texto-suave)",
+                  marginBottom: "0.5rem",
+                }}
+              >
                 MI APODERADO
               </p>
               {perfil.apoderado === null ? (
@@ -1488,16 +2061,30 @@ export default function MiPanelPage() {
                     { t: "📞 Teléfono", v: perfil.apoderado.telefono },
                     { t: "✉️ Correo", v: perfil.apoderado.email },
                   ].map((d) => (
-                    <div key={d.t} style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", padding: "0.6rem 0.9rem", borderRadius: "0.6rem", background: "#fafbfe", flexWrap: "wrap" }}>
+                    <div
+                      key={d.t}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "0.6rem",
+                        padding: "0.6rem 0.9rem",
+                        borderRadius: "0.6rem",
+                        background: "#fafbfe",
+                        flexWrap: "wrap",
+                      }}
+                    >
                       <span style={{ fontWeight: 600 }}>{d.t}</span>
-                      <span style={{ color: d.v !== null ? "inherit" : "var(--texto-suave)" }}>{d.v ?? "Sin registrar"}</span>
+                      <span style={{ color: d.v !== null ? "inherit" : "var(--texto-suave)" }}>
+                        {d.v ?? "Sin registrar"}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
 
               <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", marginTop: "1.1rem" }}>
-                ¿Algún dato está mal? Escríbele a tu guía o a soporte: los cambia el equipo de LGS Kids.
+                ¿Algún dato está mal? Escríbele a tu guía o a soporte: los cambia el equipo de LGS
+                Kids.
               </p>
             </div>
           </div>
@@ -1569,142 +2156,324 @@ export default function MiPanelPage() {
       )}
 
       {/* Modal "Avance": mapa del curso → islas con VoBos y premios (hotspots) */}
-      {verAvance && (() => {
-        const nivelIsla = avanceNivel !== null ? niveles.find((n) => n.codigo === avanceNivel) : null;
-        const hsMapa = data.hotspots?.mapa ?? {};
-        const hsIsla = data.hotspots?.isla ?? {};
-        return (
-          <div
-            onClick={() => (avanceNivel !== null ? setAvanceNivel(null) : setVerAvance(false))}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Avance del curso"
-            style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(8,11,24,0.7)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}
-          >
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "56rem", background: "white", borderRadius: "1rem", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", overflow: "hidden" }}>
-              {/* Encabezado */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", padding: "1rem 1.25rem", borderBottom: "1px solid #eef1f7" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
-                  {nivelIsla != null && (
-                    <button type="button" onClick={() => setAvanceNivel(null)} aria-label="Volver al mapa" style={{ border: "1px solid #e3e7f0", background: "white", borderRadius: "0.5rem", padding: "0.3rem 0.6rem", cursor: "pointer", fontWeight: 700 }}>
-                      ← Mapa
-                    </button>
-                  )}
-                  <h2 style={{ fontSize: "1.2rem", fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    🗺️ {nivelIsla != null ? `Isla ${nivelIsla.nombre}` : `Mapa del curso · ${tipo}`}
-                  </h2>
+      {verAvance &&
+        (() => {
+          const nivelIsla =
+            avanceNivel !== null ? niveles.find((n) => n.codigo === avanceNivel) : null;
+          const hsMapa = data.hotspots?.mapa ?? {};
+          const hsIsla = data.hotspots?.isla ?? {};
+          return (
+            <div
+              onClick={() => (avanceNivel !== null ? setAvanceNivel(null) : setVerAvance(false))}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Avance del curso"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 60,
+                background: "rgba(8,11,24,0.7)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "1.5rem 1rem",
+                overflowY: "auto",
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: "100%",
+                  maxWidth: "56rem",
+                  background: "white",
+                  borderRadius: "1rem",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Encabezado */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "0.5rem",
+                    padding: "1rem 1.25rem",
+                    borderBottom: "1px solid #eef1f7",
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}
+                  >
+                    {nivelIsla != null && (
+                      <button
+                        type="button"
+                        onClick={() => setAvanceNivel(null)}
+                        aria-label="Volver al mapa"
+                        style={{
+                          border: "1px solid #e3e7f0",
+                          background: "white",
+                          borderRadius: "0.5rem",
+                          padding: "0.3rem 0.6rem",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        ← Mapa
+                      </button>
+                    )}
+                    <h2
+                      style={{
+                        fontSize: "1.2rem",
+                        fontWeight: 800,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      🗺️{" "}
+                      {nivelIsla != null ? `Isla ${nivelIsla.nombre}` : `Mapa del curso · ${tipo}`}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setVerAvance(false)}
+                    aria-label="Cerrar"
+                    style={{
+                      width: "2.2rem",
+                      height: "2.2rem",
+                      borderRadius: "50%",
+                      border: "1px solid #e3e7f0",
+                      background: "white",
+                      cursor: "pointer",
+                      fontSize: "1.1rem",
+                      color: "var(--texto-suave)",
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button type="button" onClick={() => setVerAvance(false)} aria-label="Cerrar" style={{ width: "2.2rem", height: "2.2rem", borderRadius: "50%", border: "1px solid #e3e7f0", background: "white", cursor: "pointer", fontSize: "1.1rem", color: "var(--texto-suave)" }}>
-                  ✕
-                </button>
-              </div>
 
-              <div style={{ padding: "1.1rem 1.25rem 1.4rem" }}>
-                {nivelIsla == null ? (
-                  /* —— Vista mapa del curso —— */
-                  <>
-                    {data.mapaCursoUrl != null ? (
-                      <div style={{ position: "relative", borderRadius: "0.9rem", overflow: "hidden", border: "1px solid #e3e7f0" }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={data.mapaCursoUrl} alt={`Mapa del curso ${tipo}`} style={{ display: "block", width: "100%", height: "auto" }} />
-                        {esJunior &&
-                          (() => {
-                            // Simba se para en la unidad que el niño está cursando.
-                            const actual = niveles.find((n) => n.estado === "EN_CURSO");
-                            if (actual === undefined) return null;
-                            const hs = hsMapa[actual.codigo];
+                <div style={{ padding: "1.1rem 1.25rem 1.4rem" }}>
+                  {nivelIsla == null ? (
+                    /* —— Vista mapa del curso —— */
+                    <>
+                      {data.mapaCursoUrl != null ? (
+                        <div
+                          style={{
+                            position: "relative",
+                            borderRadius: "0.9rem",
+                            overflow: "hidden",
+                            border: "1px solid #e3e7f0",
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={data.mapaCursoUrl}
+                            alt={`Mapa del curso ${tipo}`}
+                            style={{ display: "block", width: "100%", height: "auto" }}
+                          />
+                          {esJunior &&
+                            (() => {
+                              // Simba se para en la unidad que el niño está cursando.
+                              const actual = niveles.find((n) => n.estado === "EN_CURSO");
+                              if (actual === undefined) return null;
+                              const hs = hsMapa[actual.codigo];
+                              if (hs === undefined) return null;
+                              const p =
+                                hs.unidades[actual.leccionesCompletadas] ??
+                                hs.centro ??
+                                hs.unidades.at(-1);
+                              if (p === undefined || p === null) return null;
+                              return marca(
+                                "simba-aqui",
+                                p,
+                                <Personaje quien="simba" alto="3.6rem" className="lgs-float" />,
+                              );
+                            })()}
+                          {niveles.map((n) => {
+                            const hs = hsMapa[n.codigo];
                             if (hs === undefined) return null;
-                            const p = hs.unidades[actual.leccionesCompletadas] ?? hs.centro ?? hs.unidades.at(-1);
-                            if (p === undefined || p === null) return null;
-                            return marca("simba-aqui", p, <Personaje quien="simba" alto="3.6rem" className="lgs-float" />);
-                          })()}
+                            const done = n.leccionesCompletadas;
+                            const completo = n.estado === "COMPLETADO";
+                            return (
+                              <span key={n.codigo}>
+                                {rutaSVG([
+                                  ...hs.unidades,
+                                  ...(hs.centro != null ? [hs.centro] : []),
+                                ])}
+                                {hs.unidades
+                                  .slice(0, done)
+                                  .map((p, i) => marca(`${n.codigo}-u${i}`, p, voboEl("2.2rem")))}
+                                {completo &&
+                                  hs.centro != null &&
+                                  marca(`${n.codigo}-c`, hs.centro, voboEl("4.2rem"))}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            padding: "2rem",
+                            textAlign: "center",
+                            border: "1px dashed #d8dce6",
+                            borderRadius: "0.9rem",
+                            color: "var(--texto-suave)",
+                          }}
+                        >
+                          Aún no hay “Mapa del curso completo” cargado. (Lo sube tu equipo en
+                          Mantenimiento Académico.)
+                        </div>
+                      )}
+                      {/* Islas: botones para abrir cada nivel */}
+                      <div
+                        style={{
+                          marginTop: "0.9rem",
+                          display: "flex",
+                          gap: "0.5rem",
+                          flexWrap: "wrap",
+                        }}
+                      >
                         {niveles.map((n) => {
-                          const hs = hsMapa[n.codigo];
-                          if (hs === undefined) return null;
-                          const done = n.leccionesCompletadas;
-                          const completo = n.estado === "COMPLETADO";
+                          const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
+                          const icon =
+                            n.estado === "COMPLETADO"
+                              ? "🏅"
+                              : n.estado === "EN_CURSO"
+                                ? "▶️"
+                                : "🔒";
                           return (
-                            <span key={n.codigo}>
-                              {rutaSVG([...hs.unidades, ...(hs.centro != null ? [hs.centro] : [])])}
-                              {hs.unidades.slice(0, done).map((p, i) => marca(`${n.codigo}-u${i}`, p, voboEl("2.2rem")))}
-                              {completo && hs.centro != null && marca(`${n.codigo}-c`, hs.centro, voboEl("4.2rem"))}
-                            </span>
+                            <button
+                              key={n.codigo}
+                              type="button"
+                              onClick={() => setAvanceNivel(n.codigo)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.4rem",
+                                padding: "0.45rem 0.8rem",
+                                borderRadius: "0.6rem",
+                                border: `1px solid ${c}`,
+                                borderLeft: `5px solid ${c}`,
+                                background: "white",
+                                cursor: "pointer",
+                                fontWeight: 700,
+                                fontSize: "0.85rem",
+                                opacity: n.estado === "PENDIENTE" ? 0.7 : 1,
+                              }}
+                            >
+                              {icon} {n.nombre}{" "}
+                              <span style={{ color: "var(--texto-suave)", fontWeight: 600 }}>
+                                {n.leccionesCompletadas}/{n.totalLecciones}
+                              </span>
+                            </button>
                           );
                         })}
                       </div>
-                    ) : (
-                      <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed #d8dce6", borderRadius: "0.9rem", color: "var(--texto-suave)" }}>
-                        Aún no hay “Mapa del curso completo” cargado. (Lo sube tu equipo en Mantenimiento Académico.)
-                      </div>
-                    )}
-                    {/* Islas: botones para abrir cada nivel */}
-                    <div style={{ marginTop: "0.9rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                      {niveles.map((n) => {
-                        const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
-                        const icon = n.estado === "COMPLETADO" ? "🏅" : n.estado === "EN_CURSO" ? "▶️" : "🔒";
-                        return (
-                          <button key={n.codigo} type="button" onClick={() => setAvanceNivel(n.codigo)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.45rem 0.8rem", borderRadius: "0.6rem", border: `1px solid ${c}`, borderLeft: `5px solid ${c}`, background: "white", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", opacity: n.estado === "PENDIENTE" ? 0.7 : 1 }}>
-                            {icon} {n.nombre} <span style={{ color: "var(--texto-suave)", fontWeight: 600 }}>{n.leccionesCompletadas}/{n.totalLecciones}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                ) : (
-                  /* —— Vista isla del nivel —— */
-                  (() => {
-                    const n = nivelIsla;
-                    const banner = data.bannersNivel?.[n.codigo] ?? data.imagenCursoUrl ?? null;
-                    const bloqueado = n.estado === "PENDIENTE";
-                    const completo = n.estado === "COMPLETADO";
-                    const hs = hsIsla[n.codigo];
-                    const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
-                    return (
-                      <>
-                        <div style={{ position: "relative", borderRadius: "0.9rem", overflow: "hidden", border: "1px solid #e3e7f0", background: banner == null ? `linear-gradient(140deg, ${c} 0%, #1b2140 130%)` : "#0a0e1e", aspectRatio: banner == null ? "16 / 9" : undefined, filter: bloqueado ? "grayscale(1) brightness(0.92)" : "none" }}>
-                          {banner != null && (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={banner} alt={`Isla ${n.nombre}`} style={{ display: "block", width: "100%", height: "auto" }} />
-                          )}
-                          {hs !== undefined && rutaSVG([...hs.unidades, ...(hs.premio != null ? [hs.premio] : [])])}
-                          {!bloqueado && hs !== undefined && (
-                            <>
-                              {hs.unidades.slice(0, n.leccionesCompletadas).map((p, i) => marca(`u${i}`, p, voboEl("2.8rem")))}
-                              {/* Unidad actual: aro que late */}
-                              {n.estado === "EN_CURSO" &&
-                                hs.unidades[n.leccionesCompletadas] != null &&
-                                marca(
-                                  "cur",
-                                  hs.unidades[n.leccionesCompletadas]!,
-                                  <span className="lgs-ring" style={{ display: "block", width: "1.9rem", height: "1.9rem", borderRadius: "50%", border: "3px solid var(--lgs-purpura)" }} />,
-                                )}
-                              {/* Premio: solo VoBo cuando el nivel está COMPLETO (el banner ya muestra el premio) */}
-                              {completo && hs.premio != null && marca("prem", hs.premio, voboEl("3.8rem"))}
-                            </>
-                          )}
-                          {bloqueado && (
-                            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", zIndex: 2 }}>
-                              <span style={{ fontSize: "2.5rem" }}>🔒</span>
-                            </div>
-                          )}
-                        </div>
-                        <p style={{ marginTop: "0.7rem", fontSize: "0.9rem", color: "var(--texto-suave)" }}>
-                          {bloqueado
-                            ? "Aún no llegas a este nivel."
-                            : completo
-                              ? "¡Nivel completado! El VoBo corona el premio."
-                              : `Vas ${n.leccionesCompletadas}/${n.totalLecciones} unidades. Las vistas llevan un VoBo.`}
-                          {hs === undefined && !bloqueado && " (Las posiciones se configuran en el editor de mapa.)"}
-                        </p>
-                      </>
-                    );
-                  })()
-                )}
+                    </>
+                  ) : (
+                    /* —— Vista isla del nivel —— */
+                    (() => {
+                      const n = nivelIsla;
+                      const banner = data.bannersNivel?.[n.codigo] ?? data.imagenCursoUrl ?? null;
+                      const bloqueado = n.estado === "PENDIENTE";
+                      const completo = n.estado === "COMPLETADO";
+                      const hs = hsIsla[n.codigo];
+                      const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
+                      return (
+                        <>
+                          <div
+                            style={{
+                              position: "relative",
+                              borderRadius: "0.9rem",
+                              overflow: "hidden",
+                              border: "1px solid #e3e7f0",
+                              background:
+                                banner == null
+                                  ? `linear-gradient(140deg, ${c} 0%, #1b2140 130%)`
+                                  : "#0a0e1e",
+                              aspectRatio: banner == null ? "16 / 9" : undefined,
+                              filter: bloqueado ? "grayscale(1) brightness(0.92)" : "none",
+                            }}
+                          >
+                            {banner != null && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={banner}
+                                alt={`Isla ${n.nombre}`}
+                                style={{ display: "block", width: "100%", height: "auto" }}
+                              />
+                            )}
+                            {hs !== undefined &&
+                              rutaSVG([...hs.unidades, ...(hs.premio != null ? [hs.premio] : [])])}
+                            {!bloqueado && hs !== undefined && (
+                              <>
+                                {hs.unidades
+                                  .slice(0, n.leccionesCompletadas)
+                                  .map((p, i) => marca(`u${i}`, p, voboEl("2.8rem")))}
+                                {/* Unidad actual: aro que late */}
+                                {n.estado === "EN_CURSO" &&
+                                  hs.unidades[n.leccionesCompletadas] != null &&
+                                  marca(
+                                    "cur",
+                                    hs.unidades[n.leccionesCompletadas]!,
+                                    <span
+                                      className="lgs-ring"
+                                      style={{
+                                        display: "block",
+                                        width: "1.9rem",
+                                        height: "1.9rem",
+                                        borderRadius: "50%",
+                                        border: "3px solid var(--lgs-purpura)",
+                                      }}
+                                    />,
+                                  )}
+                                {/* Premio: solo VoBo cuando el nivel está COMPLETO (el banner ya muestra el premio) */}
+                                {completo &&
+                                  hs.premio != null &&
+                                  marca("prem", hs.premio, voboEl("3.8rem"))}
+                              </>
+                            )}
+                            {bloqueado && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  display: "grid",
+                                  placeItems: "center",
+                                  zIndex: 2,
+                                }}
+                              >
+                                <span style={{ fontSize: "2.5rem" }}>🔒</span>
+                              </div>
+                            )}
+                          </div>
+                          <p
+                            style={{
+                              marginTop: "0.7rem",
+                              fontSize: "0.9rem",
+                              color: "var(--texto-suave)",
+                            }}
+                          >
+                            {bloqueado
+                              ? "Aún no llegas a este nivel."
+                              : completo
+                                ? "¡Nivel completado! El VoBo corona el premio."
+                                : `Vas ${n.leccionesCompletadas}/${n.totalLecciones} unidades. Las vistas llevan un VoBo.`}
+                            {hs === undefined &&
+                              !bloqueado &&
+                              " (Las posiciones se configuran en el editor de mapa.)"}
+                          </p>
+                        </>
+                      );
+                    })()
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
     </div>
   );
 }

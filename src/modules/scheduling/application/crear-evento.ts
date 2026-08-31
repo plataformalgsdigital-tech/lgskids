@@ -5,11 +5,7 @@ import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { OPERATIONAL_TIMEZONES, wallTimeToUtc } from "@/platform/time";
-import {
-  MENSAJE_ZOOM_INVALIDO,
-  esSalaZoomValida,
-  normalizarSalaZoom,
-} from "../domain/zoom-link";
+import { MENSAJE_ZOOM_INVALIDO, esSalaZoomValida, normalizarSalaZoom } from "../domain/zoom-link";
 
 /**
  * Evento creado A MANO desde el calendario (sesión extra, club o taller).
@@ -353,8 +349,7 @@ export async function crearEventoAdmin(input: {
     throw new ValidationError("Elige al menos un guía: si no, nadie vería el evento.");
   }
 
-  const timezone =
-    OPERATIONAL_TIMEZONES[input.pais as keyof typeof OPERATIONAL_TIMEZONES] ?? null;
+  const timezone = OPERATIONAL_TIMEZONES[input.pais as keyof typeof OPERATIONAL_TIMEZONES] ?? null;
   if (timezone === null) {
     throw new ValidationError(`País sin zona horaria conocida: ${input.pais}.`);
   }

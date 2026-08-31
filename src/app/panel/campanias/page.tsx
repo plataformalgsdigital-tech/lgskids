@@ -116,11 +116,7 @@ const PAIS_DE_GRUPO: Record<string, string> = { "01": "CL", "02": "CO" };
  * tipo y grupo elegidos (JUNIOR/YOUNGSTER Salón 01..06). El horario (bloques)
  * y el país salen del catálogo; guía y cupo se ajustan aquí.
  */
-function salonesDesdeCatalogo(
-  tipo: TipoCurso,
-  grupo: string,
-  catalogo: CatHorario[],
-): SalonForm[] {
+function salonesDesdeCatalogo(tipo: TipoCurso, grupo: string, catalogo: CatHorario[]): SalonForm[] {
   return catalogo
     .filter((h) => h.tipoCurso === tipo && h.grupoPais === grupo && h.activo)
     .sort((a, b) => a.salonNumero.localeCompare(b.salonNumero))
@@ -176,7 +172,9 @@ function SalonCard(props: {
       }}
     >
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 12rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 12rem" }}
+        >
           <span style={{ fontSize: "0.72rem", fontWeight: 600 }}>Nombre</span>
           <input
             value={salon.nombre}
@@ -186,7 +184,9 @@ function SalonCard(props: {
             style={inputStyle}
           />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 11rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 11rem" }}
+        >
           <span style={{ fontSize: "0.72rem", fontWeight: 600 }}>Guía</span>
           <select
             value={salon.guiaUserId}
@@ -201,7 +201,9 @@ function SalonCard(props: {
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem", width: "4.5rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.15rem", width: "4.5rem" }}
+        >
           <span style={{ fontSize: "0.72rem", fontWeight: 600 }}>Cupo</span>
           <input
             type="number"
@@ -403,7 +405,10 @@ export default function CampaniasPage() {
   }
 
   /** Crea la campaña (una sola vez) y devuelve su id + el mapa tipo→courseId. */
-  async function asegurarCampania(): Promise<{ id: string; byTipo: Record<string, string> } | null> {
+  async function asegurarCampania(): Promise<{
+    id: string;
+    byTipo: Record<string, string>;
+  } | null> {
     if (campaignId !== null) return { id: campaignId, byTipo: courseByTipo };
     const resC = await apiFetch("/api/catalog/campaigns", {
       method: "POST",
@@ -486,7 +491,8 @@ export default function CampaniasPage() {
     // Se permite 0 salones (la campaña se crea igual; los salones se pueden
     // agregar luego). Solo se validan los bloques de los que sí haya.
     for (const s of lista) {
-      if (s.slots.length < 1) return `El salón "${s.nombre}" necesita al menos un bloque de horario.`;
+      if (s.slots.length < 1)
+        return `El salón "${s.nombre}" necesita al menos un bloque de horario.`;
     }
     return null;
   }
@@ -620,7 +626,9 @@ export default function CampaniasPage() {
           <p style={{ width: "100%", margin: 0, fontWeight: 700, color: "var(--lgs-azul)" }}>
             Paso 1 de {totalPasos} · Datos de la campaña
           </p>
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "2 1 12rem" }}>
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "2 1 12rem" }}
+          >
             <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Nombre</span>
             <input
               value={nombre}
@@ -657,7 +665,9 @@ export default function CampaniasPage() {
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Fin de campaña (12 meses · editable)</span>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+              Fin de campaña (12 meses · editable)
+            </span>
             <input
               type="date"
               value={fin}
@@ -683,11 +693,11 @@ export default function CampaniasPage() {
             {puedeSalones ? "Siguiente: salones Junior →" : creando ? "Creando…" : "Crear campaña"}
           </button>
           <p style={{ width: "100%", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-            La campaña dura 12 meses (fin editable). Las sesiones del curso corren desde el inicio del
-            curso hasta el fin de la campaña; el cierre de matrícula es 3 semanas después del inicio
-            del curso (hasta ahí es visible en el wizard de contratos). Se generan los cursos Junior y
-            Youngster con sus 4 niveles, 4 lecciones por nivel y su Level Up. Los salones se crean
-            después: primero Junior, luego Youngster.
+            La campaña dura 12 meses (fin editable). Las sesiones del curso corren desde el inicio
+            del curso hasta el fin de la campaña; el cierre de matrícula es 3 semanas después del
+            inicio del curso (hasta ahí es visible en el wizard de contratos). Se generan los cursos
+            Junior y Youngster con sus 4 niveles, 4 lecciones por nivel y su Level Up. Los salones
+            se crean después: primero Junior, luego Youngster.
           </p>
           {error !== null && (
             <p role="alert" style={{ width: "100%", color: "#c62828", fontSize: "0.9rem" }}>
@@ -730,8 +740,22 @@ export default function CampaniasPage() {
                     Paso {esJunior ? 2 : 3} de {totalPasos} · Salones {tipoTexto} de «{nombre}» (
                     {lista.length})
                   </p>
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        fontSize: "0.8rem",
+                      }}
+                    >
                       <span style={{ fontWeight: 600 }}>País:</span>
                       <select
                         value={grupoSalones}
@@ -748,7 +772,9 @@ export default function CampaniasPage() {
                     </label>
                     <button
                       type="button"
-                      onClick={() => setLista(salonesDesdeCatalogo(plantillaTipo, grupoSalones, catalogo))}
+                      onClick={() =>
+                        setLista(salonesDesdeCatalogo(plantillaTipo, grupoSalones, catalogo))
+                      }
                       disabled={creando}
                       style={{ ...inputStyle, cursor: "pointer" }}
                     >
@@ -766,7 +792,9 @@ export default function CampaniasPage() {
                             cupo: "15",
                             pais: PAIS_DE_GRUPO[grupoSalones] ?? "CL",
                             meetingUrl: "",
-                            slots: [{ tipo: "SESION", diaSemana: 1, horaLocal: "18:00", duracionMin: 60 }],
+                            slots: [
+                              { tipo: "SESION", diaSemana: 1, horaLocal: "18:00", duracionMin: 60 },
+                            ],
                           },
                         ])
                       }
@@ -836,7 +864,10 @@ export default function CampaniasPage() {
                           type="button"
                           onClick={() => void submitJunior()}
                           disabled={creando}
-                          style={{ ...btnPrimario, background: creando ? "#9e9e9e" : "var(--lgs-verde)" }}
+                          style={{
+                            ...btnPrimario,
+                            background: creando ? "#9e9e9e" : "var(--lgs-verde)",
+                          }}
                         >
                           {creando
                             ? "Creando campaña y salones Junior…"
@@ -858,7 +889,10 @@ export default function CampaniasPage() {
                         type="button"
                         onClick={() => void submitYoungster()}
                         disabled={creando}
-                        style={{ ...btnPrimario, background: creando ? "#9e9e9e" : "var(--lgs-verde)" }}
+                        style={{
+                          ...btnPrimario,
+                          background: creando ? "#9e9e9e" : "var(--lgs-verde)",
+                        }}
                       >
                         {creando
                           ? "Creando salones Youngster…"

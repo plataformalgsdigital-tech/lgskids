@@ -76,7 +76,11 @@ export async function subirArte(input: {
 }
 
 /** id del arte vigente para la clave del tipo, o null si no hay. */
-export async function arteId(tipo: ArteTipo, curso?: string, nivel?: string): Promise<string | null> {
+export async function arteId(
+  tipo: ArteTipo,
+  curso?: string,
+  nivel?: string,
+): Promise<string | null> {
   if (!claveValida(tipo, curso, nivel)) return null;
   const archivos = await listarArchivos({
     entidad: ENTIDAD_POR_TIPO[tipo],

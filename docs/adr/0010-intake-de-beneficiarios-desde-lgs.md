@@ -9,7 +9,7 @@ Los contratos de los programas de adultos se venden/gestionan en **LGS/MOSAICO**
 Cuando un contrato incluye un **beneficiario niño**, ese niño debe quedar
 registrado en KIDS contra una campaña abierta, su tipo de curso (por edad) y un
 salón con cupo, **reteniendo el cupo** hasta que se apruebe. El ADR-0008 asumía
-que el contacto con LGS era solo el *egreso* Youngster→LGS (manual, sin HMAC) y
+que el contacto con LGS era solo el _egreso_ Youngster→LGS (manual, sin HMAC) y
 que los contratos "nacen en KIDS". Este flujo agrega una **entrada desde LGS**.
 
 ## Decisión

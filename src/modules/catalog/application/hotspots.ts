@@ -40,18 +40,26 @@ function normPunto(p: unknown): Punto | null {
 function normData(raw: unknown): HotspotData {
   const o = (raw ?? {}) as { unidades?: unknown; premio?: unknown; centro?: unknown };
   const unidades = Array.isArray(o.unidades)
-    ? o.unidades.map(normPunto).filter((x): x is Punto => x !== null).slice(0, 8)
+    ? o.unidades
+        .map(normPunto)
+        .filter((x): x is Punto => x !== null)
+        .slice(0, 8)
     : [];
   return { unidades, premio: normPunto(o.premio), centro: normPunto(o.centro) };
 }
 
 function validar(scope: string, curso: string, nivel: string): void {
-  if (!(SCOPES as readonly string[]).includes(scope)) throw new ValidationError(`Scope inválido: ${scope}.`);
+  if (!(SCOPES as readonly string[]).includes(scope))
+    throw new ValidationError(`Scope inválido: ${scope}.`);
   if (!CURSOS.includes(curso)) throw new ValidationError(`Curso inválido: ${curso}.`);
   if (!NIVELES_CODIGO.includes(nivel)) throw new ValidationError(`Nivel inválido: ${nivel}.`);
 }
 
-export async function getHotspots(scope: string, curso: string, nivel: string): Promise<HotspotData> {
+export async function getHotspots(
+  scope: string,
+  curso: string,
+  nivel: string,
+): Promise<HotspotData> {
   validar(scope, curso, nivel);
   return normData(await getHotspotData(scope, curso, nivel));
 }

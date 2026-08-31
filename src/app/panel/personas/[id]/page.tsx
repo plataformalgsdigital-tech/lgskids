@@ -157,16 +157,27 @@ export default function DetalleNinoPage() {
             </h1>
             <p style={{ margin: "0.4rem 0 0", color: "var(--texto-suave)", fontSize: "0.9rem" }}>
               ID: <strong>{nino.docNumero}</strong> · Contrato:{" "}
-              <strong>{nino.externalRef ?? (nino.contratoNumero !== null ? `N° ${nino.contratoNumero}` : "—")}</strong>{" "}
-              · Programa: <strong>{nino.campania ?? "—"}</strong> ({cursoLabel(nino.curso)}) · Estado:{" "}
-              <span style={badge(nino.estado === "ACTIVA" ? "#e8f5e9" : "#eceff1", nino.estado === "ACTIVA" ? "#1b5e20" : "#5a6172")}>
+              <strong>
+                {nino.externalRef ??
+                  (nino.contratoNumero !== null ? `N° ${nino.contratoNumero}` : "—")}
+              </strong>{" "}
+              · Programa: <strong>{nino.campania ?? "—"}</strong> ({cursoLabel(nino.curso)}) ·
+              Estado:{" "}
+              <span
+                style={badge(
+                  nino.estado === "ACTIVA" ? "#e8f5e9" : "#eceff1",
+                  nino.estado === "ACTIVA" ? "#1b5e20" : "#5a6172",
+                )}
+              >
                 {nino.estado}
               </span>
             </p>
           </div>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
             <span style={badge("#ede7f6", "#4527a0")}>BENEFICIARIO</span>
-            <span style={badge("#e3f2fd", "#0d47a1")}>{PAIS_NOMBRE[nino.countryCode] ?? nino.countryCode}</span>
+            <span style={badge("#e3f2fd", "#0d47a1")}>
+              {PAIS_NOMBRE[nino.countryCode] ?? nino.countryCode}
+            </span>
             <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
               Próxima sesión: <strong>{nino.proximaSesion ?? "sin sesión futura"}</strong>
             </span>
@@ -193,11 +204,24 @@ export default function DetalleNinoPage() {
 
       {/* Información académica */}
       <section style={{ ...card, marginTop: "1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+          }}
+        >
           <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Información académica</h2>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             {nino.meetingUrl !== null && (
-              <a href={nino.meetingUrl} target="_blank" rel="noreferrer" style={{ fontSize: "0.85rem" }}>
+              <a
+                href={nino.meetingUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: "0.85rem" }}
+              >
                 ▶ Ir a la clase
               </a>
             )}
@@ -220,7 +244,9 @@ export default function DetalleNinoPage() {
       <section style={{ ...card, marginTop: "1rem" }}>
         <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Contrato</h2>
         <Grid>
-          <Dato etiqueta="N° interno">{nino.contratoNumero !== null ? `N° ${nino.contratoNumero}` : "—"}</Dato>
+          <Dato etiqueta="N° interno">
+            {nino.contratoNumero !== null ? `N° ${nino.contratoNumero}` : "—"}
+          </Dato>
           <Dato etiqueta="N° LGS">{nino.externalRef ?? "—"}</Dato>
           <Dato etiqueta="Curso">{cursoLabel(nino.tipoCurso)}</Dato>
           <Dato etiqueta="Inicio">{nino.inicio ?? "—"}</Dato>
@@ -236,13 +262,21 @@ export default function DetalleNinoPage() {
           Apoderado{nino.apoderados.length !== 1 ? "s" : ""}
         </h2>
         {nino.apoderados.length === 0 ? (
-          <p style={{ color: "var(--texto-suave)", marginTop: "0.6rem" }}>Sin apoderados registrados.</p>
+          <p style={{ color: "var(--texto-suave)", marginTop: "0.6rem" }}>
+            Sin apoderados registrados.
+          </p>
         ) : (
-          <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div
+            style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
+          >
             {nino.apoderados.map((a, i) => (
               <div
                 key={i}
-                style={{ padding: "0.6rem 0.85rem", border: "1px solid #edf0f6", borderRadius: "0.6rem" }}
+                style={{
+                  padding: "0.6rem 0.85rem",
+                  border: "1px solid #edf0f6",
+                  borderRadius: "0.6rem",
+                }}
               >
                 <strong>{a.nombre}</strong>
                 {a.parentesco !== null && (

@@ -38,14 +38,14 @@ del salón, nunca de una acción del estudiante.
   (comercial) + `inicio del curso`; `fin` = inicio + **12 meses** (EDITABLE
   vía `PATCH /api/catalog/campaigns/[id]` → `actualizarFechasCampania`; NO
   toca `final_curso`). `final_venta` (cierre de matrícula) = inicio del curso
-  + **3 semanas**. El curso arranca en su fecha; `final_curso` = fin de campaña
-  (nominal, NUNCA reescrito). Estado de campaña SIEMPRE derivado por fecha
-  (nunca almacenado): **EN_MATRÍCULA** hasta `final_venta` (única visible en el
-  wizard de contratos y en el intake, que ya filtran EN_MATRICULA) → **ACTIVA**
-  → **CERRADA/Inactiva** al pasar `fin`. Fechas DATE puro leído con `::text`.
-  Permisos: `catalogo.gestionar` (admin, coordinador) y `catalogo.ver`
-  (+ guía). UI: /panel/campanias (wizard: campaña + crea JUNIOR/YOUNGSTER
-  Salón 1–6 DESDE EL CATÁLOGO de horarios por número/grupo).
+  - **3 semanas**. El curso arranca en su fecha; `final_curso` = fin de campaña
+    (nominal, NUNCA reescrito). Estado de campaña SIEMPRE derivado por fecha
+    (nunca almacenado): **EN_MATRÍCULA** hasta `final_venta` (única visible en el
+    wizard de contratos y en el intake, que ya filtran EN_MATRICULA) → **ACTIVA**
+    → **CERRADA/Inactiva** al pasar `fin`. Fechas DATE puro leído con `::text`.
+    Permisos: `catalogo.gestionar` (admin, coordinador) y `catalogo.ver`
+    (+ guía). UI: /panel/campanias (wizard: campaña + crea JUNIOR/YOUNGSTER
+    Salón 1–6 DESDE EL CATÁLOGO de horarios por número/grupo).
 - **Referencia curricular (2026-08-25)**: evaluada la tabla plana `NIVELES` de
   MOSAICO; en KIDS se materializa como **tabla MAESTRA `catalog_curso`**
   (migraciones `20260825000001`/`...002`), INDEPENDIENTE de campañas: una fila
@@ -67,8 +67,8 @@ del salón, nunca de una acción del estudiante.
   **Gestión de Contenido** (`/panel/mantenimiento-cursos/gestion-contenido`, estilo
   MOSAICO): editor guiado por Curso→Nivel que edita el temario y la **evaluación de
   cada lección con VARIOS cuestionarios** (`quiz = { cuestionarios: [{titulo, minutos,
-  preguntas: [{tipo: opcion_multiple|verdadero_falso|respuesta_escrita, enunciado,
-  opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada editor
+preguntas: [{tipo: opcion_multiple|verdadero_falso|respuesta_escrita, enunciado,
+opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada editor
   define su forma (Referencia guarda un arreglo de preguntas; Gestión de Contenido, los
   cuestionarios). La migración `20260825000000` había puesto la
   referencia en `catalog_lesson` (por campaña) — se RETIRÓ (superada por
@@ -180,12 +180,12 @@ del salón, nunca de una acción del estudiante.
   /mi-panel si el usuario es alumno (y no staff), al /panel en otro caso.
 - **Diseño (2026-08-25, estilo MOSAICO)**: /mi-panel a 2 columnas — izquierda:
   banner del curso + info + sesión próxima (link Zoom); derecha: Sesiones (tiles)
-  + progreso + nivel anterior/actual/próximo + "¿Cómo voy?". **Imagen de portada
-  por (curso, nivel)** (`/panel/mantenimiento-cursos/imagenes`): reutiliza el
-  módulo `files` (entidad `catalog_imagen_curso`, entidadId `CURSO:NIVEL`, la
-  última subida es la vigente); subir=`catalogo.gestionar`, servir=cualquier
-  autenticado (arte curricular, no dato de menores). El dashboard resuelve
-  `imagenCursoUrl` según el nivel actual; si falta, banner de color por nivel.
+  - progreso + nivel anterior/actual/próximo + "¿Cómo voy?". **Imagen de portada
+    por (curso, nivel)** (`/panel/mantenimiento-cursos/imagenes`): reutiliza el
+    módulo `files` (entidad `catalog_imagen_curso`, entidadId `CURSO:NIVEL`, la
+    última subida es la vigente); subir=`catalogo.gestionar`, servir=cualquier
+    autenticado (arte curricular, no dato de menores). El dashboard resuelve
+    `imagenCursoUrl` según el nivel actual; si falta, banner de color por nivel.
 - **Nav superior + modales (2026-08-26, estilo MOSAICO)**: bajo el encabezado hay
   una barra (`NAV_ITEMS`) con botón verde **Inscripción Clubes** y accesos
   Actividades/Recursos/Material/**Historial**/**Avance**/**¿Cómo voy?**/Instructivos/
@@ -241,9 +241,9 @@ del salón, nunca de una acción del estudiante.
   `replace`. No volver a poner `router.replace` en el cierre de sesión.
 - **Acceso a Zoom (2026-08-25, replicado de MOSAICO)**: lógica PURA en
   `src/ui/zoom-window.ts` (cliente): ventana de ingreso `[inicio − 5 min,
-  inicio + 15 min]`; tras entrar, **reconexión** hasta 10 min antes del fin
+inicio + 15 min]`; tras entrar, **reconexión** hasta 10 min antes del fin
   (fin = inicio + `duracion_min`). Estados `espera → disponible → vencido |
-  cerrado`. Iconos en `src/ui/ZoomAccessButton.tsx`: cámara azul + check verde
+cerrado`. Iconos en `src/ui/ZoomAccessButton.tsx`: cámara azul + check verde
   (disponible, enlace clicable) / cámara gris + reloj naranja (bloqueado), con
   mensaje por estado. Se compara contra el INSTANTE `starts_at` (UTC), no la
   hora local. El "entrar a tiempo" solo habilita la reconexión (recordada por
@@ -515,7 +515,7 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 - Docker Desktop SÍ está instalado; `docker compose -f infra/docker/...` levanta
   Postgres local.
 - **Escopar el registro de intentos de quiz al salón del guía**: `POST
-  /api/assessment/attempts` valida `evaluaciones.gestionar` pero NO que el niño
+/api/assessment/attempts` valida `evaluaciones.gestionar` pero NO que el niño
   pertenezca a un salón del guía (a diferencia de asistencia, que ya lo hace vía
   `verificarAccesoGuia`). El intento no lleva sesión/salón, así que hay que
   derivar la matrícula ACTIVA del niño y comparar `guia_user_id` con el actor

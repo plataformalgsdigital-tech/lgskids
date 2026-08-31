@@ -6,7 +6,14 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 interface SesionDetalle {
-  sesion: { id: string; tipo: string; fecha: string; horaLocal: string; numero: number; duracionMin: number };
+  sesion: {
+    id: string;
+    tipo: string;
+    fecha: string;
+    horaLocal: string;
+    numero: number;
+    duracionMin: number;
+  };
   salon: {
     id: string;
     nombre: string;
@@ -210,8 +217,7 @@ export default function ResumenSesionPage() {
   const asistieron = (inscritos ?? []).filter((i) => i.marca?.estado === "PRESENTE").length;
   const totalInscritos = inscritos?.length ?? 0;
   const lleno = totalInscritos >= detalle.salon.cupo;
-  const nombreEvento =
-    detalle.sesion.tipo === "CLUB" ? "Club" : `Sesión ${detalle.sesion.numero}`;
+  const nombreEvento = detalle.sesion.tipo === "CLUB" ? "Club" : `Sesión ${detalle.sesion.numero}`;
 
   return (
     <main style={{ padding: "2rem", maxWidth: "62rem", margin: "0 auto" }}>
@@ -293,7 +299,9 @@ export default function ResumenSesionPage() {
           <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Información del guía</h2>
           {detalle.guia !== null ? (
             <>
-              <p style={{ margin: "0.4rem 0" }}>👤 <strong>{detalle.guia.nombre}</strong></p>
+              <p style={{ margin: "0.4rem 0" }}>
+                👤 <strong>{detalle.guia.nombre}</strong>
+              </p>
               <p style={{ margin: "0.3rem 0", color: "var(--texto-suave)" }}>
                 País: {PAIS_NOMBRE[detalle.guia.pais] ?? detalle.guia.pais}
               </p>
@@ -338,7 +346,12 @@ export default function ResumenSesionPage() {
       {/* Acciones */}
       <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
         {detalle.salon.meetingUrl !== null && (
-          <a href={detalle.salon.meetingUrl} target="_blank" rel="noreferrer" style={{ ...boton, borderColor: "var(--lgs-azul)" }}>
+          <a
+            href={detalle.salon.meetingUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ ...boton, borderColor: "var(--lgs-azul)" }}
+          >
             ▶ Ir al evento
           </a>
         )}
@@ -354,14 +367,33 @@ export default function ResumenSesionPage() {
       </div>
 
       {mostrarSuspender && (
-        <div style={{ ...card, marginTop: "0.8rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+        <div
+          style={{
+            ...card,
+            marginTop: "0.8rem",
+            display: "flex",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
           <input
             placeholder="Motivo de la suspensión (obligatorio)…"
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
-            style={{ flex: "1 1 18rem", padding: "0.5rem 0.65rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6" }}
+            style={{
+              flex: "1 1 18rem",
+              padding: "0.5rem 0.65rem",
+              borderRadius: "0.5rem",
+              border: "1.5px solid #d8dce6",
+            }}
           />
-          <button type="button" disabled={ocupado} onClick={() => void suspender()} style={{ ...boton, borderColor: "#e57373", color: "#c62828" }}>
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => void suspender()}
+            style={{ ...boton, borderColor: "#e57373", color: "#c62828" }}
+          >
             Confirmar suspensión
           </button>
         </div>
@@ -369,23 +401,51 @@ export default function ResumenSesionPage() {
 
       {/* Usuarios inscritos */}
       <section style={{ ...card, marginTop: "1rem" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+          }}
+        >
           <h2 style={{ fontSize: "1.05rem", margin: 0 }}>
             Usuarios inscritos ({totalInscritos}/{detalle.salon.cupo})
           </h2>
           <div style={{ display: "flex", gap: "0.4rem" }}>
-            <span style={{ background: "#e8f5e9", color: "#1b5e20", padding: "0.2rem 0.6rem", borderRadius: "1rem", fontSize: "0.8rem", fontWeight: 700 }}>
+            <span
+              style={{
+                background: "#e8f5e9",
+                color: "#1b5e20",
+                padding: "0.2rem 0.6rem",
+                borderRadius: "1rem",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+              }}
+            >
               ✓ Asistieron: {asistieron}
             </span>
             {lleno && (
-              <span style={{ background: "#ffebee", color: "#c62828", padding: "0.2rem 0.6rem", borderRadius: "1rem", fontSize: "0.8rem", fontWeight: 700 }}>
+              <span
+                style={{
+                  background: "#ffebee",
+                  color: "#c62828",
+                  padding: "0.2rem 0.6rem",
+                  borderRadius: "1rem",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                }}
+              >
                 Lleno
               </span>
             )}
           </div>
         </div>
 
-        <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        <div
+          style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}
+        >
           {inscritos === null ? (
             <p style={{ color: "var(--texto-suave)" }}>Cargando inscritos…</p>
           ) : inscritos.length === 0 ? (

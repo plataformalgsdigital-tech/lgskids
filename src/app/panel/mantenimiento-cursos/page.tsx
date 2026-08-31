@@ -113,7 +113,9 @@ export default function MantenimientoCursosPage() {
               <strong style={{ fontSize: "1.05rem" }}>
                 {t.titulo}
                 {t.href === undefined && (
-                  <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)", fontWeight: 600 }}>
+                  <span
+                    style={{ fontSize: "0.68rem", color: "var(--texto-suave)", fontWeight: 600 }}
+                  >
                     {" "}
                     (pronto)
                   </span>
@@ -127,7 +129,11 @@ export default function MantenimientoCursosPage() {
               {contenido}
             </Link>
           ) : (
-            <div key={t.titulo} style={{ ...cardBase, opacity: 0.55 }} title="Disponible próximamente">
+            <div
+              key={t.titulo}
+              style={{ ...cardBase, opacity: 0.55 }}
+              title="Disponible próximamente"
+            >
               {contenido}
             </div>
           );

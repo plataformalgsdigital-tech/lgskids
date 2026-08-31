@@ -151,7 +151,14 @@ function QuizEditor(props: { preguntas: Pregunta[]; onChange: (p: Pregunta[]) =>
       {preguntas.map((q, i) => (
         <div
           key={i}
-          style={{ border: "1px solid #edf0f6", borderRadius: "0.6rem", padding: "0.6rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}
+          style={{
+            border: "1px solid #edf0f6",
+            borderRadius: "0.6rem",
+            padding: "0.6rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.35rem",
+          }}
         >
           <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
             <input
@@ -210,7 +217,10 @@ function QuizEditor(props: { preguntas: Pregunta[]; onChange: (p: Pregunta[]) =>
       <button
         type="button"
         onClick={() =>
-          onChange([...preguntas, { tipo: "opcion_multiple", enunciado: "", opciones: ["", ""], correcta: 0 }])
+          onChange([
+            ...preguntas,
+            { tipo: "opcion_multiple", enunciado: "", opciones: ["", ""], correcta: 0 },
+          ])
         }
         style={{ ...btn, alignSelf: "flex-start" }}
       >
@@ -331,7 +341,14 @@ export default function ReferenciaCursosPage() {
         referencia compartida por todas las campañas.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(16rem, 22rem) 1fr", gap: "1.5rem", marginTop: "1rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(16rem, 22rem) 1fr",
+          gap: "1.5rem",
+          marginTop: "1rem",
+        }}
+      >
         {/* Lista */}
         <section>
           <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.6rem" }}>
@@ -352,14 +369,26 @@ export default function ReferenciaCursosPage() {
               ))}
             </select>
           </div>
-          <button type="button" onClick={() => setForm(vacio())} style={{ ...btn, width: "100%", marginBottom: "0.6rem", borderColor: "var(--lgs-azul)", color: "var(--lgs-azul-oscuro)" }}>
+          <button
+            type="button"
+            onClick={() => setForm(vacio())}
+            style={{
+              ...btn,
+              width: "100%",
+              marginBottom: "0.6rem",
+              borderColor: "var(--lgs-azul)",
+              color: "var(--lgs-azul-oscuro)",
+            }}
+          >
             + Nueva lección
           </button>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {filas === null ? (
               <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando…</p>
             ) : filas.length === 0 ? (
-              <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Sin lecciones. Crea la primera.</p>
+              <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+                Sin lecciones. Crea la primera.
+              </p>
             ) : (
               filas.map((f) => (
                 <div
@@ -375,14 +404,29 @@ export default function ReferenciaCursosPage() {
                     background: form.id === f.id ? "#e8f1fd" : "white",
                   }}
                 >
-                  <button type="button" onClick={() => editar(f)} style={{ background: "none", border: "none", textAlign: "left", cursor: "pointer", flex: 1 }}>
+                  <button
+                    type="button"
+                    onClick={() => editar(f)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      flex: 1,
+                    }}
+                  >
                     <strong style={{ fontSize: "0.85rem" }}>{f.leccion}</strong>
                     <div style={{ fontSize: "0.72rem", color: "var(--texto-suave)" }}>
                       {f.curso} · {f.nivel}
                       {f.unidad ? ` · ${f.unidad}` : ""}
                     </div>
                   </button>
-                  <button type="button" onClick={() => void eliminar(f)} style={{ background: "none", border: "none", cursor: "pointer" }} title="Eliminar">
+                  <button
+                    type="button"
+                    onClick={() => void eliminar(f)}
+                    style={{ background: "none", border: "none", cursor: "pointer" }}
+                    title="Eliminar"
+                  >
                     🗑️
                   </button>
                 </div>
@@ -392,13 +436,34 @@ export default function ReferenciaCursosPage() {
         </section>
 
         {/* Formulario */}
-        <section style={{ border: "1px solid #e3e7f0", borderRadius: "0.9rem", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <strong style={{ fontSize: "1.05rem" }}>{form.id !== null ? "Editar lección" : "Nueva lección"}</strong>
+        <section
+          style={{
+            border: "1px solid #e3e7f0",
+            borderRadius: "0.9rem",
+            padding: "1.25rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+          }}
+        >
+          <strong style={{ fontSize: "1.05rem" }}>
+            {form.id !== null ? "Editar lección" : "Nueva lección"}
+          </strong>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(9rem, 1fr))", gap: "0.6rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(9rem, 1fr))",
+              gap: "0.6rem",
+            }}
+          >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
               <span style={label}>Curso</span>
-              <select value={form.curso} onChange={(e) => setForm({ ...form, curso: e.target.value as Curso })} style={input}>
+              <select
+                value={form.curso}
+                onChange={(e) => setForm({ ...form, curso: e.target.value as Curso })}
+                style={input}
+              >
                 {CURSOS.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -408,7 +473,11 @@ export default function ReferenciaCursosPage() {
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
               <span style={label}>Nivel</span>
-              <select value={form.nivel} onChange={(e) => setForm({ ...form, nivel: e.target.value })} style={input}>
+              <select
+                value={form.nivel}
+                onChange={(e) => setForm({ ...form, nivel: e.target.value })}
+                style={input}
+              >
                 {NIVELES.map((n) => (
                   <option key={n} value={n}>
                     {n}
@@ -418,49 +487,117 @@ export default function ReferenciaCursosPage() {
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
               <span style={label}>Unidad</span>
-              <input value={form.unidad} onChange={(e) => setForm({ ...form, unidad: e.target.value })} placeholder="Unidad 1" style={input} />
+              <input
+                value={form.unidad}
+                onChange={(e) => setForm({ ...form, unidad: e.target.value })}
+                placeholder="Unidad 1"
+                style={input}
+              />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
               <span style={label}>Lección</span>
-              <input value={form.leccion} onChange={(e) => setForm({ ...form, leccion: e.target.value })} placeholder="Lección 1" style={input} />
+              <input
+                value={form.leccion}
+                onChange={(e) => setForm({ ...form, leccion: e.target.value })}
+                placeholder="Lección 1"
+                style={input}
+              />
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", maxWidth: "6rem" }}>
+            <label
+              style={{ display: "flex", flexDirection: "column", gap: "0.2rem", maxWidth: "6rem" }}
+            >
               <span style={label}>Orden</span>
-              <input type="number" min={0} value={form.orden} onChange={(e) => setForm({ ...form, orden: e.target.value })} style={input} />
+              <input
+                type="number"
+                min={0}
+                value={form.orden}
+                onChange={(e) => setForm({ ...form, orden: e.target.value })}
+                style={input}
+              />
             </label>
           </div>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
             <span style={label}>Temario / contenido (markdown)</span>
-            <textarea value={form.contenido} onChange={(e) => setForm({ ...form, contenido: e.target.value })} rows={4} style={{ ...input, resize: "vertical", fontFamily: "inherit" }} />
+            <textarea
+              value={form.contenido}
+              onChange={(e) => setForm({ ...form, contenido: e.target.value })}
+              rows={4}
+              style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
+            />
           </label>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
             <span style={label}>Video (URL o key de storage)</span>
-            <input value={form.video} onChange={(e) => setForm({ ...form, video: e.target.value })} placeholder="videos/…mp4" style={input} />
+            <input
+              value={form.video}
+              onChange={(e) => setForm({ ...form, video: e.target.value })}
+              placeholder="videos/…mp4"
+              style={input}
+            />
           </label>
 
-          <ListaEditor titulo="Material del guía" claveValor="url" items={form.materialGuia} onChange={(items) => setForm({ ...form, materialGuia: items })} />
-          <ListaEditor titulo="Material del alumno (libros)" claveValor="url" items={form.materialUsuario} onChange={(items) => setForm({ ...form, materialUsuario: items })} />
-          <ListaEditor titulo="Actividades" claveValor="link" items={form.actividades} onChange={(items) => setForm({ ...form, actividades: items })} />
-          <ListaEditor titulo="Recursos" claveValor="link" items={form.recursos} onChange={(items) => setForm({ ...form, recursos: items })} />
-          <ListaEditor titulo="Clubes" claveValor="link" items={form.clubes} onChange={(items) => setForm({ ...form, clubes: items })} />
+          <ListaEditor
+            titulo="Material del guía"
+            claveValor="url"
+            items={form.materialGuia}
+            onChange={(items) => setForm({ ...form, materialGuia: items })}
+          />
+          <ListaEditor
+            titulo="Material del alumno (libros)"
+            claveValor="url"
+            items={form.materialUsuario}
+            onChange={(items) => setForm({ ...form, materialUsuario: items })}
+          />
+          <ListaEditor
+            titulo="Actividades"
+            claveValor="link"
+            items={form.actividades}
+            onChange={(items) => setForm({ ...form, actividades: items })}
+          />
+          <ListaEditor
+            titulo="Recursos"
+            claveValor="link"
+            items={form.recursos}
+            onChange={(items) => setForm({ ...form, recursos: items })}
+          />
+          <ListaEditor
+            titulo="Clubes"
+            claveValor="link"
+            items={form.clubes}
+            onChange={(items) => setForm({ ...form, clubes: items })}
+          />
           <QuizEditor preguntas={form.quiz} onChange={(q) => setForm({ ...form, quiz: q })} />
 
           {aviso !== null && <p style={{ color: "#1b5e20", margin: 0 }}>{aviso}</p>}
-          {error !== null && <p role="alert" style={{ color: "#c62828", margin: 0 }}>{error}</p>}
+          {error !== null && (
+            <p role="alert" style={{ color: "#c62828", margin: 0 }}>
+              {error}
+            </p>
+          )}
 
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button
               type="button"
               onClick={() => void guardar()}
               disabled={ocupado || form.leccion.trim() === ""}
-              style={{ ...btn, background: "var(--lgs-verde)", color: "#1b2a10", borderColor: "var(--lgs-verde)", padding: "0.55rem 1.4rem", fontSize: "0.9rem" }}
+              style={{
+                ...btn,
+                background: "var(--lgs-verde)",
+                color: "#1b2a10",
+                borderColor: "var(--lgs-verde)",
+                padding: "0.55rem 1.4rem",
+                fontSize: "0.9rem",
+              }}
             >
               {ocupado ? "Guardando…" : form.id !== null ? "Guardar cambios" : "Crear lección"}
             </button>
             {form.id !== null && (
-              <button type="button" onClick={() => setForm(vacio())} style={{ ...btn, padding: "0.55rem 1.2rem" }}>
+              <button
+                type="button"
+                onClick={() => setForm(vacio())}
+                style={{ ...btn, padding: "0.55rem 1.2rem" }}
+              >
                 Cancelar
               </button>
             )}

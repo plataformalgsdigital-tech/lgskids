@@ -239,7 +239,15 @@ export default function DetalleCampaniaPage() {
       <Link href="/panel/campanias" style={{ fontSize: "0.9rem" }}>
         ← Volver a campañas
       </Link>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.5rem" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+          flexWrap: "wrap",
+          marginTop: "0.5rem",
+        }}
+      >
         <h1 style={{ fontSize: "1.6rem", margin: 0 }}>{detalle.nombre}</h1>
         <span
           style={{
@@ -260,7 +268,14 @@ export default function DetalleCampaniaPage() {
       </p>
 
       {aviso !== null && (
-        <p style={{ color: "#1b5e20", background: "#e8f5e9", padding: "0.5rem 0.8rem", borderRadius: "0.6rem" }}>
+        <p
+          style={{
+            color: "#1b5e20",
+            background: "#e8f5e9",
+            padding: "0.5rem 0.8rem",
+            borderRadius: "0.6rem",
+          }}
+        >
           {aviso}
         </p>
       )}
@@ -278,7 +293,15 @@ export default function DetalleCampaniaPage() {
           padding: "1.1rem 1.25rem",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+          }}
+        >
           <h2 style={{ fontSize: "1.15rem", margin: 0 }}>
             Cursos de {detalle.nombre} ({filas.length} {filas.length === 1 ? "salón" : "salones"})
           </h2>
@@ -345,13 +368,27 @@ export default function DetalleCampaniaPage() {
                 {filas.map(({ curso, salon }) => {
                   const lleno = salon.ocupados >= salon.cupo;
                   return (
-                    <tr key={salon.id} style={{ borderBottom: "1px solid #edf0f6", opacity: salon.activo ? 1 : 0.55 }}>
-                      <td style={{ ...td, fontWeight: 700, color: "var(--lgs-azul-oscuro)" }}>{curso.tipo}</td>
-                      <td style={{ ...td, fontWeight: 600 }}>{etiquetaSalon(salon.nombre, curso.tipo)}</td>
-                      <td style={{ ...td, whiteSpace: "normal" }}>
-                        {salon.guia ?? <span style={{ color: "var(--texto-suave)" }}>— sin guía —</span>}
+                    <tr
+                      key={salon.id}
+                      style={{
+                        borderBottom: "1px solid #edf0f6",
+                        opacity: salon.activo ? 1 : 0.55,
+                      }}
+                    >
+                      <td style={{ ...td, fontWeight: 700, color: "var(--lgs-azul-oscuro)" }}>
+                        {curso.tipo}
                       </td>
-                      <td style={{ ...td, whiteSpace: "normal" }}>{resumenHorario(salon.horario)}</td>
+                      <td style={{ ...td, fontWeight: 600 }}>
+                        {etiquetaSalon(salon.nombre, curso.tipo)}
+                      </td>
+                      <td style={{ ...td, whiteSpace: "normal" }}>
+                        {salon.guia ?? (
+                          <span style={{ color: "var(--texto-suave)" }}>— sin guía —</span>
+                        )}
+                      </td>
+                      <td style={{ ...td, whiteSpace: "normal" }}>
+                        {resumenHorario(salon.horario)}
+                      </td>
                       <td style={td}>{curso.inicio}</td>
                       <td style={td}>{curso.finalCurso}</td>
                       <td style={td}>{detalle.finalVenta}</td>
@@ -382,7 +419,9 @@ export default function DetalleCampaniaPage() {
                         </span>
                       </td>
                       <td style={td}>
-                        <span style={{ display: "inline-flex", gap: "0.6rem", alignItems: "center" }}>
+                        <span
+                          style={{ display: "inline-flex", gap: "0.6rem", alignItems: "center" }}
+                        >
                           <Link href={`/panel/calendario/${salon.id}`} title="Editar salón">
                             ✏️
                           </Link>
@@ -391,7 +430,12 @@ export default function DetalleCampaniaPage() {
                             onClick={() => void eliminarSalon(salon)}
                             disabled={ocupado}
                             title="Eliminar salón"
-                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.95rem" }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: "0.95rem",
+                            }}
                           >
                             🗑️
                           </button>
@@ -461,7 +505,9 @@ export default function DetalleCampaniaPage() {
                         </li>
                       ))}
                     </ul>
-                    <p style={{ marginTop: "0.5rem", fontSize: "0.85rem", fontWeight: 700 }}>🏅 Level Up</p>
+                    <p style={{ marginTop: "0.5rem", fontSize: "0.85rem", fontWeight: 700 }}>
+                      🏅 Level Up
+                    </p>
                   </div>
                 ))}
               </div>

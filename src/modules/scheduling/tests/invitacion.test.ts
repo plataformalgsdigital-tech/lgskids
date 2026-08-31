@@ -76,7 +76,9 @@ describe("vigencia y enlace", () => {
   });
 
   it("arma la URL sin duplicar la barra del dominio", () => {
-    expect(enlaceInvitacion("https://kids.test/", "abc")).toBe("https://kids.test/nuevo-guia?t=abc");
+    expect(enlaceInvitacion("https://kids.test/", "abc")).toBe(
+      "https://kids.test/nuevo-guia?t=abc",
+    );
     expect(enlaceInvitacion("https://kids.test", "abc")).toBe("https://kids.test/nuevo-guia?t=abc");
   });
 });

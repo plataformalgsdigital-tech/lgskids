@@ -663,7 +663,14 @@ export default function UsuariosPage() {
                         />
                         <span>
                           {etiqueta}
-                          <span style={{ display: "block", fontSize: "0.68rem", color: "var(--texto-suave)", fontWeight: 400 }}>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "0.68rem",
+                              color: "var(--texto-suave)",
+                              fontWeight: 400,
+                            }}
+                          >
                             {code}
                           </span>
                         </span>
@@ -680,12 +687,32 @@ export default function UsuariosPage() {
                   const sueltos = permisosRol.catalogo.filter((p) => !enArbol.has(p.code));
 
                   return (
-                    <div style={{ marginTop: "0.8rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                    <div
+                      style={{
+                        marginTop: "0.8rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.6rem",
+                      }}
+                    >
                       {permisosRol.secciones.map((s) => (
-                        <div key={s.permiso} style={{ border: "1px solid #e3e7f0", borderRadius: "0.6rem", overflow: "hidden" }}>
+                        <div
+                          key={s.permiso}
+                          style={{
+                            border: "1px solid #e3e7f0",
+                            borderRadius: "0.6rem",
+                            overflow: "hidden",
+                          }}
+                        >
                           {casilla(s.permiso, s.etiqueta, false)}
                           {s.hijos.length > 0 && (
-                            <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid #e3e7f0" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                borderTop: "1px solid #e3e7f0",
+                              }}
+                            >
                               {[...new Set(s.hijos)].map((h) => casilla(h, nombreDe(h), true))}
                             </div>
                           )}
@@ -694,10 +721,24 @@ export default function UsuariosPage() {
 
                       {sueltos.length > 0 && (
                         <div>
-                          <p style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)", margin: "0.4rem 0 0.4rem" }}>
+                          <p
+                            style={{
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              letterSpacing: "0.06em",
+                              color: "var(--texto-suave)",
+                              margin: "0.4rem 0 0.4rem",
+                            }}
+                          >
                             OTROS PERMISOS (no salen en el menú)
                           </p>
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(15rem, 1fr))", gap: "0.35rem" }}>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fill, minmax(15rem, 1fr))",
+                              gap: "0.35rem",
+                            }}
+                          >
                             {sueltos.map((p) => casilla(p.code, p.nombre, false))}
                           </div>
                         </div>

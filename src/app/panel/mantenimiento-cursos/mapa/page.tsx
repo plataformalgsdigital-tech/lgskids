@@ -50,7 +50,11 @@ export default function EditorMapaPage() {
     const us: (Punto | null)[] = Array(N_UNIDADES).fill(null);
     let esp: Punto | null = null;
     if (hsRes.ok) {
-      const d = (await hsRes.json()) as { unidades?: Punto[]; premio?: Punto | null; centro?: Punto | null };
+      const d = (await hsRes.json()) as {
+        unidades?: Punto[];
+        premio?: Punto | null;
+        centro?: Punto | null;
+      };
       (d.unidades ?? []).slice(0, N_UNIDADES).forEach((p, i) => (us[i] = p));
       esp = scope === "MAPA" ? (d.centro ?? null) : (d.premio ?? null);
     }
@@ -121,7 +125,12 @@ export default function EditorMapaPage() {
   }
 
   const marcadores: { punto: Punto | null; label: string; tool: string; color: string }[] = [
-    ...unidades.map((p, i) => ({ punto: p, label: String(i + 1), tool: `u${i}`, color: "#2450c8" })),
+    ...unidades.map((p, i) => ({
+      punto: p,
+      label: String(i + 1),
+      tool: `u${i}`,
+      color: "#2450c8",
+    })),
     { punto: especial, label: scope === "MAPA" ? "◎" : "★", tool: "esp", color: "#d1495b" },
   ];
 
@@ -142,15 +151,20 @@ export default function EditorMapaPage() {
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Editor de mapa (hotspots)</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-        Marca dónde va cada <strong>unidad (1–4)</strong> y el <strong>{etiquetaEsp.toLowerCase()}</strong> sobre la
-        imagen. Elige un punto y haz <strong>clic sobre la imagen</strong>; se guarda como coordenada %. Lo usa la
-        pantalla <strong>Avance</strong> del alumno.
+        Marca dónde va cada <strong>unidad (1–4)</strong> y el{" "}
+        <strong>{etiquetaEsp.toLowerCase()}</strong> sobre la imagen. Elige un punto y haz{" "}
+        <strong>clic sobre la imagen</strong>; se guarda como coordenada %. Lo usa la pantalla{" "}
+        <strong>Avance</strong> del alumno.
       </p>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Curso</span>
-          <select value={curso} onChange={(e) => setCurso(e.target.value as Curso)} style={{ ...input, width: "11rem" }}>
+          <select
+            value={curso}
+            onChange={(e) => setCurso(e.target.value as Curso)}
+            style={{ ...input, width: "11rem" }}
+          >
             {CURSOS.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -160,14 +174,22 @@ export default function EditorMapaPage() {
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Imagen</span>
-          <select value={scope} onChange={(e) => setScope(e.target.value as Scope)} style={{ ...input, width: "17rem" }}>
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value as Scope)}
+            style={{ ...input, width: "17rem" }}
+          >
             <option value="ISLA">Isla del nivel (banner)</option>
             <option value="MAPA">Mapa del curso completo</option>
           </select>
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Nivel</span>
-          <select value={nivel} onChange={(e) => setNivel(e.target.value)} style={{ ...input, width: "11rem" }}>
+          <select
+            value={nivel}
+            onChange={(e) => setNivel(e.target.value)}
+            style={{ ...input, width: "11rem" }}
+          >
             {NIVELES.map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -178,8 +200,18 @@ export default function EditorMapaPage() {
       </div>
 
       {/* Paleta de puntos */}
-      <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", fontWeight: 700 }}>Marcar:</span>
+      <div
+        style={{
+          display: "flex",
+          gap: "0.5rem",
+          marginTop: "1rem",
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", fontWeight: 700 }}>
+          Marcar:
+        </span>
         {[0, 1, 2, 3].map((i) => (
           <button key={i} type="button" style={toolBtn(`u${i}`)} onClick={() => setTool(`u${i}`)}>
             Unidad {i + 1} {unidades[i] !== null && "✓"}
@@ -193,21 +225,45 @@ export default function EditorMapaPage() {
       {/* Lienzo */}
       <div style={{ marginTop: "1rem" }}>
         {imgUrl === null ? (
-          <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed #d8dce6", borderRadius: "1rem", color: "var(--texto-suave)" }}>
+          <div
+            style={{
+              padding: "2rem",
+              textAlign: "center",
+              border: "1px dashed #d8dce6",
+              borderRadius: "1rem",
+              color: "var(--texto-suave)",
+            }}
+          >
             {scope === "MAPA"
               ? "No hay imagen de “Mapa del curso completo” para este curso."
               : `No hay banner para ${curso} · ${nivel}.`}{" "}
             Súbela en <Link href="/panel/mantenimiento-cursos/imagenes">Imágenes de curso</Link>.
           </div>
         ) : (
-          <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", border: "1px solid #e3e7f0", borderRadius: "0.8rem", overflow: "hidden" }}>
+          <div
+            style={{
+              position: "relative",
+              display: "inline-block",
+              maxWidth: "100%",
+              border: "1px solid #e3e7f0",
+              borderRadius: "0.8rem",
+              overflow: "hidden",
+            }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               ref={imgRef}
               src={imgUrl}
               alt="Imagen a marcar"
               onClick={colocar}
-              style={{ display: "block", width: "100%", height: "auto", cursor: "crosshair", maxHeight: "70vh", objectFit: "contain" }}
+              style={{
+                display: "block",
+                width: "100%",
+                height: "auto",
+                cursor: "crosshair",
+                maxHeight: "70vh",
+                objectFit: "contain",
+              }}
             />
             {marcadores.map((m) =>
               m.punto === null ? null : (
@@ -224,7 +280,10 @@ export default function EditorMapaPage() {
                     background: m.color,
                     color: "white",
                     border: tool === m.tool ? "3px solid #fff" : "2px solid #fff",
-                    boxShadow: tool === m.tool ? "0 0 0 2px var(--lgs-purpura)" : "0 2px 6px rgba(0,0,0,0.35)",
+                    boxShadow:
+                      tool === m.tool
+                        ? "0 0 0 2px var(--lgs-purpura)"
+                        : "0 2px 6px rgba(0,0,0,0.35)",
                     display: "grid",
                     placeItems: "center",
                     fontWeight: 800,
@@ -241,20 +300,49 @@ export default function EditorMapaPage() {
       </div>
 
       {/* Acciones */}
-      <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+      <div
+        style={{
+          marginTop: "1rem",
+          display: "flex",
+          gap: "0.75rem",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
         <button
           type="button"
           onClick={() => void guardar()}
           disabled={ocupado || imgUrl === null}
-          style={{ padding: "0.55rem 1.4rem", borderRadius: "0.6rem", border: "none", background: ocupado || imgUrl === null ? "#9e9e9e" : "var(--lgs-verde)", color: "#1b2a10", fontWeight: 800, cursor: ocupado || imgUrl === null ? "not-allowed" : "pointer" }}
+          style={{
+            padding: "0.55rem 1.4rem",
+            borderRadius: "0.6rem",
+            border: "none",
+            background: ocupado || imgUrl === null ? "#9e9e9e" : "var(--lgs-verde)",
+            color: "#1b2a10",
+            fontWeight: 800,
+            cursor: ocupado || imgUrl === null ? "not-allowed" : "pointer",
+          }}
         >
           {ocupado ? "Guardando…" : "Guardar posiciones"}
         </button>
-        <button type="button" onClick={limpiar} style={{ padding: "0.55rem 1.1rem", borderRadius: "0.6rem", border: "1.5px solid #d8dce6", background: "white", fontWeight: 700, cursor: "pointer" }}>
+        <button
+          type="button"
+          onClick={limpiar}
+          style={{
+            padding: "0.55rem 1.1rem",
+            borderRadius: "0.6rem",
+            border: "1.5px solid #d8dce6",
+            background: "white",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
           Limpiar
         </button>
         {msg !== null && (
-          <span style={{ fontWeight: 600, color: msg.startsWith("✔") ? "#1b5e20" : "#c62828" }}>{msg}</span>
+          <span style={{ fontWeight: 600, color: msg.startsWith("✔") ? "#1b5e20" : "#c62828" }}>
+            {msg}
+          </span>
         )}
       </div>
     </main>

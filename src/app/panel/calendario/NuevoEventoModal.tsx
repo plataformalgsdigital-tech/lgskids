@@ -125,10 +125,14 @@ export function NuevoEventoModal({
 
   // Cascada: cada nivel del filtro se calcula sobre el anterior.
   const campanias = [...new Set(salones.map((s) => s.campania))];
-  const paises = [...new Set(salones.filter((s) => s.campania === campania).map((s) => s.holidayCountry))];
+  const paises = [
+    ...new Set(salones.filter((s) => s.campania === campania).map((s) => s.holidayCountry)),
+  ];
   const cursos = [
     ...new Set(
-      salones.filter((s) => s.campania === campania && s.holidayCountry === pais).map((s) => s.curso),
+      salones
+        .filter((s) => s.campania === campania && s.holidayCountry === pais)
+        .map((s) => s.curso),
     ),
   ];
   const salonesFiltrados = salones.filter(
@@ -237,106 +241,264 @@ export function NuevoEventoModal({
           <h2 style={{ fontSize: "1.2rem", fontWeight: 800 }}>
             {esAdmin ? "🏛️ Evento administrativo" : "🎓 Evento académico"}
           </h2>
-          <button type="button" onClick={onCerrar} aria-label="Cerrar" style={{ ...boton, borderRadius: "50%", width: "2.2rem", height: "2.2rem", padding: 0 }}>
+          <button
+            type="button"
+            onClick={onCerrar}
+            aria-label="Cerrar"
+            style={{ ...boton, borderRadius: "50%", width: "2.2rem", height: "2.2rem", padding: 0 }}
+          >
             ✕
           </button>
         </div>
 
-        <div style={{ padding: "1.1rem 1.25rem 1.3rem", display: "flex", flexDirection: "column", gap: "0.8rem" }}>
-          {error !== null && <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>{error}</p>}
+        <div
+          style={{
+            padding: "1.1rem 1.25rem 1.3rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.8rem",
+          }}
+        >
+          {error !== null && (
+            <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>
+              {error}
+            </p>
+          )}
 
           {esAdmin && (
             <div>
-              <label style={rotulo} htmlFor="ev-titulo">Título del evento</label>
-              <input id="ev-titulo" value={titulo} onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Reunión de coordinación, capacitación…" style={campo} />
+              <label style={rotulo} htmlFor="ev-titulo">
+                Título del evento
+              </label>
+              <input
+                id="ev-titulo"
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+                placeholder="Reunión de coordinación, capacitación…"
+                style={campo}
+              />
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.7rem" }} className="ev-tres">
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.7rem" }}
+            className="ev-tres"
+          >
             <div>
-              <label style={rotulo} htmlFor="ev-fecha">Fecha *</label>
-              <input id="ev-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={campo} />
+              <label style={rotulo} htmlFor="ev-fecha">
+                Fecha *
+              </label>
+              <input
+                id="ev-fecha"
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                style={campo}
+              />
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-hora">Hora *</label>
-              <input id="ev-hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} style={campo} />
+              <label style={rotulo} htmlFor="ev-hora">
+                Hora *
+              </label>
+              <input
+                id="ev-hora"
+                type="time"
+                value={hora}
+                onChange={(e) => setHora(e.target.value)}
+                style={campo}
+              />
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-dur">Duración (min)</label>
-              <input id="ev-dur" type="number" min={15} max={300} value={duracion}
-                onChange={(e) => setDuracion(Number(e.target.value))} style={campo} />
+              <label style={rotulo} htmlFor="ev-dur">
+                Duración (min)
+              </label>
+              <input
+                id="ev-dur"
+                type="number"
+                min={15}
+                max={300}
+                value={duracion}
+                onChange={(e) => setDuracion(Number(e.target.value))}
+                style={campo}
+              />
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }} className="ev-dos">
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
+            className="ev-dos"
+          >
             <div>
-              <label style={rotulo} htmlFor="ev-tipo">Tipo de evento *</label>
-              <select id="ev-tipo" value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} style={campo}>
+              <label style={rotulo} htmlFor="ev-tipo">
+                Tipo de evento *
+              </label>
+              <select
+                id="ev-tipo"
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as typeof tipo)}
+                style={campo}
+              >
                 {TIPOS.map((t) => (
-                  <option key={t.valor} value={t.valor}>{t.etiqueta}</option>
+                  <option key={t.valor} value={t.valor}>
+                    {t.etiqueta}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-camp">Campaña *</label>
-              <select id="ev-camp" value={campania}
-                onChange={(e) => { setCampania(e.target.value); setPais(""); setCurso(""); setSalonPrincipal(""); setExtras([]); }}
-                style={campo}>
+              <label style={rotulo} htmlFor="ev-camp">
+                Campaña *
+              </label>
+              <select
+                id="ev-camp"
+                value={campania}
+                onChange={(e) => {
+                  setCampania(e.target.value);
+                  setPais("");
+                  setCurso("");
+                  setSalonPrincipal("");
+                  setExtras([]);
+                }}
+                style={campo}
+              >
                 <option value="">Seleccionar campaña</option>
-                {campanias.map((c) => <option key={c} value={c}>{c}</option>)}
+                {campanias.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-pais">País *</label>
-              <select id="ev-pais" value={pais} disabled={campania === ""}
-                onChange={(e) => { setPais(e.target.value); setCurso(""); setSalonPrincipal(""); setExtras([]); }}
-                style={campo}>
+              <label style={rotulo} htmlFor="ev-pais">
+                País *
+              </label>
+              <select
+                id="ev-pais"
+                value={pais}
+                disabled={campania === ""}
+                onChange={(e) => {
+                  setPais(e.target.value);
+                  setCurso("");
+                  setSalonPrincipal("");
+                  setExtras([]);
+                }}
+                style={campo}
+              >
                 <option value="">Seleccionar país</option>
-                {paises.map((p) => <option key={p} value={p}>{p}</option>)}
+                {paises.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-curso">Curso *</label>
-              <select id="ev-curso" value={curso} disabled={pais === ""}
-                onChange={(e) => { setCurso(e.target.value); setSalonPrincipal(""); }}
-                style={campo}>
+              <label style={rotulo} htmlFor="ev-curso">
+                Curso *
+              </label>
+              <select
+                id="ev-curso"
+                value={curso}
+                disabled={pais === ""}
+                onChange={(e) => {
+                  setCurso(e.target.value);
+                  setSalonPrincipal("");
+                }}
+                style={campo}
+              >
                 <option value="">Seleccionar curso</option>
-                {cursos.map((c) => <option key={c} value={c}>{c}</option>)}
+                {cursos.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-salon">Salón {esAdmin ? "" : "*"}</label>
-              <select id="ev-salon" value={salonPrincipal} disabled={curso === ""}
-                onChange={(e) => setSalonPrincipal(e.target.value)} style={campo}>
+              <label style={rotulo} htmlFor="ev-salon">
+                Salón {esAdmin ? "" : "*"}
+              </label>
+              <select
+                id="ev-salon"
+                value={salonPrincipal}
+                disabled={curso === ""}
+                onChange={(e) => setSalonPrincipal(e.target.value)}
+                style={campo}
+              >
                 <option value="">Seleccionar salón</option>
-                {salonesFiltrados.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                {salonesFiltrados.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-nivel">Nivel</label>
-              <select id="ev-nivel" value={nivel} onChange={(e) => setNivel(e.target.value)} style={campo}>
+              <label style={rotulo} htmlFor="ev-nivel">
+                Nivel
+              </label>
+              <select
+                id="ev-nivel"
+                value={nivel}
+                onChange={(e) => setNivel(e.target.value)}
+                style={campo}
+              >
                 <option value="">Sin nivel</option>
-                {NIVELES.map((n) => <option key={n} value={n}>{n}</option>)}
+                {NIVELES.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-limite">Límite de usuarios</label>
-              <input id="ev-limite" type="number" min={1} max={200} value={limite}
-                placeholder={salonesFiltrados.find((s) => s.id === salonPrincipal)?.cupo.toString() ?? "cupo del salón"}
-                onChange={(e) => setLimite(e.target.value)} style={campo} />
+              <label style={rotulo} htmlFor="ev-limite">
+                Límite de usuarios
+              </label>
+              <input
+                id="ev-limite"
+                type="number"
+                min={1}
+                max={200}
+                value={limite}
+                placeholder={
+                  salonesFiltrados.find((s) => s.id === salonPrincipal)?.cupo.toString() ??
+                  "cupo del salón"
+                }
+                onChange={(e) => setLimite(e.target.value)}
+                style={campo}
+              />
             </div>
             <div>
-              <label style={rotulo} htmlFor="ev-guia">Guía {esAdmin ? "(sala de Zoom)" : "*"}</label>
-              <select id="ev-guia" value={guiaUserId} onChange={(e) => setGuiaUserId(e.target.value)} style={campo}>
+              <label style={rotulo} htmlFor="ev-guia">
+                Guía {esAdmin ? "(sala de Zoom)" : "*"}
+              </label>
+              <select
+                id="ev-guia"
+                value={guiaUserId}
+                onChange={(e) => setGuiaUserId(e.target.value)}
+                style={campo}
+              >
                 <option value="">Seleccionar guía</option>
-                {guias.map((g) => <option key={g.id} value={g.id}>{g.username}</option>)}
+                {guias.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.username}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
           {/* El Zoom no se escribe: se hereda del guía. */}
-          <div style={{ padding: "0.6rem 0.8rem", borderRadius: "0.6rem", background: "#fafbfe", fontSize: "0.85rem" }}>
+          <div
+            style={{
+              padding: "0.6rem 0.8rem",
+              borderRadius: "0.6rem",
+              background: "#fafbfe",
+              fontSize: "0.85rem",
+            }}
+          >
             <span style={{ fontWeight: 700 }}>🔗 Link de Zoom:</span>{" "}
             {guia === null ? (
               <span style={{ color: "var(--texto-suave)" }}>elige un guía para verlo</span>
@@ -344,7 +506,8 @@ export function NuevoEventoModal({
               <span>{guia.zoomUrl}</span>
             ) : (
               <span style={{ color: "#b57a00" }}>
-                {guia.username} todavía no tiene sala configurada. El evento se crea igual, pero sin enlace.
+                {guia.username} todavía no tiene sala configurada. El evento se crea igual, pero sin
+                enlace.
               </span>
             )}
             <div style={{ fontSize: "0.75rem", color: "var(--texto-suave)", marginTop: "0.2rem" }}>
@@ -354,73 +517,169 @@ export function NuevoEventoModal({
 
           {/* Compartir entre cursos: solo tiene sentido en el evento académico. */}
           {!esAdmin && (
-          <div style={{ padding: "0.8rem 0.9rem", borderRadius: "0.6rem", border: "1px solid #e3e7f0" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 700, fontSize: "0.9rem" }}>
-              <input type="checkbox" checked={compartir}
-                onChange={(e) => { setCompartir(e.target.checked); if (!e.target.checked) setExtras([]); }} />
-              Evento compartido entre cursos
-            </label>
-            <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", margin: "0.25rem 0 0" }}>
-              La misma clase en hasta {MAX_COMPARTIDOS - 1} salones adicionales (misma hora, guía y Zoom).
-              Para el guía cuenta como una sola hora.
-            </p>
-            {compartir && (
-              <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.3rem", maxHeight: "10rem", overflowY: "auto" }}>
-                {salonesCompartibles.length === 0 ? (
-                  <span style={{ fontSize: "0.82rem", color: "var(--texto-suave)" }}>
-                    Elige campaña y país para ver salones disponibles.
-                  </span>
-                ) : (
-                  salonesCompartibles.map((s) => {
-                    const marcado = extras.includes(s.id);
-                    const tope = extras.length >= MAX_COMPARTIDOS - 1;
-                    return (
-                      <label key={s.id} style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.85rem", opacity: !marcado && tope ? 0.5 : 1 }}>
-                        <input type="checkbox" checked={marcado} disabled={!marcado && tope}
-                          onChange={(e) => {
-                            setExtras((prev) => (e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)));
-                          }} />
-                        {s.curso} · {s.nombre}
-                      </label>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
+            <div
+              style={{
+                padding: "0.8rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1px solid #e3e7f0",
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={compartir}
+                  onChange={(e) => {
+                    setCompartir(e.target.checked);
+                    if (!e.target.checked) setExtras([]);
+                  }}
+                />
+                Evento compartido entre cursos
+              </label>
+              <p
+                style={{ fontSize: "0.78rem", color: "var(--texto-suave)", margin: "0.25rem 0 0" }}
+              >
+                La misma clase en hasta {MAX_COMPARTIDOS - 1} salones adicionales (misma hora, guía
+                y Zoom). Para el guía cuenta como una sola hora.
+              </p>
+              {compartir && (
+                <div
+                  style={{
+                    marginTop: "0.6rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.3rem",
+                    maxHeight: "10rem",
+                    overflowY: "auto",
+                  }}
+                >
+                  {salonesCompartibles.length === 0 ? (
+                    <span style={{ fontSize: "0.82rem", color: "var(--texto-suave)" }}>
+                      Elige campaña y país para ver salones disponibles.
+                    </span>
+                  ) : (
+                    salonesCompartibles.map((s) => {
+                      const marcado = extras.includes(s.id);
+                      const tope = extras.length >= MAX_COMPARTIDOS - 1;
+                      return (
+                        <label
+                          key={s.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.45rem",
+                            fontSize: "0.85rem",
+                            opacity: !marcado && tope ? 0.5 : 1,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={marcado}
+                            disabled={!marcado && tope}
+                            onChange={(e) => {
+                              setExtras((prev) =>
+                                e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id),
+                              );
+                            }}
+                          />
+                          {s.curso} · {s.nombre}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Audiencia: quiénes verán el evento en su calendario. */}
           {esAdmin && (
-            <div style={{ padding: "0.8rem 0.9rem", borderRadius: "0.6rem", border: "1px solid #e3e7f0" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+            <div
+              style={{
+                padding: "0.8rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1px solid #e3e7f0",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.5rem",
+                  flexWrap: "wrap",
+                }}
+              >
                 <span style={{ fontWeight: 700, fontSize: "0.9rem" }}>
                   Guías que verán este evento * ({audiencia.length}/{guias.length})
                 </span>
                 <div style={{ display: "flex", gap: "0.4rem" }}>
-                  <button type="button" style={{ ...boton, padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
-                    onClick={() => setAudiencia(guias.map((g) => g.id))}>
+                  <button
+                    type="button"
+                    style={{ ...boton, padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
+                    onClick={() => setAudiencia(guias.map((g) => g.id))}
+                  >
                     Todos
                   </button>
-                  <button type="button" style={{ ...boton, padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
-                    onClick={() => setAudiencia([])}>
+                  <button
+                    type="button"
+                    style={{ ...boton, padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
+                    onClick={() => setAudiencia([])}
+                  >
                     Ninguno
                   </button>
                 </div>
               </div>
-              <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", margin: "0.25rem 0 0.5rem" }}>
-                Solo los seleccionados lo verán en su calendario. Sin ninguno, el evento no se puede crear.
+              <p
+                style={{
+                  fontSize: "0.78rem",
+                  color: "var(--texto-suave)",
+                  margin: "0.25rem 0 0.5rem",
+                }}
+              >
+                Solo los seleccionados lo verán en su calendario. Sin ninguno, el evento no se puede
+                crear.
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", maxHeight: "12rem", overflowY: "auto" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.25rem",
+                  maxHeight: "12rem",
+                  overflowY: "auto",
+                }}
+              >
                 {guias.length === 0 ? (
-                  <span style={{ fontSize: "0.82rem", color: "var(--texto-suave)" }}>No hay guías activos.</span>
+                  <span style={{ fontSize: "0.82rem", color: "var(--texto-suave)" }}>
+                    No hay guías activos.
+                  </span>
                 ) : (
                   guias.map((g) => (
-                    <label key={g.id} style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.85rem" }}>
-                      <input type="checkbox" checked={audiencia.includes(g.id)}
+                    <label
+                      key={g.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.45rem",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={audiencia.includes(g.id)}
                         onChange={(e) => {
-                          setAudiencia((prev) => (e.target.checked ? [...prev, g.id] : prev.filter((x) => x !== g.id)));
-                        }} />
+                          setAudiencia((prev) =>
+                            e.target.checked ? [...prev, g.id] : prev.filter((x) => x !== g.id),
+                          );
+                        }}
+                      />
                       {g.username}
                       {(g.zoomUrl === null || g.zoomUrl === "") && (
                         <span style={{ fontSize: "0.72rem", color: "#b57a00" }}>· sin Zoom</span>
@@ -433,16 +692,42 @@ export function NuevoEventoModal({
           )}
 
           <div>
-            <label style={rotulo} htmlFor="ev-obs">Observaciones</label>
-            <textarea id="ev-obs" rows={2} value={observaciones}
+            <label style={rotulo} htmlFor="ev-obs">
+              Observaciones
+            </label>
+            <textarea
+              id="ev-obs"
+              rows={2}
+              value={observaciones}
               onChange={(e) => setObservaciones(e.target.value)}
-              placeholder="Notas adicionales sobre el evento" style={campo} />
+              placeholder="Notas adicionales sobre el evento"
+              style={campo}
+            />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", borderTop: "1px solid #eef1f7", paddingTop: "0.9rem" }}>
-            <button type="button" onClick={onCerrar} style={boton} disabled={ocupado}>Cancelar</button>
-            <button type="button" onClick={() => void crear()} disabled={ocupado || !listo}
-              style={{ ...boton, border: "none", background: listo ? "var(--lgs-purpura)" : "#c9c6d8", color: "white" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              borderTop: "1px solid #eef1f7",
+              paddingTop: "0.9rem",
+            }}
+          >
+            <button type="button" onClick={onCerrar} style={boton} disabled={ocupado}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void crear()}
+              disabled={ocupado || !listo}
+              style={{
+                ...boton,
+                border: "none",
+                background: listo ? "var(--lgs-purpura)" : "#c9c6d8",
+                color: "white",
+              }}
+            >
               {ocupado
                 ? "Creando…"
                 : esAdmin

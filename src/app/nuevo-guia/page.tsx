@@ -91,7 +91,11 @@ const boton: CSSProperties = {
 };
 
 function fechaLarga(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" });
+  return new Date(iso).toLocaleDateString("es-CL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export default function NuevoGuiaPage() {
@@ -108,7 +112,9 @@ function Wizard() {
   const token = useSearchParams().get("t")?.trim() ?? "";
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [cargaError, setCargaError] = useState<string | null>(
-    token === "" ? "Este enlace está incompleto. Pídele a tu coordinación el enlace de registro." : null,
+    token === ""
+      ? "Este enlace está incompleto. Pídele a tu coordinación el enlace de registro."
+      : null,
   );
   const [paso, setPaso] = useState(1);
   const [form, setForm] = useState<Campos>(VACIOS);
@@ -274,8 +280,8 @@ function Wizard() {
             Tus datos quedaron guardados. Ya puedes cerrar esta página.
           </p>
           <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
-            Entra a la plataforma con tu usuario <strong>{ficha?.username}</strong> y la clave que te
-            dio tu coordinación.
+            Entra a la plataforma con tu usuario <strong>{ficha?.username}</strong> y la clave que
+            te dio tu coordinación.
           </p>
           <a href="/login" style={{ display: "inline-block", marginTop: "1rem", fontWeight: 700 }}>
             Ir a iniciar sesión
@@ -288,7 +294,9 @@ function Wizard() {
   if (ficha === null) {
     return (
       <main style={marco}>
-        <div style={{ ...tarjeta, padding: "2rem", textAlign: "center", color: "var(--texto-suave)" }}>
+        <div
+          style={{ ...tarjeta, padding: "2rem", textAlign: "center", color: "var(--texto-suave)" }}
+        >
           Abriendo tu enlace…
         </div>
       </main>
@@ -312,13 +320,18 @@ function Wizard() {
         </header>
 
         <div style={{ padding: "1.1rem 1.4rem 0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.7rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.7rem" }}
+          >
             {PASOS.map((_, i) => {
               const n = i + 1;
               const hecho = n < paso;
               const actual = n === paso;
               return (
-                <div key={n} style={{ flex: 1, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div
+                  key={n}
+                  style={{ flex: 1, display: "flex", alignItems: "center", gap: "0.5rem" }}
+                >
                   <span
                     style={{
                       width: "1.8rem",
@@ -329,7 +342,11 @@ function Wizard() {
                       fontSize: "0.8rem",
                       fontWeight: 800,
                       flexShrink: 0,
-                      background: hecho ? "var(--lgs-verde)" : actual ? "var(--lgs-azul)" : "#e6e9f2",
+                      background: hecho
+                        ? "var(--lgs-verde)"
+                        : actual
+                          ? "var(--lgs-azul)"
+                          : "#e6e9f2",
                       color: hecho || actual ? "white" : "#8b91a3",
                     }}
                   >
@@ -354,7 +371,14 @@ function Wizard() {
           </p>
         </div>
 
-        <div style={{ padding: "1rem 1.4rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+        <div
+          style={{
+            padding: "1rem 1.4rem 1.4rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.8rem",
+          }}
+        >
           {apiError !== null && (
             <p
               role="alert"
@@ -373,32 +397,63 @@ function Wizard() {
 
           {paso === 1 && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }} className="ng-dos">
+              <div
+                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}
+                className="ng-dos"
+              >
                 <div>
-                  <label style={rotulo} htmlFor="n">Nombres *</label>
-                  <input id="n" value={form.nombres} onChange={(e) => set("nombres", e.target.value)}
-                    style={errores.nombres !== undefined ? malo : campo} autoComplete="given-name" />
+                  <label style={rotulo} htmlFor="n">
+                    Nombres *
+                  </label>
+                  <input
+                    id="n"
+                    value={form.nombres}
+                    onChange={(e) => set("nombres", e.target.value)}
+                    style={errores.nombres !== undefined ? malo : campo}
+                    autoComplete="given-name"
+                  />
                   {errores.nombres !== undefined && <p style={aviso}>{errores.nombres}</p>}
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="a">Apellidos *</label>
-                  <input id="a" value={form.apellidos} onChange={(e) => set("apellidos", e.target.value)}
-                    style={errores.apellidos !== undefined ? malo : campo} autoComplete="family-name" />
+                  <label style={rotulo} htmlFor="a">
+                    Apellidos *
+                  </label>
+                  <input
+                    id="a"
+                    value={form.apellidos}
+                    onChange={(e) => set("apellidos", e.target.value)}
+                    style={errores.apellidos !== undefined ? malo : campo}
+                    autoComplete="family-name"
+                  />
                   {errores.apellidos !== undefined && <p style={aviso}>{errores.apellidos}</p>}
                 </div>
               </div>
               <div>
-                <label style={rotulo} htmlFor="d">Número de documento *</label>
-                <input id="d" value={form.docNumero} onChange={(e) => set("docNumero", e.target.value)}
-                  style={errores.docNumero !== undefined ? malo : campo} />
+                <label style={rotulo} htmlFor="d">
+                  Número de documento *
+                </label>
+                <input
+                  id="d"
+                  value={form.docNumero}
+                  onChange={(e) => set("docNumero", e.target.value)}
+                  style={errores.docNumero !== undefined ? malo : campo}
+                />
                 {errores.docNumero !== undefined && <p style={aviso}>{errores.docNumero}</p>}
               </div>
               <div>
-                <label style={rotulo} htmlFor="f">Fecha de nacimiento *</label>
-                <input id="f" type="date" value={form.fechaNacimiento}
+                <label style={rotulo} htmlFor="f">
+                  Fecha de nacimiento *
+                </label>
+                <input
+                  id="f"
+                  type="date"
+                  value={form.fechaNacimiento}
                   onChange={(e) => set("fechaNacimiento", e.target.value)}
-                  style={errores.fechaNacimiento !== undefined ? malo : campo} />
-                {errores.fechaNacimiento !== undefined && <p style={aviso}>{errores.fechaNacimiento}</p>}
+                  style={errores.fechaNacimiento !== undefined ? malo : campo}
+                />
+                {errores.fechaNacimiento !== undefined && (
+                  <p style={aviso}>{errores.fechaNacimiento}</p>
+                )}
               </div>
             </>
           )}
@@ -406,33 +461,68 @@ function Wizard() {
           {paso === 2 && (
             <>
               <div>
-                <label style={rotulo} htmlFor="e">Correo *</label>
-                <input id="e" type="email" value={form.email} onChange={(e) => set("email", e.target.value)}
-                  style={errores.email !== undefined ? malo : campo} autoComplete="email" />
+                <label style={rotulo} htmlFor="e">
+                  Correo *
+                </label>
+                <input
+                  id="e"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  style={errores.email !== undefined ? malo : campo}
+                  autoComplete="email"
+                />
                 {errores.email !== undefined && <p style={aviso}>{errores.email}</p>}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }} className="ng-dos">
+              <div
+                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}
+                className="ng-dos"
+              >
                 <div>
-                  <label style={rotulo} htmlFor="t">Teléfono *</label>
-                  <input id="t" value={form.telefono} onChange={(e) => set("telefono", e.target.value)}
-                    style={errores.telefono !== undefined ? malo : campo} autoComplete="tel"
-                    placeholder="+56 9 1234 5678" />
+                  <label style={rotulo} htmlFor="t">
+                    Teléfono *
+                  </label>
+                  <input
+                    id="t"
+                    value={form.telefono}
+                    onChange={(e) => set("telefono", e.target.value)}
+                    style={errores.telefono !== undefined ? malo : campo}
+                    autoComplete="tel"
+                    placeholder="+56 9 1234 5678"
+                  />
                   {errores.telefono !== undefined && <p style={aviso}>{errores.telefono}</p>}
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="p">País *</label>
-                  <select id="p" value={form.pais} onChange={(e) => set("pais", e.target.value)}
-                    style={errores.pais !== undefined ? malo : campo}>
+                  <label style={rotulo} htmlFor="p">
+                    País *
+                  </label>
+                  <select
+                    id="p"
+                    value={form.pais}
+                    onChange={(e) => set("pais", e.target.value)}
+                    style={errores.pais !== undefined ? malo : campo}
+                  >
                     <option value="">Elige…</option>
-                    {PAISES.map((p) => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
+                    {PAISES.map((p) => (
+                      <option key={p.codigo} value={p.codigo}>
+                        {p.nombre}
+                      </option>
+                    ))}
                   </select>
                   {errores.pais !== undefined && <p style={aviso}>{errores.pais}</p>}
                 </div>
               </div>
               <div>
-                <label style={rotulo} htmlFor="dom">Domicilio *</label>
-                <input id="dom" value={form.domicilio} onChange={(e) => set("domicilio", e.target.value)}
-                  style={errores.domicilio !== undefined ? malo : campo} autoComplete="street-address" />
+                <label style={rotulo} htmlFor="dom">
+                  Domicilio *
+                </label>
+                <input
+                  id="dom"
+                  value={form.domicilio}
+                  onChange={(e) => set("domicilio", e.target.value)}
+                  style={errores.domicilio !== undefined ? malo : campo}
+                  autoComplete="street-address"
+                />
                 {errores.domicilio !== undefined && <p style={aviso}>{errores.domicilio}</p>}
               </div>
             </>
@@ -441,12 +531,20 @@ function Wizard() {
           {paso === 3 && (
             <>
               <div>
-                <label style={rotulo} htmlFor="z">Sala de Zoom *</label>
-                <input id="z" value={form.zoomUrl} onChange={(e) => set("zoomUrl", e.target.value)}
+                <label style={rotulo} htmlFor="z">
+                  Sala de Zoom *
+                </label>
+                <input
+                  id="z"
+                  value={form.zoomUrl}
+                  onChange={(e) => set("zoomUrl", e.target.value)}
                   style={errores.zoomUrl !== undefined ? malo : campo}
-                  placeholder="https://zoom.us/j/NÚMERO" />
+                  placeholder="https://zoom.us/j/NÚMERO"
+                />
                 {errores.zoomUrl !== undefined && <p style={aviso}>{errores.zoomUrl}</p>}
-                <p style={{ fontSize: "0.76rem", color: "var(--texto-suave)", marginTop: "0.25rem" }}>
+                <p
+                  style={{ fontSize: "0.76rem", color: "var(--texto-suave)", marginTop: "0.25rem" }}
+                >
                   Copia el enlace de tu <strong>sala</strong> (…zoom.us/j/NÚMERO). El de chat o
                   contacto no sirve: a tus alumnos les abre “Enviar solicitud de contacto” en vez de
                   la clase.
@@ -466,22 +564,41 @@ function Wizard() {
                       placeItems: "center",
                       overflow: "hidden",
                       flexShrink: 0,
-                      border: errores.foto !== undefined ? "2px solid #e57373" : "2px solid #e3e7f0",
+                      border:
+                        errores.foto !== undefined ? "2px solid #e57373" : "2px solid #e3e7f0",
                     }}
                   >
                     {fotoPrevio !== null ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={fotoPrevio} alt="Vista previa" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img
+                        src={fotoPrevio}
+                        alt="Vista previa"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
                     ) : (
                       <span style={{ fontSize: "1.8rem" }}>{ficha.tieneFoto ? "🖼️" : "👤"}</span>
                     )}
                   </div>
                   <div>
-                    <button type="button" onClick={() => fileRef.current?.click()}
-                      style={{ ...boton, background: "#eef2ff", color: "var(--lgs-azul-oscuro)", padding: "0.5rem 1rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      style={{
+                        ...boton,
+                        background: "#eef2ff",
+                        color: "var(--lgs-azul-oscuro)",
+                        padding: "0.5rem 1rem",
+                      }}
+                    >
                       📷 {foto !== null ? "Cambiar foto" : "Elegir foto"}
                     </button>
-                    <p style={{ fontSize: "0.74rem", color: "var(--texto-suave)", marginTop: "0.3rem" }}>
+                    <p
+                      style={{
+                        fontSize: "0.74rem",
+                        color: "var(--texto-suave)",
+                        marginTop: "0.3rem",
+                      }}
+                    >
                       {foto !== null
                         ? foto.name
                         : ficha.tieneFoto
@@ -490,8 +607,13 @@ function Wizard() {
                     </p>
                   </div>
                 </div>
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp"
-                  onChange={elegirFoto} style={{ display: "none" }} />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={elegirFoto}
+                  style={{ display: "none" }}
+                />
                 {errores.foto !== undefined && <p style={aviso}>{errores.foto}</p>}
               </div>
 
@@ -501,18 +623,47 @@ function Wizard() {
             </>
           )}
 
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", marginTop: "0.3rem" }}>
-            <button type="button" onClick={() => setPaso((p) => p - 1)} disabled={paso === 1}
-              style={{ ...boton, background: "#eef1f7", color: "#4a5165", visibility: paso === 1 ? "hidden" : "visible" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "0.6rem",
+              marginTop: "0.3rem",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setPaso((p) => p - 1)}
+              disabled={paso === 1}
+              style={{
+                ...boton,
+                background: "#eef1f7",
+                color: "#4a5165",
+                visibility: paso === 1 ? "hidden" : "visible",
+              }}
+            >
               ← Atrás
             </button>
             {paso < PASOS.length ? (
-              <button type="button" onClick={siguiente} style={{ ...boton, background: "var(--lgs-azul)", color: "white" }}>
+              <button
+                type="button"
+                onClick={siguiente}
+                style={{ ...boton, background: "var(--lgs-azul)", color: "white" }}
+              >
                 Continuar →
               </button>
             ) : (
-              <button type="button" onClick={() => void enviar()} disabled={enviando}
-                style={{ ...boton, background: "var(--lgs-verde)", color: "white", cursor: enviando ? "wait" : "pointer" }}>
+              <button
+                type="button"
+                onClick={() => void enviar()}
+                disabled={enviando}
+                style={{
+                  ...boton,
+                  background: "var(--lgs-verde)",
+                  color: "white",
+                  cursor: enviando ? "wait" : "pointer",
+                }}
+              >
                 {enviando ? "Guardando…" : "✓ Finalizar registro"}
               </button>
             )}

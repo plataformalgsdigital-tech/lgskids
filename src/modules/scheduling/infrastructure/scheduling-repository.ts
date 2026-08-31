@@ -165,10 +165,10 @@ export async function updateHorarioCatalogo(
 }
 
 export async function setHorarioActivo(id: string, activo: boolean): Promise<void> {
-  await execute(
-    `UPDATE scheduling_horario SET activo = $2, updated_at = now() WHERE id = $1`,
-    [id, activo],
-  );
+  await execute(`UPDATE scheduling_horario SET activo = $2, updated_at = now() WHERE id = $1`, [
+    id,
+    activo,
+  ]);
 }
 
 /** Borra un horario del catálogo. Sus slots caen por cascada (FK ON DELETE CASCADE). */
@@ -424,7 +424,9 @@ export async function listClassrooms(
     conds.push(`cl.guia_user_id = $${values.length}`);
   }
   const where = conds.length > 0 ? `WHERE ${conds.join(" AND ")}` : "";
-  const rows = await queryRows<Omit<ClassroomListItem, "horario"> & { horario: SlotResumen[] | null }>(
+  const rows = await queryRows<
+    Omit<ClassroomListItem, "horario"> & { horario: SlotResumen[] | null }
+  >(
     `SELECT cl.id, cl.course_id AS "courseId", cl.nombre,
             cl.guia_user_id AS "guiaUserId", cl.cupo, cl.meeting_url AS "meetingUrl",
             cl.timezone, cl.holiday_country AS "holidayCountry", cl.activo,

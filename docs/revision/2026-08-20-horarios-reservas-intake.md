@@ -22,12 +22,12 @@ salones + resumen de sesión + wizard de campañas (trabajo previo consolidado).
 
 ## Cambios por commit
 
-| Commit | Qué |
-|---|---|
-| `cea2a16` | **fix(auth):** `apiFetch` serializa el refresh — peticiones concurrentes con 401 compartían `/auth/refresh` y la detección de reuso revocaba la familia de sesión. |
-| `ae89dad` | **feat:** catálogo de horarios, reservas LGS (RESERVADA), agenda/calendario, wizard de campañas. |
-| `0d3f746` | **feat(intake):** puerta de servicio LGS→KIDS (Fase B). |
-| `05bf707`, `b8f5ab7` | **docs(claude):** CLAUDE.md (intake, horarios, pendientes). |
+| Commit               | Qué                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cea2a16`            | **fix(auth):** `apiFetch` serializa el refresh — peticiones concurrentes con 401 compartían `/auth/refresh` y la detección de reuso revocaba la familia de sesión. |
+| `ae89dad`            | **feat:** catálogo de horarios, reservas LGS (RESERVADA), agenda/calendario, wizard de campañas.                                                                   |
+| `0d3f746`            | **feat(intake):** puerta de servicio LGS→KIDS (Fase B).                                                                                                            |
+| `05bf707`, `b8f5ab7` | **docs(claude):** CLAUDE.md (intake, horarios, pendientes).                                                                                                        |
 
 ## Migraciones (aplicadas)
 
@@ -76,8 +76,8 @@ curl http://localhost:3000/api/kids-intake/availability                         
 ## Pendientes conocidos
 
 - **Endurecer la auth de servicio de API-key a HMAC** (integridad + anti-replay
-  + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO. No urgente
-  sobre HTTPS con rotación de clave.
+  - el secreto no viaja): alinear con el `crm-bridge` de MOSAICO. No urgente
+    sobre HTTPS con rotación de clave.
 - **Despliegue a DigitalOcean (Fase 11)**: sin él, la puerta de servicio no
   puede recibir llamadas reales de LGS (KIDS debe ser público + `LGS_INTAKE_API_KEY`
   provisionada en ambos sistemas).

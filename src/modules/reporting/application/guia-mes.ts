@@ -104,7 +104,9 @@ export async function consolidarGuiaMes(periodo: string): Promise<{ guias: numbe
  * Lee lo consolidado. Sin `periodo` devuelve TODO el histórico acumulado —
  * que es lo que se extrae para el informe.
  */
-export async function leerGuiaMes(periodo?: string): Promise<(GuiaMes & { consolidadoEn: string })[]> {
+export async function leerGuiaMes(
+  periodo?: string,
+): Promise<(GuiaMes & { consolidadoEn: string })[]> {
   const values: unknown[] = [];
   let where = "";
   if (periodo !== undefined) {

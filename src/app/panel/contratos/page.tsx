@@ -364,7 +364,9 @@ export default function ContratosPage() {
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 12rem" }}>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 12rem" }}
+        >
           <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Campaña</span>
           <select
             value={fCampaniaId}

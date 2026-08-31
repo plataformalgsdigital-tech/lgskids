@@ -91,7 +91,11 @@ export const crearReservaHandler = handlerWithAuth(async (request, auth) => {
 const ISO_DATE_OPT = z.string().regex(ISO_DATE).optional();
 const listarSchema = z.object({
   estado: z.enum(["PENDIENTE", "APROBADO", "ONHOLD", "INACTIVO"]).optional(),
-  pais: z.string().length(2).transform((c) => c.toUpperCase()).optional(),
+  pais: z
+    .string()
+    .length(2)
+    .transform((c) => c.toUpperCase())
+    .optional(),
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
   campaignId: z.uuid().optional(),
   inicioDesde: ISO_DATE_OPT,

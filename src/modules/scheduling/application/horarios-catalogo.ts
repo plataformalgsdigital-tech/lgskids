@@ -55,12 +55,7 @@ export async function crearHorario(input: {
   }
   validarSlots(input.slots);
   if (
-    await existsHorarioEtiqueta(
-      input.tipoCurso,
-      input.grupoPais,
-      input.salonNumero,
-      input.etiqueta,
-    )
+    await existsHorarioEtiqueta(input.tipoCurso, input.grupoPais, input.salonNumero, input.etiqueta)
   ) {
     throw new ConflictError(
       `Ya existe un horario "${input.etiqueta.trim()}" para ${input.tipoCurso} · Salón ${input.salonNumero} en ${GRUPOS_PAIS[input.grupoPais]}.`,

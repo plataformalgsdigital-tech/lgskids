@@ -98,7 +98,11 @@ export async function crearContrato(input: {
 
 /** Rechaza si el documento (país+tipo+número) ya existe en otra persona. */
 async function exigirDocLibre(p: PersonInput): Promise<void> {
-  const existe = await findPersonByDoc(p.countryCode, p.docTipo.trim().toUpperCase(), p.docNumero.trim());
+  const existe = await findPersonByDoc(
+    p.countryCode,
+    p.docTipo.trim().toUpperCase(),
+    p.docNumero.trim(),
+  );
   if (existe !== null) {
     throw new ConflictError(
       `Ya existe una persona con documento ${p.docTipo} ${p.docNumero} en ${p.countryCode}.`,

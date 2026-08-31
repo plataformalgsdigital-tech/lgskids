@@ -243,7 +243,10 @@ function cursoParams(input: CursoReferenciaInput): unknown[] {
   ];
 }
 
-export async function insertCursoReferencia(id: string, input: CursoReferenciaInput): Promise<void> {
+export async function insertCursoReferencia(
+  id: string,
+  input: CursoReferenciaInput,
+): Promise<void> {
   await execute(
     `INSERT INTO catalog_curso
        (id, curso, nivel, unidad, quiz, leccion, orden, contenido, video,
@@ -254,7 +257,10 @@ export async function insertCursoReferencia(id: string, input: CursoReferenciaIn
   );
 }
 
-export async function updateCursoReferencia(id: string, input: CursoReferenciaInput): Promise<void> {
+export async function updateCursoReferencia(
+  id: string,
+  input: CursoReferenciaInput,
+): Promise<void> {
   await execute(
     `UPDATE catalog_curso
         SET curso = $2::catalog_course_tipo, nivel = $3, unidad = $4, quiz = $5::jsonb,
@@ -284,10 +290,11 @@ export async function getReferenciaNivel(levelId: string): Promise<ReferenciaNiv
 }
 
 export async function updateReferenciaNivel(levelId: string, ref: ReferenciaNivel): Promise<void> {
-  await execute(
-    `UPDATE catalog_level SET descripcion = $2, recursos = $3::jsonb WHERE id = $1`,
-    [levelId, ref.descripcion, JSON.stringify(ref.recursos)],
-  );
+  await execute(`UPDATE catalog_level SET descripcion = $2, recursos = $3::jsonb WHERE id = $1`, [
+    levelId,
+    ref.descripcion,
+    JSON.stringify(ref.recursos),
+  ]);
 }
 
 export interface ReferenciaQuiz {

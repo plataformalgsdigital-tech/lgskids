@@ -122,7 +122,12 @@ const input: CSSProperties = {
   border: "1.5px solid #d8dce6",
   fontSize: "0.9rem",
 };
-const th: CSSProperties = { padding: "0.4rem 0.5rem", textAlign: "left", color: "var(--texto-suave)", whiteSpace: "nowrap" };
+const th: CSSProperties = {
+  padding: "0.4rem 0.5rem",
+  textAlign: "left",
+  color: "var(--texto-suave)",
+  whiteSpace: "nowrap",
+};
 const td: CSSProperties = { padding: "0.4rem 0.5rem", whiteSpace: "nowrap" };
 
 export default function SubirCursoPage() {
@@ -247,19 +252,34 @@ export default function SubirCursoPage() {
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Subir curso (CSV)</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
         Importa la referencia de un curso completo. Al cargar el archivo verás un{" "}
-        <strong>previo</strong> para revisar; solo al confirmar se guarda (upsert por curso · nivel ·
-        unidad · lección).
+        <strong>previo</strong> para revisar; solo al confirmar se guarda (upsert por curso · nivel
+        · unidad · lección).
       </p>
 
       {/* Formato */}
       <section
-        style={{ marginTop: "1rem", border: "1px solid #e3e7f0", borderRadius: "0.8rem", padding: "1rem" }}
+        style={{
+          marginTop: "1rem",
+          border: "1px solid #e3e7f0",
+          borderRadius: "0.8rem",
+          padding: "1rem",
+        }}
       >
         <strong style={{ fontSize: "0.95rem" }}>Formato de entrada</strong>
         <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", margin: "0.4rem 0" }}>
           Cabecera (obligatorias: <code>curso, nivel, unidad, leccion, orden</code>):
         </p>
-        <code style={{ display: "block", fontSize: "0.78rem", background: "#f4f6fb", padding: "0.5rem 0.6rem", borderRadius: "0.5rem", overflowX: "auto", whiteSpace: "pre" }}>
+        <code
+          style={{
+            display: "block",
+            fontSize: "0.78rem",
+            background: "#f4f6fb",
+            padding: "0.5rem 0.6rem",
+            borderRadius: "0.5rem",
+            overflowX: "auto",
+            whiteSpace: "pre",
+          }}
+        >
           {COLUMNAS.join(", ")}
         </code>
         <ul style={{ fontSize: "0.82rem", color: "var(--texto-suave)", marginTop: "0.5rem" }}>
@@ -269,8 +289,8 @@ export default function SubirCursoPage() {
           </li>
           <li>
             Listas (<strong>materialguia, materialusuario, actividades, recursos, clubes</strong>):
-            varios ítems separados por <code>;</code> y cada uno como{" "}
-            <code>Nombre|enlace</code>. Ej: <code>Guía L1|g1.pdf;Guía L2|g2.pdf</code>.
+            varios ítems separados por <code>;</code> y cada uno como <code>Nombre|enlace</code>.
+            Ej: <code>Guía L1|g1.pdf;Guía L2|g2.pdf</code>.
           </li>
           <li>
             El separador de columnas puede ser <code>,</code> o <code>;</code>: se detecta solo
@@ -295,7 +315,15 @@ export default function SubirCursoPage() {
       </section>
 
       {/* Cargar */}
-      <section style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+      <section
+        style={{
+          marginTop: "1rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+          flexWrap: "wrap",
+        }}
+      >
         <input type="file" accept=".csv,text/csv" onChange={onArchivo} style={input} />
         {nombreArchivo !== "" && (
           <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>{nombreArchivo}</span>
@@ -308,7 +336,13 @@ export default function SubirCursoPage() {
         </p>
       )}
       {resultado !== null && (
-        <p style={{ color: resultado.startsWith("✔") ? "#1b5e20" : "#c62828", marginTop: "0.75rem", fontWeight: 600 }}>
+        <p
+          style={{
+            color: resultado.startsWith("✔") ? "#1b5e20" : "#c62828",
+            marginTop: "0.75rem",
+            fontWeight: 600,
+          }}
+        >
           {resultado}
         </p>
       )}
@@ -316,7 +350,15 @@ export default function SubirCursoPage() {
       {/* Previo */}
       {preview !== null && (
         <section style={{ marginTop: "1.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
             <strong style={{ fontSize: "1rem" }}>
               Previo: {validas.length} válida(s)
               {conError.length > 0 && ` · ${conError.length} con error`}
@@ -356,7 +398,13 @@ export default function SubirCursoPage() {
               </thead>
               <tbody>
                 {preview.map((p) => (
-                  <tr key={p.linea} style={{ borderBottom: "1px solid #edf0f6", background: p.error ? "#fff5f5" : "white" }}>
+                  <tr
+                    key={p.linea}
+                    style={{
+                      borderBottom: "1px solid #edf0f6",
+                      background: p.error ? "#fff5f5" : "white",
+                    }}
+                  >
                     <td style={td}>{p.linea}</td>
                     <td style={td}>
                       {p.error === null ? (
@@ -372,9 +420,7 @@ export default function SubirCursoPage() {
                     <td style={td}>{p.fila.unidad ?? "—"}</td>
                     <td style={{ ...td, whiteSpace: "normal" }}>{p.fila.leccion}</td>
                     <td style={td}>{p.fila.orden}</td>
-                    <td style={td}>
-                      {p.fila.materialGuia.length + p.fila.materialUsuario.length}
-                    </td>
+                    <td style={td}>{p.fila.materialGuia.length + p.fila.materialUsuario.length}</td>
                     <td style={td}>{p.fila.actividades.length + p.fila.recursos.length}</td>
                   </tr>
                 ))}

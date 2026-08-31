@@ -49,8 +49,18 @@ const campo: CSSProperties = {
   fontSize: "0.9rem",
   fontFamily: "inherit",
 };
-const rotulo: CSSProperties = { display: "block", fontSize: "0.76rem", fontWeight: 700, marginBottom: "0.15rem" };
-const tarjeta: CSSProperties = { background: "white", border: "1px solid #e3e7f0", borderRadius: "0.9rem", padding: "1rem 1.1rem" };
+const rotulo: CSSProperties = {
+  display: "block",
+  fontSize: "0.76rem",
+  fontWeight: 700,
+  marginBottom: "0.15rem",
+};
+const tarjeta: CSSProperties = {
+  background: "white",
+  border: "1px solid #e3e7f0",
+  borderRadius: "0.9rem",
+  padding: "1rem 1.1rem",
+};
 
 const VACIA = {
   nombres: "",
@@ -206,10 +216,19 @@ export default function GuiasPage() {
         <strong>Usuarios y roles</strong>; aquí se completa la ficha.
       </p>
 
-      {error !== null && <p role="alert" style={{ color: "#c62828", fontWeight: 600, marginBottom: "0.8rem" }}>{error}</p>}
-      {aviso !== null && <p style={{ color: "#1b5e20", fontWeight: 600, marginBottom: "0.8rem" }}>{aviso}</p>}
+      {error !== null && (
+        <p role="alert" style={{ color: "#c62828", fontWeight: 600, marginBottom: "0.8rem" }}>
+          {error}
+        </p>
+      )}
+      {aviso !== null && (
+        <p style={{ color: "#1b5e20", fontWeight: 600, marginBottom: "0.8rem" }}>{aviso}</p>
+      )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "18rem 1fr", gap: "1rem" }} className="guias-dos">
+      <div
+        style={{ display: "grid", gridTemplateColumns: "18rem 1fr", gap: "1rem" }}
+        className="guias-dos"
+      >
         <section style={{ ...tarjeta, padding: "0.6rem" }}>
           {guias === null ? (
             <p style={{ color: "var(--texto-suave)", padding: "0.5rem" }}>Cargando…</p>
@@ -235,9 +254,13 @@ export default function GuiasPage() {
                   }}
                 >
                   <span style={{ fontWeight: 700 }}>
-                    {g.nombres !== null && g.apellidos !== null ? `${g.nombres} ${g.apellidos}` : g.username}
+                    {g.nombres !== null && g.apellidos !== null
+                      ? `${g.nombres} ${g.apellidos}`
+                      : g.username}
                   </span>
-                  <span style={{ display: "block", fontSize: "0.74rem", color: "var(--texto-suave)" }}>
+                  <span
+                    style={{ display: "block", fontSize: "0.74rem", color: "var(--texto-suave)" }}
+                  >
                     {g.username}
                     {g.zoomUrl === null || g.zoomUrl === "" ? " · sin Zoom" : ` · ${g.pais ?? "—"}`}
                   </span>
@@ -270,52 +293,127 @@ export default function GuiasPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
               <h2 style={{ fontSize: "1.1rem", fontWeight: 800 }}>{sel.username}</h2>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }} className="guias-dos">
+              <div
+                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
+                className="guias-dos"
+              >
                 <div>
-                  <label style={rotulo} htmlFor="g-nom">Nombres</label>
-                  <input id="g-nom" value={form.nombres} onChange={(e) => setForm({ ...form, nombres: e.target.value })} style={campo} />
+                  <label style={rotulo} htmlFor="g-nom">
+                    Nombres
+                  </label>
+                  <input
+                    id="g-nom"
+                    value={form.nombres}
+                    onChange={(e) => setForm({ ...form, nombres: e.target.value })}
+                    style={campo}
+                  />
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="g-ape">Apellidos</label>
-                  <input id="g-ape" value={form.apellidos} onChange={(e) => setForm({ ...form, apellidos: e.target.value })} style={campo} />
+                  <label style={rotulo} htmlFor="g-ape">
+                    Apellidos
+                  </label>
+                  <input
+                    id="g-ape"
+                    value={form.apellidos}
+                    onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
+                    style={campo}
+                  />
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="g-doc">Documento</label>
-                  <input id="g-doc" value={form.docNumero} onChange={(e) => setForm({ ...form, docNumero: e.target.value })} style={campo} />
+                  <label style={rotulo} htmlFor="g-doc">
+                    Documento
+                  </label>
+                  <input
+                    id="g-doc"
+                    value={form.docNumero}
+                    onChange={(e) => setForm({ ...form, docNumero: e.target.value })}
+                    style={campo}
+                  />
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="g-nac">Fecha de nacimiento</label>
-                  <input id="g-nac" type="date" value={form.fechaNacimiento} onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })} style={campo} />
+                  <label style={rotulo} htmlFor="g-nac">
+                    Fecha de nacimiento
+                  </label>
+                  <input
+                    id="g-nac"
+                    type="date"
+                    value={form.fechaNacimiento}
+                    onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
+                    style={campo}
+                  />
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="g-mail">Correo</label>
-                  <input id="g-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={campo} />
+                  <label style={rotulo} htmlFor="g-mail">
+                    Correo
+                  </label>
+                  <input
+                    id="g-mail"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    style={campo}
+                  />
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="g-tel">Teléfono</label>
-                  <input id="g-tel" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} style={campo} />
+                  <label style={rotulo} htmlFor="g-tel">
+                    Teléfono
+                  </label>
+                  <input
+                    id="g-tel"
+                    value={form.telefono}
+                    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                    style={campo}
+                  />
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="g-pais">País</label>
-                  <select id="g-pais" value={form.pais} onChange={(e) => setForm({ ...form, pais: e.target.value })} style={campo}>
+                  <label style={rotulo} htmlFor="g-pais">
+                    País
+                  </label>
+                  <select
+                    id="g-pais"
+                    value={form.pais}
+                    onChange={(e) => setForm({ ...form, pais: e.target.value })}
+                    style={campo}
+                  >
                     <option value="">Sin país</option>
-                    {PAISES.map((p) => <option key={p} value={p}>{p}</option>)}
+                    {PAISES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label style={rotulo} htmlFor="g-dom">Domicilio</label>
-                  <input id="g-dom" value={form.domicilio} onChange={(e) => setForm({ ...form, domicilio: e.target.value })} style={campo} />
+                  <label style={rotulo} htmlFor="g-dom">
+                    Domicilio
+                  </label>
+                  <input
+                    id="g-dom"
+                    value={form.domicilio}
+                    onChange={(e) => setForm({ ...form, domicilio: e.target.value })}
+                    style={campo}
+                  />
                 </div>
               </div>
 
               <div>
-                <label style={rotulo} htmlFor="g-zoom">Sala de Zoom</label>
-                <input id="g-zoom" value={form.zoomUrl} onChange={(e) => setForm({ ...form, zoomUrl: e.target.value })}
-                  placeholder="https://zoom.us/j/NÚMERO" style={campo} />
-                <p style={{ fontSize: "0.75rem", color: "var(--texto-suave)", marginTop: "0.2rem" }}>
-                  Debe ser el enlace de la <strong>sala</strong>, no el de chat o contacto: ese último le abre
-                  al alumno “Enviar solicitud de contacto” en vez de la clase. El enlace de anfitrión
-                  (<code>/s/</code>) se convierte solo. Dos guías no pueden compartir sala.
+                <label style={rotulo} htmlFor="g-zoom">
+                  Sala de Zoom
+                </label>
+                <input
+                  id="g-zoom"
+                  value={form.zoomUrl}
+                  onChange={(e) => setForm({ ...form, zoomUrl: e.target.value })}
+                  placeholder="https://zoom.us/j/NÚMERO"
+                  style={campo}
+                />
+                <p
+                  style={{ fontSize: "0.75rem", color: "var(--texto-suave)", marginTop: "0.2rem" }}
+                >
+                  Debe ser el enlace de la <strong>sala</strong>, no el de chat o contacto: ese
+                  último le abre al alumno “Enviar solicitud de contacto” en vez de la clase. El
+                  enlace de anfitrión (<code>/s/</code>) se convierte solo. Dos guías no pueden
+                  compartir sala.
                 </p>
               </div>
 
@@ -332,7 +430,13 @@ export default function GuiasPage() {
               >
                 <div>
                   <strong style={{ fontSize: "0.9rem" }}>🔗 Enlace de registro</strong>
-                  <p style={{ fontSize: "0.76rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}>
+                  <p
+                    style={{
+                      fontSize: "0.76rem",
+                      color: "var(--texto-suave)",
+                      marginTop: "0.15rem",
+                    }}
+                  >
                     En vez de llenarle la ficha, envíale este enlace y él mismo carga sus datos, su
                     sala de Zoom y su foto. Sirve <strong>una sola vez</strong> y vence a los{" "}
                     {diasVigencia} días.
@@ -354,12 +458,25 @@ export default function GuiasPage() {
                 )}
 
                 {enlaceNuevo !== null && (
-                  <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.4rem",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <input
                       readOnly
                       value={enlaceNuevo}
                       onFocus={(e) => e.currentTarget.select()}
-                      style={{ ...campo, flex: 1, minWidth: "14rem", fontSize: "0.78rem", background: "white" }}
+                      style={{
+                        ...campo,
+                        flex: 1,
+                        minWidth: "14rem",
+                        fontSize: "0.78rem",
+                        background: "white",
+                      }}
                     />
                     <button
                       type="button"
@@ -420,8 +537,21 @@ export default function GuiasPage() {
                 </div>
               </section>
 
-              <button type="button" onClick={() => void guardar()} disabled={ocupado}
-                style={{ alignSelf: "flex-start", padding: "0.6rem 1.2rem", borderRadius: "0.6rem", border: "none", background: "var(--lgs-azul)", color: "white", fontWeight: 700, cursor: ocupado ? "wait" : "pointer" }}>
+              <button
+                type="button"
+                onClick={() => void guardar()}
+                disabled={ocupado}
+                style={{
+                  alignSelf: "flex-start",
+                  padding: "0.6rem 1.2rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  background: "var(--lgs-azul)",
+                  color: "white",
+                  fontWeight: 700,
+                  cursor: ocupado ? "wait" : "pointer",
+                }}
+              >
                 {ocupado ? "Guardando…" : "💾 Guardar ficha"}
               </button>
             </div>

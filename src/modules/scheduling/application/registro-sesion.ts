@@ -182,10 +182,9 @@ export async function solicitarRepeticion(input: {
   if (motivo.length < 5) {
     throw new ValidationError("Explica el motivo de la repetición (mínimo 5 caracteres).");
   }
-  const sesion = await queryOne<{ id: string }>(
-    `SELECT id FROM scheduling_session WHERE id = $1`,
-    [input.sessionId],
-  );
+  const sesion = await queryOne<{ id: string }>(`SELECT id FROM scheduling_session WHERE id = $1`, [
+    input.sessionId,
+  ]);
   if (sesion === null) throw new NotFoundError("La sesión no existe.");
 
   const viva = await queryOne<{ id: string }>(
@@ -235,7 +234,12 @@ export async function resolverRepeticion(input: {
       `UPDATE scheduling_repeticion
           SET estado = $2, resuelto_por = $3, resuelto_en = now(), nota_resolucion = $4
         WHERE id = $1`,
-      [input.repeticionId, input.aprobar ? "APROBADA" : "RECHAZADA", input.actorUserId, input.nota ?? null],
+      [
+        input.repeticionId,
+        input.aprobar ? "APROBADA" : "RECHAZADA",
+        input.actorUserId,
+        input.nota ?? null,
+      ],
       tx,
     );
     await registrarAuditoria({
