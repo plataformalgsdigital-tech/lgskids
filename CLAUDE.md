@@ -301,6 +301,10 @@ Ultimate Stage (5 niveles; duración 2/2/3/3/2 meses).
 ```bash
 pnpm dev          # desarrollo
 pnpm verify       # lint + tipos + pruebas + arquitectura + build (cierre de fase)
+# OJO: `pnpm test` SALTA las pruebas de integración si faltan las variables.
+# CI sí las corre, así que en local pueden verse 13/23 archivos "en verde"
+# mientras CI está en rojo. Para correrlas de verdad:
+INTEGRATION_TESTS=1 DATABASE_URL=postgresql://kids:kids_dev@localhost:5432/kids2026 pnpm test
 pnpm test:arch    # solo límites de módulos (dependency-cruiser)
 docker compose -f infra/docker/docker-compose.yml up -d   # Postgres local
 ```
@@ -504,8 +508,10 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   `LGS_INTAKE_API_KEY` provisionada en ambos sistemas).
 - Procedimiento operativo para cuando el desfase CL–CO sea de 2 h (verano
   austral): el negocio lo definirá más adelante.
-- Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. Falta definir
-  protección de `main` y CI.
+- Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. **CI activo**
+  (`.github/workflows/ci.yml`: lint, tipos, pruebas CON integración contra un
+  Postgres de servicio, arquitectura y build). Falta definir protección de `main`
+  —hoy se empuja directo— y hay PRs de Dependabot abiertos sin revisar.
 - Docker Desktop SÍ está instalado; `docker compose -f infra/docker/...` levanta
   Postgres local.
 - **Escopar el registro de intentos de quiz al salón del guía**: `POST

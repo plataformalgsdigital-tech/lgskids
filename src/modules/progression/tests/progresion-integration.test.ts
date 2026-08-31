@@ -36,8 +36,9 @@ describe.runIf(RUN)("progresión (integración)", () => {
     classroomId = newId();
     sessionId = newId();
     await execute(
-      `INSERT INTO catalog_campaign (id, nombre, inicio, fin, updated_at)
-       VALUES ($1, $2, '2026-08-03', '2026-10-25', now())`,
+      `INSERT INTO catalog_campaign (id, nombre, inicio, fin, final_venta, updated_at)
+       VALUES ($1, $2, '2026-08-03', '2026-10-25',
+               ('2026-08-03'::date + INTERVAL '21 days')::date, now())`,
       [campaignId, `IT Prog ${sufijo}`],
     );
     await execute(
