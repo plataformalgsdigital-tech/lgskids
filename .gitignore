@@ -18,6 +18,13 @@ dist/
 # Almacenamiento local de desarrollo (adaptador local de archivos)
 .storage/
 
+# Arte de ORIGEN a resolución completa (~130 MB). No se despliega: de aquí
+# salen por proceso public/personajes/ y el arte que se sube por el panel.
+# Fuera del repositorio porque git carga los binarios para siempre; se
+# conservan en disco y en Drive. Ver arte/README.md.
+arte/personajes-fuente/
+imagenes/
+
 # Logs y depuración
 *.log
 npm-debug.log*
