@@ -52,6 +52,7 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.CONTRATOS_GESTIONAR]: "Gestionar contratos",
   [PERMISOS.CONTRATOS_VER]: "Ver contratos",
   [PERMISOS.SALONES_GESTIONAR]: "Gestionar salones y sesiones",
+  [PERMISOS.EVENTOS_CREAR]: "Crear eventos en el calendario",
   [PERMISOS.SALONES_VER]: "Ver salones y sesiones",
   [PERMISOS.MATRICULAS_GESTIONAR]: "Gestionar matrículas y cambios académicos",
   [PERMISOS.MATRICULAS_VER]: "Ver matrículas y listas de salón",
@@ -63,6 +64,24 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.REPORTES_VER]: "Ver reportes y tableros",
   [PERMISOS.ARCHIVOS_GESTIONAR]: "Subir archivos",
   [PERMISOS.ARCHIVOS_VER]: "Ver y descargar archivos",
+  [PERMISOS.PANEL_TABLERO]: "Tablero (pantalla de entrada)",
+  [PERMISOS.MENU_CALENDARIO]: "Calendario",
+  [PERMISOS.MENU_MANTENIMIENTO]: "Mantenimiento Académico",
+  [PERMISOS.MENU_KIDS]: "Kids",
+  [PERMISOS.MENU_CONTRATOS]: "Contratos",
+  [PERMISOS.MENU_RESERVAS]: "Reservas (LGS)",
+  [PERMISOS.MENU_USUARIOS]: "Usuarios y roles",
+  [PERMISOS.MENU_REPORTES]: "Reportes",
+  [PERMISOS.MENU_AUDITORIA]: "Auditoría",
+  [PERMISOS.MENU_AVISO_LOGIN]: "Aviso de login",
+  [PERMISOS.MENU_GUIAS]: "Guías",
+  [PERMISOS.MENU_MIS_CLASES]: "Mis clases",
+  [PERMISOS.MENU_MIS_SALONES]: "Mis salones",
+  [PERMISOS.MENU_MIS_NINOS]: "Mis niños",
+  [PERMISOS.SECCION_ACADEMICA]: "Sección Académica (menú)",
+  [PERMISOS.SECCION_OPERACION]: "Sección Operación (menú)",
+  [PERMISOS.SECCION_ADMINISTRACION]: "Sección Administración (menú)",
+  [PERMISOS.SECCION_GUIA]: "Sección Guía (menú)",
   [PERMISOS.PANEL_ADMINISTRACION]: "Panel de administración",
   [PERMISOS.PANEL_GUIA]: "Panel del guía",
   [PERMISOS.PANEL_APODERADO]: "Panel del apoderado",
@@ -131,6 +150,50 @@ async function main(): Promise<void> {
           tx,
         );
       }
+    }
+
+    // Permisos de SECCIÓN (padre del menú): son nuevos y gobiernan áreas que
+    // los roles YA usaban. Un administrador no pudo haberlos desmarcado nunca,
+    // así que no aplica la regla de "solo si está vacío": se conceden a quien
+    // ya tenga alguna pantalla de esa sección, para conservar su acceso actual.
+    // Es idempotente y solo AÑADE — nunca quita.
+    const SECCION_POR_HIJOS: [string, string[]][] = [
+      ["seccion.academica", ["salones.ver", "catalogo.ver"]],
+      ["seccion.operacion", ["personas.ver", "contratos.ver", "matriculas.gestionar"]],
+      ["seccion.administracion", ["usuarios.gestionar", "reportes.ver", "auditoria.ver"]],
+      ["seccion.guia", ["panel.guia"]],
+      ["panel.tablero", ["panel.administracion", "panel.guia"]],
+      // Visibilidad del menú: se concede a quien ya tenía el permiso funcional
+      // de esa pantalla. Excepción deliberada: "Mantenimiento Académico" NO se
+      // le enciende al guía, que necesita catalogo.ver para los cuestionarios
+      // pero no tiene por qué ver el mantenimiento del catálogo.
+      ["menu.calendario", ["salones.ver"]],
+      ["menu.mantenimiento", ["catalogo.gestionar"]],
+      ["menu.kids", ["personas.ver"]],
+      ["menu.contratos", ["contratos.ver"]],
+      ["menu.reservas", ["contratos.gestionar"]],
+      ["menu.usuarios", ["usuarios.gestionar"]],
+      ["menu.reportes", ["reportes.ver"]],
+      ["menu.auditoria", ["auditoria.ver"]],
+      ["menu.aviso_login", ["catalogo.gestionar"]],
+      ["menu.mis_clases", ["panel.guia"]],
+      ["menu.mis_salones", ["panel.guia"]],
+      ["menu.mis_ninos", ["panel.guia"]],
+      ["eventos.crear", ["salones.gestionar"]],
+      ["menu.guias", ["usuarios.gestionar"]],
+    ];
+    for (const [seccion, hijos] of SECCION_POR_HIJOS) {
+      await execute(
+        `INSERT INTO access_role_permission (role_id, permission_id)
+         SELECT DISTINCT rp.role_id, ps.id
+           FROM access_role_permission rp
+           JOIN access_permission ph ON ph.id = rp.permission_id
+           JOIN access_permission ps ON ps.code = $1
+          WHERE ph.code = ANY($2)
+         ON CONFLICT DO NOTHING`,
+        [seccion, hijos],
+        tx,
+      );
     }
 
     const existente = await queryOne<{ id: string }>(

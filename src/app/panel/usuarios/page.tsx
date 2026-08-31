@@ -23,6 +23,7 @@ interface PermisosRol {
   rol: string;
   editable: boolean;
   catalogo: { code: string; nombre: string; asignado: boolean }[];
+  secciones: { etiqueta: string; permiso: string; hijos: string[] }[];
 }
 
 interface Credenciales {
@@ -627,56 +628,88 @@ export default function UsuariosPage() {
                     </span>
                   )}
                 </div>
-                <div
-                  style={{
-                    marginTop: "0.8rem",
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(15rem, 1fr))",
-                    gap: "0.35rem",
-                  }}
-                >
-                  {permisosRol.catalogo.map((p) => (
-                    <label
-                      key={p.code}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.45rem",
-                        padding: "0.4rem 0.55rem",
-                        borderRadius: "0.5rem",
-                        background: marcados.has(p.code) ? "#e8f5e9" : "#fafbfe",
-                        fontSize: "0.85rem",
-                        cursor: permisosRol.editable ? "pointer" : "default",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        disabled={!permisosRol.editable}
-                        checked={permisosRol.editable ? marcados.has(p.code) : true}
-                        onChange={(e) => {
-                          setMarcados((prev) => {
-                            const nuevo = new Set(prev);
-                            if (e.target.checked) nuevo.add(p.code);
-                            else nuevo.delete(p.code);
-                            return nuevo;
-                          });
+                {(() => {
+                  // Casilla reutilizable: el padre manda sobre la sección, los
+                  // hijos sobre cada pantalla.
+                  const casilla = (code: string, etiqueta: string, sangria: boolean) => {
+                    const marcado = permisosRol.editable ? marcados.has(code) : true;
+                    return (
+                      <label
+                        key={code}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.45rem",
+                          padding: sangria ? "0.35rem 0.6rem 0.35rem 2rem" : "0.5rem 0.6rem",
+                          borderRadius: "0.45rem",
+                          background: marcado ? "#e8f5e9" : "#fafbfe",
+                          fontSize: "0.85rem",
+                          fontWeight: sangria ? 400 : 700,
+                          cursor: permisosRol.editable ? "pointer" : "default",
                         }}
-                      />
-                      <span>
-                        {p.nombre}
-                        <span
-                          style={{
-                            display: "block",
-                            fontSize: "0.68rem",
-                            color: "var(--texto-suave)",
+                      >
+                        <input
+                          type="checkbox"
+                          disabled={!permisosRol.editable}
+                          checked={marcado}
+                          onChange={(e) => {
+                            setMarcados((prev) => {
+                              const nuevo = new Set(prev);
+                              if (e.target.checked) nuevo.add(code);
+                              else nuevo.delete(code);
+                              return nuevo;
+                            });
                           }}
-                        >
-                          {p.code}
+                        />
+                        <span>
+                          {etiqueta}
+                          <span style={{ display: "block", fontSize: "0.68rem", color: "var(--texto-suave)", fontWeight: 400 }}>
+                            {code}
+                          </span>
                         </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                      </label>
+                    );
+                  };
+
+                  const nombreDe = (code: string) =>
+                    permisosRol.catalogo.find((p) => p.code === code)?.nombre ?? code;
+                  // Permisos que ya salen en el árbol: el resto va al final.
+                  const enArbol = new Set(
+                    permisosRol.secciones.flatMap((s) => [s.permiso, ...s.hijos]),
+                  );
+                  const sueltos = permisosRol.catalogo.filter((p) => !enArbol.has(p.code));
+
+                  return (
+                    <div style={{ marginTop: "0.8rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                      {permisosRol.secciones.map((s) => (
+                        <div key={s.permiso} style={{ border: "1px solid #e3e7f0", borderRadius: "0.6rem", overflow: "hidden" }}>
+                          {casilla(s.permiso, s.etiqueta, false)}
+                          {s.hijos.length > 0 && (
+                            <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid #e3e7f0" }}>
+                              {[...new Set(s.hijos)].map((h) => casilla(h, nombreDe(h), true))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {sueltos.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)", margin: "0.4rem 0 0.4rem" }}>
+                            OTROS PERMISOS (no salen en el menú)
+                          </p>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(15rem, 1fr))", gap: "0.35rem" }}>
+                            {sueltos.map((p) => casilla(p.code, p.nombre, false))}
+                          </div>
+                        </div>
+                      )}
+
+                      <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", margin: 0 }}>
+                        Quitar la casilla de una sección apaga esa área entera del menú, aunque sus
+                        pantallas sigan marcadas.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 
 /**
  * Layout del panel: el sidebar (menú según permisos) persiste en TODAS las
@@ -16,24 +17,45 @@ interface Me {
   permisos: { code: string }[];
 }
 
-// Orden de las secciones del sidebar.
-const SECCIONES = ["Académica", "Operación", "Administración", "Guía"] as const;
+// El orden y el permiso PADRE de cada sección los define el módulo access
+// (SECCIONES_MENU), que es la única fuente de la jerarquía.
+const SECCIONES = ["Tablero", "Académica", "Operación", "Administración", "Guía"] as const;
+
+/** Permiso padre por sección: sin él, la sección no se dibuja. */
+const PERMISO_SECCION: Record<(typeof SECCIONES)[number], string> = {
+  Tablero: "panel.tablero",
+  Académica: "seccion.academica",
+  Operación: "seccion.operacion",
+  Administración: "seccion.administracion",
+  Guía: "seccion.guia",
+};
 
 const MENU: {
   seccion: (typeof SECCIONES)[number];
+  /** Permiso de VISIBILIDAD del ítem: apagarlo lo oculta sin quitar capacidades. */
+  permisoMenu?: string;
   permiso: string;
   etiqueta: string;
   color: string;
   href?: string;
   pronto?: boolean;
 }[] = [
+  // ── Tablero: pantalla de entrada, encima de todo ──────────
+  {
+    seccion: "Tablero",
+    permiso: "panel.tablero",
+    etiqueta: "Tablero",
+    color: "var(--lgs-purpura)",
+    href: "/panel/tablero",
+  },
   // ── Académica (Campañas y Horarios viven dentro de Mantenimiento Académico) ──
   {
     seccion: "Académica",
     permiso: "salones.ver",
     etiqueta: "Calendario",
     color: "var(--lgs-verde)",
-    href: "/panel/salones",
+    href: "/panel/calendario",
+    permisoMenu: "menu.calendario",
   },
   {
     seccion: "Académica",
@@ -41,6 +63,7 @@ const MENU: {
     etiqueta: "Mantenimiento Académico",
     color: "var(--lgs-purpura)",
     href: "/panel/mantenimiento-cursos",
+    permisoMenu: "menu.mantenimiento",
   },
   // ── Operación ──────────────────────────────────────────────
   {
@@ -49,6 +72,7 @@ const MENU: {
     etiqueta: "Kids",
     color: "var(--lgs-cian)",
     href: "/panel/personas",
+    permisoMenu: "menu.kids",
   },
   {
     seccion: "Operación",
@@ -56,6 +80,7 @@ const MENU: {
     etiqueta: "Contratos",
     color: "var(--lgs-magenta)",
     href: "/panel/contratos",
+    permisoMenu: "menu.contratos",
   },
   {
     seccion: "Operación",
@@ -63,6 +88,7 @@ const MENU: {
     etiqueta: "Reservas (LGS)",
     color: "var(--lgs-purpura)",
     href: "/panel/reservas",
+    permisoMenu: "menu.reservas",
   },
   // ── Administración ─────────────────────────────────────────
   {
@@ -71,6 +97,15 @@ const MENU: {
     etiqueta: "Usuarios y roles",
     color: "var(--lgs-cian)",
     href: "/panel/usuarios",
+    permisoMenu: "menu.usuarios",
+  },
+  {
+    seccion: "Administración",
+    permiso: "usuarios.gestionar",
+    permisoMenu: "menu.guias",
+    etiqueta: "Guías",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/guias",
   },
   {
     seccion: "Administración",
@@ -78,6 +113,7 @@ const MENU: {
     etiqueta: "Reportes",
     color: "var(--lgs-purpura)",
     href: "/panel/reportes",
+    permisoMenu: "menu.reportes",
   },
   {
     seccion: "Administración",
@@ -85,17 +121,30 @@ const MENU: {
     etiqueta: "Auditoría",
     color: "var(--lgs-verde)",
     href: "/panel/auditoria",
+    permisoMenu: "menu.auditoria",
+  },
+  {
+    seccion: "Administración",
+    permiso: "catalogo.gestionar",
+    etiqueta: "Aviso de login",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/aviso-login",
+    permisoMenu: "menu.aviso_login",
   },
   // ── Guía (restringido a sus salones/sesiones/niños) ────────
-  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis clases", color: "var(--lgs-verde)", href: "/panel/mis-clases" },
-  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", href: "/panel/mis-salones" },
-  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis niños", color: "var(--lgs-magenta)", href: "/panel/mis-ninos" },
+  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis clases", color: "var(--lgs-verde)", href: "/panel/mis-clases", permisoMenu: "menu.mis_clases" },
+  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis salones", color: "var(--lgs-amarillo)", href: "/panel/mis-salones", permisoMenu: "menu.mis_salones" },
+  { seccion: "Guía", permiso: "panel.guia", etiqueta: "Mis niños", color: "var(--lgs-magenta)", href: "/panel/mis-ninos", permisoMenu: "menu.mis_ninos" },
 ];
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [me, setMe] = useState<Me | null>(null);
+
+  // Si el navegador restaura esta pantalla desde la caché de retroceso,
+  // se recarga para volver a comprobar la sesión.
+  useReinicioAlVolver();
   const [busqueda, setBusqueda] = useState("");
 
   function buscar(event: FormEvent) {
@@ -133,8 +182,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   }, [router]);
 
   async function salir() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    await cerrarSesion();
   }
 
   if (me === null) {
@@ -146,7 +194,13 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   }
 
   const permisos = new Set(me.permisos.map((p) => p.code));
-  const opciones = MENU.filter((item) => permisos.has(item.permiso));
+  // Dos condiciones: el permiso FUNCIONAL (si no, la pantalla daría 403) y el
+  // de VISIBILIDAD del menú. Así se puede ocultar un ítem sin quitar acceso.
+  const opciones = MENU.filter(
+    (item) =>
+      permisos.has(item.permiso) &&
+      (item.permisoMenu === undefined || permisos.has(item.permisoMenu)),
+  );
 
   return (
     <div style={{ minHeight: "100vh", display: "flex" }}>
@@ -181,22 +235,27 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           </span>
         </Link>
         {SECCIONES.map((seccion) => {
+          // Sin el permiso PADRE la sección no aparece, aunque el rol conserve
+          // permisos de sus ítems.
+          if (!permisos.has(PERMISO_SECCION[seccion])) return null;
           const items = opciones.filter((o) => o.seccion === seccion);
           if (items.length === 0) return null;
           return (
             <div key={seccion} style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span
-                style={{
-                  fontSize: "0.68rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  color: "var(--texto-suave)",
-                  padding: "0.5rem 0.25rem 0.1rem",
-                }}
-              >
-                {seccion}
-              </span>
+              {seccion !== "Tablero" && (
+                <span
+                  style={{
+                    fontSize: "0.68rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--texto-suave)",
+                    padding: "0.5rem 0.25rem 0.1rem",
+                  }}
+                >
+                  {seccion}
+                </span>
+              )}
               {items.map((item) => {
                 const activo = item.href !== undefined && pathname.startsWith(item.href);
                 const estilo = {

@@ -1,7 +1,7 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
-import { ROLES } from "../domain/permisos";
+import { ROLES, SECCIONES_MENU } from "../domain/permisos";
 import { accessRepository, invalidateAllProfiles } from "./get-access-profile";
 import {
   getPermissionsCatalog,
@@ -64,6 +64,12 @@ export interface PermisosDeRol {
   rol: string;
   editable: boolean;
   catalogo: { code: string; nombre: string; asignado: boolean }[];
+  /**
+   * Jerarquía del menú (padre → hijos) para que la pantalla de Roles marque
+   * en árbol. Viaja desde el servidor: SECCIONES_MENU es la única fuente y el
+   * cliente no la vuelve a declarar.
+   */
+  secciones: { etiqueta: string; permiso: string; hijos: string[] }[];
 }
 
 /** Catálogo completo con marca de cuáles tiene el rol. */
@@ -79,6 +85,11 @@ export async function permisosDeRol(roleCode: string): Promise<PermisosDeRol> {
     rol: roleCode,
     editable: roleCode !== ROLES.SUPERADMIN,
     catalogo: catalogo.map((p) => ({ ...p, asignado: set.has(p.code) })),
+    secciones: SECCIONES_MENU.map((s) => ({
+      etiqueta: s.etiqueta,
+      permiso: s.permiso as string,
+      hijos: s.hijos.map((h) => h.permiso as string),
+    })),
   };
 }
 
