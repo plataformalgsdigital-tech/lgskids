@@ -189,7 +189,7 @@ export default function MisClasesPage() {
                 return (
                   <Link
                     key={s.id}
-                    href={`/panel/salones/${s.classroomId}/sesion/${s.id}`}
+                    href={`/panel/calendario/${s.classroomId}/sesion/${s.id}`}
                     title={`${s.horaLocal} · ${s.salon} · ${s.ocupados}/${s.cupo}`}
                     style={{
                       display: "block",
@@ -294,7 +294,7 @@ export default function MisClasesPage() {
                 .map((s) => (
                   <Link
                     key={s.id}
-                    href={`/panel/salones/${s.classroomId}/sesion/${s.id}`}
+                    href={`/panel/calendario/${s.classroomId}/sesion/${s.id}`}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",

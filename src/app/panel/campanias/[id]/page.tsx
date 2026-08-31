@@ -302,7 +302,7 @@ export default function DetalleCampaniaPage() {
               {ocupado ? "Generando…" : "⚙️ Generar salones del catálogo"}
             </button>
             <Link
-              href="/panel/salones"
+              href="/panel/calendario"
               style={{
                 padding: "0.5rem 1rem",
                 borderRadius: "0.6rem",
@@ -322,7 +322,7 @@ export default function DetalleCampaniaPage() {
         ) : filas.length === 0 ? (
           <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
             Esta campaña aún no tiene salones. Agrégalos en{" "}
-            <Link href="/panel/salones">Salones</Link>.
+            <Link href="/panel/calendario">Salones</Link>.
           </p>
         ) : (
           <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
@@ -383,7 +383,7 @@ export default function DetalleCampaniaPage() {
                       </td>
                       <td style={td}>
                         <span style={{ display: "inline-flex", gap: "0.6rem", alignItems: "center" }}>
-                          <Link href={`/panel/salones/${salon.id}`} title="Editar salón">
+                          <Link href={`/panel/calendario/${salon.id}`} title="Editar salón">
                             ✏️
                           </Link>
                           <button

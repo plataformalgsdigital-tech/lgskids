@@ -26,6 +26,15 @@ const ADMIN = "00000000-0000-0000-0000-000000000000";
 const sufijo = Math.random().toString(36).slice(2, 7);
 const PASSWORD_DEMO = "DemoAlumno123";
 
+/**
+ * Tipo de curso por argumento: `pnpm demo:alumno YOUNGSTER` (por omisión
+ * JUNIOR). La fecha de nacimiento se ajusta al tramo de edad del curso —
+ * Junior 6–9, Youngster 10–13—; con la edad equivocada el contrato se rechaza.
+ */
+const TIPO_CURSO = (process.argv[2] ?? "JUNIOR").toUpperCase() === "YOUNGSTER" ? "YOUNGSTER" : "JUNIOR";
+const NACIMIENTO = TIPO_CURSO === "YOUNGSTER" ? "2014-06-01" : "2018-06-01";
+const NOMBRE_NINO = TIPO_CURSO === "YOUNGSTER" ? "Matías" : "Sofía";
+
 async function main(): Promise<void> {
   // 1) Campaña (genera cursos Junior + Youngster con sus niveles/lecciones).
   const campania = await crearCampania({
@@ -35,8 +44,8 @@ async function main(): Promise<void> {
     cursoInicio: "2026-08-17",
   });
   const curso = await queryOne<{ id: string }>(
-    `SELECT id FROM catalog_course WHERE campaign_id = $1 AND tipo = 'JUNIOR'`,
-    [campania.id],
+    `SELECT id FROM catalog_course WHERE campaign_id = $1 AND tipo = $2::catalog_course_tipo`,
+    [campania.id, TIPO_CURSO],
   );
   const courseId = curso?.id as string;
 
@@ -44,7 +53,7 @@ async function main(): Promise<void> {
   const salon = await crearSalon({
     actorUserId: ADMIN,
     courseId,
-    nombre: `Rookie Demo ${sufijo}`,
+    nombre: `${TIPO_CURSO} Demo ${sufijo}`,
     cupo: 12,
     meetingUrl: "https://meet.google.com/demo-lgs-kids",
     timezone: "America/Bogota",
@@ -60,9 +69,9 @@ async function main(): Promise<void> {
   const { ninoId } = await crearNino({
     actorUserId: ADMIN,
     nino: {
-      nombres: "Sofía",
+      nombres: NOMBRE_NINO,
       apellidos: `Demo ${sufijo}`,
-      fechaNacimiento: "2018-06-01", // ~8 años → JUNIOR
+      fechaNacimiento: NACIMIENTO,
       docTipo: "TI",
       docNumero: `DEMO-${sufijo}`,
       countryCode: "CO",
@@ -83,7 +92,7 @@ async function main(): Promise<void> {
     titularId: ninoId, // el titular puede ser el apoderado; para demo da igual
     beneficiarioId: ninoId,
     countryCode: "CO",
-    tipoCurso: "JUNIOR",
+    tipoCurso: TIPO_CURSO,
     inicio: "2026-08-03",
     finalContrato: "2026-12-20",
   }).catch(async () => {
@@ -97,7 +106,7 @@ async function main(): Promise<void> {
       titularId: apo?.apoderado_id as string,
       beneficiarioId: ninoId,
       countryCode: "CO",
-      tipoCurso: "JUNIOR",
+      tipoCurso: TIPO_CURSO,
       inicio: "2026-08-03",
       finalContrato: "2026-12-20",
     });

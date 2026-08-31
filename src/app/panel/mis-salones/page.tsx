@@ -15,6 +15,11 @@ interface Salon {
   nombre: string;
   curso: string;
   campania: string;
+  campaniaInicio: string;
+  holidayCountry: string;
+  guia: string | null;
+  primeraSesion: string | null;
+  ultimaSesion: string | null;
   cupo: number;
   ocupados: number;
   sesiones: number;
@@ -75,10 +80,29 @@ export default function MisSalonesPage() {
         ) : salones.length === 0 ? (
           <p style={{ color: "var(--texto-suave)" }}>Aún no tienes salones asignados.</p>
         ) : (
-          salones.map((s) => (
+          (() => {
+            // El servidor ya ordena por campaña más reciente primero; aquí
+            // solo se cortan los grupos, sin reordenar.
+            const grupos: { campania: string; inicio: string; items: Salon[] }[] = [];
+            for (const s of salones) {
+              const ultimo = grupos[grupos.length - 1];
+              if (ultimo !== undefined && ultimo.campania === s.campania) ultimo.items.push(s);
+              else grupos.push({ campania: s.campania, inicio: s.campaniaInicio, items: [s] });
+            }
+            return grupos.map((g) => (
+              <div key={g.campania} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.4rem" }}>
+                  <h2 style={{ fontSize: "0.95rem", fontWeight: 800 }}>{g.campania}</h2>
+                  <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                    desde {new Date(`${g.inicio}T12:00:00`).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })}
+                    {" · "}
+                    {g.items.length} {g.items.length === 1 ? "salón" : "salones"}
+                  </span>
+                </div>
+                {g.items.map((s) => (
             <Link
               key={s.id}
-              href={`/panel/salones/${s.id}`}
+              href={`/panel/calendario/${s.id}`}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -92,21 +116,20 @@ export default function MisSalonesPage() {
               }}
             >
               <div>
-                <strong style={{ fontSize: "1.05rem" }}>{s.nombre}</strong>{" "}
-                <span
-                  style={{
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    color: s.curso === "JUNIOR" ? "#0d47a1" : "#6a1b9a",
-                    background: s.curso === "JUNIOR" ? "#e3f2fd" : "#f3e5f5",
-                    padding: "0.1rem 0.45rem",
-                    borderRadius: "0.5rem",
-                  }}
-                >
-                  {s.curso === "JUNIOR" ? "Junior" : "Youngster"}
-                </span>
+                {/* Título: Curso · País · Salón (igual que en administración) */}
+                <strong style={{ fontSize: "1.05rem" }}>
+                  {s.curso} · {s.holidayCountry} · {s.nombre}
+                </strong>
+                <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)", marginTop: "0.15rem" }}>
+                  <span style={{ fontWeight: 700 }}>Horario:</span> {resumenHorario(s.horario)}
+                </div>
                 <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-                  {s.campania} · {resumenHorario(s.horario)} · {s.sesiones} sesiones
+                  <span style={{ fontWeight: 700 }}>Inicio:</span> {s.primeraSesion ?? "—"}
+                  {"  "}
+                  <span style={{ fontWeight: 700 }}>Final:</span> {s.ultimaSesion ?? "—"}
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                  <span style={{ fontWeight: 700 }}>Advisor:</span> {s.guia ?? "sin asignar"}
                 </div>
               </div>
               <span
@@ -119,7 +142,10 @@ export default function MisSalonesPage() {
                 {s.ocupados}/{s.cupo} cupos
               </span>
             </Link>
-          ))
+                ))}
+              </div>
+            ));
+          })()
         )}
       </section>
     </main>
