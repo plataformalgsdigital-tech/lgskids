@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
-import { handlerWithAuth, json } from "@/platform/http/handler";
+import { handler, handlerWithAuth, json } from "@/platform/http/handler";
 import { ValidationError } from "@/platform/errors";
 import {
   arteId,
@@ -10,6 +10,11 @@ import {
   type ArteTipo,
 } from "../application/imagen-curso";
 import { getHotspots, setHotspots } from "../application/hotspots";
+import {
+  descargarAvisoLoginPublico,
+  getAvisoLogin,
+  setAvisoLoginActivo,
+} from "../application/aviso-login";
 import { crearCampania } from "../application/crear-campania";
 import { actualizarFechasCampania } from "../application/editar-campania";
 import { detalleCampania, listarCampanias } from "../application/consultas";
@@ -253,7 +258,7 @@ export const referenciaQuizPutHandler = handlerWithAuth(async (request, auth, co
 // Arte curricular (banner · premio · mapa · vobo) por curso/nivel
 // ============================================================
 
-const TIPOS_ARTE: readonly ArteTipo[] = ["banner", "premio", "mapa", "vobo"];
+const TIPOS_ARTE: readonly ArteTipo[] = ["banner", "premio", "mapa", "vobo", "aviso_login"];
 function tipoArte(v: string | null | undefined): ArteTipo {
   return (TIPOS_ARTE as readonly string[]).includes(v ?? "") ? (v as ArteTipo) : "banner";
 }
@@ -331,4 +336,62 @@ export const hotspotsGuardarHandler = handlerWithAuth(async (request, auth) => {
   const body = hotspotsBodySchema.parse(await request.json());
   const data = await setHotspots({ actorUserId: auth.userId, ...body });
   return json(data);
+});
+
+// ============================================================
+// Aviso de la pantalla de login (imagen cambiable + interruptor)
+// ============================================================
+
+/**
+ * GET /api/public/login-aviso — PÚBLICO (sin sesión): lo consume /login.
+ * Solo revela si hay aviso prendido y su URL; nunca un id de archivo.
+ */
+export const avisoLoginPublicoHandler = handler(async () => {
+  const aviso = await getAvisoLogin();
+  const visible = aviso.activo && aviso.fileId !== null;
+  return json({
+    activo: visible,
+    url: visible ? "/api/public/login-aviso/imagen" : null,
+  });
+});
+
+/**
+ * GET /api/public/login-aviso/imagen — PÚBLICO: sirve la imagen vigente.
+ * No recibe id: la ruta resuelve sola cuál es, y solo entrega algo si el
+ * aviso está prendido. Así apagarlo deja de EXPONER la imagen, no solo de
+ * mostrarla, y no se puede usar para pedir archivos privados.
+ */
+export const avisoLoginImagenHandler = handler(async () => {
+  const { meta, bytes } = await descargarAvisoLoginPublico();
+  return new NextResponse(new Uint8Array(bytes), {
+    headers: {
+      "Content-Type": meta.mime,
+      "Content-Disposition": "inline",
+      "Cache-Control": "public, max-age=60",
+    },
+  });
+});
+
+/** GET /api/catalog/aviso-login — estado para el panel (ve también el apagado). */
+export const avisoLoginEstadoHandler = handlerWithAuth(async (_request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_VER);
+  const aviso = await getAvisoLogin();
+  return json({
+    activo: aviso.activo,
+    actualizadoEn: aviso.actualizadoEn,
+    // El panel SÍ está autenticado: puede previsualizar por la ruta de arte.
+    url: aviso.fileId !== null ? `/api/catalog/imagen-curso/${aviso.fileId}` : null,
+  });
+});
+
+const avisoLoginBodySchema = z.object({ activo: z.boolean() });
+
+/** PATCH /api/catalog/aviso-login — prende o apaga el aviso. */
+export const avisoLoginActivarHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const body = avisoLoginBodySchema.parse(await request.json());
+  const aviso = await setAvisoLoginActivo(body.activo, auth.userId);
+  return json({ activo: aviso.activo, actualizadoEn: aviso.actualizadoEn });
 });

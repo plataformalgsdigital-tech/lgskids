@@ -25,6 +25,10 @@ export {
   imagenCursoSubirHandler,
   imagenCursoInfoHandler,
   imagenCursoServeHandler,
+  avisoLoginPublicoHandler,
+  avisoLoginImagenHandler,
+  avisoLoginEstadoHandler,
+  avisoLoginActivarHandler,
   hotspotsInfoHandler,
   hotspotsGuardarHandler,
 } from "./api/handlers";

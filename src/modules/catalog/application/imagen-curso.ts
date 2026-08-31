@@ -10,15 +10,19 @@ import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
  *  - premio: imagen del premio por (curso, nivel) — brújula/llave/corona/…
  *  - mapa:   mapa del curso completo (todas las islas) por curso.
  *  - vobo:   sello "VoBo" global (marca de unidad vista).
+ *  - aviso_login: imagen del aviso de la pantalla de login (global). No es
+ *    curricular, pero comparte exactamente el mismo mecanismo; el interruptor
+ *    que lo prende/apaga vive en `aviso-login.ts`.
  */
 
-export type ArteTipo = "banner" | "premio" | "vobo" | "mapa";
+export type ArteTipo = "banner" | "premio" | "vobo" | "mapa" | "aviso_login";
 
 const ENTIDAD_POR_TIPO: Record<ArteTipo, string> = {
   banner: "catalog_imagen_curso",
   premio: "catalog_premio_nivel",
   mapa: "catalog_mapa_curso",
   vobo: "catalog_vobo",
+  aviso_login: "login_aviso",
 };
 
 const CURSOS = TIPOS_CURSO.map((c) => c.tipo) as readonly string[];
@@ -36,7 +40,7 @@ function nivelValido(nivel: string): boolean {
 
 /** entidadId (clave natural) por tipo, validando los parámetros que aplican. */
 function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string): string {
-  if (tipo === "vobo") return "GLOBAL";
+  if (tipo === "vobo" || tipo === "aviso_login") return "GLOBAL";
   if (!CURSOS.includes(curso ?? "")) throw new ValidationError(`Curso inválido: ${curso}.`);
   if (tipo === "mapa") return curso as string;
   // banner / premio → por (curso, nivel)
@@ -46,7 +50,7 @@ function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string): string {
 
 /** ¿los parámetros forman una clave válida para el tipo? (sin lanzar). */
 function claveValida(tipo: ArteTipo, curso?: string, nivel?: string): boolean {
-  if (tipo === "vobo") return true;
+  if (tipo === "vobo" || tipo === "aviso_login") return true;
   if (!CURSOS.includes(curso ?? "")) return false;
   if (tipo === "mapa") return true;
   return nivelValido(nivel ?? "");
