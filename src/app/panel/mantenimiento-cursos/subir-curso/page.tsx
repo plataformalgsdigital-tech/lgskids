@@ -52,8 +52,26 @@ interface FilaPreview {
   error: string | null;
 }
 
+/**
+ * Detecta el separador de columnas mirando la PRIMERA línea: Excel en español
+ * exporta con punto y coma, y el archivo llegaba como una sola columna.
+ * Se decide por la cabecera, no por todo el texto, porque el contenido puede
+ * llevar comas legítimas.
+ */
+function detectarSeparador(text: string): "," | ";" {
+  const primeraLinea = text.split(String.fromCharCode(10))[0] ?? "";
+  const cabecera = primeraLinea.replace(String.fromCharCode(13), "");
+  let comas = 0;
+  let puntoYComa = 0;
+  for (const c of cabecera) {
+    if (c === ",") comas += 1;
+    else if (c === ";") puntoYComa += 1;
+  }
+  return puntoYComa > comas ? ";" : ",";
+}
+
 /** Parser CSV mínimo con soporte de comillas ("" escapa una comilla). */
-function parseCSV(text: string): string[][] {
+function parseCSV(text: string, sep: "," | ";" = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -68,7 +86,7 @@ function parseCSV(text: string): string[][] {
         } else inQuotes = false;
       } else field += c;
     } else if (c === '"') inQuotes = true;
-    else if (c === ",") {
+    else if (c === sep) {
       row.push(field);
       field = "";
     } else if (c === "\n") {
@@ -124,13 +142,16 @@ export default function SubirCursoPage() {
     const reader = new FileReader();
     reader.onload = () => {
       const texto = String(reader.result ?? "");
-      const rows = parseCSV(texto);
+      const sep = detectarSeparador(texto);
+      const rows = parseCSV(texto, sep);
       if (rows.length < 2) {
         setErrFormato("El archivo no tiene filas de datos.");
         return;
       }
       const header = rows[0]!.map((h) => h.trim().toLowerCase());
-      const faltantes = ["curso", "nivel", "leccion"].filter((c) => !header.includes(c));
+      const faltantes = ["curso", "nivel", "unidad", "leccion", "orden"].filter(
+        (c) => !header.includes(c),
+      );
       if (faltantes.length > 0) {
         setErrFormato(`Faltan columnas obligatorias en la cabecera: ${faltantes.join(", ")}.`);
         return;
@@ -140,15 +161,19 @@ export default function SubirCursoPage() {
       const filas: FilaPreview[] = rows.slice(1).map((r, i) => {
         const get = (col: string) => (idx(col) >= 0 ? (r[idx(col)] ?? "").trim() : "");
         const curso = get("curso").toUpperCase();
-        const nivel = get("nivel").toUpperCase();
-        const unidad = get("unidad") || null;
+        // El nivel se muestra como "Ultimate Stage" pero su código es ULTIMATE:
+        // se acepta cualquiera de las dos formas para no pelear con el CSV.
+        const nivelCrudo = get("nivel").toUpperCase().trim();
+        const nivel = nivelCrudo === "ULTIMATE STAGE" ? "ULTIMATE" : nivelCrudo;
+        const unidad = get("unidad");
         const leccion = get("leccion");
+        const ordenCrudo = get("orden");
         const fila: Fila = {
           curso,
           nivel,
           unidad,
           leccion,
-          orden: Number(get("orden")) || 0,
+          orden: Number(ordenCrudo),
           contenido: get("contenido") || null,
           video: get("video") || null,
           materialGuia: parseItems(get("materialguia"), "url"),
@@ -160,9 +185,12 @@ export default function SubirCursoPage() {
         let error: string | null = null;
         if (!CURSOS.includes(curso)) error = `Curso inválido: "${curso}"`;
         else if (!NIVELES.includes(nivel)) error = `Nivel inválido: "${nivel}"`;
+        else if (unidad === "") error = "Unidad vacía";
         else if (leccion === "") error = "Lección vacía";
+        else if (ordenCrudo === "") error = "Orden vacío";
+        else if (!Number.isInteger(Number(ordenCrudo))) error = `Orden inválido: "${ordenCrudo}"`;
         else {
-          const clave = `${curso}|${nivel}|${unidad ?? ""}|${leccion.toLowerCase()}`;
+          const clave = `${curso}|${nivel}|${unidad}|${leccion.toLowerCase()}`;
           if (vistas.has(clave)) error = "Duplicada en el archivo";
           else vistas.add(clave);
         }
@@ -229,7 +257,7 @@ export default function SubirCursoPage() {
       >
         <strong style={{ fontSize: "0.95rem" }}>Formato de entrada</strong>
         <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", margin: "0.4rem 0" }}>
-          Cabecera (obligatorias: <code>curso, nivel, leccion</code>):
+          Cabecera (obligatorias: <code>curso, nivel, unidad, leccion, orden</code>):
         </p>
         <code style={{ display: "block", fontSize: "0.78rem", background: "#f4f6fb", padding: "0.5rem 0.6rem", borderRadius: "0.5rem", overflowX: "auto", whiteSpace: "pre" }}>
           {COLUMNAS.join(", ")}
@@ -243,6 +271,15 @@ export default function SubirCursoPage() {
             Listas (<strong>materialguia, materialusuario, actividades, recursos, clubes</strong>):
             varios ítems separados por <code>;</code> y cada uno como{" "}
             <code>Nombre|enlace</code>. Ej: <code>Guía L1|g1.pdf;Guía L2|g2.pdf</code>.
+          </li>
+          <li>
+            El separador de columnas puede ser <code>,</code> o <code>;</code>: se detecta solo
+            (Excel en español exporta con <code>;</code>). Si usas <code>;</code> como separador,
+            encierra entre comillas dobles las columnas de listas, porque ahí <code>;</code>
+            separa ítems.
+          </li>
+          <li>
+            El nivel se acepta como <code>ULTIMATE</code> o como <code>ULTIMATE STAGE</code>.
           </li>
           <li>
             Si <code>contenido</code> tiene comas, enciérralo en comillas dobles.
