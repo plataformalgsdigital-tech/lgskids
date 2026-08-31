@@ -157,7 +157,7 @@ export default function ProgresoPage() {
       </div>
 
       <p style={{ marginTop: "1.5rem" }}>
-        <Link href="/panel/salones" style={{ fontSize: "0.9rem" }}>
+        <Link href="/panel/calendario" style={{ fontSize: "0.9rem" }}>
           ← Volver a salones
         </Link>
       </p>

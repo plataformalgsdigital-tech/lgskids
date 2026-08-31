@@ -1,5 +1,10 @@
 import { PERMISOS, getAccessProfile } from "@/modules/access";
-import { agendaProximas, historialAsistencia, resumenAsistencia } from "@/modules/attendance";
+import {
+  agendaProximas,
+  comentariosDeGuia,
+  historialAsistencia,
+  resumenAsistencia,
+} from "@/modules/attendance";
 import {
   NIVEL_TODOS,
   getHotspotsCurso,
@@ -39,11 +44,13 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     });
   }
 
-  const [asistencia, agenda, progreso, historial] = await Promise.all([
+  const [asistencia, agenda, progreso, historial, comentarios] = await Promise.all([
     resumenAsistencia(persona.id, matricula.classroomId),
     agendaProximas(matricula.classroomId, 14), // próximas 2 semanas (incluye clubes/talleres)
     progresoDeNino(persona.id),
     historialAsistencia(persona.id, matricula.classroomId, 30),
+    // Solo el comentario PARA EL ALUMNO; la nota privada del guía no sale de aquí.
+    comentariosDeGuia(persona.id, 20),
   ]);
 
   // Imagen de portada del curso según el nivel actual (o el primero no completado).
@@ -75,6 +82,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     agenda,
     progreso,
     historial,
+    comentarios, // lo que el guía le escribió, del más reciente al más antiguo
     imagenCursoUrl: url(imgId),
     premios, // { [nivelCodigo]: url | null }  → íconos de "¿Cómo voy?"
     bannersNivel, // { [nivelCodigo]: url | null } → mapas de isla en "Avance"

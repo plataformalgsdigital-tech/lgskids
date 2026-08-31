@@ -4,6 +4,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
+import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
+import { apiFetch } from "@/ui/api-fetch";
+import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
+
+/** Marca que ya se ofreció subir la foto: no se insiste en cada visita. */
+const FOTO_OFRECIDA = "lgs-kids:foto-ofrecida";
 
 interface Dashboard {
   alumno: { nombre: string } | null;
@@ -49,6 +55,7 @@ interface Dashboard {
     }[];
     diploma: boolean;
   };
+  comentarios?: ComentarioGuia[];
   historial?: {
     sessionId: string;
     tipo: string;
@@ -65,6 +72,31 @@ interface Dashboard {
     isla: Record<string, HotspotData>;
     mapa: Record<string, HotspotData>;
   };
+}
+
+interface ComentarioGuia {
+  sessionId: string;
+  fecha: string;
+  tipo: string;
+  numero: number;
+  guia: string | null;
+  comentario: string;
+}
+
+interface Perfil {
+  nombre: string;
+  correo: string | null;
+  telefono: string | null;
+  cumpleanos: string | null;
+  usuario: string | null;
+  apoderado: {
+    nombre: string;
+    parentesco: string | null;
+    telefono: string | null;
+    email: string | null;
+  } | null;
+  tieneFoto: boolean;
+  fotoUrl: string | null;
 }
 
 interface HotspotData {
@@ -123,7 +155,7 @@ const SOPORTE: { label: string; tel: string; color: string; msg: string }[] = [
 
 // Barra de navegación bajo el encabezado (estilo MOSAICO). Los que tienen href
 // hacen scroll a la sección de la página; el resto queda como acceso futuro.
-const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" | "historial" | "avance" }[] = [
+const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; action?: "comovoy" | "historial" | "avance" | "perfil" }[] = [
   { label: "Actividades", emoji: "✨", menu: true },
   { label: "Recursos", emoji: "🔗", menu: true },
   { label: "Material", emoji: "📖" },
@@ -131,7 +163,7 @@ const NAV_ITEMS: { label: string; emoji: string; href?: string; menu?: boolean; 
   { label: "Avance", emoji: "🗺️", action: "avance" },
   { label: "¿Cómo voy?", emoji: "📊", action: "comovoy" },
   { label: "Instructivos", emoji: "🎥" },
-  { label: "Perfil", emoji: "👤" },
+  { label: "Perfil", emoji: "👤", action: "perfil" },
 ];
 
 function fechaLarga(iso: string): string {
@@ -150,6 +182,12 @@ export default function MiPanelPage() {
   const [verComoVoy, setVerComoVoy] = useState(false); // modal "¿Cómo voy?"
   const [verHistorial, setVerHistorial] = useState(false); // modal "Historial de clases"
   const [verAvance, setVerAvance] = useState(false); // modal "Avance" (mapa del curso)
+  const [verPerfil, setVerPerfil] = useState(false); // modal "Perfil"
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  // Sella el ofrecimiento inicial de foto para no insistir en cada visita.
+  const [fotoOfrecida, setFotoOfrecida] = useState(false);
   const [avanceNivel, setAvanceNivel] = useState<string | null>(null); // isla abierta (código de nivel) o null = mapa
   const [nivelesAbiertos, setNivelesAbiertos] = useState<Set<string>>(() => new Set()); // acordeón de niveles
 
@@ -161,6 +199,8 @@ export default function MiPanelPage() {
       return next;
     });
   }
+
+  useReinicioAlVolver();
 
   useEffect(() => {
     const id = setInterval(() => setAhora(Date.now()), 30_000);
@@ -181,7 +221,7 @@ export default function MiPanelPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [verImagen, verComoVoy, verHistorial, verAvance, avanceNivel]);
+  }, [verImagen, verComoVoy, verHistorial, verAvance, verPerfil, avanceNivel]);
 
   useEffect(() => {
     let cancelado = false;
@@ -211,9 +251,57 @@ export default function MiPanelPage() {
     };
   }, [router]);
 
+  useEffect(() => {
+    let cancelado = false;
+    async function cargarPerfil() {
+      const res = await apiFetch("/api/student/perfil");
+      if (!res.ok || cancelado) return;
+      const cuerpo = (await res.json()) as { perfil: Perfil | null };
+      if (cancelado || cuerpo.perfil === null) return;
+      setPerfil(cuerpo.perfil);
+      // Primera vez sin foto: se abre el perfil para ofrecerla. Se marca en el
+      // navegador para no insistir en cada visita.
+      if (!cuerpo.perfil.tieneFoto && localStorage.getItem(FOTO_OFRECIDA) === null) {
+        localStorage.setItem(FOTO_OFRECIDA, "1");
+        setFotoOfrecida(true);
+        setVerPerfil(true);
+      }
+    }
+    void cargarPerfil();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  async function subirFoto(archivo: File) {
+    setSubiendoFoto(true);
+    setErrorFoto(null);
+    try {
+      const form = new FormData();
+      form.append("foto", archivo);
+      const res = await apiFetch("/api/student/perfil", { method: "POST", body: form });
+      if (!res.ok) {
+        const cuerpo: { error?: { message?: string } } = await res.json().catch(() => ({}));
+        setErrorFoto(cuerpo.error?.message ?? "No se pudo subir la foto.");
+        return;
+      }
+      const recarga = await apiFetch("/api/student/perfil");
+      if (!recarga.ok) return;
+      const cuerpo = (await recarga.json()) as { perfil: Perfil | null };
+      if (cuerpo.perfil === null) return;
+      // La URL de la foto no cambia: se le agrega una marca para recargarla.
+      setPerfil({
+        ...cuerpo.perfil,
+        fotoUrl: "/api/student/perfil/foto?v=" + String(Date.now()),
+      });
+      setFotoOfrecida(false);
+    } finally {
+      setSubiendoFoto(false);
+    }
+  }
+
   async function salir() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    await cerrarSesion();
   }
 
   const proxSessionId = data?.proxima?.sessionId ?? null;
@@ -276,6 +364,8 @@ export default function MiPanelPage() {
 
   const tipo = data.matricula?.tipoCurso ?? "JUNIOR";
   const curso = DESC_CURSO[tipo] ?? DESC_CURSO["JUNIOR"]!;
+  // Los personajes solo acompañan a JUNIOR; en Youngster resultan infantiles.
+  const esJunior = tipo === "JUNIOR";
   const colorNivel = nivelActual !== undefined ? (COLOR_NIVEL[nivelActual.codigo] ?? "var(--lgs-azul)") : "var(--lgs-azul)";
 
   const moduloBox: CSSProperties = {
@@ -442,7 +532,15 @@ export default function MiPanelPage() {
   // Contenido del historial de clases (se muestra dentro del modal "Historial")
   const listaHistorial =
     data.historial === undefined || data.historial.length === 0 ? (
-      <p style={{ color: "var(--texto-suave)" }}>Todavía no hay clases dictadas.</p>
+      esJunior ? (
+        <VacioConPersonaje
+          quien="emma-triste"
+          titulo="Todavía no hay clases dictadas."
+          detalle="Cuando tengas tu primera sesión, aquí vas a ver si asististe."
+        />
+      ) : (
+        <p style={{ color: "var(--texto-suave)" }}>Todavía no hay clases dictadas.</p>
+      )
     ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
         {data.historial.map((h) => {
@@ -700,6 +798,13 @@ export default function MiPanelPage() {
                 </button>
               );
             }
+            if (it.action === "perfil") {
+              return (
+                <button key={it.label} type="button" onClick={() => setVerPerfil(true)} style={base}>
+                  {inner}
+                </button>
+              );
+            }
             if (it.action === "avance") {
               return (
                 <button key={it.label} type="button" onClick={() => { setAvanceNivel(null); setVerAvance(true); }} style={base}>
@@ -870,12 +975,23 @@ export default function MiPanelPage() {
                         LINK DE INGRESO
                       </p>
                       {data.matricula.meetingUrl !== null && estadoZoomActual !== null ? (
-                        <ZoomAccessButton
-                          meetingUrl={data.matricula.meetingUrl}
-                          estado={estadoZoomActual}
-                          tieneAcceso={ingreso}
-                          onEntrar={entrarZoom}
-                        />
+                        <>
+                          {/* Rocky pone cara según el estado real del enlace. */}
+                          {esJunior && (
+                            <Personaje
+                              quien={poseZoom(estadoZoomActual)}
+                              alto="4.2rem"
+                              className="lgs-float"
+                              style={{ marginBottom: "0.4rem" }}
+                            />
+                          )}
+                          <ZoomAccessButton
+                            meetingUrl={data.matricula.meetingUrl}
+                            estado={estadoZoomActual}
+                            tieneAcceso={ingreso}
+                            onEntrar={entrarZoom}
+                          />
+                        </>
                       ) : (
                         <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
                           El enlace lo asigna la guía del salón.
@@ -944,7 +1060,16 @@ export default function MiPanelPage() {
                   Sesiones y clubes de las próximas 2 semanas
                 </p>
                 {data.agenda === undefined || data.agenda.length === 0 ? (
-                  <p style={{ color: "var(--texto-suave)" }}>Sin clases en las próximas 2 semanas.</p>
+                  esJunior ? (
+                    <VacioConPersonaje
+                      quien="simba-triste"
+                      titulo="Sin clases en las próximas 2 semanas."
+                      detalle="En cuanto tu salón programe una sesión o un club, aparece aquí."
+                      alto="4.5rem"
+                    />
+                  ) : (
+                    <p style={{ color: "var(--texto-suave)" }}>Sin clases en las próximas 2 semanas.</p>
+                  )
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                     {data.agenda.map((ev) => (
@@ -956,6 +1081,53 @@ export default function MiPanelPage() {
                           {hora(ev.startsAt)}
                           {ev.guia !== null && ` · ${ev.guia}`}
                         </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Lo que el guía le escribió en sus sesiones, del más reciente
+                  al más antiguo. Solo el comentario para el alumno: las notas
+                  privadas del equipo nunca llegan a esta pantalla. */}
+              <section id="comentarios" style={{ ...card, scrollMarginTop: "1rem" }}>
+                <h2 style={{ fontSize: "1.1rem", marginBottom: "0.15rem" }}>💬 Lo que dice mi guía</h2>
+                <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", marginBottom: "0.75rem" }}>
+                  Comentarios de tus clases, del más reciente al más antiguo
+                </p>
+                {data.comentarios === undefined || data.comentarios.length === 0 ? (
+                  esJunior ? (
+                    <VacioConPersonaje
+                      quien="coco-triste"
+                      titulo="Todavía no hay comentarios."
+                      detalle="Cuando tu guía te escriba algo en una clase, aparece aquí."
+                      alto="5rem"
+                    />
+                  ) : (
+                    <p style={{ color: "var(--texto-suave)" }}>Todavía no hay comentarios.</p>
+                  )
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    {data.comentarios.map((c) => (
+                      <div
+                        key={c.sessionId}
+                        style={{
+                          padding: "0.7rem 0.9rem",
+                          borderRadius: "0.6rem",
+                          background: "#fafbfe",
+                          borderLeft: "4px solid var(--lgs-verde)",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--texto-suave)" }}>
+                            {c.tipo === "CLUB" ? "🎉 Club" : `📘 Sesión ${String(c.numero)}`} ·{" "}
+                            {fechaLarga(`${c.fecha}T12:00:00`)}
+                          </span>
+                          {c.guia !== null && (
+                            <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>{c.guia}</span>
+                          )}
+                        </div>
+                        <p style={{ marginTop: "0.3rem", fontSize: "0.92rem" }}>{c.comentario}</p>
                       </div>
                     ))}
                   </div>
@@ -1174,12 +1346,28 @@ export default function MiPanelPage() {
                   </span>
                   <span>{asistPct}% asistencia</span>
                 </div>
-                <div style={{ marginTop: "0.7rem", padding: "0.7rem 0.9rem", borderRadius: "0.6rem", background: "#f4f6fb", fontSize: "0.88rem" }}>
-                  {data.progreso?.diploma === true
-                    ? "🎓 ¡Completaste todos los niveles! Diploma conseguido."
-                    : faltanNivel > 0
-                      ? `Te faltan ${faltanNivel} ${faltanNivel === 1 ? "sesión" : "sesiones"} para completar el nivel y avanzar.`
-                      : "¡Completaste las sesiones del nivel! Falta aprobar el Level Up para avanzar."}
+                <div style={{ marginTop: "0.7rem", padding: "0.7rem 0.9rem", borderRadius: "0.6rem", background: "#f4f6fb", fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "0.7rem" }}>
+                  {esJunior && (
+                    /* La cara de Emma sigue al avance real: celebra, anima o piensa. */
+                    <Personaje
+                      quien={
+                        data.progreso?.diploma === true
+                          ? "emma-celebrando"
+                          : faltanNivel > 0
+                            ? "emma-pensativa"
+                            : "emma-expectante"
+                      }
+                      alto="4.6rem"
+                      className="lgs-float"
+                    />
+                  )}
+                  <span>
+                    {data.progreso?.diploma === true
+                      ? "🎓 ¡Completaste todos los niveles! Diploma conseguido."
+                      : faltanNivel > 0
+                        ? `Te faltan ${faltanNivel} ${faltanNivel === 1 ? "sesión" : "sesiones"} para completar el nivel y avanzar.`
+                        : "¡Completaste las sesiones del nivel! Falta aprobar el Level Up para avanzar."}
+                  </span>
                 </div>
               </div>
 
@@ -1190,6 +1378,127 @@ export default function MiPanelPage() {
                 </p>
                 {listaNiveles}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal "Perfil": foto, datos del alumno y contacto del apoderado */}
+      {verPerfil && perfil !== null && (
+        <div
+          onClick={() => setVerPerfil(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mi perfil"
+          style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(8,11,24,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "2rem 1rem", overflowY: "auto" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: "34rem", background: "white", borderRadius: "1rem", boxShadow: "0 20px 60px rgba(0,0,0,0.35)", overflow: "hidden" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.1rem 1.25rem", borderBottom: "1px solid #eef1f7" }}>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>👤 Mi perfil</h2>
+              <button
+                type="button"
+                onClick={() => setVerPerfil(false)}
+                aria-label="Cerrar"
+                style={{ width: "2.2rem", height: "2.2rem", borderRadius: "50%", border: "1px solid #e3e7f0", background: "white", cursor: "pointer", fontSize: "1.1rem", lineHeight: 1, color: "var(--texto-suave)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: "1.25rem" }}>
+              {/* Primera vez: se explica por qué aparece solo */}
+              {fotoOfrecida && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1.1rem", padding: "0.8rem 1rem", borderRadius: "0.7rem", background: "#f4f6fb" }}>
+                  {esJunior && <Personaje quien="rocky-picaro" alto="4rem" className="lgs-float" />}
+                  <p style={{ fontSize: "0.9rem", fontWeight: 600 }}>
+                    ¡Ponle una foto a tu perfil! Así tu guía y tus compañeros te reconocen.
+                  </p>
+                </div>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center", gap: "1.1rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
+                <div
+                  style={{ width: "6.5rem", height: "6.5rem", borderRadius: "50%", overflow: "hidden", background: "#eef1f7", display: "grid", placeItems: "center", flex: "0 0 auto", border: "3px solid var(--lgs-azul)" }}
+                >
+                  {perfil.fotoUrl !== null ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={perfil.fotoUrl} alt="Mi foto" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <span style={{ fontSize: "2.4rem" }} aria-hidden="true">
+                      🙂
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ flex: "1 1 12rem", minWidth: 0 }}>
+                  <p style={{ fontSize: "1.15rem", fontWeight: 800 }}>{perfil.nombre}</p>
+                  {perfil.usuario !== null && (
+                    <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>Usuario: {perfil.usuario}</p>
+                  )}
+                  <label
+                    style={{ display: "inline-block", marginTop: "0.6rem", padding: "0.5rem 1rem", borderRadius: "0.6rem", border: "1.5px solid var(--lgs-azul)", color: "var(--lgs-azul)", fontWeight: 700, fontSize: "0.88rem", cursor: subiendoFoto ? "wait" : "pointer" }}
+                  >
+                    {subiendoFoto ? "Subiendo…" : perfil.tieneFoto ? "Cambiar foto" : "Subir mi foto"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={subiendoFoto}
+                      onChange={(e) => {
+                        const archivo = e.target.files?.[0];
+                        e.target.value = "";
+                        if (archivo !== undefined) void subirFoto(archivo);
+                      }}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                  {errorFoto !== null && (
+                    <p role="alert" style={{ color: "#c62828", fontSize: "0.85rem", marginTop: "0.4rem" }}>
+                      {errorFoto}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", marginBottom: "1.25rem" }}>
+                {[
+                  { t: "🎂 Cumpleaños", v: perfil.cumpleanos !== null ? fechaLarga(`${perfil.cumpleanos}T12:00:00`) : null },
+                  { t: "✉️ Correo", v: perfil.correo },
+                  { t: "📞 Teléfono", v: perfil.telefono },
+                ].map((d) => (
+                  <div key={d.t} style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", padding: "0.6rem 0.9rem", borderRadius: "0.6rem", background: "#fafbfe", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 600 }}>{d.t}</span>
+                    <span style={{ color: d.v !== null ? "inherit" : "var(--texto-suave)" }}>{d.v ?? "Sin registrar"}</span>
+                  </div>
+                ))}
+              </div>
+
+              <p style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em", color: "var(--texto-suave)", marginBottom: "0.5rem" }}>
+                MI APODERADO
+              </p>
+              {perfil.apoderado === null ? (
+                <p style={{ color: "var(--texto-suave)" }}>Sin apoderado registrado.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  {[
+                    { t: "👤 Nombre", v: perfil.apoderado.nombre },
+                    { t: "🔗 Parentesco", v: perfil.apoderado.parentesco },
+                    { t: "📞 Teléfono", v: perfil.apoderado.telefono },
+                    { t: "✉️ Correo", v: perfil.apoderado.email },
+                  ].map((d) => (
+                    <div key={d.t} style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", padding: "0.6rem 0.9rem", borderRadius: "0.6rem", background: "#fafbfe", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 600 }}>{d.t}</span>
+                      <span style={{ color: d.v !== null ? "inherit" : "var(--texto-suave)" }}>{d.v ?? "Sin registrar"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p style={{ fontSize: "0.78rem", color: "var(--texto-suave)", marginTop: "1.1rem" }}>
+                ¿Algún dato está mal? Escríbele a tu guía o a soporte: los cambia el equipo de LGS Kids.
+              </p>
             </div>
           </div>
         </div>
@@ -1298,6 +1607,17 @@ export default function MiPanelPage() {
                       <div style={{ position: "relative", borderRadius: "0.9rem", overflow: "hidden", border: "1px solid #e3e7f0" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={data.mapaCursoUrl} alt={`Mapa del curso ${tipo}`} style={{ display: "block", width: "100%", height: "auto" }} />
+                        {esJunior &&
+                          (() => {
+                            // Simba se para en la unidad que el niño está cursando.
+                            const actual = niveles.find((n) => n.estado === "EN_CURSO");
+                            if (actual === undefined) return null;
+                            const hs = hsMapa[actual.codigo];
+                            if (hs === undefined) return null;
+                            const p = hs.unidades[actual.leccionesCompletadas] ?? hs.centro ?? hs.unidades.at(-1);
+                            if (p === undefined || p === null) return null;
+                            return marca("simba-aqui", p, <Personaje quien="simba" alto="3.6rem" className="lgs-float" />);
+                          })()}
                         {niveles.map((n) => {
                           const hs = hsMapa[n.codigo];
                           if (hs === undefined) return null;
@@ -1306,8 +1626,8 @@ export default function MiPanelPage() {
                           return (
                             <span key={n.codigo}>
                               {rutaSVG([...hs.unidades, ...(hs.centro != null ? [hs.centro] : [])])}
-                              {hs.unidades.slice(0, done).map((p, i) => marca(`${n.codigo}-u${i}`, p, voboEl("1.6rem")))}
-                              {completo && hs.centro != null && marca(`${n.codigo}-c`, hs.centro, voboEl("3.2rem"))}
+                              {hs.unidades.slice(0, done).map((p, i) => marca(`${n.codigo}-u${i}`, p, voboEl("2.2rem")))}
+                              {completo && hs.centro != null && marca(`${n.codigo}-c`, hs.centro, voboEl("4.2rem"))}
                             </span>
                           );
                         })}
@@ -1349,7 +1669,7 @@ export default function MiPanelPage() {
                           {hs !== undefined && rutaSVG([...hs.unidades, ...(hs.premio != null ? [hs.premio] : [])])}
                           {!bloqueado && hs !== undefined && (
                             <>
-                              {hs.unidades.slice(0, n.leccionesCompletadas).map((p, i) => marca(`u${i}`, p, voboEl("2rem")))}
+                              {hs.unidades.slice(0, n.leccionesCompletadas).map((p, i) => marca(`u${i}`, p, voboEl("2.8rem")))}
                               {/* Unidad actual: aro que late */}
                               {n.estado === "EN_CURSO" &&
                                 hs.unidades[n.leccionesCompletadas] != null &&
@@ -1359,7 +1679,7 @@ export default function MiPanelPage() {
                                   <span className="lgs-ring" style={{ display: "block", width: "1.9rem", height: "1.9rem", borderRadius: "50%", border: "3px solid var(--lgs-purpura)" }} />,
                                 )}
                               {/* Premio: solo VoBo cuando el nivel está COMPLETO (el banner ya muestra el premio) */}
-                              {completo && hs.premio != null && marca("prem", hs.premio, voboEl("2.8rem"))}
+                              {completo && hs.premio != null && marca("prem", hs.premio, voboEl("3.8rem"))}
                             </>
                           )}
                           {bloqueado && (
