@@ -350,6 +350,18 @@ Node 24.11.0 · pnpm 11.16.0 · Next 16.2.11 · React 19.2.8 · TypeScript 5.9.3
 10: eslint-plugin-react incompatible) · Zod 4.4.3 (API nueva: `z.url()`) ·
 pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
 
+- **`@prisma/client` es devDependency, no de producción**: nadie lo importa —el
+  acceso a datos va por SQL parametrizado con `pg`— y como dependencia de
+  producción arrastraba el CLI de Prisma y sus avisos de seguridad al grafo
+  desplegado. Si algún día se adopta el client, hay que moverlo de vuelta.
+- **Los overrides de pnpm viven en `pnpm-workspace.yaml`, NO en el campo `pnpm`
+  de package.json**: pnpm 11 ignora ese campo (solo avisa). Ese archivo lleva
+  también `allowBuilds`, la lista de paquetes autorizados a ejecutar scripts de
+  instalación — no borrarla al editar.
+- Al fijar un override, **acotar la línea de versión**: `nanoid: ">=3.3.18"`
+  resuelve nanoid 6 y arrastra postcss a una versión anterior a la que otro
+  override ya subía por seguridad. Va `^3.3.18`.
+
 ## Intake de beneficiarios desde LGS (2026-08-19, ADR-0010)
 
 Entrada desde LGS/MOSAICO: un beneficiario niño se registra en KIDS contra una
