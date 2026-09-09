@@ -223,15 +223,17 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   El PNG original traía el tablero de transparencia INCRUSTADO (colorType 2, sin
   alfa): se recortó por relleno desde el borde (candidato = min canal ≥ 232 y
   max−min ≤ 16, que puentea los dos grises del tablero sin comerse la ropa).
-- **Mi próximo evento (2026-09-09)**: caja bajo "Sesión próxima" con el próximo
-  EVENTO del salón — lo creado A MANO en el calendario (`slot_id IS NULL`): club
-  puntual, taller o refuerzo. Se separa de la clase porque el niño la vive distinto:
-  no es su clase de siempre. `agendaProximas` gana `observaciones`, `nivel` y
-  `esEvento`; el dashboard expone `proximoEvento`. Las dos columnas pasan a 5/4 por
-  CSS (`.lgs-dos-col`, apiladas bajo 62rem): la izquierda carga el banner, que es la
-  pieza alta. **Pendiente**: el alumno NO se inscribe a eventos — ve los de su salón.
-  Inscripción por el propio alumno chocaría con el modelo de cohortes ("el niño no
-  agenda"); si el negocio la quiere, es decisión aparte.
+- **Mis talleres (2026-09-09)**: caja bajo "Sesión próxima" con los TALLERES del
+  salón en la ventana de 14 días. El taller se crea como **evento ACADÉMICO** y dura
+  **una o dos horas** (`DURACIONES_TALLER`, validado en `crearEvento`); sesiones y
+  clubes conservan el rango abierto porque los fija el horario del salón. El modal
+  cambia el campo de duración a un desplegable cuando el tipo es Taller.
+  `agendaProximas` gana `observaciones`, `nivel` y `esEvento`; el dashboard expone
+  `talleres`. Las dos columnas pasan a 5/4 por CSS (`.lgs-dos-col`, apiladas bajo
+  62rem) y la última caja de la derecha lleva `flex: 1` para que ambos extremos
+  inferiores coincidan. **Pendiente**: el alumno NO se inscribe — ve los talleres de
+  su salón. La inscripción por el propio alumno chocaría con el modelo de cohortes
+  ("el niño no agenda"); si el negocio la quiere, es decisión aparte.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:
   la `nota_privada` de la misma fila es del equipo y NUNCA viaja al panel del niño.
@@ -301,8 +303,10 @@ cerrado`. Iconos en `src/ui/ZoomAccessButton.tsx`: cámara azul + check verde
 
 ## Vocabulario del negocio (obligatorio en código y UI)
 
-**Guía** (no profesor) · **Club** (no taller) · **Sesión** (no clase) ·
-**Salón** · **Campaña**. Niveles: Rookie → Champion → Elite → Legendary →
+**Guía** (no profesor) · **Sesión** (no clase) ·
+**Salón** · **Campaña**. **Club** y **Taller** son tipos DISTINTOS de evento
+(`scheduling_slot_tipo`) desde 2026-08-28 — antes esta guía decía "Club, no taller",
+regla que dejó de valer cuando el negocio los separó. Niveles: Rookie → Champion → Elite → Legendary →
 Ultimate Stage (5 niveles; duración 2/2/3/3/2 meses).
 
 ## Comandos

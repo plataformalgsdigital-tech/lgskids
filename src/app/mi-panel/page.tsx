@@ -34,8 +34,8 @@ interface Dashboard {
     duracionMin: number;
     guia: string | null;
   } | null;
-  /** Próximo evento creado a mano (club, taller o refuerzo), si lo hay. */
-  proximoEvento?: {
+  /** Talleres próximos del salón: actividad puntual, no el horario de siempre. */
+  talleres?: {
     sessionId: string;
     tipo: string;
     fecha: string;
@@ -44,7 +44,7 @@ interface Dashboard {
     guia: string | null;
     observaciones: string | null;
     nivel: string | null;
-  } | null;
+  }[];
   agenda?: {
     sessionId: string;
     tipo: string;
@@ -1122,7 +1122,6 @@ export default function MiPanelPage() {
             style={{
               display: "grid",
               gap: "1.25rem",
-              alignItems: "start",
             }}
             className="lgs-dos-col"
           >
@@ -1291,10 +1290,10 @@ export default function MiPanelPage() {
               </section>
 
               {/*
-                Próximo EVENTO: lo creado a mano en el calendario (club puntual,
-                taller o refuerzo), que no nace del horario del salón. Va aparte
-                de la sesión próxima porque el niño lo vive distinto: no es su
-                clase de siempre.
+                MIS TALLERES: el taller es su propio tipo de evento desde
+                2026-08-28 — no es un club ni una clase del horario. Se crea
+                como evento ACADÉMICO y dura una o dos horas. Va aparte porque
+                el niño lo vive distinto: es una actividad puntual.
               */}
               <section style={card}>
                 <h2
@@ -1305,56 +1304,56 @@ export default function MiPanelPage() {
                     letterSpacing: "0.05em",
                   }}
                 >
-                  MI PRÓXIMO EVENTO
+                  MIS TALLERES
                 </h2>
-                {data.proximoEvento != null ? (
-                  <>
-                    <p style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: "0.35rem" }}>
-                      {data.proximoEvento.tipo === "CLUB"
-                        ? "Club"
-                        : data.proximoEvento.tipo === "TALLER"
-                          ? "Taller"
-                          : "Sesión extra"}{" "}
-                      · {fechaLarga(data.proximoEvento.startsAt)}
-                    </p>
-                    <p style={{ fontSize: "0.9rem", color: "var(--texto-suave)" }}>
-                      {hora(data.proximoEvento.startsAt)} (tu hora local)
-                      {data.proximoEvento.guia !== null && ` · con ${data.proximoEvento.guia}`}
-                    </p>
-                    {data.proximoEvento.observaciones !== null &&
-                      data.proximoEvento.observaciones !== "" && (
-                        <p style={{ fontSize: "0.88rem", marginTop: "0.45rem" }}>
-                          {data.proximoEvento.observaciones}
-                        </p>
-                      )}
-                    <div style={{ marginTop: "0.8rem" }}>
-                      <p
+                {(data.talleres ?? []).length > 0 ? (
+                  <div
+                    style={{
+                      marginTop: "0.5rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.6rem",
+                    }}
+                  >
+                    {(data.talleres ?? []).map((tl) => (
+                      <div
+                        key={tl.sessionId}
                         style={{
-                          fontSize: "0.72rem",
-                          fontWeight: 700,
-                          color: "var(--texto-suave)",
-                          marginBottom: "0.35rem",
+                          borderLeft: "4px solid var(--lgs-cian)",
+                          paddingLeft: "0.7rem",
                         }}
                       >
-                        LINK DE INGRESO
-                      </p>
-                      {data.matricula.meetingUrl !== null ? (
-                        <p style={{ fontSize: "0.85rem" }}>
-                          Se abre desde <strong>Sesión próxima</strong> cuando llegue la hora.
+                        <p style={{ fontSize: "1rem", fontWeight: 700 }}>
+                          Taller · {fechaLarga(tl.startsAt)}
                         </p>
-                      ) : (
-                        <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-                          El enlace lo asigna la guía del salón.
+                        <p style={{ fontSize: "0.88rem", color: "var(--texto-suave)" }}>
+                          {hora(tl.startsAt)} (tu hora local) ·{" "}
+                          {tl.duracionMin >= 120 ? "2 horas" : "1 hora"}
+                          {tl.guia !== null && ` · con ${tl.guia}`}
                         </p>
-                      )}
-                    </div>
-                  </>
+                        {tl.observaciones !== null && tl.observaciones !== "" && (
+                          <p style={{ fontSize: "0.86rem", marginTop: "0.25rem" }}>
+                            {tl.observaciones}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    <p
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--texto-suave)",
+                        marginTop: "0.2rem",
+                      }}
+                    >
+                      Se entra por el mismo enlace de tu salón, arriba.
+                    </p>
+                  </div>
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: "0.8rem" }}>
                     {esJunior && <Personaje quien="coco" alto="3.6rem" className="lgs-float" />}
                     <p style={{ fontSize: "0.95rem", color: "var(--texto-suave)" }}>
-                      Todavía no tienes eventos. Cuando tu guía programe un club o un taller,
-                      aparece aquí con su información y el enlace.
+                      Todavía no tienes talleres. Cuando tu guía programe uno, aparece aquí con su
+                      información y el enlace.
                     </p>
                   </div>
                 )}
@@ -1531,7 +1530,7 @@ export default function MiPanelPage() {
               {/* Lo que el guía le escribió en sus sesiones, del más reciente
                   al más antiguo. Solo el comentario para el alumno: las notas
                   privadas del equipo nunca llegan a esta pantalla. */}
-              <section id="comentarios" style={{ ...card, scrollMarginTop: "1rem" }}>
+              <section id="comentarios" style={{ ...card, scrollMarginTop: "1rem", flex: 1 }}>
                 <h2 style={{ fontSize: "1.1rem", marginBottom: "0.15rem" }}>
                   💬 Lo que dice mi guía
                 </h2>

@@ -78,6 +78,7 @@ export {
   guardarFichaGuia,
   fichasDeGuias,
   MAX_SALONES_COMPARTIDOS,
+  DURACIONES_TALLER,
 } from "./application/crear-evento";
 export {
   crearEventoAdmin,

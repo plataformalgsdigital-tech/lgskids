@@ -27,6 +27,15 @@ import { MENSAJE_ZOOM_INVALIDO, esSalaZoomValida, normalizarSalaZoom } from "../
 
 export type TipoEvento = "SESION" | "CLUB" | "TALLER";
 
+/**
+ * Duraciones válidas de un TALLER: una o dos horas.
+ *
+ * El taller no es una clase larga ni un club: es una actividad acotada que el
+ * negocio programa en bloques de hora. Sesiones y clubes siguen con el rango
+ * abierto porque los fija el horario del salón.
+ */
+export const DURACIONES_TALLER = [60, 120];
+
 /** Máximo de salones que puede compartir un mismo evento. */
 export const MAX_SALONES_COMPARTIDOS = 3;
 
@@ -197,6 +206,9 @@ export async function crearEvento(input: {
   }
   if (input.duracionMin < 15 || input.duracionMin > 300) {
     throw new ValidationError("La duración debe estar entre 15 y 300 minutos.");
+  }
+  if (input.tipo === "TALLER" && !DURACIONES_TALLER.includes(input.duracionMin)) {
+    throw new ValidationError("Un taller dura una o dos horas.");
   }
   const salones = [...new Set(input.classroomIds)];
   if (salones.length === 0) {

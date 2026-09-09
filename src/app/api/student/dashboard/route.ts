@@ -81,7 +81,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     matricula,
     asistencia,
     proxima: agenda[0] ?? null,
-    proximoEvento: agenda.find((e) => e.esEvento) ?? null,
+    talleres: agenda.filter((e) => e.tipo === "TALLER"),
     agenda,
     progreso,
     historial,

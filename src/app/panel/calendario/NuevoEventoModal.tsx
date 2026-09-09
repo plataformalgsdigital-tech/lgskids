@@ -51,6 +51,9 @@ const TIPOS_ADMIN = [
 /** Duración del evento interno: de 1 a 8 horas, en horas enteras. */
 const HORAS_ADMIN = [1, 2, 3, 4, 5, 6, 7, 8];
 
+/** El taller es una actividad acotada: una o dos horas. */
+const HORAS_TALLER = [1, 2];
+
 const campo: CSSProperties = {
   width: "100%",
   padding: "0.55rem 0.65rem",
@@ -322,16 +325,16 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-dur">
-                Duración {esAdmin ? "" : "(min)"}
+                Duración {esAdmin || tipo === "TALLER" ? "" : "(min)"}
               </label>
-              {esAdmin ? (
+              {esAdmin || tipo === "TALLER" ? (
                 <select
                   id="ev-dur"
                   value={duracion}
                   onChange={(e) => setDuracion(Number(e.target.value))}
                   style={campo}
                 >
-                  {HORAS_ADMIN.map((h) => (
+                  {(esAdmin ? HORAS_ADMIN : HORAS_TALLER).map((h) => (
                     <option key={h} value={h * 60}>
                       {h} hora{h === 1 ? "" : "s"}
                     </option>
@@ -362,7 +365,11 @@ export function NuevoEventoModal({
               <select
                 id="ev-tipo"
                 value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
+                onChange={(e) => {
+                  const nuevo = e.target.value;
+                  setTipo(nuevo);
+                  if (nuevo === "TALLER" && duracion !== 60 && duracion !== 120) setDuracion(60);
+                }}
                 style={campo}
               >
                 {(esAdmin ? TIPOS_ADMIN : TIPOS_ACADEMICO).map((t) => (
