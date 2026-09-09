@@ -56,6 +56,8 @@ const cuerpoSchema = z.discriminatedUnion("accion", [
     accion: z.literal("solicitar_repeticion"),
     motivo: z.string().min(5).max(500),
     repetirLeccion: z.boolean().default(false),
+    /** Lección de la referencia curricular. Informativa. */
+    cursoRefId: z.uuid().nullish(),
   }),
 ]);
 
@@ -96,6 +98,7 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
       sessionId,
       motivo: body.motivo,
       repetirLeccion: body.repetirLeccion,
+      cursoRefId: body.cursoRefId ?? null,
       ip,
     }),
     { status: 201 },

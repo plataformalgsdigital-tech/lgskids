@@ -27,6 +27,7 @@ interface Refuerzo {
   nivel: string | null;
   motivo: string;
   repetirLeccion: boolean;
+  leccionRef: string | null;
   solicitante: string | null;
   solicitadoEn: string;
   estado: "PENDIENTE" | "APROBADA" | "RECHAZADA";
@@ -339,6 +340,7 @@ export default function RefuerzosPage() {
               <th style={celda}>Guía</th>
               <th style={celda}>Campaña</th>
               <th style={celda}>Curso · País · Salón</th>
+              <th style={celda}>Lección solicitada</th>
               <th style={celda}>Sesión</th>
               <th style={celda}>Fecha del evento</th>
               <th style={celda}>Solicitud</th>
@@ -350,7 +352,7 @@ export default function RefuerzosPage() {
             {filas !== null && filas.length === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   style={{ ...celda, color: "var(--texto-suave)", padding: "1.5rem" }}
                 >
                   No hay solicitudes con esos filtros.
@@ -365,14 +367,21 @@ export default function RefuerzosPage() {
                   <strong>{f.cursoTipo}</strong> · {f.pais ?? "—"} · {f.salon}
                 </td>
                 <td style={celda}>
-                  {f.numero > 0 ? `N° ${String(f.numero)}` : "Evento suelto"}
-                  {f.nivel !== null && (
-                    <span style={{ color: "var(--texto-suave)" }}> · {f.nivel}</span>
+                  {f.leccionRef !== null ? (
+                    <strong>{f.leccionRef}</strong>
+                  ) : (
+                    <span style={{ color: "var(--texto-suave)" }}>Sin especificar</span>
                   )}
                   {f.repetirLeccion && (
                     <span style={{ display: "block", fontSize: "0.72rem", color: "#e65100" }}>
                       repite la lección
                     </span>
+                  )}
+                </td>
+                <td style={celda}>
+                  {f.numero > 0 ? `N° ${String(f.numero)}` : "Evento suelto"}
+                  {f.nivel !== null && (
+                    <span style={{ color: "var(--texto-suave)" }}> · {f.nivel}</span>
                   )}
                 </td>
                 <td style={celda}>{f.fechaEvento}</td>
@@ -481,6 +490,13 @@ export default function RefuerzosPage() {
               matrículas activas, y el avance del alumno no se altera: depende de las evaluaciones.
             </p>
 
+            <div style={{ fontSize: "0.85rem" }}>
+              <span style={rotulo}>Lección solicitada</span>
+              <p style={{ margin: 0 }}>
+                {sel.leccionRef ?? "Sin especificar"}
+                {sel.repetirLeccion && " · se repite la lección"}
+              </p>
+            </div>
             <div style={{ fontSize: "0.85rem" }}>
               <span style={rotulo}>Motivo del guía</span>
               <p style={{ margin: 0 }}>{sel.motivo}</p>

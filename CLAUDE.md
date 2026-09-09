@@ -484,9 +484,17 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   2. No hay bookings: la lista sale de las matrículas ACTIVAS (Fase 7).
   3. El avance NO se detiene: se deriva de evaluaciones, no de sesiones dictadas
      (regla 4). `repetir_leccion` solo rotula, nunca toca progresión.
-     Por ser clase extra hay que darle **fecha y hora propias**: el horario regular del
-     salón ya está ocupado y hay índice único por (salón, instante).
-     Invariantes probados en `tests/refuerzo-integration.test.ts`.
+- Por ser clase extra hay que darle **fecha y hora propias**: el horario regular del
+  salón ya está ocupado y hay índice único por (salón, instante). MOSAICO las calcula
+  solo porque allá el refuerzo se anexa al curso; aquí no.
+- **Lección solicitada** (`curso_ref_id` → `catalog_curso`, migración
+  `20260908000001`): el guía señala QUÉ lección repetir eligiéndola de la referencia
+  curricular (el modal ya la carga para Material/Recursos). Es **referencia**, no dato
+  operativo: sirve para que coordinación sepa de qué se trata y para rotular la clase
+  extra —que hereda el `nivel` y lleva la lección en `observaciones`—. Lo operativo
+  sigue siendo agendar la sesión extra para ese curso. Es el primer uso real de
+  `catalog_curso` desde `scheduling`.
+- Invariantes probados en `tests/refuerzo-integration.test.ts`.
 - El menú lateral de KIDS es de DOS niveles, así que lo que en MOSAICO es el submenú
   `Académico › Sesiones` aquí es la página-índice **/panel/sesiones** con tarjetas
   (mismo patrón que Mantenimiento Académico). Permiso de menú `menu.sesiones`.

@@ -144,6 +144,7 @@ export function SesionModal({
   );
   const [motivo, setMotivo] = useState("");
   const [repetirLeccion, setRepetirLeccion] = useState(false);
+  const [cursoRefId, setCursoRefId] = useState("");
 
   const cargar = useCallback(async () => {
     try {
@@ -312,6 +313,17 @@ export function SesionModal({
     }
   }
 
+  /**
+   * Referencia curricular del curso. La usan las pestañas de material y el
+   * selector de lección al pedir un refuerzo. Se pide UNA vez por sesión.
+   */
+  async function cargarReferencia() {
+    if (contenido !== null || sesion === null) return;
+    const res = await apiFetch(`/api/catalog/curso?curso=${sesion.cursoTipo ?? ""}`);
+    if (res.ok) setContenido(((await res.json()) as { referencias: CursoRef[] }).referencias ?? []);
+    else setContenido([]);
+  }
+
   /** Material del curso. Todavía sin nivel: llega cuando exista Niveles. */
   async function abrirContenido(cual: "material_usuario" | "material_guia" | "recursos") {
     if (pestana === cual) {
@@ -319,12 +331,7 @@ export function SesionModal({
       return;
     }
     setPestana(cual);
-    if (contenido === null && sesion !== null) {
-      const res = await apiFetch(`/api/catalog/curso?curso=${sesion.cursoTipo ?? ""}`);
-      if (res.ok)
-        setContenido(((await res.json()) as { referencias: CursoRef[] }).referencias ?? []);
-      else setContenido([]);
-    }
+    await cargarReferencia();
   }
 
   /** Abre el registro proponiendo la hora actual del navegador. */
@@ -561,7 +568,10 @@ export function SesionModal({
               type="button"
               style={boton}
               disabled={ocupado || pendiente !== null}
-              onClick={() => setPidiendoRepeticion((v) => !v)}
+              onClick={() => {
+                setPidiendoRepeticion((v) => !v);
+                void cargarReferencia();
+              }}
             >
               🔁 {pendiente !== null ? "Repetición solicitada" : "Solicitar repetir sesión"}
             </button>
@@ -841,6 +851,40 @@ export function SesionModal({
               />
               <label
                 style={{
+                  display: "block",
+                  margin: "0.6rem 0 0.15rem",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                }}
+                htmlFor="rep-leccion"
+              >
+                Lección a repetir <span style={{ fontWeight: 400 }}>(referencia)</span>
+              </label>
+              <select
+                id="rep-leccion"
+                value={cursoRefId}
+                onChange={(e) => setCursoRefId(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  borderRadius: "0.5rem",
+                  border: "1.5px solid #d8dce6",
+                  fontFamily: "inherit",
+                  fontSize: "0.85rem",
+                  background: "white",
+                }}
+              >
+                <option value="">Sin especificar</option>
+                {(contenido ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {[c.nivel, c.unidad, c.leccion]
+                      .filter((x) => x !== null && x !== "")
+                      .join(" · ")}
+                  </option>
+                ))}
+              </select>
+              <label
+                style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "0.4rem",
@@ -861,7 +905,12 @@ export function SesionModal({
                 disabled={ocupado || motivo.trim().length < 5}
                 onClick={() =>
                   void accionRegistro(
-                    { accion: "solicitar_repeticion", motivo, repetirLeccion },
+                    {
+                      accion: "solicitar_repeticion",
+                      motivo,
+                      repetirLeccion,
+                      cursoRefId: cursoRefId === "" ? null : cursoRefId,
+                    },
                     "Solicitud enviada a coordinación.",
                   )
                 }

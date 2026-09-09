@@ -177,6 +177,9 @@ export async function solicitarRepeticion(input: {
   sessionId: string;
   motivo: string;
   repetirLeccion: boolean;
+  /** Lección de `catalog_curso` que hay que repetir. Es REFERENCIA: sirve para
+   *  que coordinación sepa de qué se trata y para rotular la clase extra. */
+  cursoRefId?: string | null;
   ip?: string | null;
 }): Promise<{ id: string }> {
   const motivo = input.motivo.trim();
@@ -198,9 +201,17 @@ export async function solicitarRepeticion(input: {
 
   const id = newId();
   await execute(
-    `INSERT INTO scheduling_repeticion (id, session_id, solicitado_por, motivo, repetir_leccion)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [id, input.sessionId, input.actorUserId, motivo, input.repetirLeccion],
+    `INSERT INTO scheduling_repeticion
+       (id, session_id, solicitado_por, motivo, repetir_leccion, curso_ref_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      id,
+      input.sessionId,
+      input.actorUserId,
+      motivo,
+      input.repetirLeccion,
+      input.cursoRefId ?? null,
+    ],
   );
   await registrarAuditoria({
     actorUserId: input.actorUserId,
@@ -252,13 +263,18 @@ export async function resolverRepeticion(input: {
       fecha: string;
       duracion_min: number;
       guia_original: string | null;
+      ref_nivel: string | null;
+      ref_unidad: string | null;
+      ref_leccion: string | null;
     }>(
       `SELECT r.session_id, r.estado, r.motivo,
               s.classroom_id, s.fecha::text AS fecha, s.duracion_min,
-              COALESCE(s.guia_user_id, cl.guia_user_id) AS guia_original
+              COALESCE(s.guia_user_id, cl.guia_user_id) AS guia_original,
+              cr.nivel AS ref_nivel, cr.unidad AS ref_unidad, cr.leccion AS ref_leccion
          FROM scheduling_repeticion r
          JOIN scheduling_session s ON s.id = r.session_id
          JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+         LEFT JOIN catalog_curso cr ON cr.id = r.curso_ref_id
         WHERE r.id = $1
         FOR UPDATE OF r`,
       [input.repeticionId],
@@ -277,6 +293,14 @@ export async function resolverRepeticion(input: {
       if (guiaUserId === null) {
         throw new ValidationError("El salón no tiene guía asignado: elige uno para el refuerzo.");
       }
+      // La lección va en el rótulo de la clase extra: el guía y el alumno
+      // tienen que ver QUÉ se va a repetir, no solo que hay una sesión más.
+      const leccion =
+        fila.ref_leccion === null
+          ? ""
+          : ` Lección: ${[fila.ref_nivel, fila.ref_unidad, fila.ref_leccion]
+              .filter((x) => x !== null && x !== "")
+              .join(" · ")}.`;
       const { sesiones } = await crearEvento({
         actorUserId: input.actorUserId,
         classroomIds: [fila.classroom_id],
@@ -285,7 +309,8 @@ export async function resolverRepeticion(input: {
         horaLocal: input.refuerzo.horaLocal,
         duracionMin: input.refuerzo.duracionMin,
         guiaUserId,
-        observaciones: `Refuerzo de la sesión del ${fila.fecha}. ${fila.motivo}`,
+        nivel: fila.ref_nivel,
+        observaciones: `Refuerzo de la sesión del ${fila.fecha}.${leccion} ${fila.motivo}`,
         client: tx,
         ip: input.ip ?? null,
       });
@@ -352,6 +377,8 @@ export interface FilaRefuerzo {
   nivel: string | null;
   motivo: string;
   repetirLeccion: boolean;
+  /** Lección que el guía pidió repetir, ya legible. Referencia, no operativo. */
+  leccionRef: string | null;
   solicitante: string | null;
   solicitadoEn: string;
   estado: "PENDIENTE" | "APROBADA" | "RECHAZADA";
@@ -406,6 +433,7 @@ export async function listarRefuerzos(
             COALESCE(gu.username, '') AS guia,
             s.fecha::text AS "fechaEvento", s.numero, s.nivel,
             r.motivo, r.repetir_leccion AS "repetirLeccion",
+            NULLIF(CONCAT_WS(' · ', cr.nivel, cr.unidad, cr.leccion), '') AS "leccionRef",
             su.username AS solicitante, r.created_at::text AS "solicitadoEn",
             r.estado, r.nota_resolucion AS "notaResolucion",
             ref.fecha::text AS "fechaRefuerzo"
@@ -417,6 +445,7 @@ export async function listarRefuerzos(
        LEFT JOIN identity_user gu ON gu.id = COALESCE(s.guia_user_id, cl.guia_user_id)
        LEFT JOIN identity_user su ON su.id = r.solicitado_por
        LEFT JOIN scheduling_session ref ON ref.id = r.sesion_refuerzo_id
+       LEFT JOIN catalog_curso cr ON cr.id = r.curso_ref_id
        ${where}
       ORDER BY r.created_at DESC
       LIMIT ${p(limite)}`,

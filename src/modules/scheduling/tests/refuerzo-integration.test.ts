@@ -29,11 +29,13 @@ describe.runIf(RUN)("refuerzo de sesión (integración)", () => {
   let guiaId: string;
   let sessionId: string;
   let repeticionId: string;
+  let cursoRefId: string;
 
   beforeAll(async () => {
     campaignId = newId();
     courseId = newId();
     guiaId = newId();
+    cursoRefId = newId();
 
     await execute(
       `INSERT INTO identity_user (id, username, password_hash, updated_at)
@@ -50,6 +52,13 @@ describe.runIf(RUN)("refuerzo de sesión (integración)", () => {
       `INSERT INTO catalog_course (id, campaign_id, tipo, inicio, final_curso, updated_at)
        VALUES ($1, $2, 'JUNIOR', '2026-08-03', '2026-10-25', now())`,
       [courseId, campaignId],
+    );
+    // Lección de la referencia curricular: es la que el guía señala al pedir
+    // el refuerzo. Vive fuera de la campaña, en la tabla maestra.
+    await execute(
+      `INSERT INTO catalog_curso (id, curso, nivel, unidad, leccion, orden)
+       VALUES ($1, 'JUNIOR', 'ROOKIE', 'Unidad IT', 'Lección IT', 999)`,
+      [cursoRefId],
     );
 
     const salon = await crearSalon({
@@ -78,6 +87,7 @@ describe.runIf(RUN)("refuerzo de sesión (integración)", () => {
   afterAll(async () => {
     await execute(`DELETE FROM scheduling_classroom WHERE id = $1`, [classroomId]);
     await execute(`DELETE FROM catalog_campaign WHERE id = $1`, [campaignId]);
+    await execute(`DELETE FROM catalog_curso WHERE id = $1`, [cursoRefId]);
     await execute(`DELETE FROM identity_user WHERE id = $1`, [guiaId]);
     await closePool();
   });
@@ -88,6 +98,7 @@ describe.runIf(RUN)("refuerzo de sesión (integración)", () => {
       sessionId,
       motivo: "Se cortó la conexión y quedó la mitad de la lección.",
       repetirLeccion: true,
+      cursoRefId,
     });
     repeticionId = id;
 
@@ -98,6 +109,8 @@ describe.runIf(RUN)("refuerzo de sesión (integración)", () => {
     expect(fila?.salon).toBe("Salón Refuerzo");
     expect(fila?.cursoTipo).toBe("JUNIOR");
     expect(fila?.pais).toBe("CL");
+    // La lección viaja como REFERENCIA, ya legible para coordinación.
+    expect(fila?.leccionRef).toBe("ROOKIE · Unidad IT · Lección IT");
   });
 
   it("aprobar sin fecha no aprueba nada: la solicitud sigue pendiente", async () => {
@@ -161,11 +174,18 @@ describe.runIf(RUN)("refuerzo de sesión (integración)", () => {
     // Es una clase extra, no una prórroga.
     expect(despues?.fin).toBe(antes?.fin);
 
-    const creada = await queryOne<{ slot_id: string | null; numero: number }>(
-      `SELECT slot_id, numero FROM scheduling_session WHERE id = $1`,
-      [sesionRefuerzoId ?? ""],
-    );
+    const creada = await queryOne<{
+      slot_id: string | null;
+      numero: number;
+      nivel: string | null;
+      observaciones: string | null;
+    }>(`SELECT slot_id, numero, nivel, observaciones FROM scheduling_session WHERE id = $1`, [
+      sesionRefuerzoId ?? "",
+    ]);
     expect(creada?.slot_id).toBeNull();
+    // La clase extra queda rotulada con la lección que se pidió repetir.
+    expect(creada?.nivel).toBe("ROOKIE");
+    expect(creada?.observaciones).toContain("ROOKIE · Unidad IT · Lección IT");
     // Fuera de la numeración del curso: no corre las sesiones que ya existían.
     expect(creada?.numero).toBe(0);
   });
