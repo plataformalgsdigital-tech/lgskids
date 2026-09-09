@@ -509,7 +509,20 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   muestra la audiencia por nombre. Se siguen CREANDO desde el calendario
   (`eventos.crear`). `eventosAdmin` gana `pais` y `audiencia` (usernames): antes solo
   devolvía el conteo, que no alcanza para gestionarlos. Leer exige `salones.ver` y la
-  consulta se acota al guía cuando no gestiona salones.
+  consulta se acota al guía cuando no gestiona salones. Filtros por tipo y país.
+- **Tipos y duración del evento admin (2026-09-09, migración `20260909000000`)**: su
+  vocabulario NO es el de una clase (SESION/CLUB/TALLER) sino
+  **MEETING · TRAINING · OBSERVATION · DEVELOPMENT**, y la duración va de **1 a 8
+  horas** — una clase dura minutos, una capacitación puede ocupar la jornada. Ambas
+  reglas viven en `domain/evento-admin.ts` Y como CHECK en la base. Los tipos
+  antiguos se migraron (TALLER→TRAINING, CLUB/SESION→MEETING). En el modal el
+  selector de tipo y el de duración cambian según el modo.
+- **Asistencia del evento admin**: se pasa lista desde la pantalla
+  (`POST /api/scheduling/eventos-admin/[id]/asistencia`, `salones.gestionar`) y se
+  guarda en `scheduling_evento_admin_guia` (`asistio`/`marcado_en`/`marcado_por`),
+  **NUNCA** en `attendance_attendance`: esa es la asistencia de NIÑOS y dispara la
+  función central de progresión (regla 4). `asistio` NULL = sin pasar lista, distinto
+  de "no vino". Solo se actualizan guías que YA están en la audiencia.
 - **Estadística mensual del guía** (`reporting/application/guia-mes.ts`,
   `reporting_guia_mes`): `calcularGuiaMes` es la consulta viva y `consolidarGuiaMes`
   la congela con UPSERT idempotente — necesario porque regenerar un salón es

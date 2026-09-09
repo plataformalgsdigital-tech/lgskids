@@ -79,7 +79,13 @@ export {
   fichasDeGuias,
   MAX_SALONES_COMPARTIDOS,
 } from "./application/crear-evento";
-export { crearEventoAdmin, eventosAdmin } from "./application/crear-evento";
+export {
+  crearEventoAdmin,
+  eventosAdmin,
+  audienciaEventoAdmin,
+  marcarAsistenciaEventoAdmin,
+} from "./application/crear-evento";
+export type { AsistenteEventoAdmin } from "./application/crear-evento";
 export type {
   TipoEvento,
   EventoCreado,
@@ -101,5 +107,13 @@ export type {
   FichaPrellenada,
   DatosWizard,
 } from "./application/invitacion-guia";
+export {
+  TIPOS_EVENTO_ADMIN,
+  CODIGOS_EVENTO_ADMIN,
+  DURACION_ADMIN_MIN,
+  DURACION_ADMIN_MAX,
+  etiquetaEventoAdmin,
+} from "./domain/evento-admin";
+export type { TipoEventoAdmin } from "./domain/evento-admin";
 export { DIAS_VIGENCIA_INVITACION } from "./domain/invitacion";
 export type { EstadoInvitacion } from "./domain/invitacion";

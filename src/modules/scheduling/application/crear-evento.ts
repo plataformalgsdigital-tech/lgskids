@@ -5,6 +5,12 @@ import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { OPERATIONAL_TIMEZONES, wallTimeToUtc } from "@/platform/time";
+import {
+  DURACION_ADMIN_MAX,
+  DURACION_ADMIN_MIN,
+  type TipoEventoAdmin,
+  esTipoEventoAdmin,
+} from "../domain/evento-admin";
 import { MENSAJE_ZOOM_INVALIDO, esSalaZoomValida, normalizarSalaZoom } from "../domain/zoom-link";
 
 /**
@@ -322,7 +328,9 @@ export interface EventoAdminCreado {
  */
 export async function crearEventoAdmin(input: {
   actorUserId: string;
-  tipo: TipoEvento;
+  /** Meeting | Training | Observation | Development: vocabulario propio del
+   *  evento interno, distinto del de una sesión de clase. */
+  tipo: TipoEventoAdmin;
   titulo?: string | null;
   fecha: string;
   horaLocal: string;
@@ -345,8 +353,14 @@ export async function crearEventoAdmin(input: {
   if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(input.horaLocal)) {
     throw new ValidationError("La hora debe ser HH:MM.");
   }
-  if (input.duracionMin < 15 || input.duracionMin > 300) {
-    throw new ValidationError("La duración debe estar entre 15 y 300 minutos.");
+  if (!esTipoEventoAdmin(input.tipo)) {
+    throw new ValidationError(
+      "Tipo inválido: un evento administrativo es Meeting, Training, Observation o Development.",
+    );
+  }
+  // Una clase dura minutos; una capacitación puede ocupar la jornada.
+  if (input.duracionMin < DURACION_ADMIN_MIN || input.duracionMin > DURACION_ADMIN_MAX) {
+    throw new ValidationError("La duración debe estar entre 1 y 8 horas.");
   }
   const guias = [...new Set(input.guiaUserIds)];
   if (guias.length === 0) {
@@ -427,6 +441,9 @@ export interface EventoAdmin {
   pais: string | null;
   /** Cuántos guías lo ven. */
   guias: number;
+  /** Cuántos asistieron y cuántos ya tienen marca (para distinguir 0 de "sin pasar lista"). */
+  asistieron: number;
+  marcados: number;
   /** Quiénes lo ven, para poder gestionarlo sin abrir el evento. */
   audiencia: string[];
 }
@@ -441,19 +458,33 @@ export async function eventosAdmin(
   desde: string,
   hasta: string,
   guiaUserId: string | null,
+  filtros: { tipo?: string | null; pais?: string | null } = {},
 ): Promise<EventoAdmin[]> {
   const values: unknown[] = [desde, hasta];
-  let filtro = "";
+  const cond: string[] = [];
   if (guiaUserId !== null) {
     values.push(guiaUserId);
-    filtro = `AND EXISTS (SELECT 1 FROM scheduling_evento_admin_guia g
-                            WHERE g.evento_id = e.id AND g.guia_user_id = $${String(values.length)})`;
+    cond.push(`EXISTS (SELECT 1 FROM scheduling_evento_admin_guia g
+                          WHERE g.evento_id = e.id AND g.guia_user_id = $${String(values.length)})`);
   }
+  if (filtros.tipo != null && filtros.tipo !== "") {
+    values.push(filtros.tipo);
+    cond.push(`e.tipo = $${String(values.length)}`);
+  }
+  if (filtros.pais != null && filtros.pais !== "") {
+    values.push(filtros.pais);
+    cond.push(`e.pais = $${String(values.length)}`);
+  }
+  const filtro = cond.length > 0 ? `AND ${cond.join(" AND ")}` : "";
   return queryRows<EventoAdmin>(
     `SELECT e.id, e.tipo, e.titulo, e.fecha::text AS fecha, e.starts_at AS "startsAt",
             e.duracion_min AS "duracionMin", e.campania, e.curso, e.nivel, e.observaciones,
             e.pais,
             (SELECT count(*) FROM scheduling_evento_admin_guia g WHERE g.evento_id = e.id)::int AS guias,
+            (SELECT count(*) FROM scheduling_evento_admin_guia g
+              WHERE g.evento_id = e.id AND g.asistio)::int AS asistieron,
+            (SELECT count(*) FROM scheduling_evento_admin_guia g
+              WHERE g.evento_id = e.id AND g.asistio IS NOT NULL)::int AS marcados,
             COALESCE((SELECT array_agg(u.username ORDER BY u.username)
                         FROM scheduling_evento_admin_guia g
                         JOIN identity_user u ON u.id = g.guia_user_id
@@ -464,4 +495,82 @@ export async function eventosAdmin(
       ORDER BY e.starts_at`,
     values,
   );
+}
+
+// ============================================================
+// Asistencia del evento administrativo
+// ============================================================
+
+export interface AsistenteEventoAdmin {
+  guiaUserId: string;
+  username: string;
+  nombre: string | null;
+  /** null = todavía nadie pasó lista. Distinto de "no vino". */
+  asistio: boolean | null;
+  marcadoEn: string | null;
+}
+
+/** La audiencia del evento, con su marca. Es la lista del modal. */
+export async function audienciaEventoAdmin(eventoId: string): Promise<AsistenteEventoAdmin[]> {
+  return queryRows<AsistenteEventoAdmin>(
+    `SELECT g.guia_user_id AS "guiaUserId", u.username,
+            NULLIF(TRIM(CONCAT_WS(' ', gu.nombres, gu.apellidos)), '') AS nombre,
+            g.asistio, g.marcado_en::text AS "marcadoEn"
+       FROM scheduling_evento_admin_guia g
+       JOIN identity_user u ON u.id = g.guia_user_id
+       LEFT JOIN scheduling_guia gu ON gu.guia_user_id = g.guia_user_id
+      WHERE g.evento_id = $1
+      ORDER BY u.username`,
+    [eventoId],
+  );
+}
+
+/**
+ * Pasa lista del evento administrativo.
+ *
+ * Se guarda en la tabla de AUDIENCIA, nunca en `attendance_attendance`: esa
+ * es la asistencia de NIÑOS a sesiones y dispara la función central de
+ * progresión (regla 4). Un guía en una capacitación no tiene progresión que
+ * mover, y mezclarlas metería un segundo camino de escritura donde debe
+ * haber uno solo.
+ *
+ * Solo se tocan los guías que vienen en `marcas`, y solo si están en la
+ * audiencia: marcar a alguien que no fue convocado sería inventar un dato.
+ */
+export async function marcarAsistenciaEventoAdmin(input: {
+  actorUserId: string;
+  eventoId: string;
+  marcas: { guiaUserId: string; asistio: boolean | null }[];
+  ip?: string | null;
+}): Promise<{ marcados: number }> {
+  const evento = await queryOne<{ id: string }>(
+    `SELECT id FROM scheduling_evento_admin WHERE id = $1`,
+    [input.eventoId],
+  );
+  if (evento === null) throw new NotFoundError("El evento no existe.");
+
+  let marcados = 0;
+  await withTransaction(async (tx) => {
+    for (const m of input.marcas) {
+      marcados += await execute(
+        `UPDATE scheduling_evento_admin_guia
+            SET asistio = $3::boolean,
+                marcado_en = CASE WHEN $3::boolean IS NULL THEN NULL ELSE now() END,
+                marcado_por = CASE WHEN $3::boolean IS NULL THEN NULL ELSE $4::uuid END
+          WHERE evento_id = $1 AND guia_user_id = $2`,
+        [input.eventoId, m.guiaUserId, m.asistio, input.actorUserId],
+        tx,
+      );
+    }
+  });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.evento_admin_asistencia",
+    entidad: "scheduling_evento_admin",
+    entidadId: input.eventoId,
+    payload: { marcados },
+    ip: input.ip ?? null,
+  });
+  return { marcados };
 }

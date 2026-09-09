@@ -33,11 +33,23 @@ interface Guia {
 }
 
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"] as const;
-const TIPOS = [
+/** Tipos de una clase: la dicta un salón. */
+const TIPOS_ACADEMICO = [
   { valor: "SESION", etiqueta: "Sesión" },
   { valor: "CLUB", etiqueta: "Club" },
   { valor: "TALLER", etiqueta: "Taller" },
 ] as const;
+
+/** Tipos del evento INTERNO: su audiencia son guías, no un salón. */
+const TIPOS_ADMIN = [
+  { valor: "MEETING", etiqueta: "Meeting" },
+  { valor: "TRAINING", etiqueta: "Training" },
+  { valor: "OBSERVATION", etiqueta: "Observation" },
+  { valor: "DEVELOPMENT", etiqueta: "Development" },
+] as const;
+
+/** Duración del evento interno: de 1 a 8 horas, en horas enteras. */
+const HORAS_ADMIN = [1, 2, 3, 4, 5, 6, 7, 8];
 
 const campo: CSSProperties = {
   width: "100%",
@@ -88,7 +100,7 @@ export function NuevoEventoModal({
   );
   const [hora, setHora] = useState("16:00");
   const [duracion, setDuracion] = useState(60);
-  const [tipo, setTipo] = useState<"SESION" | "CLUB" | "TALLER">("SESION");
+  const [tipo, setTipo] = useState<string>(esAdmin ? "MEETING" : "SESION");
   const [campania, setCampania] = useState("");
   const [pais, setPais] = useState("");
   const [curso, setCurso] = useState("");
@@ -310,17 +322,32 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-dur">
-                Duración (min)
+                Duración {esAdmin ? "" : "(min)"}
               </label>
-              <input
-                id="ev-dur"
-                type="number"
-                min={15}
-                max={300}
-                value={duracion}
-                onChange={(e) => setDuracion(Number(e.target.value))}
-                style={campo}
-              />
+              {esAdmin ? (
+                <select
+                  id="ev-dur"
+                  value={duracion}
+                  onChange={(e) => setDuracion(Number(e.target.value))}
+                  style={campo}
+                >
+                  {HORAS_ADMIN.map((h) => (
+                    <option key={h} value={h * 60}>
+                      {h} hora{h === 1 ? "" : "s"}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="ev-dur"
+                  type="number"
+                  min={15}
+                  max={300}
+                  value={duracion}
+                  onChange={(e) => setDuracion(Number(e.target.value))}
+                  style={campo}
+                />
+              )}
             </div>
           </div>
 
@@ -335,10 +362,10 @@ export function NuevoEventoModal({
               <select
                 id="ev-tipo"
                 value={tipo}
-                onChange={(e) => setTipo(e.target.value as typeof tipo)}
+                onChange={(e) => setTipo(e.target.value)}
                 style={campo}
               >
-                {TIPOS.map((t) => (
+                {(esAdmin ? TIPOS_ADMIN : TIPOS_ACADEMICO).map((t) => (
                   <option key={t.valor} value={t.valor}>
                     {t.etiqueta}
                   </option>

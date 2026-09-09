@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
-import { crearEventoAdmin, eventosAdmin } from "@/modules/scheduling";
+import {
+  CODIGOS_EVENTO_ADMIN,
+  DURACION_ADMIN_MAX,
+  DURACION_ADMIN_MIN,
+  crearEventoAdmin,
+  eventosAdmin,
+} from "@/modules/scheduling";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
 bootstrapIdentity();
@@ -24,15 +30,25 @@ export const GET = handlerWithAuth(async (request, auth) => {
   const soloSuyos =
     profile.hasPermission(PERMISOS.PANEL_GUIA) &&
     !profile.hasPermission(PERMISOS.SALONES_GESTIONAR);
-  return json({ eventos: await eventosAdmin(desde, hasta, soloSuyos ? auth.userId : null) });
+  return json({
+    eventos: await eventosAdmin(desde, hasta, soloSuyos ? auth.userId : null, {
+      tipo: q.get("tipo"),
+      pais: q.get("pais"),
+    }),
+  });
 });
 
 const crearSchema = z.object({
-  tipo: z.enum(["SESION", "CLUB", "TALLER"]),
+  tipo: z.enum(CODIGOS_EVENTO_ADMIN),
   titulo: z.string().max(200).nullish(),
   fecha: rangoSchema,
   horaLocal: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "La hora debe ser HH:MM."),
-  duracionMin: z.number().int().min(15).max(300).default(60),
+  duracionMin: z
+    .number()
+    .int()
+    .min(DURACION_ADMIN_MIN)
+    .max(DURACION_ADMIN_MAX)
+    .default(DURACION_ADMIN_MIN),
   pais: z.enum(["CL", "CO", "EC", "PE"]),
   campania: z.string().max(120).nullish(),
   curso: z.string().max(40).nullish(),

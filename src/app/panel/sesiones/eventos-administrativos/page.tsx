@@ -29,13 +29,33 @@ interface EventoAdmin {
   observaciones: string | null;
   pais: string | null;
   guias: number;
+  asistieron: number;
+  marcados: number;
   audiencia: string[];
 }
 
+interface Asistente {
+  guiaUserId: string;
+  username: string;
+  nombre: string | null;
+  asistio: boolean | null;
+  marcadoEn: string | null;
+}
+
+const TIPOS = [
+  { valor: "MEETING", etiqueta: "Meeting" },
+  { valor: "TRAINING", etiqueta: "Training" },
+  { valor: "OBSERVATION", etiqueta: "Observation" },
+  { valor: "DEVELOPMENT", etiqueta: "Development" },
+];
+
+const PAISES = ["CL", "CO", "EC", "PE"];
+
 const COLOR_TIPO: Record<string, string> = {
-  SESION: "#e65100",
-  CLUB: "#6a1b9a",
-  TALLER: "#00695c",
+  MEETING: "#e65100",
+  TRAINING: "#00695c",
+  OBSERVATION: "#6a1b9a",
+  DEVELOPMENT: "#1565c0",
 };
 
 const campo: CSSProperties = {
@@ -72,18 +92,27 @@ export default function EventosAdministrativosPage() {
   const [eventos, setEventos] = useState<EventoAdmin[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
+  const [tipo, setTipo] = useState("");
+  const [pais, setPais] = useState("");
+
+  // Modal de lista: evento elegido, su audiencia y las marcas sin guardar.
+  const [lista, setLista] = useState<EventoAdmin | null>(null);
+  const [asistentes, setAsistentes] = useState<Asistente[] | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [errorLista, setErrorLista] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
-    const res = await apiFetch(
-      `/api/scheduling/eventos-admin?from=${encodeURIComponent(desde)}&to=${encodeURIComponent(hasta)}`,
-    );
+    const qs = new URLSearchParams({ from: desde, to: hasta });
+    if (tipo !== "") qs.set("tipo", tipo);
+    if (pais !== "") qs.set("pais", pais);
+    const res = await apiFetch(`/api/scheduling/eventos-admin?${qs.toString()}`);
     if (!res.ok) {
       setError("No se pudieron cargar los eventos administrativos.");
       return;
     }
     setError(null);
     setEventos(((await res.json()) as { eventos: EventoAdmin[] }).eventos);
-  }, [desde, hasta]);
+  }, [desde, hasta, tipo, pais]);
 
   useEffect(() => {
     async function inicio() {
@@ -94,6 +123,49 @@ export default function EventosAdministrativosPage() {
 
   function hora(iso: string): string {
     return new Date(iso).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  async function abrirLista(e: EventoAdmin) {
+    setLista(e);
+    setAsistentes(null);
+    setErrorLista(null);
+    const res = await apiFetch(`/api/scheduling/eventos-admin/${e.id}/asistencia`);
+    if (!res.ok) {
+      setErrorLista("No se pudo cargar la lista.");
+      return;
+    }
+    setAsistentes(((await res.json()) as { audiencia: Asistente[] }).audiencia);
+  }
+
+  /** Marca local; nada viaja hasta guardar. */
+  function alternar(guiaUserId: string, asistio: boolean | null) {
+    setAsistentes((prev) =>
+      (prev ?? []).map((a) => (a.guiaUserId === guiaUserId ? { ...a, asistio } : a)),
+    );
+  }
+
+  async function guardarLista() {
+    if (lista === null || asistentes === null) return;
+    setGuardando(true);
+    setErrorLista(null);
+    try {
+      const res = await apiFetch(`/api/scheduling/eventos-admin/${lista.id}/asistencia`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marcas: asistentes.map((a) => ({ guiaUserId: a.guiaUserId, asistio: a.asistio })),
+        }),
+      });
+      if (!res.ok) {
+        const c: { error?: { message?: string } } = await res.json();
+        setErrorLista(c.error?.message ?? "No se pudo guardar la lista.");
+        return;
+      }
+      setLista(null);
+      await cargar();
+    } finally {
+      setGuardando(false);
+    }
   }
 
   return (
@@ -148,6 +220,32 @@ export default function EventosAdministrativosPage() {
             style={campo}
           />
         </div>
+        <div>
+          <label style={rotulo} htmlFor="e-tipo">
+            Tipo
+          </label>
+          <select id="e-tipo" value={tipo} onChange={(e) => setTipo(e.target.value)} style={campo}>
+            <option value="">Todos</option>
+            {TIPOS.map((x) => (
+              <option key={x.valor} value={x.valor}>
+                {x.etiqueta}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={rotulo} htmlFor="e-pais">
+            País
+          </label>
+          <select id="e-pais" value={pais} onChange={(e) => setPais(e.target.value)} style={campo}>
+            <option value="">Todos</option>
+            {PAISES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </div>
         <span style={{ fontSize: "0.82rem", color: "var(--texto-suave)", paddingBottom: "0.5rem" }}>
           {eventos === null
             ? "Cargando…"
@@ -173,6 +271,7 @@ export default function EventosAdministrativosPage() {
               <th style={celda}>Título</th>
               <th style={celda}>País</th>
               <th style={celda}>Audiencia</th>
+              <th style={celda}>Asistencia</th>
               <th style={celda} />
             </tr>
           </thead>
@@ -180,7 +279,7 @@ export default function EventosAdministrativosPage() {
             {eventos !== null && eventos.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   style={{ ...celda, color: "var(--texto-suave)", padding: "1.5rem" }}
                 >
                   No hay eventos administrativos en ese rango.
@@ -214,7 +313,33 @@ export default function EventosAdministrativosPage() {
                   <td style={celda}>
                     {e.guias} guía{e.guias === 1 ? "" : "s"}
                   </td>
-                  <td style={{ ...celda, textAlign: "right" }}>
+                  <td style={celda}>
+                    {e.marcados === 0 ? (
+                      <span style={{ color: "var(--texto-suave)" }}>Sin pasar lista</span>
+                    ) : (
+                      <>
+                        <strong>{e.asistieron}</strong> de {e.guias}
+                      </>
+                    )}
+                  </td>
+                  <td style={{ ...celda, textAlign: "right", whiteSpace: "nowrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => void abrirLista(e)}
+                      style={{
+                        padding: "0.35rem 0.8rem",
+                        borderRadius: "0.5rem",
+                        border: "none",
+                        background: "var(--lgs-azul)",
+                        color: "white",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontSize: "0.78rem",
+                        marginRight: "0.5rem",
+                      }}
+                    >
+                      Pasar lista
+                    </button>
                     <button
                       type="button"
                       onClick={() => setAbierto(abierto === e.id ? null : e.id)}
@@ -233,7 +358,7 @@ export default function EventosAdministrativosPage() {
                 </tr>
                 {abierto === e.id && (
                   <tr style={{ background: "#fbfcff" }}>
-                    <td colSpan={7} style={{ ...celda, paddingBottom: "1rem" }}>
+                    <td colSpan={8} style={{ ...celda, paddingBottom: "1rem" }}>
                       <div style={{ display: "grid", gap: "0.5rem", maxWidth: "48rem" }}>
                         <div>
                           <span style={rotulo}>Quiénes lo ven</span>
@@ -264,6 +389,146 @@ export default function EventosAdministrativosPage() {
           </tbody>
         </table>
       </section>
+
+      {lista !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Lista de asistencia"
+          onClick={() => {
+            if (!guardando) setLista(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(8,11,24,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+            overflowY: "auto",
+          }}
+        >
+          <div
+            onClick={(ev) => ev.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "32rem",
+              background: "white",
+              borderRadius: "1rem",
+              padding: "1.4rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.8rem",
+            }}
+          >
+            <h2 style={{ fontSize: "1.15rem", fontWeight: 800, margin: 0 }}>Lista de asistencia</h2>
+            <p style={{ fontSize: "0.88rem", margin: 0 }}>
+              {lista.tipo} · {lista.titulo ?? "Sin título"} · {lista.fecha} {hora(lista.startsAt)}
+            </p>
+
+            {asistentes === null ? (
+              <p style={{ color: "var(--texto-suave)" }}>Cargando la audiencia…</p>
+            ) : asistentes.length === 0 ? (
+              <p style={{ color: "var(--texto-suave)" }}>Este evento no tiene audiencia.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                {asistentes.map((a2) => (
+                  <div
+                    key={a2.guiaUserId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.6rem",
+                      padding: "0.5rem 0.6rem",
+                      border: "1px solid #eef1f7",
+                      borderRadius: "0.6rem",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.88rem" }}>
+                      <strong>{a2.nombre ?? a2.username}</strong>
+                      {a2.nombre !== null && (
+                        <span style={{ color: "var(--texto-suave)" }}> · {a2.username}</span>
+                      )}
+                    </span>
+                    <span style={{ display: "flex", gap: "0.3rem", flexShrink: 0 }}>
+                      {[
+                        { v: true, txt: "Asistió", bg: "var(--lgs-verde)" },
+                        { v: false, txt: "No", bg: "#c62828" },
+                        { v: null, txt: "—", bg: "#9aa1b2" },
+                      ].map((op) => (
+                        <button
+                          key={String(op.v)}
+                          type="button"
+                          onClick={() => alternar(a2.guiaUserId, op.v)}
+                          style={{
+                            padding: "0.25rem 0.6rem",
+                            borderRadius: "0.5rem",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "0.76rem",
+                            fontWeight: 700,
+                            background: a2.asistio === op.v ? op.bg : "#eef1f7",
+                            color: a2.asistio === op.v ? "white" : "#5a6172",
+                          }}
+                        >
+                          {op.txt}
+                        </button>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p style={{ fontSize: "0.74rem", color: "var(--texto-suave)", margin: 0 }}>
+              “—” deja al guía sin marcar, que no es lo mismo que “no asistió”.
+            </p>
+
+            {errorLista !== null && (
+              <p role="alert" style={{ color: "#c62828", fontWeight: 600, fontSize: "0.85rem" }}>
+                {errorLista}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setLista(null)}
+                disabled={guardando}
+                style={{
+                  padding: "0.6rem 1.1rem",
+                  borderRadius: "0.6rem",
+                  border: "1.5px solid #e0e4ee",
+                  background: "white",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void guardarLista()}
+                disabled={guardando || asistentes === null || asistentes.length === 0}
+                style={{
+                  padding: "0.6rem 1.1rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  background: "var(--lgs-verde)",
+                  color: "white",
+                  fontWeight: 700,
+                  cursor: guardando ? "wait" : "pointer",
+                }}
+              >
+                {guardando ? "Guardando…" : "Guardar lista"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
