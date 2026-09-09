@@ -223,6 +223,15 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   El PNG original traía el tablero de transparencia INCRUSTADO (colorType 2, sin
   alfa): se recortó por relleno desde el borde (candidato = min canal ≥ 232 y
   max−min ≤ 16, que puentea los dos grises del tablero sin comerse la ropa).
+- **Mi próximo evento (2026-09-09)**: caja bajo "Sesión próxima" con el próximo
+  EVENTO del salón — lo creado A MANO en el calendario (`slot_id IS NULL`): club
+  puntual, taller o refuerzo. Se separa de la clase porque el niño la vive distinto:
+  no es su clase de siempre. `agendaProximas` gana `observaciones`, `nivel` y
+  `esEvento`; el dashboard expone `proximoEvento`. Las dos columnas pasan a 5/4 por
+  CSS (`.lgs-dos-col`, apiladas bajo 62rem): la izquierda carga el banner, que es la
+  pieza alta. **Pendiente**: el alumno NO se inscribe a eventos — ve los de su salón.
+  Inscripción por el propio alumno chocaría con el modelo de cohortes ("el niño no
+  agenda"); si el negocio la quiere, es decisión aparte.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:
   la `nota_privada` de la misma fila es del equipo y NUNCA viaja al panel del niño.

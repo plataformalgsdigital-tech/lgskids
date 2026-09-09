@@ -81,6 +81,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     matricula,
     asistencia,
     proxima: agenda[0] ?? null,
+    proximoEvento: agenda.find((e) => e.esEvento) ?? null,
     agenda,
     progreso,
     historial,

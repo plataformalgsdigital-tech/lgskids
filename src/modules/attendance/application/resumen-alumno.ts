@@ -16,6 +16,15 @@ export interface EventoAgenda {
   startsAt: Date;
   duracionMin: number;
   guia: string | null;
+  /** Lo que se escribió al crearlo a mano; en las generadas viene vacío. */
+  observaciones: string | null;
+  nivel: string | null;
+  /**
+   * Creado A MANO desde el calendario (sin slot): un club puntual, un taller o
+   * un refuerzo. Lo que el negocio llama "evento", frente a la clase que nace
+   * del horario recurrente del salón.
+   */
+  esEvento: boolean;
 }
 
 export async function resumenAsistencia(
@@ -118,6 +127,7 @@ export async function agendaProximas(classroomId: string, dias = 14): Promise<Ev
   return queryRows<EventoAgenda>(
     `SELECT s.id AS "sessionId", s.tipo::text AS tipo, s.fecha::text AS fecha,
             s.starts_at AS "startsAt", s.duracion_min AS "duracionMin",
+            s.observaciones, s.nivel, (s.slot_id IS NULL) AS "esEvento",
             COALESCE(gp.nombres || ' ' || gp.apellidos, gu.username) AS guia
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id

@@ -34,6 +34,17 @@ interface Dashboard {
     duracionMin: number;
     guia: string | null;
   } | null;
+  /** Próximo evento creado a mano (club, taller o refuerzo), si lo hay. */
+  proximoEvento?: {
+    sessionId: string;
+    tipo: string;
+    fecha: string;
+    startsAt: string;
+    duracionMin: number;
+    guia: string | null;
+    observaciones: string | null;
+    nivel: string | null;
+  } | null;
   agenda?: {
     sessionId: string;
     tipo: string;
@@ -804,6 +815,10 @@ export default function MiPanelPage() {
         .lgs-shine{animation:lgsShine 1.8s ease-in-out infinite}
         .lgs-ruta{animation:lgsRuta 3s linear infinite}
         @media (prefers-reduced-motion:reduce){.lgs-float,.lgs-ring,.lgs-shine,.lgs-ruta{animation:none}}
+        /* Dos columnas 5/4: la izquierda carga el banner del curso, que es la
+           pieza alta. Debajo de 62rem se apilan. */
+        .lgs-dos-col{grid-template-columns:1fr}
+        @media (min-width:62rem){.lgs-dos-col{grid-template-columns:5fr 4fr}}
       `}</style>
       {/* Barra superior */}
       <header
@@ -1107,8 +1122,9 @@ export default function MiPanelPage() {
             style={{
               display: "grid",
               gap: "1.25rem",
-              gridTemplateColumns: "repeat(auto-fit, minmax(20rem, 1fr))",
+              alignItems: "start",
             }}
+            className="lgs-dos-col"
           >
             {/* Columna izquierda: imagen del curso + info + sesión próxima */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
@@ -1271,6 +1287,76 @@ export default function MiPanelPage() {
                   >
                     No hay próximas clases programadas.
                   </p>
+                )}
+              </section>
+
+              {/*
+                Próximo EVENTO: lo creado a mano en el calendario (club puntual,
+                taller o refuerzo), que no nace del horario del salón. Va aparte
+                de la sesión próxima porque el niño lo vive distinto: no es su
+                clase de siempre.
+              */}
+              <section style={card}>
+                <h2
+                  style={{
+                    fontSize: "0.8rem",
+                    fontWeight: 800,
+                    color: "var(--lgs-cian)",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  MI PRÓXIMO EVENTO
+                </h2>
+                {data.proximoEvento != null ? (
+                  <>
+                    <p style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: "0.35rem" }}>
+                      {data.proximoEvento.tipo === "CLUB"
+                        ? "Club"
+                        : data.proximoEvento.tipo === "TALLER"
+                          ? "Taller"
+                          : "Sesión extra"}{" "}
+                      · {fechaLarga(data.proximoEvento.startsAt)}
+                    </p>
+                    <p style={{ fontSize: "0.9rem", color: "var(--texto-suave)" }}>
+                      {hora(data.proximoEvento.startsAt)} (tu hora local)
+                      {data.proximoEvento.guia !== null && ` · con ${data.proximoEvento.guia}`}
+                    </p>
+                    {data.proximoEvento.observaciones !== null &&
+                      data.proximoEvento.observaciones !== "" && (
+                        <p style={{ fontSize: "0.88rem", marginTop: "0.45rem" }}>
+                          {data.proximoEvento.observaciones}
+                        </p>
+                      )}
+                    <div style={{ marginTop: "0.8rem" }}>
+                      <p
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          color: "var(--texto-suave)",
+                          marginBottom: "0.35rem",
+                        }}
+                      >
+                        LINK DE INGRESO
+                      </p>
+                      {data.matricula.meetingUrl !== null ? (
+                        <p style={{ fontSize: "0.85rem" }}>
+                          Se abre desde <strong>Sesión próxima</strong> cuando llegue la hora.
+                        </p>
+                      ) : (
+                        <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                          El enlace lo asigna la guía del salón.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.8rem" }}>
+                    {esJunior && <Personaje quien="coco" alto="3.6rem" className="lgs-float" />}
+                    <p style={{ fontSize: "0.95rem", color: "var(--texto-suave)" }}>
+                      Todavía no tienes eventos. Cuando tu guía programe un club o un taller,
+                      aparece aquí con su información y el enlace.
+                    </p>
+                  </div>
                 )}
               </section>
             </div>
