@@ -59,6 +59,16 @@ const MENU: {
   },
   {
     seccion: "Académica",
+    // La ACCIÓN es de coordinación (`salones.gestionar`); el guía solicita el
+    // refuerzo desde el modal de la sesión, no desde aquí.
+    permiso: "salones.gestionar",
+    etiqueta: "Sesiones",
+    color: "var(--lgs-azul)",
+    href: "/panel/sesiones",
+    permisoMenu: "menu.sesiones",
+  },
+  {
+    seccion: "Académica",
     permiso: "catalogo.ver",
     etiqueta: "Mantenimiento Académico",
     color: "var(--lgs-purpura)",

@@ -180,6 +180,8 @@ export async function crearEvento(input: {
   guiaUserId: string;
   observaciones?: string | null;
   ip?: string | null;
+  /** Para crearlo dentro de una transacción ya abierta (aprobar un refuerzo). */
+  client?: PoolClient;
 }): Promise<EventoCreado> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) {
     throw new ValidationError("La fecha debe ser YYYY-MM-DD.");
@@ -216,7 +218,7 @@ export async function crearEvento(input: {
   const grupoId = salones.length > 1 ? newId() : null;
   const creadas: EventoCreado["sesiones"] = [];
 
-  await withTransaction(async (tx) => {
+  const insertar = async (tx: PoolClient) => {
     for (const classroomId of salones) {
       const salon = await queryOne<{ id: string; nombre: string; timezone: string; cupo: number }>(
         `SELECT id, nombre, timezone, cupo FROM scheduling_classroom WHERE id = $1 AND activo`,
@@ -275,7 +277,9 @@ export async function crearEvento(input: {
       );
       creadas.push({ id, classroomId, salon: salon.nombre });
     }
-  });
+  };
+  if (input.client !== undefined) await insertar(input.client);
+  else await withTransaction(insertar);
 
   await registrarAuditoria({
     actorUserId: input.actorUserId,

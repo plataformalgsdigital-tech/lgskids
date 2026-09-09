@@ -33,6 +33,7 @@ export const PERMISOS = {
   // `catalogo.ver` para los cuestionarios y aun así no ver "Mantenimiento
   // Académico" en su barra lateral.
   MENU_CALENDARIO: "menu.calendario",
+  MENU_SESIONES: "menu.sesiones",
   MENU_MANTENIMIENTO: "menu.mantenimiento",
   MENU_KIDS: "menu.kids",
   MENU_CONTRATOS: "menu.contratos",
@@ -106,6 +107,7 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.SECCION_OPERACION,
     PERMISOS.SECCION_ADMINISTRACION,
     PERMISOS.MENU_CALENDARIO,
+    PERMISOS.MENU_SESIONES,
     PERMISOS.MENU_MANTENIMIENTO,
     PERMISOS.MENU_KIDS,
     PERMISOS.MENU_CONTRATOS,
@@ -167,6 +169,7 @@ export const SECCIONES_MENU: {
     permiso: PERMISOS.SECCION_ACADEMICA,
     hijos: [
       { etiqueta: "Calendario", permiso: PERMISOS.MENU_CALENDARIO },
+      { etiqueta: "Sesiones", permiso: PERMISOS.MENU_SESIONES },
       { etiqueta: "Mantenimiento Académico", permiso: PERMISOS.MENU_MANTENIMIENTO },
     ],
   },

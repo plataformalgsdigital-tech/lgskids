@@ -1,6 +1,7 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
+import { crearEvento } from "./crear-evento";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { withTransaction } from "@/platform/db/transaction";
 
@@ -212,17 +213,54 @@ export async function solicitarRepeticion(input: {
   return { id };
 }
 
-/** Coordinación aprueba o rechaza. La decisión queda en el evento. */
+/**
+ * Coordinación aprueba o rechaza.
+ *
+ * Aprobar CREA una clase EXTRA (refuerzo). No se extiende el curso ni se toca
+ * `final_curso` (regla 1): es un evento adicional con su propia fecha y hora,
+ * y por eso hay que dárselas — el horario regular del salón ya está ocupado.
+ *
+ * Nace como evento suelto (sin slot), así que regenerar el salón —que es
+ * destructivo por diseño— no se lo lleva por delante.
+ *
+ * Aprobar y crear van en la MISMA transacción: una solicitud aprobada sin su
+ * clase sería una promesa que nadie ve en el calendario.
+ */
 export async function resolverRepeticion(input: {
   actorUserId: string;
   repeticionId: string;
   aprobar: boolean;
   nota?: string | null;
+  /** Cuándo se dicta el refuerzo. Obligatorio al aprobar. */
+  refuerzo?: {
+    fecha: string;
+    horaLocal: string;
+    duracionMin: number;
+    /** Por defecto, quien dictó la sesión original. */
+    guiaUserId?: string | null;
+  } | null;
   ip?: string | null;
-}): Promise<void> {
+}): Promise<{ sesionRefuerzoId: string | null }> {
+  let sesionRefuerzoId: string | null = null;
+
   await withTransaction(async (tx) => {
-    const fila = await queryOne<{ session_id: string; estado: string }>(
-      `SELECT session_id, estado FROM scheduling_repeticion WHERE id = $1 FOR UPDATE`,
+    const fila = await queryOne<{
+      session_id: string;
+      estado: string;
+      motivo: string;
+      classroom_id: string;
+      fecha: string;
+      duracion_min: number;
+      guia_original: string | null;
+    }>(
+      `SELECT r.session_id, r.estado, r.motivo,
+              s.classroom_id, s.fecha::text AS fecha, s.duracion_min,
+              COALESCE(s.guia_user_id, cl.guia_user_id) AS guia_original
+         FROM scheduling_repeticion r
+         JOIN scheduling_session s ON s.id = r.session_id
+         JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+        WHERE r.id = $1
+        FOR UPDATE OF r`,
       [input.repeticionId],
       tx,
     );
@@ -230,27 +268,56 @@ export async function resolverRepeticion(input: {
     if (fila.estado !== "PENDIENTE") {
       throw new ConflictError("Esa solicitud ya fue resuelta.");
     }
+
+    if (input.aprobar) {
+      if (input.refuerzo == null) {
+        throw new ValidationError("Indica la fecha y la hora de la clase de refuerzo.");
+      }
+      const guiaUserId = input.refuerzo.guiaUserId ?? fila.guia_original;
+      if (guiaUserId === null) {
+        throw new ValidationError("El salón no tiene guía asignado: elige uno para el refuerzo.");
+      }
+      const { sesiones } = await crearEvento({
+        actorUserId: input.actorUserId,
+        classroomIds: [fila.classroom_id],
+        tipo: "SESION",
+        fecha: input.refuerzo.fecha,
+        horaLocal: input.refuerzo.horaLocal,
+        duracionMin: input.refuerzo.duracionMin,
+        guiaUserId,
+        observaciones: `Refuerzo de la sesión del ${fila.fecha}. ${fila.motivo}`,
+        client: tx,
+        ip: input.ip ?? null,
+      });
+      sesionRefuerzoId = sesiones[0]?.id ?? null;
+    }
+
     await execute(
       `UPDATE scheduling_repeticion
-          SET estado = $2, resuelto_por = $3, resuelto_en = now(), nota_resolucion = $4
+          SET estado = $2, resuelto_por = $3, resuelto_en = now(),
+              nota_resolucion = $4, sesion_refuerzo_id = $5
         WHERE id = $1`,
       [
         input.repeticionId,
         input.aprobar ? "APROBADA" : "RECHAZADA",
         input.actorUserId,
         input.nota ?? null,
+        sesionRefuerzoId,
       ],
       tx,
     );
-    await registrarAuditoria({
-      actorUserId: input.actorUserId,
-      accion: input.aprobar ? "scheduling.repeticion_aprobada" : "scheduling.repeticion_rechazada",
-      entidad: "scheduling_session",
-      entidadId: fila.session_id,
-      payload: { repeticionId: input.repeticionId, nota: input.nota ?? null },
-      ip: input.ip ?? null,
-    });
   });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: input.aprobar ? "scheduling.repeticion_aprobada" : "scheduling.repeticion_rechazada",
+    entidad: "scheduling_repeticion",
+    entidadId: input.repeticionId,
+    payload: { nota: input.nota ?? null, sesionRefuerzoId },
+    ip: input.ip ?? null,
+  });
+
+  return { sesionRefuerzoId };
 }
 
 /** Solicitudes de una sesión, para pintarlas en el evento del calendario. */
@@ -268,18 +335,91 @@ export async function repeticionesDeSesion(sessionId: string): Promise<Repeticio
   );
 }
 
-/** Bandeja del coordinador. */
-export async function repeticionesPendientes(limite = 50): Promise<Repeticion[]> {
-  return queryRows<Repeticion>(
-    `SELECT r.id, r.session_id AS "sessionId", r.solicitado_por AS "solicitadoPor",
-            u.username AS solicitante, r.motivo, r.repetir_leccion AS "repetirLeccion",
-            r.estado, r.resuelto_por AS "resueltoPor", r.resuelto_en::text AS "resueltoEn",
-            r.nota_resolucion AS "notaResolucion", r.created_at::text AS "createdAt"
+export interface FilaRefuerzo {
+  id: string;
+  sessionId: string;
+  campania: string;
+  cursoTipo: string;
+  classroomId: string;
+  guiaUserId: string | null;
+  pais: string | null;
+  salon: string;
+  guia: string | null;
+  /** Fecha de la sesión que se pide repetir (local del salón). */
+  fechaEvento: string;
+  /** Número de sesión en el curso; 0 en eventos sueltos. */
+  numero: number;
+  nivel: string | null;
+  motivo: string;
+  repetirLeccion: boolean;
+  solicitante: string | null;
+  solicitadoEn: string;
+  estado: "PENDIENTE" | "APROBADA" | "RECHAZADA";
+  notaResolucion: string | null;
+  /** Fecha de la clase extra, cuando ya se aprobó. */
+  fechaRefuerzo: string | null;
+}
+
+/**
+ * Bandeja de refuerzos para coordinación, con los filtros de la pantalla.
+ *
+ * Las fechas de `desde`/`hasta` filtran por FECHA DE SOLICITUD, que es lo que
+ * ordena el trabajo del coordinador; la fecha del evento va como dato.
+ */
+export async function listarRefuerzos(
+  filtros: {
+    estado?: "PENDIENTE" | "APROBADA" | "RECHAZADA" | "TODAS";
+    guiaUserId?: string | null;
+    cursoTipo?: string | null;
+    classroomId?: string | null;
+    desde?: string | null;
+    hasta?: string | null;
+    limite?: number;
+  } = {},
+): Promise<FilaRefuerzo[]> {
+  const cond: string[] = [];
+  const params: unknown[] = [];
+  const p = (v: unknown) => {
+    params.push(v);
+    return `$${String(params.length)}`;
+  };
+
+  const estado = filtros.estado ?? "PENDIENTE";
+  if (estado !== "TODAS") cond.push(`r.estado = ${p(estado)}`);
+  if (filtros.guiaUserId)
+    cond.push(`COALESCE(s.guia_user_id, cl.guia_user_id) = ${p(filtros.guiaUserId)}`);
+  if (filtros.cursoTipo) cond.push(`cu.tipo::text = ${p(filtros.cursoTipo)}`);
+  if (filtros.classroomId) cond.push(`cl.id = ${p(filtros.classroomId)}`);
+  if (filtros.desde) cond.push(`r.created_at >= ${p(filtros.desde)}::date`);
+  // +1 día para que "hasta" incluya todo ese día, no solo su medianoche.
+  if (filtros.hasta) cond.push(`r.created_at < (${p(filtros.hasta)}::date + 1)`);
+
+  const where = cond.length > 0 ? `WHERE ${cond.join(" AND ")}` : "";
+  const limite = Math.min(Math.max(filtros.limite ?? 200, 1), 500);
+
+  return queryRows<FilaRefuerzo>(
+    `SELECT r.id, r.session_id AS "sessionId",
+            ca.nombre AS campania, cu.tipo::text AS "cursoTipo",
+            cl.holiday_country AS pais,
+            cl.id AS "classroomId", cl.nombre AS salon,
+            COALESCE(s.guia_user_id, cl.guia_user_id) AS "guiaUserId",
+            COALESCE(gu.username, '') AS guia,
+            s.fecha::text AS "fechaEvento", s.numero, s.nivel,
+            r.motivo, r.repetir_leccion AS "repetirLeccion",
+            su.username AS solicitante, r.created_at::text AS "solicitadoEn",
+            r.estado, r.nota_resolucion AS "notaResolucion",
+            ref.fecha::text AS "fechaRefuerzo"
        FROM scheduling_repeticion r
-       LEFT JOIN identity_user u ON u.id = r.solicitado_por
-      WHERE r.estado = 'PENDIENTE'
-      ORDER BY r.created_at
-      LIMIT $1`,
-    [limite],
+       JOIN scheduling_session s ON s.id = r.session_id
+       JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+       JOIN catalog_course cu ON cu.id = cl.course_id
+       JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+       LEFT JOIN identity_user gu ON gu.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+       LEFT JOIN identity_user su ON su.id = r.solicitado_por
+       LEFT JOIN scheduling_session ref ON ref.id = r.sesion_refuerzo_id
+       ${where}
+      ORDER BY r.created_at DESC
+      LIMIT ${p(limite)}`,
+    params,
   );
 }

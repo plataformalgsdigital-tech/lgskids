@@ -469,8 +469,27 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   mismo en el reporte. Cerrar fija `guia_user_id` si estaba vacío — el salón puede
   cambiar de guía y el histórico debe recordar quién la dictó. `hora_real` es TIME
   (hora de pared) y `cerrada_en` es el instante: dos cosas distintas, dos columnas.
-- **Repetición**: el guía la SOLICITA; aprobarla o rechazarla es del coordinador
-  (`salones.gestionar`).
+- **Refuerzos (2026-09-08)**: el guía SOLICITA repetir una sesión desde el modal;
+  coordinación autoriza en **/panel/sesiones/refuerzos** (`salones.gestionar`).
+  Autorizar crea una **clase EXTRA** llamando a `crearEvento` —el mismo camino de
+  los eventos sueltos—, así que nace **sin slot** y la regeneración destructiva no
+  se la lleva. `sesion_refuerzo_id` (migración `20260908000000`) da trazabilidad en
+  ambos sentidos. Aprobar y crear van en la MISMA transacción: si la hora choca con
+  otra sesión del salón, la solicitud sigue PENDIENTE en vez de quedar aprobada sin
+  clase (`crearEvento` acepta `client` para sumarse a esa transacción).
+  **Tres diferencias con MOSAICO**, que al autorizar "extiende el curso una semana,
+  crea sesiones + bookings y detiene el avance una lección":
+  1. Aquí NO se extiende nada: `final_curso` nunca se reescribe (regla 1) y el
+     refuerzo va con `numero = 0`, fuera de la numeración del curso.
+  2. No hay bookings: la lista sale de las matrículas ACTIVAS (Fase 7).
+  3. El avance NO se detiene: se deriva de evaluaciones, no de sesiones dictadas
+     (regla 4). `repetir_leccion` solo rotula, nunca toca progresión.
+     Por ser clase extra hay que darle **fecha y hora propias**: el horario regular del
+     salón ya está ocupado y hay índice único por (salón, instante).
+     Invariantes probados en `tests/refuerzo-integration.test.ts`.
+- El menú lateral de KIDS es de DOS niveles, así que lo que en MOSAICO es el submenú
+  `Académico › Sesiones` aquí es la página-índice **/panel/sesiones** con tarjetas
+  (mismo patrón que Mantenimiento Académico). Permiso de menú `menu.sesiones`.
 - **Estadística mensual del guía** (`reporting/application/guia-mes.ts`,
   `reporting_guia_mes`): `calcularGuiaMes` es la consulta viva y `consolidarGuiaMes`
   la congela con UPSERT idempotente — necesario porque regenerar un salón es

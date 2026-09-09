@@ -69,9 +69,9 @@ export {
   solicitarRepeticion,
   resolverRepeticion,
   repeticionesDeSesion,
-  repeticionesPendientes,
+  listarRefuerzos,
 } from "./application/registro-sesion";
-export type { RegistroSesion, Repeticion } from "./application/registro-sesion";
+export type { RegistroSesion, Repeticion, FilaRefuerzo } from "./application/registro-sesion";
 export {
   crearEvento,
   guiasConZoom,
