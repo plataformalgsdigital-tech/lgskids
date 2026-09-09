@@ -424,7 +424,11 @@ export interface EventoAdmin {
   curso: string | null;
   nivel: string | null;
   observaciones: string | null;
+  pais: string | null;
+  /** Cuántos guías lo ven. */
   guias: number;
+  /** Quiénes lo ven, para poder gestionarlo sin abrir el evento. */
+  audiencia: string[];
 }
 
 /**
@@ -448,7 +452,12 @@ export async function eventosAdmin(
   return queryRows<EventoAdmin>(
     `SELECT e.id, e.tipo, e.titulo, e.fecha::text AS fecha, e.starts_at AS "startsAt",
             e.duracion_min AS "duracionMin", e.campania, e.curso, e.nivel, e.observaciones,
-            (SELECT count(*) FROM scheduling_evento_admin_guia g WHERE g.evento_id = e.id)::int AS guias
+            e.pais,
+            (SELECT count(*) FROM scheduling_evento_admin_guia g WHERE g.evento_id = e.id)::int AS guias,
+            COALESCE((SELECT array_agg(u.username ORDER BY u.username)
+                        FROM scheduling_evento_admin_guia g
+                        JOIN identity_user u ON u.id = g.guia_user_id
+                       WHERE g.evento_id = e.id), ARRAY[]::text[]) AS audiencia
        FROM scheduling_evento_admin e
       WHERE e.fecha BETWEEN $1::date AND $2::date
         ${filtro}

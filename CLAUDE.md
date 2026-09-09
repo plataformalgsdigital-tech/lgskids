@@ -497,7 +497,19 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 - Invariantes probados en `tests/refuerzo-integration.test.ts`.
 - El menú lateral de KIDS es de DOS niveles, así que lo que en MOSAICO es el submenú
   `Académico › Sesiones` aquí es la página-índice **/panel/sesiones** con tarjetas
-  (mismo patrón que Mantenimiento Académico). Permiso de menú `menu.sesiones`.
+  (mismo patrón que Mantenimiento Académico). Permiso de menú `menu.sesiones`,
+  sembrado desde `salones.gestionar` — un permiso de menú nuevo NO basta con
+  declararlo: hay que sumarlo al seed y correr `pnpm seed`, o el ítem queda
+  invisible para todos salvo `superadmin`.
+  Tarjetas: **Refuerzos** y **Eventos administrativos**; Suspensiones y Feriados
+  quedan marcadas "(pronto)" hasta traerlas del calendario.
+- **Eventos administrativos** (`/panel/sesiones/eventos-administrativos`): única
+  vista COMPLETA de `scheduling_evento_admin` — en el calendario cada guía solo ve
+  los suyos. Se consultan por rango de fechas (abre en el mes en curso) y el detalle
+  muestra la audiencia por nombre. Se siguen CREANDO desde el calendario
+  (`eventos.crear`). `eventosAdmin` gana `pais` y `audiencia` (usernames): antes solo
+  devolvía el conteo, que no alcanza para gestionarlos. Leer exige `salones.ver` y la
+  consulta se acota al guía cuando no gestiona salones.
 - **Estadística mensual del guía** (`reporting/application/guia-mes.ts`,
   `reporting_guia_mes`): `calcularGuiaMes` es la consulta viva y `consolidarGuiaMes`
   la congela con UPSERT idempotente — necesario porque regenerar un salón es

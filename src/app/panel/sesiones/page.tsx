@@ -28,6 +28,13 @@ const TARJETAS: Tarjeta[] = [
     href: "/panel/sesiones/refuerzos",
   },
   {
+    titulo: "Eventos administrativos",
+    desc: "Reuniones, capacitaciones y talleres internos. La audiencia son guías, no niños.",
+    emoji: "📋",
+    color: "var(--lgs-purpura)",
+    href: "/panel/sesiones/eventos-administrativos",
+  },
+  {
     titulo: "Suspensiones",
     desc: "Suspender una sesión con motivo y regenerar el salón. Hoy se hace desde el calendario.",
     emoji: "⛔",
