@@ -66,6 +66,7 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.ARCHIVOS_VER]: "Ver y descargar archivos",
   [PERMISOS.PANEL_TABLERO]: "Tablero (pantalla de entrada)",
   [PERMISOS.MENU_CALENDARIO]: "Calendario",
+  [PERMISOS.MENU_SESIONES]: "Sesiones",
   [PERMISOS.MENU_MANTENIMIENTO]: "Mantenimiento Académico",
   [PERMISOS.MENU_KIDS]: "Kids",
   [PERMISOS.MENU_CONTRATOS]: "Contratos",
@@ -168,6 +169,7 @@ async function main(): Promise<void> {
       // le enciende al guía, que necesita catalogo.ver para los cuestionarios
       // pero no tiene por qué ver el mantenimiento del catálogo.
       ["menu.calendario", ["salones.ver"]],
+      ["menu.sesiones", ["salones.gestionar"]],
       ["menu.mantenimiento", ["catalogo.gestionar"]],
       ["menu.kids", ["personas.ver"]],
       ["menu.contratos", ["contratos.ver"]],
