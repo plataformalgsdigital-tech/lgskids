@@ -358,11 +358,21 @@ docker compose -f infra/docker/docker-compose.yml up -d   # Postgres local
 
 ## Versiones (registradas 2026-07-22)
 
-Node 24.11.0 · pnpm 11.16.0 · Next 16.2.11 · React 19.2.8 · TypeScript 5.9.3
+Node 24.11.0 · pnpm 11.16.0 · Next 16.3.4 · React 19.2.8 · TypeScript 5.9.3
 (NO subir a TS 7: rompe Next/ESLint/depcruise) · ESLint 9.39.5 (NO subir a
 10: eslint-plugin-react incompatible) · Zod 4.4.3 (API nueva: `z.url()`) ·
 pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
 
+- **Next 16.3.4 (2026-09-10, subido desde 16.2.11 por seguridad)**: dos avisos
+  CRÍTICOS publicados el 8-sep afectaban a >=16.0.0 <16.3.3 —
+  `GHSA-p293-qw3h-jr36` (CVE-2026-75604): ejecución remota de código SIN
+  autenticar en servidores sobre sistema de archivos **Windows**, sin mitigación
+  conocida; y `GHSA-2xp9-vwfh-vxw4`: RCE en el optimizador de imágenes al procesar
+  **AVIF** (el fallo está en `libheif`, vía `sharp`). El segundo nos rozaba apenas
+  —`next/image` solo optimiza assets LOCALES, no hay `images.remotePatterns`, y el
+  arte subido se sirve con `<img>` por `/api/catalog/imagen-curso/[id]`—, pero el
+  primero sí, porque el entorno de desarrollo corre en Windows. `eslint-config-next`
+  se sube a la par: van sincronizados.
 - **`@prisma/client` es devDependency, no de producción**: nadie lo importa —el
   acceso a datos va por SQL parametrizado con `pg`— y como dependencia de
   producción arrastraba el CLI de Prisma y sus avisos de seguridad al grafo
@@ -627,3 +637,13 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   (agosto) se crearon con SQL a mano en `prisma/migrations/` y no se reflejaron en
   el schema. `migrate deploy` funciona igual; **no correr `migrate dev`**, que
   diffea contra el schema y querría borrarlas.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
