@@ -234,6 +234,22 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   inferiores coincidan. **Pendiente**: el alumno NO se inscribe — ve los talleres de
   su salón. La inscripción por el propio alumno chocaría con el modelo de cohortes
   ("el niño no agenda"); si el negocio la quiere, es decisión aparte.
+- **Lámina y juegos por UNIDAD (2026-09-10)**: al tocar "Unidad N" sobre la isla se
+  abre un modal con la **lámina** de esa unidad y sus **enlaces de juegos**. Antes los
+  marcadores de unidad eran decorativos (`marca` pone `pointerEvents:none`); ahora el
+  contenido es un botón que lo repone, y se pintan las 4 unidades —las vistas con
+  VoBo, las que faltan con un aro punteado— porque la lámina se consulta aunque no se
+  haya llegado.
+  - **Arte tipo `unidad`** (`catalog_imagen_unidad`, clave `CURSO:NIVEL:N`) con su
+    selector en `/panel/mantenimiento-cursos/imagenes`.
+  - **Juegos** en `catalog_unidad_juego` (migración `20260910000000`), JSONB sin tope:
+    son 5 o más por unidad. Editor en `/panel/mantenimiento-cursos/juegos`
+    (`catalogo.gestionar`); `GET|PUT /api/catalog/unidad-juegos`. El enlace se valida
+    http(s) al guardar: uno roto en el panel del niño es peor que no tenerlo.
+  - **La unidad es un NÚMERO 1..4**, el mismo que marcan los hotspots. En
+    `catalog_curso` la unidad es texto libre y trae "Unidad 0", "Repaso 3" y erratas
+    como "Evalucion 6"; colgar de ahí la clave la haría frágil.
+  - El dashboard expone `unidades` y `juegosUnidad` por nivel.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:
   la `nota_privada` de la misma fila es del equipo y NUNCA viaja al panel del niño.

@@ -41,7 +41,11 @@ export {
   mapaCursoId,
   voboId,
   NIVEL_TODOS,
+  UNIDADES_POR_NIVEL,
+  imagenesUnidadNivel,
 } from "./application/imagen-curso";
+export { juegosDeUnidad, juegosDeNivel, guardarJuegosUnidad } from "./application/unidad-juegos";
+export type { Juego, JuegosUnidad } from "./application/unidad-juegos";
 export {
   obtenerReferenciaNivel,
   actualizarReferenciaNivel,

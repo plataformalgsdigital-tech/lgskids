@@ -5,13 +5,17 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
-type Tipo = "banner" | "premio" | "mapa" | "vobo";
+type Tipo = "banner" | "premio" | "unidad" | "mapa" | "vobo";
+
+/** Unidades que marca el mapa de cada isla. */
+const UNIDADES = [1, 2, 3, 4];
 
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
 
 const TIPOS: { valor: Tipo; etiqueta: string; ayuda: string; cuadrada: boolean }[] = [
   { valor: "banner", etiqueta: "Banner del nivel (mapa de la isla)", ayuda: "16:9 · recomendado 1600×900. JPG/PNG/WebP.", cuadrada: false },
   { valor: "premio", etiqueta: "Premio del nivel", ayuda: "PNG con fondo transparente, cuadrado ~512×512 (brújula, llave, corona, estrella, tesoro).", cuadrada: true },
+  { valor: "unidad", etiqueta: "Lámina de la unidad", ayuda: "La que se abre al tocar “Unidad N” en el mapa de la isla. Vertical o cuadrada; recomendado 1000×1300. JPG/PNG/WebP.", cuadrada: false },
   { valor: "mapa", etiqueta: "Mapa del curso completo", ayuda: "El mapa con TODAS las islas. 16:9 · recomendado 1920×1080.", cuadrada: false },
   { valor: "vobo", etiqueta: "Sello VoBo (global)", ayuda: "PNG transparente cuadrado del personaje con el visto (marca de unidad vista).", cuadrada: true },
 ];
@@ -32,6 +36,7 @@ export default function ImagenesCursoPage() {
   const [tipo, setTipo] = useState<Tipo>("banner");
   const [curso, setCurso] = useState<Curso>("JUNIOR");
   const [nivel, setNivel] = useState<string>("ROOKIE");
+  const [unidad, setUnidad] = useState(1);
   const [actualUrl, setActualUrl] = useState<string | null>(null);
   const [previo, setPrevio] = useState<string | null>(null); // data URL del archivo elegido
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -40,7 +45,8 @@ export default function ImagenesCursoPage() {
 
   const def = TIPOS.find((t) => t.valor === tipo) ?? TIPOS[0]!;
   const usaCurso = tipo !== "vobo";
-  const usaNivel = tipo === "banner" || tipo === "premio";
+  const usaNivel = tipo === "banner" || tipo === "premio" || tipo === "unidad";
+  const usaUnidad = tipo === "unidad";
   const nivelesDisp = tipo === "banner" ? NIVELES_BANNER : NIVELES_REALES;
 
   // La query de consulta/subida solo lleva los parámetros que aplican al tipo.
@@ -48,8 +54,9 @@ export default function ImagenesCursoPage() {
     const p = new URLSearchParams({ tipo });
     if (usaCurso) p.set("curso", curso);
     if (usaNivel) p.set("nivel", nivel);
+    if (usaUnidad) p.set("unidad", String(unidad));
     return p.toString();
-  }, [tipo, usaCurso, usaNivel, curso, nivel]);
+  }, [tipo, usaCurso, usaNivel, usaUnidad, curso, nivel, unidad]);
 
   const cargarActual = useCallback(async () => {
     const res = await apiFetch(`/api/catalog/imagen-curso?${query()}`);
@@ -62,7 +69,7 @@ export default function ImagenesCursoPage() {
   // Cambiar de tipo: corrige el nivel si dejó de ser válido (premio no admite TODOS).
   function cambiarTipo(t: Tipo) {
     setTipo(t);
-    if (t === "premio" && nivel === "TODOS") setNivel("ROOKIE");
+    if ((t === "premio" || t === "unidad") && nivel === "TODOS") setNivel("ROOKIE");
   }
 
   useEffect(() => {
@@ -97,6 +104,7 @@ export default function ImagenesCursoPage() {
       fd.append("tipo", tipo);
       if (usaCurso) fd.append("curso", curso);
       if (usaNivel) fd.append("nivel", nivel);
+      if (usaUnidad) fd.append("unidad", String(unidad));
       fd.append("archivo", archivo);
       const res = await apiFetch("/api/catalog/imagen-curso", { method: "POST", body: fd });
       const data: { error?: { message: string } } = await res.json();
@@ -164,6 +172,22 @@ export default function ImagenesCursoPage() {
               {nivelesDisp.map((n) => (
                 <option key={n} value={n}>
                   {ETIQUETA_NIVEL[n] ?? n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {usaUnidad && (
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Unidad</span>
+            <select
+              value={unidad}
+              onChange={(e) => setUnidad(Number(e.target.value))}
+              style={{ ...input, width: "16rem" }}
+            >
+              {UNIDADES.map((u) => (
+                <option key={u} value={u}>
+                  Unidad {u}
                 </option>
               ))}
             </select>

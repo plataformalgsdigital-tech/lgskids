@@ -9,17 +9,23 @@ import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
  *  - banner: imagen de portada por (curso, nivel) — banner del panel/mapa de isla.
  *  - premio: imagen del premio por (curso, nivel) — brújula/llave/corona/…
  *  - mapa:   mapa del curso completo (todas las islas) por curso.
+ *  - unidad: lámina de la UNIDAD por (curso, nivel, unidad 1..4). Es la que
+ *    se abre al tocar "Unidad N" en el mapa de la isla.
  *  - vobo:   sello "VoBo" global (marca de unidad vista).
  *  - aviso_login: imagen del aviso de la pantalla de login (global). No es
  *    curricular, pero comparte exactamente el mismo mecanismo; el interruptor
  *    que lo prende/apaga vive en `aviso-login.ts`.
  */
 
-export type ArteTipo = "banner" | "premio" | "vobo" | "mapa" | "aviso_login";
+export type ArteTipo = "banner" | "premio" | "unidad" | "vobo" | "mapa" | "aviso_login";
+
+/** Unidades que marca el mapa de cada isla. */
+export const UNIDADES_POR_NIVEL = 4;
 
 const ENTIDAD_POR_TIPO: Record<ArteTipo, string> = {
   banner: "catalog_imagen_curso",
   premio: "catalog_premio_nivel",
+  unidad: "catalog_imagen_unidad",
   mapa: "catalog_mapa_curso",
   vobo: "catalog_vobo",
   aviso_login: "login_aviso",
@@ -39,21 +45,42 @@ function nivelValido(nivel: string): boolean {
 }
 
 /** entidadId (clave natural) por tipo, validando los parámetros que aplican. */
-function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string): string {
+function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: number): string {
   if (tipo === "vobo" || tipo === "aviso_login") return "GLOBAL";
   if (!CURSOS.includes(curso ?? "")) throw new ValidationError(`Curso inválido: ${curso}.`);
   if (tipo === "mapa") return curso as string;
-  // banner / premio → por (curso, nivel)
   if (!nivelValido(nivel ?? "")) throw new ValidationError(`Nivel inválido: ${nivel}.`);
+  // La lámina de unidad va por NÚMERO (1..4), el mismo que marca el mapa: en
+  // `catalog_curso` la unidad es texto libre y colgar de ahí la clave la haría
+  // frágil ("Unidad 0", "Repaso 3", erratas incluidas).
+  if (tipo === "unidad") {
+    if (!unidadValida(unidad)) {
+      throw new ValidationError(
+        `Unidad inválida: ${String(unidad)} (1 a ${String(UNIDADES_POR_NIVEL)}).`,
+      );
+    }
+    return `${curso}:${nivel}:${String(unidad)}`;
+  }
+  // banner / premio → por (curso, nivel)
   return `${curso}:${nivel}`;
 }
 
+function unidadValida(unidad?: number): boolean {
+  return (
+    typeof unidad === "number" &&
+    Number.isInteger(unidad) &&
+    unidad >= 1 &&
+    unidad <= UNIDADES_POR_NIVEL
+  );
+}
+
 /** ¿los parámetros forman una clave válida para el tipo? (sin lanzar). */
-function claveValida(tipo: ArteTipo, curso?: string, nivel?: string): boolean {
+function claveValida(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: number): boolean {
   if (tipo === "vobo" || tipo === "aviso_login") return true;
   if (!CURSOS.includes(curso ?? "")) return false;
   if (tipo === "mapa") return true;
-  return nivelValido(nivel ?? "");
+  if (!nivelValido(nivel ?? "")) return false;
+  return tipo === "unidad" ? unidadValida(unidad) : true;
 }
 
 export async function subirArte(input: {
@@ -61,6 +88,8 @@ export async function subirArte(input: {
   tipo: ArteTipo;
   curso?: string;
   nivel?: string;
+  /** Solo para el tipo `unidad`: 1..4, el número que marca el mapa. */
+  unidad?: number;
   nombreOriginal: string;
   mime: string;
   bytes: Buffer;
@@ -71,7 +100,7 @@ export async function subirArte(input: {
     mime: input.mime,
     bytes: input.bytes,
     entidad: ENTIDAD_POR_TIPO[input.tipo],
-    entidadId: entidadIdArte(input.tipo, input.curso, input.nivel),
+    entidadId: entidadIdArte(input.tipo, input.curso, input.nivel, input.unidad),
   });
 }
 
@@ -80,11 +109,12 @@ export async function arteId(
   tipo: ArteTipo,
   curso?: string,
   nivel?: string,
+  unidad?: number,
 ): Promise<string | null> {
-  if (!claveValida(tipo, curso, nivel)) return null;
+  if (!claveValida(tipo, curso, nivel, unidad)) return null;
   const archivos = await listarArchivos({
     entidad: ENTIDAD_POR_TIPO[tipo],
-    entidadId: entidadIdArte(tipo, curso, nivel),
+    entidadId: entidadIdArte(tipo, curso, nivel, unidad),
     limit: 1,
   });
   return archivos[0]?.id ?? null;
@@ -140,4 +170,15 @@ export async function descargarImagenCurso(id: string): Promise<{
   bytes: Buffer;
 }> {
   return descargarArchivo(id);
+}
+
+/** Láminas de las unidades de un nivel: `{ 1: url|null, ... 4: url|null }`. */
+export async function imagenesUnidadNivel(
+  curso: string,
+  nivel: string,
+): Promise<Record<number, string | null>> {
+  const ids = await Promise.all(
+    Array.from({ length: UNIDADES_POR_NIVEL }, (_, i) => arteId("unidad", curso, nivel, i + 1)),
+  );
+  return Object.fromEntries(ids.map((id, i) => [i + 1, id])) as Record<number, string | null>;
 }

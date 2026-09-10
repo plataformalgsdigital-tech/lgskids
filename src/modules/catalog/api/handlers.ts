@@ -270,7 +270,20 @@ export const referenciaQuizPutHandler = handlerWithAuth(async (request, auth, co
 // Arte curricular (banner · premio · mapa · vobo) por curso/nivel
 // ============================================================
 
-const TIPOS_ARTE: readonly ArteTipo[] = ["banner", "premio", "mapa", "vobo", "aviso_login"];
+const TIPOS_ARTE: readonly ArteTipo[] = [
+  "banner",
+  "premio",
+  "unidad",
+  "mapa",
+  "vobo",
+  "aviso_login",
+];
+
+/** La unidad llega como texto en el formulario/query; sin número válido, no aplica. */
+function unidadParam(v: string | null | undefined): number | undefined {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
 function tipoArte(v: string | null | undefined): ArteTipo {
   return (TIPOS_ARTE as readonly string[]).includes(v ?? "") ? (v as ArteTipo) : "banner";
 }
@@ -289,11 +302,15 @@ export const imagenCursoSubirHandler = handlerWithAuth(async (request, auth) => 
   const tipo = tipoArte(typeof form.get("tipo") === "string" ? (form.get("tipo") as string) : null);
   const curso = typeof form.get("curso") === "string" ? (form.get("curso") as string) : undefined;
   const nivel = typeof form.get("nivel") === "string" ? (form.get("nivel") as string) : undefined;
+  const unidad = unidadParam(
+    typeof form.get("unidad") === "string" ? (form.get("unidad") as string) : null,
+  );
   const r = await subirArte({
     actorUserId: auth.userId,
     tipo,
     ...(curso !== undefined && { curso }),
     ...(nivel !== undefined && { nivel }),
+    ...(unidad !== undefined && { unidad }),
     nombreOriginal: archivo.name,
     mime: archivo.type,
     bytes: Buffer.from(await archivo.arrayBuffer()),
@@ -310,6 +327,7 @@ export const imagenCursoInfoHandler = handlerWithAuth(async (request, auth) => {
     tipoArte(q.get("tipo")),
     q.get("curso") ?? undefined,
     q.get("nivel") ?? undefined,
+    unidadParam(q.get("unidad")),
   );
   return json({ id, url: id !== null ? `/api/catalog/imagen-curso/${id}` : null });
 });

@@ -76,6 +76,10 @@ interface Dashboard {
   }[];
   imagenCursoUrl?: string | null;
   premios?: Record<string, string | null>; // premio por código de nivel (imagen)
+  /** Láminas de unidad: { NIVEL: { "1": url|null, ... } } */
+  unidades?: Record<string, Record<string, string | null>> | null;
+  /** Juegos por unidad: { NIVEL: { "1": [{nombre,enlace}], ... } } */
+  juegosUnidad?: Record<string, Record<string, { nombre: string; enlace: string }[]>> | null;
   bannersNivel?: Record<string, string | null>; // mapa de isla por código de nivel
   mapaCursoUrl?: string | null; // mapa del curso completo
   voboUrl?: string | null; // sello VoBo
@@ -220,7 +224,11 @@ export default function MiPanelPage() {
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
   // Sella el ofrecimiento inicial de foto para no insistir en cada visita.
   const [fotoOfrecida, setFotoOfrecida] = useState(false);
-  const [avanceNivel, setAvanceNivel] = useState<string | null>(null); // isla abierta (código de nivel) o null = mapa
+  const [avanceNivel, setAvanceNivel] = useState<string | null>(null);
+  /** Unidad abierta desde el mapa de la isla: { nivel, unidad 1..4 }. */
+  const [unidadAbierta, setUnidadAbierta] = useState<{ nivel: string; unidad: number } | null>(
+    null,
+  ); // isla abierta (código de nivel) o null = mapa
   const [nivelesAbiertos, setNivelesAbiertos] = useState<Set<string>>(() => new Set()); // acordeón de niveles
 
   function toggleNivel(levelId: string) {
@@ -2494,9 +2502,45 @@ export default function MiPanelPage() {
                               rutaSVG([...hs.unidades, ...(hs.premio != null ? [hs.premio] : [])])}
                             {!bloqueado && hs !== undefined && (
                               <>
-                                {hs.unidades
-                                  .slice(0, n.leccionesCompletadas)
-                                  .map((p, i) => marca(`u${i}`, p, voboEl("2.8rem")))}
+                                {hs.unidades.map((p, i) =>
+                                  marca(
+                                    `u${i}`,
+                                    p,
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setUnidadAbierta({ nivel: n.codigo, unidad: i + 1 })
+                                      }
+                                      title={`Unidad ${String(i + 1)}`}
+                                      aria-label={`Abrir la Unidad ${String(i + 1)}`}
+                                      style={{
+                                        pointerEvents: "auto",
+                                        border: "none",
+                                        background: "none",
+                                        padding: 0,
+                                        cursor: "pointer",
+                                        display: "block",
+                                        width: "2.8rem",
+                                        height: "2.8rem",
+                                      }}
+                                    >
+                                      {i < n.leccionesCompletadas ? (
+                                        voboEl("2.8rem")
+                                      ) : (
+                                        <span
+                                          style={{
+                                            display: "block",
+                                            width: "100%",
+                                            height: "100%",
+                                            borderRadius: "50%",
+                                            border: "2px dashed rgba(255,255,255,.75)",
+                                            background: "rgba(20,25,50,.25)",
+                                          }}
+                                        />
+                                      )}
+                                    </button>,
+                                  ),
+                                )}
                                 {/* Unidad actual: aro que late */}
                                 {n.estado === "EN_CURSO" &&
                                   hs.unidades[n.leccionesCompletadas] != null &&
@@ -2555,6 +2599,138 @@ export default function MiPanelPage() {
                     })()
                   )}
                 </div>
+              </div>
+            </div>
+          );
+        })()}
+
+      {/*
+        Lámina de la UNIDAD: se abre al tocar "Unidad N" sobre la isla. Va
+        encima del modal de Avance (zIndex mayor), porque nace desde él.
+      */}
+      {unidadAbierta !== null &&
+        (() => {
+          const { nivel, unidad } = unidadAbierta;
+          const lamina = data.unidades?.[nivel]?.[String(unidad)] ?? null;
+          const juegos = data.juegosUnidad?.[nivel]?.[String(unidad)] ?? [];
+          return (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Unidad ${String(unidad)}`}
+              onClick={() => setUnidadAbierta(null)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 70,
+                background: "rgba(8,11,24,0.75)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1rem",
+                overflowY: "auto",
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: "100%",
+                  maxWidth: "34rem",
+                  background: "white",
+                  borderRadius: "1rem",
+                  overflow: "hidden",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "0.9rem 1.1rem",
+                    background:
+                      "linear-gradient(120deg, var(--lgs-azul) 0%, var(--lgs-purpura) 140%)",
+                    color: "white",
+                  }}
+                >
+                  <strong style={{ fontSize: "1.05rem" }}>Unidad {unidad}</strong>
+                  <button
+                    type="button"
+                    onClick={() => setUnidadAbierta(null)}
+                    aria-label="Cerrar"
+                    style={{
+                      width: "2rem",
+                      height: "2rem",
+                      borderRadius: "50%",
+                      border: "none",
+                      background: "rgba(255,255,255,.25)",
+                      color: "white",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {lamina !== null ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={lamina}
+                    alt={`Unidad ${String(unidad)}`}
+                    style={{ display: "block", width: "100%", height: "auto" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      padding: "2rem 1.2rem",
+                      textAlign: "center",
+                      color: "var(--texto-suave)",
+                    }}
+                  >
+                    {esJunior && <Personaje quien="coco" alto="4rem" className="lgs-float" />}
+                    <p style={{ marginTop: "0.6rem" }}>Esta unidad todavía no tiene lámina.</p>
+                  </div>
+                )}
+
+                {juegos.length > 0 && (
+                  <div style={{ padding: "0.9rem 1.1rem 1.1rem" }}>
+                    <p
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: 800,
+                        color: "var(--lgs-verde)",
+                        letterSpacing: "0.05em",
+                        marginBottom: "0.5rem",
+                      }}
+                    >
+                      JUEGOS DE LA UNIDAD
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      {juegos.map((j, i) => (
+                        <a
+                          key={i}
+                          href={j.enlace}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            padding: "0.55rem 0.7rem",
+                            borderRadius: "0.6rem",
+                            background: "#f4f6fb",
+                            fontWeight: 600,
+                            color: "inherit",
+                          }}
+                        >
+                          🎮 {j.nombre}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );

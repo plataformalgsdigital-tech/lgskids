@@ -55,6 +55,13 @@ const TARJETAS: Tarjeta[] = [
     href: "/panel/mantenimiento-cursos/imagenes",
   },
   {
+    titulo: "Enlaces de juegos",
+    desc: "Los juegos de cada unidad. El niño los abre al tocar “Unidad N” en el mapa de su isla.",
+    emoji: "🎮",
+    color: "var(--lgs-verde)",
+    href: "/panel/mantenimiento-cursos/juegos",
+  },
+  {
     titulo: "Editor de mapa (hotspots)",
     desc: "Marca dónde va cada unidad y el premio sobre las islas y el mapa (pantalla Avance).",
     emoji: "📍",

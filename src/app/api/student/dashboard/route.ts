@@ -13,6 +13,8 @@ import {
   mapaCursoId,
   premioNivelId,
   voboId,
+  imagenesUnidadNivel,
+  juegosDeNivel,
 } from "@/modules/catalog";
 import { matriculaDeNino } from "@/modules/enrollment";
 import { bootstrapIdentity } from "@/modules/identity";
@@ -63,18 +65,32 @@ export const GET = handlerWithAuth(async (_request, auth) => {
   // Arte curricular: banner del nivel actual + premios/mapas/vobo para "¿Cómo voy?" y "Avance".
   const niveles = progreso.niveles;
   const url = (id: string | null) => (id !== null ? `/api/catalog/imagen-curso/${id}` : null);
-  const [imgId, premioIds, bannerIds, mapaId, vId, hotspots] = await Promise.all([
-    imagenCursoIdResuelto(matricula.tipoCurso, nivelActual?.codigo ?? NIVEL_TODOS),
-    Promise.all(niveles.map((n) => premioNivelId(matricula.tipoCurso, n.codigo))),
-    Promise.all(niveles.map((n) => imagenCursoId(matricula.tipoCurso, n.codigo))),
-    mapaCursoId(matricula.tipoCurso),
-    voboId(),
-    getHotspotsCurso(matricula.tipoCurso),
-  ]);
+  const [imgId, premioIds, bannerIds, mapaId, vId, hotspots, unidadIds, juegosNivel] =
+    await Promise.all([
+      imagenCursoIdResuelto(matricula.tipoCurso, nivelActual?.codigo ?? NIVEL_TODOS),
+      Promise.all(niveles.map((n) => premioNivelId(matricula.tipoCurso, n.codigo))),
+      Promise.all(niveles.map((n) => imagenCursoId(matricula.tipoCurso, n.codigo))),
+      mapaCursoId(matricula.tipoCurso),
+      voboId(),
+      getHotspotsCurso(matricula.tipoCurso),
+      // Láminas y juegos de las unidades: lo que se abre al tocar "Unidad N".
+      Promise.all(niveles.map((n) => imagenesUnidadNivel(matricula.tipoCurso, n.codigo))),
+      Promise.all(niveles.map((n) => juegosDeNivel(matricula.tipoCurso, n.codigo))),
+    ]);
   const premios = Object.fromEntries(niveles.map((n, i) => [n.codigo, url(premioIds[i] ?? null)]));
   const bannersNivel = Object.fromEntries(
     niveles.map((n, i) => [n.codigo, url(bannerIds[i] ?? null)]),
   );
+  // { NIVEL: { 1: url|null, ... } } y { NIVEL: { 1: [juegos], ... } }
+  const unidades = Object.fromEntries(
+    niveles.map((n, i) => [
+      n.codigo,
+      Object.fromEntries(
+        Object.entries(unidadIds[i] ?? {}).map(([u, id]) => [u, url(id as string | null)]),
+      ),
+    ]),
+  );
+  const juegosUnidad = Object.fromEntries(niveles.map((n, i) => [n.codigo, juegosNivel[i] ?? {}]));
 
   return json({
     alumno: { nombre: `${persona.nombres} ${persona.apellidos}` },
@@ -87,6 +103,8 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     historial,
     comentarios, // lo que el guía le escribió, del más reciente al más antiguo
     imagenCursoUrl: url(imgId),
+    unidades, // láminas por nivel y unidad
+    juegosUnidad, // enlaces de juegos por nivel y unidad
     premios, // { [nivelCodigo]: url | null }  → íconos de "¿Cómo voy?"
     bannersNivel, // { [nivelCodigo]: url | null } → mapas de isla en "Avance"
     mapaCursoUrl: url(mapaId), // mapa del curso completo (todas las islas)
