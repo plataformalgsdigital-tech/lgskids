@@ -42,12 +42,10 @@ interface Asistente {
   marcadoEn: string | null;
 }
 
-const TIPOS = [
-  { valor: "MEETING", etiqueta: "Meeting" },
-  { valor: "TRAINING", etiqueta: "Training" },
-  { valor: "OBSERVATION", etiqueta: "Observation" },
-  { valor: "DEVELOPMENT", etiqueta: "Development" },
-];
+interface TipoAdmin {
+  valor: string;
+  etiqueta: string;
+}
 
 const PAISES = ["CL", "CO", "EC", "PE"];
 
@@ -94,6 +92,9 @@ export default function EventosAdministrativosPage() {
   const [abierto, setAbierto] = useState<string | null>(null);
   const [tipo, setTipo] = useState("");
   const [pais, setPais] = useState("");
+  // El vocabulario lo define el dominio y lo sirve la API; copiarlo aquí
+  // dejaría el filtro desfasado al añadir un tipo.
+  const [tipos, setTipos] = useState<TipoAdmin[]>([]);
 
   // Modal de lista: evento elegido, su audiencia y las marcas sin guardar.
   const [lista, setLista] = useState<EventoAdmin | null>(null);
@@ -111,7 +112,9 @@ export default function EventosAdministrativosPage() {
       return;
     }
     setError(null);
-    setEventos(((await res.json()) as { eventos: EventoAdmin[] }).eventos);
+    const d = (await res.json()) as { eventos: EventoAdmin[]; tipos: TipoAdmin[] };
+    setEventos(d.eventos);
+    setTipos(d.tipos);
   }, [desde, hasta, tipo, pais]);
 
   useEffect(() => {
@@ -226,7 +229,7 @@ export default function EventosAdministrativosPage() {
           </label>
           <select id="e-tipo" value={tipo} onChange={(e) => setTipo(e.target.value)} style={campo}>
             <option value="">Todos</option>
-            {TIPOS.map((x) => (
+            {tipos.map((x) => (
               <option key={x.valor} value={x.valor}>
                 {x.etiqueta}
               </option>

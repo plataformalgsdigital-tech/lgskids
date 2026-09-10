@@ -1,7 +1,15 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
-import { MAX_SALONES_COMPARTIDOS, crearEvento, guiasConZoom } from "@/modules/scheduling";
+import {
+  DURACIONES_TALLER,
+  DURACION_ADMIN_MAX,
+  DURACION_ADMIN_MIN,
+  TIPOS_EVENTO_ADMIN,
+  MAX_SALONES_COMPARTIDOS,
+  crearEvento,
+  guiasConZoom,
+} from "@/modules/scheduling";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
 bootstrapIdentity();
@@ -15,7 +23,14 @@ bootstrapIdentity();
 export const GET = handlerWithAuth(async (_request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.EVENTOS_CREAR);
-  return json({ guias: await guiasConZoom() });
+  return json({
+    guias: await guiasConZoom(),
+    // Vocabulario y rangos DEL DOMINIO. Si la UI los copiara, añadir un tipo
+    // dejaría el formulario y el filtro desfasados sin que nadie lo note.
+    tiposAdmin: TIPOS_EVENTO_ADMIN,
+    duracionAdmin: { min: DURACION_ADMIN_MIN, max: DURACION_ADMIN_MAX },
+    duracionesTaller: DURACIONES_TALLER,
+  });
 });
 
 const crearSchema = z.object({

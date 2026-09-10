@@ -3,6 +3,7 @@ import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
 import {
   CODIGOS_EVENTO_ADMIN,
+  TIPOS_EVENTO_ADMIN,
   DURACION_ADMIN_MAX,
   DURACION_ADMIN_MIN,
   crearEventoAdmin,
@@ -31,6 +32,7 @@ export const GET = handlerWithAuth(async (request, auth) => {
     profile.hasPermission(PERMISOS.PANEL_GUIA) &&
     !profile.hasPermission(PERMISOS.SALONES_GESTIONAR);
   return json({
+    tipos: TIPOS_EVENTO_ADMIN,
     eventos: await eventosAdmin(desde, hasta, soloSuyos ? auth.userId : null, {
       tipo: q.get("tipo"),
       pais: q.get("pais"),

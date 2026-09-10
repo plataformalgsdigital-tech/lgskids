@@ -40,19 +40,17 @@ const TIPOS_ACADEMICO = [
   { valor: "TALLER", etiqueta: "Taller" },
 ] as const;
 
-/** Tipos del evento INTERNO: su audiencia son guías, no un salón. */
-const TIPOS_ADMIN = [
-  { valor: "MEETING", etiqueta: "Meeting" },
-  { valor: "TRAINING", etiqueta: "Training" },
-  { valor: "OBSERVATION", etiqueta: "Observation" },
-  { valor: "DEVELOPMENT", etiqueta: "Development" },
-] as const;
+interface TipoAdmin {
+  valor: string;
+  etiqueta: string;
+}
 
-/** Duración del evento interno: de 1 a 8 horas, en horas enteras. */
-const HORAS_ADMIN = [1, 2, 3, 4, 5, 6, 7, 8];
-
-/** El taller es una actividad acotada: una o dos horas. */
-const HORAS_TALLER = [1, 2];
+/** Horas enteras entre dos duraciones en minutos, ambas incluidas. */
+function horasEntre(minMin: number, maxMin: number): number[] {
+  const horas: number[] = [];
+  for (let h = Math.ceil(minMin / 60); h <= Math.floor(maxMin / 60); h++) horas.push(h);
+  return horas;
+}
 
 const campo: CSSProperties = {
   width: "100%",
@@ -103,7 +101,9 @@ export function NuevoEventoModal({
   );
   const [hora, setHora] = useState("16:00");
   const [duracion, setDuracion] = useState(60);
-  const [tipo, setTipo] = useState<string>(esAdmin ? "MEETING" : "SESION");
+  // En modo administrativo arranca vacío y toma el primer tipo que sirva la
+  // API: fijar un literal aquí sería una cuarta copia del vocabulario.
+  const [tipo, setTipo] = useState<string>(esAdmin ? "" : "SESION");
   const [campania, setCampania] = useState("");
   const [pais, setPais] = useState("");
   const [curso, setCurso] = useState("");
@@ -117,11 +117,30 @@ export function NuevoEventoModal({
   // Audiencia del evento administrativo: qué guías lo verán.
   const [titulo, setTitulo] = useState("");
   const [audiencia, setAudiencia] = useState<string[]>([]);
+  // Vocabulario y rangos del dominio, servidos por la API.
+  const [tiposAdmin, setTiposAdmin] = useState<TipoAdmin[]>([]);
+  const [horasAdmin, setHorasAdmin] = useState<number[]>([]);
+  const [horasTaller, setHorasTaller] = useState<number[]>([]);
 
   const cargarGuias = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/eventos");
-    if (res.ok) setGuias(((await res.json()) as { guias: Guia[] }).guias);
-  }, []);
+    if (!res.ok) return;
+    const d = (await res.json()) as {
+      guias: Guia[];
+      tiposAdmin: TipoAdmin[];
+      duracionAdmin: { min: number; max: number };
+      duracionesTaller: number[];
+    };
+    setGuias(d.guias);
+    setTiposAdmin(d.tiposAdmin);
+    if (esAdmin && d.tiposAdmin.length > 0) {
+      setTipo((actual) =>
+        d.tiposAdmin.some((x) => x.valor === actual) ? actual : (d.tiposAdmin[0]?.valor ?? ""),
+      );
+    }
+    setHorasAdmin(horasEntre(d.duracionAdmin.min, d.duracionAdmin.max));
+    setHorasTaller(d.duracionesTaller.map((m) => m / 60));
+  }, [esAdmin]);
 
   useEffect(() => {
     async function inicial() {
@@ -334,7 +353,7 @@ export function NuevoEventoModal({
                   onChange={(e) => setDuracion(Number(e.target.value))}
                   style={campo}
                 >
-                  {(esAdmin ? HORAS_ADMIN : HORAS_TALLER).map((h) => (
+                  {(esAdmin ? horasAdmin : horasTaller).map((h) => (
                     <option key={h} value={h * 60}>
                       {h} hora{h === 1 ? "" : "s"}
                     </option>
@@ -372,7 +391,7 @@ export function NuevoEventoModal({
                 }}
                 style={campo}
               >
-                {(esAdmin ? TIPOS_ADMIN : TIPOS_ACADEMICO).map((t) => (
+                {(esAdmin ? tiposAdmin : TIPOS_ACADEMICO).map((t) => (
                   <option key={t.valor} value={t.valor}>
                     {t.etiqueta}
                   </option>
