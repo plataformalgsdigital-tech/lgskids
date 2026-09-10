@@ -10,6 +10,7 @@ import {
   type FormEvent,
 } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { fechaLocal, horaLocal } from "@/ui/fecha-local";
 import { SesionModal } from "./SesionModal";
 import { NuevoEventoModal } from "./NuevoEventoModal";
 
@@ -191,9 +192,12 @@ function CalendarioSalones() {
   const adminPorDia = useMemo(() => {
     const mapa = new Map<string, EventoAdmin[]>();
     for (const e of eventosAdmin) {
-      const lista = mapa.get(e.fecha) ?? [];
+      // Por el DÍA LOCAL del instante: la hora se pinta en el reloj de quien
+      // mira, así que la casilla tiene que salir del mismo reloj.
+      const dia = fechaLocal(e.startsAt);
+      const lista = mapa.get(dia) ?? [];
       lista.push(e);
-      mapa.set(e.fecha, lista);
+      mapa.set(dia, lista);
     }
     return mapa;
   }, [eventosAdmin]);
@@ -357,12 +361,7 @@ function CalendarioSalones() {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  🏛️{" "}
-                  {new Date(e.startsAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  {e.titulo ?? "Administrativo"}
+                  🏛️ {horaLocal(e.startsAt)} {e.titulo ?? "Administrativo"}
                 </div>
               ))}
               {visibles.map((s) => {

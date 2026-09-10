@@ -51,7 +51,10 @@ const crearSchema = z.object({
     .min(DURACION_ADMIN_MIN)
     .max(DURACION_ADMIN_MAX)
     .default(DURACION_ADMIN_MIN),
-  pais: z.enum(["CL", "CO", "EC", "PE"]),
+  // Contexto de audiencia, no el reloj: vacío significa todos los países.
+  pais: z.enum(["CL", "CO", "EC", "PE"]).nullish(),
+  // Zona IANA del navegador de quien crea. El evento es un instante.
+  zona: z.string().min(1).max(64),
   campania: z.string().max(120).nullish(),
   curso: z.string().max(40).nullish(),
   classroomId: z.uuid().nullish(),
@@ -72,7 +75,8 @@ export const POST = handlerWithAuth(async (request, auth) => {
     fecha: body.fecha,
     horaLocal: body.horaLocal,
     duracionMin: body.duracionMin,
-    pais: body.pais,
+    pais: body.pais ?? null,
+    zona: body.zona,
     campania: body.campania ?? null,
     curso: body.curso ?? null,
     classroomId: body.classroomId ?? null,

@@ -33,6 +33,9 @@ interface Guia {
 }
 
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"] as const;
+
+/** Aforo por defecto del evento interno: no cuelga de un salón del que heredar cupo. */
+const LIMITE_ADMIN_DEFECTO = 25;
 /** Tipos de una clase: la dicta un salón. */
 const TIPOS_ACADEMICO = [
   { valor: "SESION", etiqueta: "Sesión" },
@@ -109,7 +112,7 @@ export function NuevoEventoModal({
   const [curso, setCurso] = useState("");
   const [salonPrincipal, setSalonPrincipal] = useState("");
   const [nivel, setNivel] = useState("");
-  const [limite, setLimite] = useState("");
+  const [limite, setLimite] = useState(esAdmin ? String(LIMITE_ADMIN_DEFECTO) : "");
   const [guiaUserId, setGuiaUserId] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [compartir, setCompartir] = useState(false);
@@ -158,19 +161,34 @@ export function NuevoEventoModal({
   }, [onCerrar]);
 
   // Cascada: cada nivel del filtro se calcula sobre el anterior.
+  // El evento ADMINISTRATIVO no se dicta en un salón: campaña, curso, salón y
+  // nivel son contexto, y dejarlos vacíos significa TODOS. En el académico la
+  // cascada sí obliga, porque la clase ocurre en UN salón concreto.
+  const libre = (valor: string) => esAdmin && valor === "";
   const campanias = [...new Set(salones.map((s) => s.campania))];
   const paises = [
-    ...new Set(salones.filter((s) => s.campania === campania).map((s) => s.holidayCountry)),
+    ...new Set(
+      salones
+        .filter((s) => libre(campania) || s.campania === campania)
+        .map((s) => s.holidayCountry),
+    ),
   ];
   const cursos = [
     ...new Set(
       salones
-        .filter((s) => s.campania === campania && s.holidayCountry === pais)
+        .filter(
+          (s) =>
+            (libre(campania) || s.campania === campania) &&
+            (libre(pais) || s.holidayCountry === pais),
+        )
         .map((s) => s.curso),
     ),
   ];
   const salonesFiltrados = salones.filter(
-    (s) => s.campania === campania && s.holidayCountry === pais && s.curso === curso,
+    (s) =>
+      (libre(campania) || s.campania === campania) &&
+      (libre(pais) || s.holidayCountry === pais) &&
+      (libre(curso) || s.curso === curso),
   );
   // Para compartir se ofrecen los salones de la MISMA campaña y país, de
   // cualquier curso: compartir entre cursos es justo el caso de uso.
@@ -181,7 +199,7 @@ export function NuevoEventoModal({
   const guia = guias.find((g) => g.id === guiaUserId) ?? null;
   const seleccionados = [salonPrincipal, ...(compartir ? extras : [])].filter((x) => x !== "");
   const listo = esAdmin
-    ? fecha !== "" && hora !== "" && pais !== "" && audiencia.length > 0
+    ? fecha !== "" && hora !== "" && audiencia.length > 0
     : fecha !== "" && hora !== "" && salonPrincipal !== "" && guiaUserId !== "";
 
   async function crear() {
@@ -195,7 +213,8 @@ export function NuevoEventoModal({
             fecha,
             horaLocal: hora,
             duracionMin: duracion,
-            pais,
+            zona: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            pais: pais === "" ? null : pais,
             campania: campania === "" ? null : campania,
             curso: curso === "" ? null : curso,
             classroomId: salonPrincipal === "" ? null : salonPrincipal,
@@ -400,7 +419,7 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-camp">
-                Campaña *
+                Campaña {esAdmin ? "" : "*"}
               </label>
               <select
                 id="ev-camp"
@@ -414,7 +433,7 @@ export function NuevoEventoModal({
                 }}
                 style={campo}
               >
-                <option value="">Seleccionar campaña</option>
+                <option value="">{esAdmin ? "Todas las campañas" : "Seleccionar campaña"}</option>
                 {campanias.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -424,12 +443,12 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-pais">
-                País *
+                País {esAdmin ? "" : "*"}
               </label>
               <select
                 id="ev-pais"
                 value={pais}
-                disabled={campania === ""}
+                disabled={!esAdmin && campania === ""}
                 onChange={(e) => {
                   setPais(e.target.value);
                   setCurso("");
@@ -438,7 +457,7 @@ export function NuevoEventoModal({
                 }}
                 style={campo}
               >
-                <option value="">Seleccionar país</option>
+                <option value="">{esAdmin ? "Todos los países" : "Seleccionar país"}</option>
                 {paises.map((p) => (
                   <option key={p} value={p}>
                     {p}
@@ -448,19 +467,19 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-curso">
-                Curso *
+                Curso {esAdmin ? "" : "*"}
               </label>
               <select
                 id="ev-curso"
                 value={curso}
-                disabled={pais === ""}
+                disabled={!esAdmin && pais === ""}
                 onChange={(e) => {
                   setCurso(e.target.value);
                   setSalonPrincipal("");
                 }}
                 style={campo}
               >
-                <option value="">Seleccionar curso</option>
+                <option value="">{esAdmin ? "Todos los cursos" : "Seleccionar curso"}</option>
                 {cursos.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -475,11 +494,11 @@ export function NuevoEventoModal({
               <select
                 id="ev-salon"
                 value={salonPrincipal}
-                disabled={curso === ""}
+                disabled={!esAdmin && curso === ""}
                 onChange={(e) => setSalonPrincipal(e.target.value)}
                 style={campo}
               >
-                <option value="">Seleccionar salón</option>
+                <option value="">{esAdmin ? "Todos los salones" : "Seleccionar salón"}</option>
                 {salonesFiltrados.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.nombre}
@@ -497,7 +516,7 @@ export function NuevoEventoModal({
                 onChange={(e) => setNivel(e.target.value)}
                 style={campo}
               >
-                <option value="">Sin nivel</option>
+                <option value="">{esAdmin ? "Todos los niveles" : "Sin nivel"}</option>
                 {NIVELES.map((n) => (
                   <option key={n} value={n}>
                     {n}
@@ -516,8 +535,10 @@ export function NuevoEventoModal({
                 max={200}
                 value={limite}
                 placeholder={
-                  salonesFiltrados.find((s) => s.id === salonPrincipal)?.cupo.toString() ??
-                  "cupo del salón"
+                  esAdmin
+                    ? String(LIMITE_ADMIN_DEFECTO)
+                    : (salonesFiltrados.find((s) => s.id === salonPrincipal)?.cupo.toString() ??
+                      "cupo del salón")
                 }
                 onChange={(e) => setLimite(e.target.value)}
                 style={campo}

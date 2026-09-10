@@ -530,6 +530,17 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   reglas viven en `domain/evento-admin.ts` Y como CHECK en la base. Los tipos
   antiguos se migraron (TALLER→TRAINING, CLUB/SESION→MEETING). En el modal el
   selector de tipo y el de duración cambian según el modo.
+- **El evento admin es un INSTANTE, no una hora de país (2026-09-10)**: la hora se
+  escribe en el reloj DE QUIEN LO CREA (el modal manda su zona IANA del navegador)
+  y cada quien lo ve en el suyo — creado 13:00 en Colombia, quien entra desde Chile
+  lo ve 15:00. Por eso `pais` dejó de ser el reloj y pasó a ser contexto de
+  audiencia: **Campaña, país, curso, salón y nivel admiten "Todos"** (vacío = todos)
+  y solo la fecha, la hora y la audiencia son obligatorias. El aforo por defecto es
+  **25**, porque el evento interno no cuelga de un salón del que heredar cupo.
+  **Trampa**: el DÍA también hay que derivarlo del instante (`src/ui/fecha-local.ts`)
+  y no del `fecha` guardado al crear — un evento de las 23:30 en Colombia cae al día
+  siguiente para Chile, y agruparlo por el día guardado lo pintaba en una casilla que
+  no cuadraba con su hora.
 - **Asistencia del evento admin**: se pasa lista desde la pantalla
   (`POST /api/scheduling/eventos-admin/[id]/asistencia`, `salones.gestionar`) y se
   guarda en `scheduling_evento_admin_guia` (`asistio`/`marcado_en`/`marcado_por`),

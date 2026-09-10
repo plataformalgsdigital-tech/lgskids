@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { fechaLocal, horaLocal } from "@/ui/fecha-local";
 
 /**
  * Eventos ADMINISTRATIVOS: reuniones, capacitaciones y talleres internos cuya
@@ -123,10 +124,6 @@ export default function EventosAdministrativosPage() {
     }
     void inicio();
   }, [cargar]);
-
-  function hora(iso: string): string {
-    return new Date(iso).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
-  }
 
   async function abrirLista(e: EventoAdmin) {
     setLista(e);
@@ -292,9 +289,9 @@ export default function EventosAdministrativosPage() {
             {(eventos ?? []).map((e) => (
               <Fragment key={e.id}>
                 <tr style={{ borderTop: "1px solid #eef1f7" }}>
-                  <td style={celda}>{e.fecha}</td>
+                  <td style={celda}>{fechaLocal(e.startsAt)}</td>
                   <td style={celda}>
-                    {hora(e.startsAt)}
+                    {horaLocal(e.startsAt)}
                     <span style={{ color: "var(--texto-suave)" }}> · {String(e.duracionMin)}′</span>
                   </td>
                   <td style={celda}>
@@ -428,7 +425,8 @@ export default function EventosAdministrativosPage() {
           >
             <h2 style={{ fontSize: "1.15rem", fontWeight: 800, margin: 0 }}>Lista de asistencia</h2>
             <p style={{ fontSize: "0.88rem", margin: 0 }}>
-              {lista.tipo} · {lista.titulo ?? "Sin título"} · {lista.fecha} {hora(lista.startsAt)}
+              {lista.tipo} · {lista.titulo ?? "Sin título"} · {fechaLocal(lista.startsAt)}{" "}
+              {horaLocal(lista.startsAt)}
             </p>
 
             {asistentes === null ? (

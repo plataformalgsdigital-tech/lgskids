@@ -4,7 +4,7 @@ import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
-import { OPERATIONAL_TIMEZONES, wallTimeToUtc } from "@/platform/time";
+import { wallTimeToUtc } from "@/platform/time";
 import {
   DURACION_ADMIN_MAX,
   DURACION_ADMIN_MIN,
@@ -347,8 +347,15 @@ export async function crearEventoAdmin(input: {
   fecha: string;
   horaLocal: string;
   duracionMin: number;
-  /** País que fija la zona horaria del evento. */
-  pais: string;
+  /**
+   * Zona IANA del reloj con que se escribió la hora — la del navegador de
+   * quien crea el evento. El evento es un INSTANTE: quien lo mire lo verá en
+   * su propia hora local. Una reunión creada a las 13:00 en Colombia la ve a
+   * las 15:00 quien entra desde Chile.
+   */
+  zona: string;
+  /** Contexto de audiencia, NO el reloj. Vacío = todos los países. */
+  pais?: string | null;
   campania?: string | null;
   curso?: string | null;
   classroomId?: string | null;
@@ -379,9 +386,13 @@ export async function crearEventoAdmin(input: {
     throw new ValidationError("Elige al menos un guía: si no, nadie vería el evento.");
   }
 
-  const timezone = OPERATIONAL_TIMEZONES[input.pais as keyof typeof OPERATIONAL_TIMEZONES] ?? null;
-  if (timezone === null) {
-    throw new ValidationError(`País sin zona horaria conocida: ${input.pais}.`);
+  // La zona la manda el cliente; si no es una IANA válida, Intl lanza y el
+  // evento quedaría en un instante arbitrario. Mejor rechazarlo.
+  const timezone = input.zona;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+  } catch {
+    throw new ValidationError(`Zona horaria desconocida: ${timezone}.`);
   }
 
   const [hh, mm] = input.horaLocal.split(":");
@@ -407,7 +418,7 @@ export async function crearEventoAdmin(input: {
         timezone,
         input.duracionMin,
         input.campania ?? null,
-        input.pais,
+        input.pais ?? null,
         input.curso ?? null,
         input.classroomId ?? null,
         input.nivel ?? null,
