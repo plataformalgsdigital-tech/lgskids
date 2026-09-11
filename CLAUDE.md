@@ -249,6 +249,13 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   - **La unidad es un NÚMERO 1..4**, el mismo que marcan los hotspots. En
     `catalog_curso` la unidad es texto libre y trae "Unidad 0", "Repaso 3" y erratas
     como "Evalucion 6"; colgar de ahí la clave la haría frágil.
+  - **Los juegos pueden ir SOBRE la lámina**: cada uno lleva `x`/`y` opcionales en %
+    de la imagen, igual que los hotspots del mapa. Se colocan haciendo clic sobre la
+    lámina en el editor; al niño le salen como etiquetas encima de su cartel, y en la
+    lista de abajo quedan SOLO los que no tienen posición. Las dos coordenadas van
+    juntas o ninguna: la ruta las pasa TAL CUAL para que la regla del dominio pueda
+    rechazar una media coordenada — sanearla en el borde perdía la posición en
+    silencio. El marcador del editor se toca para devolver el juego a la lista.
   - El dashboard expone `unidades` y `juegosUnidad` por nivel.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:

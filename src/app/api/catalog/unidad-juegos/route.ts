@@ -17,6 +17,9 @@ bootstrapIdentity();
 const juegoSchema = z.object({
   nombre: z.string().max(120),
   enlace: z.string().max(500),
+  // Posición sobre la lámina, en % (opcional).
+  x: z.number().min(0).max(100).optional(),
+  y: z.number().min(0).max(100).optional(),
 });
 
 const guardarSchema = z.object({
@@ -49,7 +52,12 @@ export const PUT = handlerWithAuth(async (request, auth) => {
       curso: b.curso,
       nivel: b.nivel,
       unidad: b.unidad,
-      juegos: b.juegos,
+      juegos: b.juegos.map((j) => ({
+        nombre: j.nombre,
+        enlace: j.enlace,
+        ...(j.x !== undefined ? { x: j.x } : {}),
+        ...(j.y !== undefined ? { y: j.y } : {}),
+      })),
       ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     }),
   );

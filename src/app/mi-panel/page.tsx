@@ -79,7 +79,10 @@ interface Dashboard {
   /** Láminas de unidad: { NIVEL: { "1": url|null, ... } } */
   unidades?: Record<string, Record<string, string | null>> | null;
   /** Juegos por unidad: { NIVEL: { "1": [{nombre,enlace}], ... } } */
-  juegosUnidad?: Record<string, Record<string, { nombre: string; enlace: string }[]>> | null;
+  juegosUnidad?: Record<
+    string,
+    Record<string, { nombre: string; enlace: string; x?: number; y?: number }[]>
+  > | null;
   bannersNivel?: Record<string, string | null>; // mapa de isla por código de nivel
   mapaCursoUrl?: string | null; // mapa del curso completo
   voboUrl?: string | null; // sello VoBo
@@ -2707,12 +2710,43 @@ export default function MiPanelPage() {
                 </div>
 
                 {lamina !== null ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={lamina}
-                    alt={`Unidad ${String(unidad)}`}
-                    style={{ display: "block", width: "100%", height: "auto" }}
-                  />
+                  <div style={{ position: "relative" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={lamina}
+                      alt={`Unidad ${String(unidad)}`}
+                      style={{ display: "block", width: "100%", height: "auto" }}
+                    />
+                    {/* Juegos UBICADOS: van sobre su cartel en la lámina. */}
+                    {juegos.map((j, i) =>
+                      j.x === undefined || j.y === undefined ? null : (
+                        <a
+                          key={i}
+                          href={j.enlace}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={j.nombre}
+                          style={{
+                            position: "absolute",
+                            left: `${String(j.x)}%`,
+                            top: `${String(j.y)}%`,
+                            transform: "translate(-50%,-50%)",
+                            padding: "0.3rem 0.7rem",
+                            borderRadius: "1rem",
+                            background: "rgba(10,14,30,.72)",
+                            color: "white",
+                            fontSize: "0.78rem",
+                            fontWeight: 800,
+                            whiteSpace: "nowrap",
+                            boxShadow: "0 2px 10px rgba(0,0,0,.35)",
+                            border: "2px solid rgba(255,255,255,.8)",
+                          }}
+                        >
+                          🎮 {j.nombre}
+                        </a>
+                      ),
+                    )}
+                  </div>
                 ) : (
                   <div
                     style={{
@@ -2726,7 +2760,7 @@ export default function MiPanelPage() {
                   </div>
                 )}
 
-                {juegos.length > 0 && (
+                {juegos.filter((j) => j.x === undefined || j.y === undefined).length > 0 && (
                   <div style={{ padding: "0.9rem 1.1rem 1.1rem" }}>
                     <p
                       style={{
@@ -2740,26 +2774,28 @@ export default function MiPanelPage() {
                       JUEGOS DE LA UNIDAD
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                      {juegos.map((j, i) => (
-                        <a
-                          key={i}
-                          href={j.enlace}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
-                            padding: "0.55rem 0.7rem",
-                            borderRadius: "0.6rem",
-                            background: "#f4f6fb",
-                            fontWeight: 600,
-                            color: "inherit",
-                          }}
-                        >
-                          🎮 {j.nombre}
-                        </a>
-                      ))}
+                      {juegos
+                        .filter((j) => j.x === undefined || j.y === undefined)
+                        .map((j, i) => (
+                          <a
+                            key={i}
+                            href={j.enlace}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                              padding: "0.55rem 0.7rem",
+                              borderRadius: "0.6rem",
+                              background: "#f4f6fb",
+                              fontWeight: 600,
+                              color: "inherit",
+                            }}
+                          >
+                            🎮 {j.nombre}
+                          </a>
+                        ))}
                     </div>
                   </div>
                 )}

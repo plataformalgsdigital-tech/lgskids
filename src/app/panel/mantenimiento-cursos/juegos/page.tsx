@@ -15,6 +15,9 @@ import { apiFetch } from "@/ui/api-fetch";
 interface Juego {
   nombre: string;
   enlace: string;
+  /** Posición sobre la lámina, en % de la imagen. */
+  x?: number;
+  y?: number;
 }
 
 const CURSOS = ["JUNIOR", "YOUNGSTER"];
@@ -41,6 +44,10 @@ export default function JuegosUnidadPage() {
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  /** Lámina de la unidad, para colocar los juegos encima. */
+  const [lamina, setLamina] = useState<string | null>(null);
+  /** Juego que se está ubicando: el siguiente clic sobre la lámina lo fija. */
+  const [ubicando, setUbicando] = useState<number | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -55,6 +62,13 @@ export default function JuegosUnidadPage() {
     setError(null);
     setAviso(null);
     setJuegos(((await res.json()) as { juegos: Juego[] }).juegos);
+    setUbicando(null);
+
+    // La lámina de esta unidad: es el lienzo sobre el que se colocan.
+    const img = await apiFetch(
+      `/api/catalog/imagen-curso?tipo=unidad&curso=${curso}&nivel=${nivel}&unidad=${String(unidad)}`,
+    );
+    setLamina(img.ok ? (((await img.json()) as { url: string | null }).url ?? null) : null);
     setCargando(false);
   }, [curso, nivel, unidad]);
 
@@ -65,8 +79,36 @@ export default function JuegosUnidadPage() {
     void inicial();
   }, [cargar]);
 
-  function cambiar(i: number, campo: keyof Juego, valor: string) {
+  function cambiar(i: number, campo: "nombre" | "enlace", valor: string) {
     setJuegos((prev) => prev.map((j, k) => (k === i ? { ...j, [campo]: valor } : j)));
+    setAviso(null);
+  }
+
+  /** Clic sobre la lámina: fija la posición del juego que se está ubicando. */
+  function colocar(e: React.MouseEvent<HTMLDivElement>) {
+    if (ubicando === null) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * 100;
+    const y = ((e.clientY - r.top) / r.height) * 100;
+    setJuegos((prev) =>
+      prev.map((j, k) =>
+        k === ubicando ? { ...j, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } : j,
+      ),
+    );
+    setUbicando(null);
+    setAviso(null);
+  }
+
+  function quitarPosicion(i: number) {
+    setJuegos((prev) =>
+      prev.map((j, k) => {
+        if (k !== i) return j;
+        const resto = { ...j };
+        delete resto.x;
+        delete resto.y;
+        return resto;
+      }),
+    );
     setAviso(null);
   }
 
@@ -170,7 +212,11 @@ export default function JuegosUnidadPage() {
               {juegos.map((j, i) => (
                 <div
                   key={i}
-                  style={{ display: "grid", gridTemplateColumns: "1fr 2fr auto", gap: "0.5rem" }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 2fr auto auto",
+                    gap: "0.5rem",
+                  }}
                   className="juegos-fila"
                 >
                   <input
@@ -187,6 +233,26 @@ export default function JuegosUnidadPage() {
                     style={input}
                     aria-label={`Enlace del juego ${String(i + 1)}`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setUbicando(ubicando === i ? null : i)}
+                    aria-label={`Ubicar el juego ${String(i + 1)} sobre la lámina`}
+                    title={
+                      j.x === undefined
+                        ? "Ubicar sobre la lámina"
+                        : `En ${String(j.x)}%, ${String(j.y ?? 0)}% · clic para mover`
+                    }
+                    style={{
+                      border: "1.5px solid " + (ubicando === i ? "var(--lgs-azul)" : "#e0e4ee"),
+                      background: ubicando === i ? "#eef2ff" : "white",
+                      borderRadius: "0.5rem",
+                      padding: "0 0.7rem",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {j.x === undefined ? "📍" : "✅"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setJuegos((prev) => prev.filter((_, k) => k !== i))}
@@ -239,6 +305,98 @@ export default function JuegosUnidadPage() {
               >
                 {ocupado ? "Guardando…" : "💾 Guardar"}
               </button>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/*
+        Lienzo: la lámina de la unidad con los juegos ya colocados. Se pinta con
+        `height: auto` —igual que en el panel del niño— para que los % caigan en
+        el mismo sitio que verá él.
+      */}
+      <section
+        style={{
+          marginTop: "1.2rem",
+          background: "white",
+          border: "1px solid #e3e7f0",
+          borderRadius: "0.9rem",
+          padding: "1rem",
+        }}
+      >
+        <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--texto-suave)" }}>
+          LÁMINA DE LA UNIDAD
+        </p>
+        {lamina === null ? (
+          <p style={{ color: "var(--texto-suave)", marginTop: "0.5rem" }}>
+            Esta unidad todavía no tiene lámina. Súbela en{" "}
+            <Link href="/panel/mantenimiento-cursos/imagenes">Imágenes de curso</Link> para poder
+            colocar los juegos sobre sus carteles.
+          </p>
+        ) : (
+          <>
+            <p
+              style={{
+                fontSize: "0.82rem",
+                color: "var(--texto-suave)",
+                margin: "0.3rem 0 0.6rem",
+              }}
+            >
+              {ubicando === null
+                ? "Toca 📍 en un juego y luego haz clic sobre su cartel."
+                : `Haz clic sobre el cartel de "${juegos[ubicando]?.nombre ?? ""}".`}
+            </p>
+            <div
+              onClick={colocar}
+              style={{
+                position: "relative",
+                maxWidth: "26rem",
+                borderRadius: "0.8rem",
+                overflow: "hidden",
+                border: "1px solid #e3e7f0",
+                cursor: ubicando === null ? "default" : "crosshair",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lamina}
+                alt="Lámina de la unidad"
+                style={{ display: "block", width: "100%", height: "auto" }}
+              />
+              {juegos.map((j, i) =>
+                j.x === undefined || j.y === undefined ? null : (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (ubicando === null) quitarPosicion(i);
+                    }}
+                    title={
+                      ubicando === null ? "Quitar de la lámina (queda solo en la lista)" : undefined
+                    }
+                    style={{
+                      position: "absolute",
+                      left: `${String(j.x)}%`,
+                      top: `${String(j.y)}%`,
+                      transform: "translate(-50%,-50%)",
+                      padding: "0.15rem 0.5rem",
+                      borderRadius: "1rem",
+                      border: "none",
+                      background: ubicando === i ? "var(--lgs-azul)" : "rgba(10,14,30,.8)",
+                      color: "white",
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      fontFamily: "inherit",
+                      cursor: ubicando === null ? "pointer" : "crosshair",
+                      pointerEvents: ubicando === null ? "auto" : "none",
+                    }}
+                  >
+                    🎮 {j.nombre === "" ? `Juego ${String(i + 1)}` : j.nombre}
+                  </button>
+                ),
+              )}
             </div>
           </>
         )}

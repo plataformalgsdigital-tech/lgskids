@@ -21,6 +21,13 @@ import { UNIDADES_POR_NIVEL } from "./imagen-curso";
 export interface Juego {
   nombre: string;
   enlace: string;
+  /**
+   * Posición sobre la LÁMINA, en % de la imagen (como los hotspots del mapa).
+   * Opcional: sin ella el juego solo sale en la lista de abajo. Van juntas o
+   * ninguna — media coordenada no ubica nada.
+   */
+  x?: number;
+  y?: number;
 }
 
 export interface JuegosUnidad {
@@ -57,7 +64,25 @@ function limpiar(juegos: Juego[]): Juego[] {
     if (!/^https?:\/\/\S+$/i.test(enlace)) {
       throw new ValidationError(`El enlace de "${nombre}" debe empezar por http:// o https://`);
     }
-    salida.push({ nombre: nombre.slice(0, 120), enlace: enlace.slice(0, 500) });
+    const tieneX = typeof j.x === "number";
+    const tieneY = typeof j.y === "number";
+    if (tieneX !== tieneY) {
+      throw new ValidationError(`"${nombre}" tiene media coordenada: hacen falta las dos.`);
+    }
+    if (tieneX && tieneY) {
+      const dentro = (v: number) => Number.isFinite(v) && v >= 0 && v <= 100;
+      if (!dentro(j.x as number) || !dentro(j.y as number)) {
+        throw new ValidationError(`La posición de "${nombre}" debe estar entre 0 y 100 %.`);
+      }
+    }
+    salida.push({
+      nombre: nombre.slice(0, 120),
+      enlace: enlace.slice(0, 500),
+      // Se redondea a una décima: más precisión no se aprecia y ensucia el JSON.
+      ...(tieneX && tieneY
+        ? { x: Math.round((j.x as number) * 10) / 10, y: Math.round((j.y as number) * 10) / 10 }
+        : {}),
+    });
   }
   return salida;
 }
