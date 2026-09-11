@@ -12,10 +12,17 @@ const UNIDADES = [1, 2, 3, 4];
 
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
 
-const TIPOS: { valor: Tipo; etiqueta: string; ayuda: string; cuadrada: boolean }[] = [
+const TIPOS: {
+  valor: Tipo;
+  etiqueta: string;
+  ayuda: string;
+  cuadrada: boolean;
+  /** Se muestra con SU proporción, sin recortar (lámina vertical). */
+  libre?: boolean;
+}[] = [
   { valor: "banner", etiqueta: "Banner del nivel (mapa de la isla)", ayuda: "16:9 · recomendado 1600×900. JPG/PNG/WebP.", cuadrada: false },
   { valor: "premio", etiqueta: "Premio del nivel", ayuda: "PNG con fondo transparente, cuadrado ~512×512 (brújula, llave, corona, estrella, tesoro).", cuadrada: true },
-  { valor: "unidad", etiqueta: "Lámina de la unidad", ayuda: "La que se abre al tocar “Unidad N” en el mapa de la isla. Vertical o cuadrada; recomendado 1000×1300. JPG/PNG/WebP.", cuadrada: false },
+  { valor: "unidad", etiqueta: "Lámina de la unidad", ayuda: "La que se abre al tocar “Unidad N” en el mapa de la isla. Se muestra COMPLETA, sin recortar; cualquier proporción sirve (recomendado 1000×1300). JPG/PNG/WebP.", cuadrada: false, libre: true },
   { valor: "mapa", etiqueta: "Mapa del curso completo", ayuda: "El mapa con TODAS las islas. 16:9 · recomendado 1920×1080.", cuadrada: false },
   { valor: "vobo", etiqueta: "Sello VoBo (global)", ayuda: "PNG transparente cuadrado del personaje con el visto (marca de unidad vista).", cuadrada: true },
 ];
@@ -205,8 +212,11 @@ export default function ImagenesCursoPage() {
             marginTop: "0.4rem",
             position: "relative",
             width: "100%",
-            maxWidth: def.cuadrada ? "16rem" : "28rem",
-            aspectRatio: def.cuadrada ? "1 / 1" : "16 / 9",
+            maxWidth: def.libre === true ? "20rem" : def.cuadrada ? "16rem" : "28rem",
+            // Sin proporción fija: la caja se adapta a la imagen y así el previo
+            // enseña exactamente lo que verá el niño.
+            ...(def.libre === true ? {} : { aspectRatio: def.cuadrada ? "1 / 1" : "16 / 9" }),
+            minHeight: def.libre === true ? "12rem" : undefined,
             borderRadius: "1rem",
             overflow: "hidden",
             border: "1px solid #e3e7f0",
@@ -228,17 +238,23 @@ export default function ImagenesCursoPage() {
               src={muestraUrl}
               alt="Previo"
               style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: def.cuadrada ? "contain" : "cover",
-                padding: def.cuadrada ? "0.6rem" : 0,
+                ...(def.libre === true
+                  ? { position: "relative", width: "100%", height: "auto", display: "block" }
+                  : {
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: def.cuadrada ? "contain" : "cover",
+                      padding: def.cuadrada ? "0.6rem" : 0,
+                    }),
               }}
             />
           ) : (
             <div style={{ textAlign: "center", opacity: 0.9 }}>
-              <div style={{ fontSize: "2.4rem", lineHeight: 1 }}>{tipo === "vobo" ? "✅" : tipo === "premio" ? "🏆" : "🗺️"}</div>
+              <div style={{ fontSize: "2.4rem", lineHeight: 1 }}>
+                {tipo === "vobo" ? "✅" : tipo === "premio" ? "🏆" : tipo === "unidad" ? "📄" : "🗺️"}
+              </div>
               <div style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>Sin imagen aún</div>
             </div>
           )}
