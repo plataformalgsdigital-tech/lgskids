@@ -5,17 +5,22 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 /**
- * Editor de ENLACES DE JUEGOS por unidad.
+ * Colocar los JUEGOS de una unidad sobre su lámina.
  *
- * Van atados a curso · nivel · unidad (1..4) porque lo que el niño toca es la
- * unidad en el mapa de la isla: ahí se le abre la lámina de esa unidad y, con
- * ella, sus juegos. No hay tope: se agregan las filas que hagan falta.
+ * Los juegos NO se crean aquí: son las **actividades de las lecciones**, que se
+ * cargan en Gestión de Contenido o por CSV. Esta pantalla solo decide DÓNDE va
+ * cada una sobre la lámina; el nombre y el enlace no se tocan.
+ *
+ * Solo caen en el mapa las lecciones de "Unidad 1".."Unidad 4". La "Unidad 0"
+ * es la bienvenida, y repasos y evaluaciones no tienen casilla.
  */
 
 interface Juego {
+  cursoRefId: string;
+  indice: number;
+  leccion: string;
   nombre: string;
   enlace: string;
-  /** Posición sobre la lámina, en % de la imagen. */
   x?: number;
   y?: number;
 }
@@ -44,7 +49,6 @@ export default function JuegosUnidadPage() {
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  /** Lámina de la unidad, para colocar los juegos encima. */
   const [lamina, setLamina] = useState<string | null>(null);
   /** Juego que se está ubicando: el siguiente clic sobre la lámina lo fija. */
   const [ubicando, setUbicando] = useState<number | null>(null);
@@ -64,7 +68,6 @@ export default function JuegosUnidadPage() {
     setJuegos(((await res.json()) as { juegos: Juego[] }).juegos);
     setUbicando(null);
 
-    // La lámina de esta unidad: es el lienzo sobre el que se colocan.
     const img = await apiFetch(
       `/api/catalog/imagen-curso?tipo=unidad&curso=${curso}&nivel=${nivel}&unidad=${String(unidad)}`,
     );
@@ -78,11 +81,6 @@ export default function JuegosUnidadPage() {
     }
     void inicial();
   }, [cargar]);
-
-  function cambiar(i: number, campo: "nombre" | "enlace", valor: string) {
-    setJuegos((prev) => prev.map((j, k) => (k === i ? { ...j, [campo]: valor } : j)));
-    setAviso(null);
-  }
 
   /** Clic sobre la lámina: fija la posición del juego que se está ubicando. */
   function colocar(e: React.MouseEvent<HTMLDivElement>) {
@@ -120,18 +118,21 @@ export default function JuegosUnidadPage() {
       const res = await apiFetch("/api/catalog/unidad-juegos", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ curso, nivel, unidad, juegos }),
+        body: JSON.stringify({
+          posiciones: juegos.map((j) => ({
+            cursoRefId: j.cursoRefId,
+            indice: j.indice,
+            ...(j.x !== undefined && j.y !== undefined ? { x: j.x, y: j.y } : {}),
+          })),
+        }),
       });
-      const c: { juegos?: Juego[]; error?: { message?: string } } = await res.json();
+      const c: { actualizadas?: number; error?: { message?: string } } = await res.json();
       if (!res.ok) {
-        setError(c.error?.message ?? "No se pudieron guardar los juegos.");
+        setError(c.error?.message ?? "No se pudieron guardar las posiciones.");
         return;
       }
-      // El servidor descarta filas vacías: se refleja lo que quedó guardado.
-      setJuegos(c.juegos ?? []);
-      setAviso(
-        `Guardado: ${String((c.juegos ?? []).length)} juego(s) en la Unidad ${String(unidad)}.`,
-      );
+      const sobre = juegos.filter((j) => j.x !== undefined).length;
+      setAviso(`Guardado: ${String(sobre)} de ${String(juegos.length)} sobre la lámina.`);
     } finally {
       setOcupado(false);
     }
@@ -144,8 +145,10 @@ export default function JuegosUnidadPage() {
       </Link>
       <h1 style={{ fontSize: "1.6rem", margin: "0.5rem 0 0" }}>Enlaces de juegos</h1>
       <p style={{ color: "var(--texto-suave)", marginTop: "0.25rem" }}>
-        Los juegos de cada <strong>unidad</strong>. El niño los abre al tocar “Unidad N” en el mapa
-        de su isla, junto con la lámina de esa unidad.
+        Coloca sobre la lámina las <strong>actividades</strong> de las lecciones de esta unidad. Los
+        juegos se crean en{" "}
+        <Link href="/panel/mantenimiento-cursos/gestion-contenido">Gestión de Contenido</Link>; aquí
+        solo se decide dónde va cada uno. El niño toca el cartel y se le abre.
       </p>
 
       <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap", marginTop: "1.2rem" }}>
@@ -201,119 +204,91 @@ export default function JuegosUnidadPage() {
       >
         {cargando ? (
           <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
+        ) : juegos.length === 0 ? (
+          <p style={{ color: "var(--texto-suave)" }}>
+            Las lecciones de <strong>Unidad {unidad}</strong> todavía no tienen actividades.
+            Cárgalas en{" "}
+            <Link href="/panel/mantenimiento-cursos/gestion-contenido">Gestión de Contenido</Link> y
+            vuelve aquí a colocarlas.
+          </p>
         ) : (
-          <>
-            {juegos.length === 0 && (
-              <p style={{ color: "var(--texto-suave)", marginBottom: "0.8rem" }}>
-                Esta unidad todavía no tiene juegos. Agrega el primero.
-              </p>
-            )}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {juegos.map((j, i) => (
-                <div
-                  key={i}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            {juegos.map((j, i) => (
+              <div
+                key={`${j.cursoRefId}-${String(j.indice)}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.6rem",
+                  padding: "0.5rem 0.6rem",
+                  borderRadius: "0.6rem",
+                  background: ubicando === i ? "#eef2ff" : "#f7f9fd",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setUbicando(ubicando === i ? null : i)}
+                  aria-label={`Ubicar ${j.nombre} sobre la lámina`}
+                  title={
+                    j.x === undefined
+                      ? "Ubicar sobre la lámina"
+                      : `En ${String(j.x)}%, ${String(j.y ?? 0)}% · clic para mover`
+                  }
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 2fr auto auto",
-                    gap: "0.5rem",
+                    border: "1.5px solid " + (ubicando === i ? "var(--lgs-azul)" : "#e0e4ee"),
+                    background: "white",
+                    borderRadius: "0.5rem",
+                    padding: "0.25rem 0.6rem",
+                    cursor: "pointer",
+                    fontWeight: 700,
                   }}
-                  className="juegos-fila"
                 >
-                  <input
-                    value={j.nombre}
-                    onChange={(e) => cambiar(i, "nombre", e.target.value)}
-                    placeholder="Nombre del juego"
-                    style={input}
-                    aria-label={`Nombre del juego ${String(i + 1)}`}
-                  />
-                  <input
-                    value={j.enlace}
-                    onChange={(e) => cambiar(i, "enlace", e.target.value)}
-                    placeholder="https://wordwall.net/..."
-                    style={input}
-                    aria-label={`Enlace del juego ${String(i + 1)}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setUbicando(ubicando === i ? null : i)}
-                    aria-label={`Ubicar el juego ${String(i + 1)} sobre la lámina`}
-                    title={
-                      j.x === undefined
-                        ? "Ubicar sobre la lámina"
-                        : `En ${String(j.x)}%, ${String(j.y ?? 0)}% · clic para mover`
-                    }
+                  {j.x === undefined ? "📍" : "✅"}
+                </button>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <strong style={{ fontSize: "0.9rem" }}>{j.nombre}</strong>
+                  <span
                     style={{
-                      border: "1.5px solid " + (ubicando === i ? "var(--lgs-azul)" : "#e0e4ee"),
-                      background: ubicando === i ? "#eef2ff" : "white",
-                      borderRadius: "0.5rem",
-                      padding: "0 0.7rem",
-                      cursor: "pointer",
-                      fontWeight: 700,
+                      display: "block",
+                      fontSize: "0.74rem",
+                      color: "var(--texto-suave)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {j.x === undefined ? "📍" : "✅"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setJuegos((prev) => prev.filter((_, k) => k !== i))}
-                    aria-label={`Quitar el juego ${String(i + 1)}`}
-                    style={{
-                      border: "1.5px solid #e0e4ee",
-                      background: "white",
-                      borderRadius: "0.5rem",
-                      padding: "0 0.7rem",
-                      cursor: "pointer",
-                      color: "#8a2020",
-                      fontWeight: 700,
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
+                    {j.leccion} · {j.enlace}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
-            <div style={{ display: "flex", gap: "0.6rem", marginTop: "0.9rem", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => setJuegos((prev) => [...prev, { nombre: "", enlace: "" }])}
-                style={{
-                  padding: "0.55rem 1rem",
-                  borderRadius: "0.6rem",
-                  border: "1.5px solid var(--lgs-azul)",
-                  background: "white",
-                  color: "var(--lgs-azul-oscuro)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                + Agregar juego
-              </button>
-              <button
-                type="button"
-                onClick={() => void guardar()}
-                disabled={ocupado}
-                style={{
-                  padding: "0.55rem 1.2rem",
-                  borderRadius: "0.6rem",
-                  border: "none",
-                  background: "var(--lgs-azul)",
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: ocupado ? "wait" : "pointer",
-                }}
-              >
-                {ocupado ? "Guardando…" : "💾 Guardar"}
-              </button>
-            </div>
-          </>
+        {juegos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => void guardar()}
+            disabled={ocupado}
+            style={{
+              marginTop: "0.9rem",
+              padding: "0.55rem 1.2rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background: "var(--lgs-azul)",
+              color: "white",
+              fontWeight: 700,
+              cursor: ocupado ? "wait" : "pointer",
+            }}
+          >
+            {ocupado ? "Guardando…" : "💾 Guardar posiciones"}
+          </button>
         )}
       </section>
 
       {/*
-        Lienzo: la lámina de la unidad con los juegos ya colocados. Se pinta con
-        `height: auto` —igual que en el panel del niño— para que los % caigan en
-        el mismo sitio que verá él.
+        Lienzo: la lámina con los juegos colocados. Se pinta con `height: auto`
+        —igual que en el panel del niño— para que los % caigan donde él los verá.
       */}
       <section
         style={{
@@ -343,7 +318,7 @@ export default function JuegosUnidadPage() {
               }}
             >
               {ubicando === null
-                ? "Toca 📍 en un juego y luego haz clic sobre su cartel."
+                ? "Toca 📍 en un juego y luego haz clic sobre su cartel. Para quitarlo de la lámina, toca su marcador."
                 : `Haz clic sobre el cartel de "${juegos[ubicando]?.nombre ?? ""}".`}
             </p>
             <div
@@ -366,14 +341,16 @@ export default function JuegosUnidadPage() {
               {juegos.map((j, i) =>
                 j.x === undefined || j.y === undefined ? null : (
                   <button
-                    key={i}
+                    key={`${j.cursoRefId}-${String(j.indice)}`}
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (ubicando === null) quitarPosicion(i);
                     }}
                     title={
-                      ubicando === null ? "Quitar de la lámina (queda solo en la lista)" : undefined
+                      ubicando === null
+                        ? `${j.nombre} · clic para quitarlo de la lámina`
+                        : undefined
                     }
                     style={{
                       position: "absolute",
@@ -402,8 +379,6 @@ export default function JuegosUnidadPage() {
           </>
         )}
       </section>
-
-      <style>{`@media (max-width: 640px) { .juegos-fila { grid-template-columns: 1fr auto !important; } }`}</style>
     </main>
   );
 }

@@ -44,8 +44,13 @@ export {
   UNIDADES_POR_NIVEL,
   imagenesUnidadNivel,
 } from "./application/imagen-curso";
-export { juegosDeUnidad, juegosDeNivel, guardarJuegosUnidad } from "./application/unidad-juegos";
-export type { Juego, JuegosUnidad } from "./application/unidad-juegos";
+export {
+  juegosDeUnidad,
+  juegosDeNivel,
+  guardarPosicionesUnidad,
+} from "./application/unidad-juegos";
+export type { Juego, Posicion } from "./application/unidad-juegos";
+export { UNIDADES_MAPA, unidadMapa } from "./domain/unidad-mapa";
 export {
   obtenerReferenciaNivel,
   actualizarReferenciaNivel,

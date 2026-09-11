@@ -1,0 +1,15 @@
+-- Los juegos de una unidad SON las actividades de sus lecciones (2026-09-11).
+--
+-- `catalog_unidad_juego` (creada el 2026-09-10) guardaba los enlaces aparte, y
+-- eso duplicaba lo que ya se carga en Gestión de Contenido y por CSV: las
+-- mismas cinco actividades acabaron escritas en dos sitios, en unidades
+-- distintas, sin verse entre sí.
+--
+-- Ahora se leen de `catalog_curso.actividades` y lo único que se guarda extra
+-- es la POSICIÓN sobre la lámina, dentro de la propia actividad (`x`/`y` en %).
+-- Una sola fuente: el nombre y el enlace siguen teniendo un solo dueño.
+--
+-- Qué lección cae en qué casilla lo decide `unidadMapa` en el código, porque
+-- `catalog_curso.unidad` es texto libre ("Unidad 0", "Repaso 2", erratas) y
+-- solo "Unidad 1".."Unidad 4" tienen casilla en el mapa.
+DROP TABLE IF EXISTS "catalog_unidad_juego";

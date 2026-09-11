@@ -242,20 +242,30 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   haya llegado.
   - **Arte tipo `unidad`** (`catalog_imagen_unidad`, clave `CURSO:NIVEL:N`) con su
     selector en `/panel/mantenimiento-cursos/imagenes`.
-  - **Juegos** en `catalog_unidad_juego` (migración `20260910000000`), JSONB sin tope:
-    son 5 o más por unidad. Editor en `/panel/mantenimiento-cursos/juegos`
-    (`catalogo.gestionar`); `GET|PUT /api/catalog/unidad-juegos`. El enlace se valida
-    http(s) al guardar: uno roto en el panel del niño es peor que no tenerlo.
-  - **La unidad es un NÚMERO 1..4**, el mismo que marcan los hotspots. En
-    `catalog_curso` la unidad es texto libre y trae "Unidad 0", "Repaso 3" y erratas
-    como "Evalucion 6"; colgar de ahí la clave la haría frágil.
-  - **Los juegos pueden ir SOBRE la lámina**: cada uno lleva `x`/`y` opcionales en %
-    de la imagen, igual que los hotspots del mapa. Se colocan haciendo clic sobre la
-    lámina en el editor; al niño le salen como etiquetas encima de su cartel, y en la
-    lista de abajo quedan SOLO los que no tienen posición. Las dos coordenadas van
-    juntas o ninguna: la ruta las pasa TAL CUAL para que la regla del dominio pueda
-    rechazar una media coordenada — sanearla en el borde perdía la posición en
-    silencio. El marcador del editor se toca para devolver el juego a la lista.
+  - **Los juegos SON las actividades de la lección** (2026-09-11): se cargan UNA vez
+    en Gestión de Contenido o por CSV (`catalog_curso.actividades`) y de ahí se leen.
+    La tabla `catalog_unidad_juego`, que los guardaba por segunda vez, se eliminó
+    (migración `20260911000000`): el mismo enlace en dos lugares era pedir que se
+    desincronizaran. El editor `/panel/mantenimiento-cursos/juegos`
+    (`catalogo.gestionar`, `GET|PUT /api/catalog/unidad-juegos`) ya no crea ni edita
+    nada — solo decide DÓNDE va cada actividad sobre la lámina.
+  - **De la unidad de texto a la casilla**: `catalog_curso.unidad` es texto libre y
+    trae "Unidad 0", "Repaso 3" y erratas como "Evalucion 6". `unidadMapa`
+    (`catalog/domain/unidad-mapa.ts`, con pruebas) es LA regla: solo "Unidad 1".."Unidad
+    4" caen en el mapa; "Unidad 0" es el cartel WELCOME y repasos y evaluaciones no
+    tienen casilla. Lo que no mapea no se pierde —sigue en su lección—, solo que no se
+    abre desde el mapa. `UNIDADES_MAPA = 4` es la única constante (la reusa
+    `imagen-curso.ts`).
+  - **La POSICIÓN vive DENTRO de la actividad**: `x`/`y` opcionales en % de la imagen,
+    igual que los hotspots. El PUT recibe `posiciones` y reescribe `actividades`
+    conservando nombre y enlace TAL CUAL, para que este editor no pueda estropear lo
+    que se carga en Gestión de Contenido. Al niño le salen como botones 🎮 redondos
+    sobre el cartel; en la lista de abajo quedan SOLO los que no tienen posición. Las
+    dos coordenadas van juntas o ninguna: la ruta las pasa TAL CUAL para que la regla
+    del dominio pueda rechazar una media coordenada — sanearla en el borde perdía la
+    posición en silencio. El marcador del editor se toca para quitar la posición.
+  - **Trampa**: reimportar por CSV esa lección SOBRESCRIBE `actividades` y se lleva las
+    posiciones; hay que volver a colocarlas.
   - El dashboard expone `unidades` y `juegosUnidad` por nivel.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:

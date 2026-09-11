@@ -1,153 +1,203 @@
 import { registrarAuditoria } from "@/modules/audit";
-import { execute, queryOne, queryRows } from "@/platform/db/query";
+import { execute, queryRows } from "@/platform/db/query";
+import { withTransaction } from "@/platform/db/transaction";
 import { ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
-import { UNIDADES_POR_NIVEL } from "./imagen-curso";
+import { UNIDADES_MAPA, unidadMapa } from "../domain/unidad-mapa";
 
 /**
- * Enlaces de JUEGOS por unidad.
+ * JUEGOS de una unidad del mapa.
  *
- * Van atados a (curso, nivel, unidad 1..4) —no a la lección— porque lo que el
- * niño toca es la unidad en el mapa de la isla: ahí se le abre la lámina de la
- * unidad y, con ella, sus juegos.
+ * NO son un dato propio: son las **actividades de las lecciones** de esa
+ * unidad, las mismas que se cargan en Gestión de Contenido y por CSV. Tenerlas
+ * dos veces era pedir que se desincronizaran, así que aquí solo se leen.
  *
- * La unidad se identifica por NÚMERO, el mismo que marcan los hotspots. En
- * `catalog_curso` la unidad es texto libre y trae de todo ("Unidad 0",
- * "Repaso 3", erratas incluidas); colgar de ahí la clave la haría frágil.
+ * Lo único que este módulo escribe es la POSICIÓN sobre la lámina (`x`/`y` en
+ * % de la imagen), guardada dentro de la propia actividad. Nombre y enlace se
+ * siguen editando donde siempre.
  *
- * No hay tope de juegos: son un puñado por unidad y siempre se leen enteros.
+ * Qué lección cae en qué casilla lo decide `unidadMapa`: solo "Unidad 1".."4".
+ * La "Unidad 0" es la bienvenida y los repasos/evaluaciones no tienen casilla,
+ * así que sus actividades existen pero no se abren desde el mapa.
  */
 
 export interface Juego {
+  /** Lección de `catalog_curso` de la que sale. */
+  cursoRefId: string;
+  /** Posición dentro del arreglo `actividades` de esa lección. */
+  indice: number;
+  leccion: string;
   nombre: string;
   enlace: string;
-  /**
-   * Posición sobre la LÁMINA, en % de la imagen (como los hotspots del mapa).
-   * Opcional: sin ella el juego solo sale en la lista de abajo. Van juntas o
-   * ninguna — media coordenada no ubica nada.
-   */
+  /** Posición sobre la lámina, en % de la imagen. Opcional. */
   x?: number;
   y?: number;
 }
 
-export interface JuegosUnidad {
-  curso: string;
-  nivel: string;
-  unidad: number;
-  juegos: Juego[];
+interface FilaActividad {
+  id: string;
+  unidad: string | null;
+  leccion: string;
+  actividades: { nombre?: string; link?: string; enlace?: string; x?: number; y?: number }[] | null;
 }
 
 const CURSOS = TIPOS_CURSO.map((c) => c.tipo) as readonly string[];
 const NIVELES_CODIGO = NIVELES.map((n) => n.codigo) as readonly string[];
 
-function exigirClave(curso: string, nivel: string, unidad: number): void {
+function exigirCursoNivel(curso: string, nivel: string): void {
   if (!CURSOS.includes(curso)) throw new ValidationError(`Curso inválido: ${curso}.`);
   if (!NIVELES_CODIGO.includes(nivel)) throw new ValidationError(`Nivel inválido: ${nivel}.`);
-  if (!Number.isInteger(unidad) || unidad < 1 || unidad > UNIDADES_POR_NIVEL) {
-    throw new ValidationError(
-      `Unidad inválida: ${String(unidad)} (1 a ${String(UNIDADES_POR_NIVEL)}).`,
-    );
-  }
 }
 
-/**
- * Normaliza la lista: descarta las filas vacías y exige que el enlace sea una
- * URL http(s). Un enlace roto en el panel del niño es peor que no tenerlo.
- */
-function limpiar(juegos: Juego[]): Juego[] {
-  const salida: Juego[] = [];
-  for (const j of juegos) {
-    const nombre = (j.nombre ?? "").trim();
-    const enlace = (j.enlace ?? "").trim();
-    if (nombre === "" && enlace === "") continue;
-    if (nombre === "") throw new ValidationError("Cada juego necesita un nombre.");
-    if (!/^https?:\/\/\S+$/i.test(enlace)) {
-      throw new ValidationError(`El enlace de "${nombre}" debe empezar por http:// o https://`);
-    }
-    const tieneX = typeof j.x === "number";
-    const tieneY = typeof j.y === "number";
-    if (tieneX !== tieneY) {
-      throw new ValidationError(`"${nombre}" tiene media coordenada: hacen falta las dos.`);
-    }
-    if (tieneX && tieneY) {
-      const dentro = (v: number) => Number.isFinite(v) && v >= 0 && v <= 100;
-      if (!dentro(j.x as number) || !dentro(j.y as number)) {
-        throw new ValidationError(`La posición de "${nombre}" debe estar entre 0 y 100 %.`);
-      }
-    }
-    salida.push({
-      nombre: nombre.slice(0, 120),
-      enlace: enlace.slice(0, 500),
-      // Se redondea a una décima: más precisión no se aprecia y ensucia el JSON.
-      ...(tieneX && tieneY
-        ? { x: Math.round((j.x as number) * 10) / 10, y: Math.round((j.y as number) * 10) / 10 }
-        : {}),
-    });
-  }
-  return salida;
+async function actividadesDelNivel(curso: string, nivel: string): Promise<FilaActividad[]> {
+  return queryRows<FilaActividad>(
+    `SELECT id, unidad, leccion, actividades
+       FROM catalog_curso
+      WHERE curso = $1::catalog_course_tipo AND nivel = $2
+        AND actividades IS NOT NULL AND jsonb_array_length(actividades) > 0
+      ORDER BY orden, leccion`,
+    [curso, nivel],
+  );
 }
 
-/** Juegos de UNA unidad. Devuelve lista vacía si nunca se guardaron. */
+/** Convierte una fila del catálogo en los juegos de su casilla. */
+function juegosDeFila(fila: FilaActividad): Juego[] {
+  return (fila.actividades ?? []).flatMap((a, indice) => {
+    // El CSV guarda `link`; algún editor escribió `enlace`. Se aceptan ambos.
+    const enlace = (a.link ?? a.enlace ?? "").trim();
+    const nombre = (a.nombre ?? "").trim();
+    if (enlace === "" || nombre === "") return [];
+    return [
+      {
+        cursoRefId: fila.id,
+        indice,
+        leccion: fila.leccion,
+        nombre,
+        enlace,
+        ...(typeof a.x === "number" && typeof a.y === "number" ? { x: a.x, y: a.y } : {}),
+      },
+    ];
+  });
+}
+
+/** Juegos de UNA casilla del mapa. */
 export async function juegosDeUnidad(
   curso: string,
   nivel: string,
   unidad: number,
 ): Promise<Juego[]> {
-  exigirClave(curso, nivel, unidad);
-  const fila = await queryOne<{ juegos: Juego[] }>(
-    `SELECT juegos FROM catalog_unidad_juego
-      WHERE curso = $1::catalog_course_tipo AND nivel = $2 AND unidad = $3`,
-    [curso, nivel, unidad],
-  );
-  return fila?.juegos ?? [];
+  exigirCursoNivel(curso, nivel);
+  if (!Number.isInteger(unidad) || unidad < 1 || unidad > UNIDADES_MAPA) {
+    throw new ValidationError(`Unidad inválida: ${String(unidad)} (1 a ${String(UNIDADES_MAPA)}).`);
+  }
+  const filas = await actividadesDelNivel(curso, nivel);
+  return filas.filter((f) => unidadMapa(f.unidad) === unidad).flatMap(juegosDeFila);
 }
 
-/** Juegos de TODAS las unidades de un nivel, para el panel del alumno. */
+/** Juegos de TODAS las casillas de un nivel, para el panel del alumno. */
 export async function juegosDeNivel(
   curso: string,
   nivel: string,
 ): Promise<Record<number, Juego[]>> {
   if (!CURSOS.includes(curso) || !NIVELES_CODIGO.includes(nivel)) return {};
-  const filas = await queryRows<{ unidad: number; juegos: Juego[] }>(
-    `SELECT unidad, juegos FROM catalog_unidad_juego
-      WHERE curso = $1::catalog_course_tipo AND nivel = $2
-      ORDER BY unidad`,
-    [curso, nivel],
-  );
+  const filas = await actividadesDelNivel(curso, nivel);
   const mapa: Record<number, Juego[]> = {};
-  for (let u = 1; u <= UNIDADES_POR_NIVEL; u++) mapa[u] = [];
-  for (const f of filas) mapa[f.unidad] = f.juegos;
+  for (let u = 1; u <= UNIDADES_MAPA; u++) mapa[u] = [];
+  for (const f of filas) {
+    const u = unidadMapa(f.unidad);
+    if (u === null) continue;
+    mapa[u] = [...(mapa[u] ?? []), ...juegosDeFila(f)];
+  }
   return mapa;
 }
 
-/** Reemplaza la lista completa de la unidad (UPSERT). */
-export async function guardarJuegosUnidad(input: {
-  actorUserId: string;
-  curso: string;
-  nivel: string;
-  unidad: number;
-  juegos: Juego[];
-  ip?: string | null;
-}): Promise<{ juegos: Juego[] }> {
-  exigirClave(input.curso, input.nivel, input.unidad);
-  const juegos = limpiar(input.juegos);
+export interface Posicion {
+  cursoRefId: string;
+  indice: number;
+  /** Sin x/y se QUITA de la lámina y el juego vuelve a la lista. */
+  x?: number;
+  y?: number;
+}
 
-  await execute(
-    `INSERT INTO catalog_unidad_juego (curso, nivel, unidad, juegos, updated_at)
-     VALUES ($1::catalog_course_tipo, $2, $3, $4::jsonb, now())
-     ON CONFLICT (curso, nivel, unidad)
-     DO UPDATE SET juegos = EXCLUDED.juegos, updated_at = now()`,
-    [input.curso, input.nivel, input.unidad, JSON.stringify(juegos)],
-  );
+/**
+ * Guarda dónde va cada juego sobre la lámina.
+ *
+ * Solo toca `x`/`y` de la actividad indicada: nombre y enlace se leen y se
+ * vuelven a escribir tal cual, para que este editor no pueda estropear lo que
+ * se carga en Gestión de Contenido.
+ */
+export async function guardarPosicionesUnidad(input: {
+  actorUserId: string;
+  posiciones: Posicion[];
+  ip?: string | null;
+}): Promise<{ actualizadas: number }> {
+  const dentro = (v: number) => Number.isFinite(v) && v >= 0 && v <= 100;
+  for (const p of input.posiciones) {
+    const tieneX = typeof p.x === "number";
+    const tieneY = typeof p.y === "number";
+    if (tieneX !== tieneY) {
+      throw new ValidationError("Media coordenada no ubica nada: hacen falta las dos.");
+    }
+    if (tieneX && tieneY && (!dentro(p.x as number) || !dentro(p.y as number))) {
+      throw new ValidationError("La posición debe estar entre 0 y 100 %.");
+    }
+  }
+
+  // Las posiciones de una unidad se guardan juntas: a medio guardar, unos
+  // juegos quedarían sobre la lámina y otros no.
+  let actualizadas = 0;
+  await withTransaction(async (tx) => {
+    // Se agrupan por lección para reescribir cada `actividades` una sola vez.
+    const porLeccion = new Map<string, Posicion[]>();
+    for (const p of input.posiciones) {
+      porLeccion.set(p.cursoRefId, [...(porLeccion.get(p.cursoRefId) ?? []), p]);
+    }
+
+    for (const [cursoRefId, posiciones] of porLeccion) {
+      const filas = await queryRows<FilaActividad>(
+        `SELECT id, unidad, leccion, actividades FROM catalog_curso WHERE id = $1 FOR UPDATE`,
+        [cursoRefId],
+        tx,
+      );
+      const fila = filas[0];
+      if (fila === undefined) throw new ValidationError("La lección ya no existe.");
+
+      const actividades = [...(fila.actividades ?? [])];
+      for (const p of posiciones) {
+        const a = actividades[p.indice];
+        if (a === undefined) {
+          throw new ValidationError(
+            `La actividad ${String(p.indice + 1)} de "${fila.leccion}" ya no existe: recarga la pantalla.`,
+          );
+        }
+        const copia = { ...a };
+        if (typeof p.x === "number" && typeof p.y === "number") {
+          copia.x = Math.round(p.x * 10) / 10;
+          copia.y = Math.round(p.y * 10) / 10;
+        } else {
+          delete copia.x;
+          delete copia.y;
+        }
+        actividades[p.indice] = copia;
+        actualizadas++;
+      }
+
+      await execute(
+        `UPDATE catalog_curso SET actividades = $2::jsonb, updated_at = now() WHERE id = $1`,
+        [cursoRefId, JSON.stringify(actividades)],
+        tx,
+      );
+    }
+  });
 
   await registrarAuditoria({
     actorUserId: input.actorUserId,
-    accion: "catalog.juegos_unidad_guardados",
-    entidad: "catalog_unidad_juego",
-    entidadId: `${input.curso}:${input.nivel}:${String(input.unidad)}`,
-    payload: { cuantos: juegos.length },
+    accion: "catalog.posiciones_juegos_guardadas",
+    entidad: "catalog_curso",
+    entidadId: input.posiciones[0]?.cursoRefId ?? null,
+    payload: { actualizadas },
     ip: input.ip ?? null,
   });
 
-  return { juegos };
+  return { actualizadas };
 }
