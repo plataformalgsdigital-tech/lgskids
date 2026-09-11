@@ -380,20 +380,21 @@ export default function JuegosUnidadPage() {
                       left: `${String(j.x)}%`,
                       top: `${String(j.y)}%`,
                       transform: "translate(-50%,-50%)",
-                      padding: "0.15rem 0.5rem",
-                      borderRadius: "1rem",
-                      border: "none",
-                      background: ubicando === i ? "var(--lgs-azul)" : "rgba(10,14,30,.8)",
-                      color: "white",
-                      fontSize: "0.7rem",
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
+                      width: "2rem",
+                      height: "2rem",
+                      borderRadius: "50%",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: "0.95rem",
+                      background: ubicando === i ? "var(--lgs-azul)" : "rgba(255,255,255,.92)",
+                      border: "2px solid var(--lgs-verde)",
+                      boxShadow: "0 2px 8px rgba(0,0,0,.4)",
                       fontFamily: "inherit",
                       cursor: ubicando === null ? "pointer" : "crosshair",
                       pointerEvents: ubicando === null ? "auto" : "none",
                     }}
                   >
-                    🎮 {j.nombre === "" ? `Juego ${String(i + 1)}` : j.nombre}
+                    🎮
                   </button>
                 ),
               )}

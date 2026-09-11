@@ -2715,7 +2715,13 @@ export default function MiPanelPage() {
                     <img
                       src={lamina}
                       alt={`Unidad ${String(unidad)}`}
-                      style={{ display: "block", width: "100%", height: "auto" }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        height: "auto",
+                        maxHeight: "62vh",
+                        objectFit: "contain",
+                      }}
                     />
                     {/* Juegos UBICADOS: van sobre su cartel en la lámina. */}
                     {juegos.map((j, i) =>
@@ -2725,24 +2731,27 @@ export default function MiPanelPage() {
                           href={j.enlace}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={j.nombre}
+                          title={`Jugar: ${j.nombre}`}
+                          aria-label={`Jugar: ${j.nombre}`}
+                          className="lgs-float"
                           style={{
                             position: "absolute",
                             left: `${String(j.x)}%`,
                             top: `${String(j.y)}%`,
                             transform: "translate(-50%,-50%)",
-                            padding: "0.3rem 0.7rem",
-                            borderRadius: "1rem",
-                            background: "rgba(10,14,30,.72)",
-                            color: "white",
-                            fontSize: "0.78rem",
-                            fontWeight: 800,
-                            whiteSpace: "nowrap",
-                            boxShadow: "0 2px 10px rgba(0,0,0,.35)",
-                            border: "2px solid rgba(255,255,255,.8)",
+                            width: "2.4rem",
+                            height: "2.4rem",
+                            borderRadius: "50%",
+                            display: "grid",
+                            placeItems: "center",
+                            fontSize: "1.1rem",
+                            textDecoration: "none",
+                            background: "rgba(255,255,255,.92)",
+                            boxShadow: "0 3px 12px rgba(0,0,0,.45)",
+                            border: "2px solid var(--lgs-verde)",
                           }}
                         >
-                          🎮 {j.nombre}
+                          🎮
                         </a>
                       ),
                     )}
