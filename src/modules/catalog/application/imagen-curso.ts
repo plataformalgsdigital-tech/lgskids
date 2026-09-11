@@ -1,6 +1,7 @@
 import { descargarArchivo, listarArchivos, subirArchivo } from "@/modules/files";
 import { ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
+import { UNIDADES_MAPA } from "../domain/unidad-mapa";
 
 /**
  * Arte curricular (no dato de menores). Reutiliza el módulo `files` (storage +
@@ -19,8 +20,8 @@ import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
 
 export type ArteTipo = "banner" | "premio" | "unidad" | "vobo" | "mapa" | "aviso_login";
 
-/** Unidades que marca el mapa de cada isla. */
-export const UNIDADES_POR_NIVEL = 4;
+/** Unidades que marca el mapa de cada isla. La define el dominio. */
+export const UNIDADES_POR_NIVEL = UNIDADES_MAPA;
 
 const ENTIDAD_POR_TIPO: Record<ArteTipo, string> = {
   banner: "catalog_imagen_curso",
