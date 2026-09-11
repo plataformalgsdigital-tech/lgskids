@@ -256,14 +256,28 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
     tienen casilla. Lo que no mapea no se pierde —sigue en su lección—, solo que no se
     abre desde el mapa. `UNIDADES_MAPA = 4` es la única constante (la reusa
     `imagen-curso.ts`).
-  - **La POSICIÓN vive DENTRO de la actividad**: `x`/`y` opcionales en % de la imagen,
-    igual que los hotspots. El PUT recibe `posiciones` y reescribe `actividades`
-    conservando nombre y enlace TAL CUAL, para que este editor no pueda estropear lo
-    que se carga en Gestión de Contenido. Al niño le salen como botones 🎮 redondos
-    sobre el cartel; en la lista de abajo quedan SOLO los que no tienen posición. Las
-    dos coordenadas van juntas o ninguna: la ruta las pasa TAL CUAL para que la regla
-    del dominio pueda rechazar una media coordenada — sanearla en el borde perdía la
-    posición en silencio. El marcador del editor se toca para quitar la posición.
+  - **El enlace ES el cartel dibujado (2026-09-11)**: no se marca un punto sino una
+    ZONA — `x`/`y` del centro más `w`/`h` del recuadro, todo en % de la imagen y
+    guardado DENTRO de la actividad. El cartel ya está pintado en la lámina, así que
+    ponerle encima un botón 🎮 tapaba el dibujo: ahora la zona va **transparente** y
+    solo se enciende al pasarle por encima o enfocarla con el teclado (`.lgs-cartel`,
+    un halo que late para decir "esto se toca", apagado con `prefers-reduced-motion`).
+    En el editor se ARRASTRA sobre el cartel; un clic simple (< 1,5 % en cualquier eje)
+    usa el tamaño estándar. Ese estándar (`ANCHO_ZONA`/`ALTO_ZONA`) viaja RESUELTO en
+    la respuesta del GET y lo aplica el servidor al guardar, para que el cliente no
+    copie la cifra.
+  - El PUT recibe `posiciones` y reescribe `actividades` conservando nombre y enlace
+    TAL CUAL, para que este editor no pueda estropear lo que se carga en Gestión de
+    Contenido. Las dos coordenadas van juntas o ninguna, y un tamaño sin posición se
+    RECHAZA: la ruta lo pasa todo tal cual para que la regla del dominio pueda
+    contestar 400 — sanearlo en el borde perdía la zona en silencio. Quitar la zona
+    borra las cuatro cifras, no solo el punto. En la lista de abajo del panel del niño
+    quedan SOLO los juegos sin zona.
+  - **El GET devuelve también `sinCasilla`**: las lecciones del nivel que TIENEN
+    actividades pero cuya unidad no es casilla del mapa. Sin eso, cargar cinco juegos
+    en una lección de "Unidad 0" y no verlos parecía un fallo — el editor solo podía
+    decir "esta unidad no tiene juegos", que es cierto y no ayuda. Ahora los nombra y
+    dice dónde cambiarlos.
   - **Trampa**: reimportar por CSV esa lección SOBRESCRIBE `actividades` y se lleva las
     posiciones; hay que volver a colocarlas.
   - El dashboard expone `unidades` y `juegosUnidad` por nivel.

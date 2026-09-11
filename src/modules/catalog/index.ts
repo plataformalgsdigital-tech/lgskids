@@ -47,9 +47,11 @@ export {
 export {
   juegosDeUnidad,
   juegosDeNivel,
+  leccionesSinCasilla,
   guardarPosicionesUnidad,
 } from "./application/unidad-juegos";
-export type { Juego, Posicion } from "./application/unidad-juegos";
+export { ANCHO_ZONA, ALTO_ZONA } from "./application/unidad-juegos";
+export type { Juego, Posicion, LeccionSinCasilla } from "./application/unidad-juegos";
 export { UNIDADES_MAPA, unidadMapa } from "./domain/unidad-mapa";
 export {
   obtenerReferenciaNivel,

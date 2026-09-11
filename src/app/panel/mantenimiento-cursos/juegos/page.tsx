@@ -8,8 +8,12 @@ import { apiFetch } from "@/ui/api-fetch";
  * Colocar los JUEGOS de una unidad sobre su lámina.
  *
  * Los juegos NO se crean aquí: son las **actividades de las lecciones**, que se
- * cargan en Gestión de Contenido o por CSV. Esta pantalla solo decide DÓNDE va
- * cada una sobre la lámina; el nombre y el enlace no se tocan.
+ * cargan en Gestión de Contenido o por CSV. Esta pantalla solo decide QUÉ TROZO
+ * de la lámina abre cada una; el nombre y el enlace no se tocan.
+ *
+ * Se marca un RECUADRO, no un punto: el enlace es el propio cartel ya dibujado
+ * en la lámina, así que al niño no se le pinta nada encima — la zona va
+ * transparente y solo se ilumina al tocarla.
  *
  * Solo caen en el mapa las lecciones de "Unidad 1".."Unidad 4". La "Unidad 0"
  * es la bienvenida, y repasos y evaluaciones no tienen casilla.
@@ -23,11 +27,33 @@ interface Juego {
   enlace: string;
   x?: number;
   y?: number;
+  w?: number;
+  h?: number;
+}
+
+interface SinCasilla {
+  leccion: string;
+  unidad: string;
+  actividades: number;
+}
+
+interface Zona {
+  ancho: number;
+  alto: number;
+}
+
+interface Arrastre {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
 }
 
 const CURSOS = ["JUNIOR", "YOUNGSTER"];
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"];
 const UNIDADES = [1, 2, 3, 4];
+/** Bajo esto el gesto fue un clic, no un arrastre: se usa el tamaño estándar. */
+const MINIMO_ARRASTRE = 1.5;
 
 const input: CSSProperties = {
   padding: "0.5rem 0.6rem",
@@ -45,13 +71,16 @@ export default function JuegosUnidadPage() {
   const [unidad, setUnidad] = useState(1);
 
   const [juegos, setJuegos] = useState<Juego[]>([]);
+  const [sinCasilla, setSinCasilla] = useState<SinCasilla[]>([]);
+  const [zona, setZona] = useState<Zona | null>(null);
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [lamina, setLamina] = useState<string | null>(null);
-  /** Juego que se está ubicando: el siguiente clic sobre la lámina lo fija. */
+  /** Juego que se está ubicando: el siguiente gesto sobre la lámina lo fija. */
   const [ubicando, setUbicando] = useState<number | null>(null);
+  const [arrastre, setArrastre] = useState<Arrastre | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -65,8 +94,12 @@ export default function JuegosUnidadPage() {
     }
     setError(null);
     setAviso(null);
-    setJuegos(((await res.json()) as { juegos: Juego[] }).juegos);
+    const c = (await res.json()) as { juegos: Juego[]; sinCasilla: SinCasilla[]; zona: Zona };
+    setJuegos(c.juegos);
+    setSinCasilla(c.sinCasilla);
+    setZona(c.zona);
     setUbicando(null);
+    setArrastre(null);
 
     const img = await apiFetch(
       `/api/catalog/imagen-curso?tipo=unidad&curso=${curso}&nivel=${nivel}&unidad=${String(unidad)}`,
@@ -82,17 +115,56 @@ export default function JuegosUnidadPage() {
     void inicial();
   }, [cargar]);
 
-  /** Clic sobre la lámina: fija la posición del juego que se está ubicando. */
-  function colocar(e: React.MouseEvent<HTMLDivElement>) {
-    if (ubicando === null) return;
+  /** Coordenadas del puntero en % de la lámina. */
+  function pct(e: React.MouseEvent<HTMLDivElement>): { x: number; y: number } {
     const r = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
+    return {
+      x: ((e.clientX - r.left) / r.width) * 100,
+      y: ((e.clientY - r.top) / r.height) * 100,
+    };
+  }
+
+  function empezar(e: React.MouseEvent<HTMLDivElement>) {
+    if (ubicando === null) return;
+    const p = pct(e);
+    setArrastre({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+  }
+
+  function mover(e: React.MouseEvent<HTMLDivElement>) {
+    if (arrastre === null) return;
+    const p = pct(e);
+    setArrastre({ ...arrastre, x1: p.x, y1: p.y });
+  }
+
+  /** Suelta el recuadro sobre el cartel. Un clic simple usa el tamaño estándar. */
+  function soltar() {
+    if (arrastre === null || ubicando === null || zona === null) return;
+    const ancho = Math.abs(arrastre.x1 - arrastre.x0);
+    const alto = Math.abs(arrastre.y1 - arrastre.y0);
+    const chico = ancho < MINIMO_ARRASTRE || alto < MINIMO_ARRASTRE;
+    const redondo = (v: number) => Math.round(v * 10) / 10;
+    const caja = chico
+      ? { x: arrastre.x0, y: arrastre.y0, w: zona.ancho, h: zona.alto }
+      : {
+          x: (arrastre.x0 + arrastre.x1) / 2,
+          y: (arrastre.y0 + arrastre.y1) / 2,
+          w: ancho,
+          h: alto,
+        };
     setJuegos((prev) =>
       prev.map((j, k) =>
-        k === ubicando ? { ...j, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } : j,
+        k === ubicando
+          ? {
+              ...j,
+              x: redondo(caja.x),
+              y: redondo(caja.y),
+              w: redondo(caja.w),
+              h: redondo(caja.h),
+            }
+          : j,
       ),
     );
+    setArrastre(null);
     setUbicando(null);
     setAviso(null);
   }
@@ -104,6 +176,8 @@ export default function JuegosUnidadPage() {
         const resto = { ...j };
         delete resto.x;
         delete resto.y;
+        delete resto.w;
+        delete resto.h;
         return resto;
       }),
     );
@@ -122,7 +196,14 @@ export default function JuegosUnidadPage() {
           posiciones: juegos.map((j) => ({
             cursoRefId: j.cursoRefId,
             indice: j.indice,
-            ...(j.x !== undefined && j.y !== undefined ? { x: j.x, y: j.y } : {}),
+            ...(j.x !== undefined && j.y !== undefined
+              ? {
+                  x: j.x,
+                  y: j.y,
+                  ...(j.w !== undefined ? { w: j.w } : {}),
+                  ...(j.h !== undefined ? { h: j.h } : {}),
+                }
+              : {}),
           })),
         }),
       });
@@ -138,6 +219,17 @@ export default function JuegosUnidadPage() {
     }
   }
 
+  /** Recuadro en curso mientras se arrastra. */
+  const cajaArrastre =
+    arrastre === null
+      ? null
+      : {
+          left: Math.min(arrastre.x0, arrastre.x1),
+          top: Math.min(arrastre.y0, arrastre.y1),
+          width: Math.abs(arrastre.x1 - arrastre.x0),
+          height: Math.abs(arrastre.y1 - arrastre.y0),
+        };
+
   return (
     <main style={{ padding: "2rem", maxWidth: "56rem", margin: "0 auto" }}>
       <Link href="/panel/mantenimiento-cursos" style={{ fontSize: "0.85rem" }}>
@@ -145,10 +237,11 @@ export default function JuegosUnidadPage() {
       </Link>
       <h1 style={{ fontSize: "1.6rem", margin: "0.5rem 0 0" }}>Enlaces de juegos</h1>
       <p style={{ color: "var(--texto-suave)", marginTop: "0.25rem" }}>
-        Coloca sobre la lámina las <strong>actividades</strong> de las lecciones de esta unidad. Los
-        juegos se crean en{" "}
+        Marca sobre la lámina el cartel que abre cada <strong>actividad</strong> de las lecciones de
+        esta unidad. Los juegos se crean en{" "}
         <Link href="/panel/mantenimiento-cursos/gestion-contenido">Gestión de Contenido</Link>; aquí
-        solo se decide dónde va cada uno. El niño toca el cartel y se le abre.
+        solo se decide qué trozo de la imagen es el enlace. Al niño no se le pinta nada encima: toca
+        el cartel y se le abre.
       </p>
 
       <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap", marginTop: "1.2rem" }}>
@@ -228,11 +321,11 @@ export default function JuegosUnidadPage() {
                 <button
                   type="button"
                   onClick={() => setUbicando(ubicando === i ? null : i)}
-                  aria-label={`Ubicar ${j.nombre} sobre la lámina`}
+                  aria-label={`Marcar el cartel de ${j.nombre} sobre la lámina`}
                   title={
                     j.x === undefined
-                      ? "Ubicar sobre la lámina"
-                      : `En ${String(j.x)}%, ${String(j.y ?? 0)}% · clic para mover`
+                      ? "Marcar su cartel sobre la lámina"
+                      : `Zona de ${String(j.w ?? 0)}×${String(j.h ?? 0)} % · clic para volver a marcarla`
                   }
                   style={{
                     border: "1.5px solid " + (ubicando === i ? "var(--lgs-azul)" : "#e0e4ee"),
@@ -265,6 +358,39 @@ export default function JuegosUnidadPage() {
           </div>
         )}
 
+        {/*
+          El aviso que faltaba: si las actividades están en una lección cuya
+          unidad no es casilla del mapa, la pantalla se veía vacía sin explicar
+          por qué, y eso parece un fallo del sistema.
+        */}
+        {!cargando && sinCasilla.length > 0 && (
+          <div
+            style={{
+              marginTop: "0.9rem",
+              padding: "0.7rem 0.8rem",
+              borderRadius: "0.6rem",
+              background: "#fff8e1",
+              border: "1px solid #ffe082",
+              fontSize: "0.82rem",
+            }}
+          >
+            <strong>Estas actividades no las abre ninguna unidad del mapa:</strong>
+            <ul style={{ margin: "0.4rem 0", paddingLeft: "1.1rem" }}>
+              {sinCasilla.map((s) => (
+                <li key={`${s.leccion}-${s.unidad}`}>
+                  {s.leccion} — unidad <strong>“{s.unidad}”</strong> ({s.actividades}{" "}
+                  {s.actividades === 1 ? "actividad" : "actividades"})
+                </li>
+              ))}
+            </ul>
+            El mapa de la isla solo tiene las casillas <strong>Unidad 1</strong> a{" "}
+            <strong>Unidad 4</strong>: “Unidad 0” es el cartel WELCOME, y los repasos y las
+            evaluaciones no tienen casilla. Cambia la unidad de esas lecciones en{" "}
+            <Link href="/panel/mantenimiento-cursos/gestion-contenido">Gestión de Contenido</Link>{" "}
+            para que aparezcan aquí.
+          </div>
+        )}
+
         {juegos.length > 0 && (
           <button
             type="button"
@@ -287,7 +413,7 @@ export default function JuegosUnidadPage() {
       </section>
 
       {/*
-        Lienzo: la lámina con los juegos colocados. Se pinta con `height: auto`
+        Lienzo: la lámina con las zonas marcadas. Se pinta con `height: auto`
         —igual que en el panel del niño— para que los % caigan donde él los verá.
       */}
       <section
@@ -306,7 +432,7 @@ export default function JuegosUnidadPage() {
           <p style={{ color: "var(--texto-suave)", marginTop: "0.5rem" }}>
             Esta unidad todavía no tiene lámina. Súbela en{" "}
             <Link href="/panel/mantenimiento-cursos/imagenes">Imágenes de curso</Link> para poder
-            colocar los juegos sobre sus carteles.
+            marcar sus carteles.
           </p>
         ) : (
           <>
@@ -318,11 +444,14 @@ export default function JuegosUnidadPage() {
               }}
             >
               {ubicando === null
-                ? "Toca 📍 en un juego y luego haz clic sobre su cartel. Para quitarlo de la lámina, toca su marcador."
-                : `Haz clic sobre el cartel de "${juegos[ubicando]?.nombre ?? ""}".`}
+                ? "Toca 📍 en un juego y luego arrastra sobre su cartel para marcar el recuadro. Para quitarlo de la lámina, toca su zona."
+                : `Arrastra sobre el cartel de “${juegos[ubicando]?.nombre ?? ""}”. Un clic simple usa el tamaño estándar.`}
             </p>
             <div
-              onClick={colocar}
+              onMouseDown={empezar}
+              onMouseMove={mover}
+              onMouseUp={soltar}
+              onMouseLeave={() => setArrastre(null)}
               style={{
                 position: "relative",
                 maxWidth: "26rem",
@@ -330,12 +459,14 @@ export default function JuegosUnidadPage() {
                 overflow: "hidden",
                 border: "1px solid #e3e7f0",
                 cursor: ubicando === null ? "default" : "crosshair",
+                userSelect: "none",
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={lamina}
                 alt="Lámina de la unidad"
+                draggable={false}
                 style={{ display: "block", width: "100%", height: "auto" }}
               />
               {juegos.map((j, i) =>
@@ -354,26 +485,42 @@ export default function JuegosUnidadPage() {
                     }
                     style={{
                       position: "absolute",
-                      left: `${String(j.x)}%`,
-                      top: `${String(j.y)}%`,
-                      transform: "translate(-50%,-50%)",
-                      width: "2rem",
-                      height: "2rem",
-                      borderRadius: "50%",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "0.95rem",
-                      background: ubicando === i ? "var(--lgs-azul)" : "rgba(255,255,255,.92)",
-                      border: "2px solid var(--lgs-verde)",
-                      boxShadow: "0 2px 8px rgba(0,0,0,.4)",
+                      left: `${String(j.x - (j.w ?? 0) / 2)}%`,
+                      top: `${String(j.y - (j.h ?? 0) / 2)}%`,
+                      width: `${String(j.w ?? 0)}%`,
+                      height: `${String(j.h ?? 0)}%`,
+                      borderRadius: "0.3rem",
+                      border: "2px dashed var(--lgs-verde)",
+                      background: "rgba(46,125,50,.2)",
+                      color: "white",
+                      fontSize: "0.58rem",
+                      fontWeight: 700,
                       fontFamily: "inherit",
+                      textShadow: "0 1px 3px rgba(0,0,0,.95)",
+                      overflow: "hidden",
+                      padding: 0,
                       cursor: ubicando === null ? "pointer" : "crosshair",
                       pointerEvents: ubicando === null ? "auto" : "none",
                     }}
                   >
-                    🎮
+                    {j.nombre}
                   </button>
                 ),
+              )}
+              {cajaArrastre !== null && (
+                <div
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    left: `${String(cajaArrastre.left)}%`,
+                    top: `${String(cajaArrastre.top)}%`,
+                    width: `${String(cajaArrastre.width)}%`,
+                    height: `${String(cajaArrastre.height)}%`,
+                    border: "2px dashed var(--lgs-azul)",
+                    background: "rgba(25,118,210,.2)",
+                    pointerEvents: "none",
+                  }}
+                />
               )}
             </div>
           </>

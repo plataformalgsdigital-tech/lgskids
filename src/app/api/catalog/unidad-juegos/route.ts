@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
-import { guardarPosicionesUnidad, juegosDeUnidad } from "@/modules/catalog";
+import {
+  ALTO_ZONA,
+  ANCHO_ZONA,
+  guardarPosicionesUnidad,
+  juegosDeUnidad,
+  leccionesSinCasilla,
+} from "@/modules/catalog";
 import { bootstrapIdentity } from "@/modules/identity";
 import { ValidationError } from "@/platform/errors";
 import { handlerWithAuth, json } from "@/platform/http/handler";
@@ -22,6 +28,8 @@ const posicionSchema = z.object({
   indice: z.number().int().min(0).max(200),
   x: z.number().min(0).max(100).optional(),
   y: z.number().min(0).max(100).optional(),
+  w: z.number().min(0).max(100).optional(),
+  h: z.number().min(0).max(100).optional(),
 });
 
 const guardarSchema = z.object({
@@ -38,7 +46,14 @@ export const GET = handlerWithAuth(async (request, auth) => {
   if (curso === null || nivel === null || !Number.isInteger(unidad)) {
     throw new ValidationError("Indica curso, nivel y unidad.");
   }
-  return json({ juegos: await juegosDeUnidad(curso, nivel, unidad) });
+  // `sinCasilla` acompaña siempre: sin él, una unidad vacía no distingue "aún
+  // no hay actividades" de "las hay, pero en una lección que el mapa no abre".
+  const [juegos, sinCasilla] = await Promise.all([
+    juegosDeUnidad(curso, nivel, unidad),
+    leccionesSinCasilla(curso, nivel),
+  ]);
+  // El tamaño por defecto viaja resuelto para que el editor no lo copie.
+  return json({ juegos, sinCasilla, zona: { ancho: ANCHO_ZONA, alto: ALTO_ZONA } });
 });
 
 export const PUT = handlerWithAuth(async (request, auth) => {
@@ -55,6 +70,8 @@ export const PUT = handlerWithAuth(async (request, auth) => {
         indice: p.indice,
         ...(p.x !== undefined ? { x: p.x } : {}),
         ...(p.y !== undefined ? { y: p.y } : {}),
+        ...(p.w !== undefined ? { w: p.w } : {}),
+        ...(p.h !== undefined ? { h: p.h } : {}),
       })),
       ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     }),

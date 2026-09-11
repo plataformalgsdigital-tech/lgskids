@@ -78,10 +78,16 @@ interface Dashboard {
   premios?: Record<string, string | null>; // premio por código de nivel (imagen)
   /** Láminas de unidad: { NIVEL: { "1": url|null, ... } } */
   unidades?: Record<string, Record<string, string | null>> | null;
-  /** Juegos por unidad: { NIVEL: { "1": [{nombre,enlace}], ... } } */
+  /**
+   * Juegos por unidad: { NIVEL: { "1": [{nombre,enlace}], ... } }. `x`/`y` es el
+   * centro de su cartel sobre la lámina y `w`/`h` el recuadro que lo cubre.
+   */
   juegosUnidad?: Record<
     string,
-    Record<string, { nombre: string; enlace: string; x?: number; y?: number }[]>
+    Record<
+      string,
+      { nombre: string; enlace: string; x?: number; y?: number; w?: number; h?: number }[]
+    >
   > | null;
   bannersNivel?: Record<string, string | null>; // mapa de isla por código de nivel
   mapaCursoUrl?: string | null; // mapa del curso completo
@@ -870,7 +876,12 @@ export default function MiPanelPage() {
         .lgs-ring{animation:lgsPulse 1.4s ease-out infinite}
         .lgs-shine{animation:lgsShine 1.8s ease-in-out infinite}
         .lgs-ruta{animation:lgsRuta 3s linear infinite}
-        @media (prefers-reduced-motion:reduce){.lgs-float,.lgs-ring,.lgs-shine,.lgs-ruta{animation:none}}
+        /* Cartel-enlace de la lámina: transparente para no tapar el dibujo,
+           con un halo que late para decir "esto se toca". */
+        @keyframes lgsCartel{0%,100%{box-shadow:0 0 0 0 rgba(255,214,0,0)}50%{box-shadow:0 0 14px 3px rgba(255,214,0,.55)}}
+        .lgs-cartel{animation:lgsCartel 2.4s ease-in-out infinite;background:transparent;outline:none}
+        .lgs-cartel:hover,.lgs-cartel:focus-visible{animation:none;background:rgba(255,214,0,.28);box-shadow:0 0 0 3px rgba(255,214,0,.95)}
+        @media (prefers-reduced-motion:reduce){.lgs-float,.lgs-ring,.lgs-shine,.lgs-ruta,.lgs-cartel{animation:none}}
         /* Dos columnas 5/4: la izquierda carga el banner del curso, que es la
            pieza alta. Debajo de 62rem se apilan. */
         .lgs-dos-col{grid-template-columns:1fr}
@@ -2723,7 +2734,14 @@ export default function MiPanelPage() {
                         objectFit: "contain",
                       }}
                     />
-                    {/* Juegos UBICADOS: van sobre su cartel en la lámina. */}
+                    {/*
+                      Juegos UBICADOS: el enlace ES el cartel que ya está
+                      dibujado en la lámina. Por eso la zona va TRANSPARENTE —
+                      pintarle un botón encima tapaba el dibujo— y solo se
+                      enciende al pasar por encima o al enfocarla con el
+                      teclado. `lgs-cartel` late despacio para que el niño vea
+                      que hay algo que tocar sin esconder la ilustración.
+                    */}
                     {juegos.map((j, i) =>
                       j.x === undefined || j.y === undefined ? null : (
                         <a
@@ -2733,26 +2751,17 @@ export default function MiPanelPage() {
                           rel="noopener noreferrer"
                           title={`Jugar: ${j.nombre}`}
                           aria-label={`Jugar: ${j.nombre}`}
-                          className="lgs-float"
+                          className="lgs-cartel"
                           style={{
                             position: "absolute",
-                            left: `${String(j.x)}%`,
-                            top: `${String(j.y)}%`,
-                            transform: "translate(-50%,-50%)",
-                            width: "2.4rem",
-                            height: "2.4rem",
-                            borderRadius: "50%",
-                            display: "grid",
-                            placeItems: "center",
-                            fontSize: "1.1rem",
+                            left: `${String(j.x - (j.w ?? 0) / 2)}%`,
+                            top: `${String(j.y - (j.h ?? 0) / 2)}%`,
+                            width: `${String(j.w ?? 0)}%`,
+                            height: `${String(j.h ?? 0)}%`,
+                            borderRadius: "0.4rem",
                             textDecoration: "none",
-                            background: "rgba(255,255,255,.92)",
-                            boxShadow: "0 3px 12px rgba(0,0,0,.45)",
-                            border: "2px solid var(--lgs-verde)",
                           }}
-                        >
-                          🎮
-                        </a>
+                        />
                       ),
                     )}
                   </div>

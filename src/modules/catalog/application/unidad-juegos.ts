@@ -12,14 +12,26 @@ import { UNIDADES_MAPA, unidadMapa } from "../domain/unidad-mapa";
  * unidad, las mismas que se cargan en Gestión de Contenido y por CSV. Tenerlas
  * dos veces era pedir que se desincronizaran, así que aquí solo se leen.
  *
- * Lo único que este módulo escribe es la POSICIÓN sobre la lámina (`x`/`y` en
- * % de la imagen), guardada dentro de la propia actividad. Nombre y enlace se
- * siguen editando donde siempre.
+ * Lo único que este módulo escribe es la ZONA que ocupa el juego sobre la
+ * lámina (`x`/`y` del centro y `w`/`h` del recuadro, todo en % de la imagen),
+ * guardada dentro de la propia actividad. Nombre y enlace se siguen editando
+ * donde siempre.
  *
  * Qué lección cae en qué casilla lo decide `unidadMapa`: solo "Unidad 1".."4".
  * La "Unidad 0" es la bienvenida y los repasos/evaluaciones no tienen casilla,
  * así que sus actividades existen pero no se abren desde el mapa.
  */
+
+/**
+ * Tamaño de la zona cuando todavía no se ha ajustado, en % de la lámina.
+ *
+ * El juego se toca sobre SU CARTEL, que ya está dibujado en la lámina: la zona
+ * va transparente y solo se ilumina al pasar por encima. Por eso necesita ancho
+ * y alto —un punto no cubre un cartel— y por eso el valor por defecto se sirve
+ * ya resuelto desde aquí: así ni el panel del niño ni el editor copian la cifra.
+ */
+export const ANCHO_ZONA = 22;
+export const ALTO_ZONA = 5.5;
 
 export interface Juego {
   /** Lección de `catalog_curso` de la que sale. */
@@ -29,16 +41,29 @@ export interface Juego {
   leccion: string;
   nombre: string;
   enlace: string;
-  /** Posición sobre la lámina, en % de la imagen. Opcional. */
+  /** Centro de la zona sobre la lámina, en % de la imagen. */
   x?: number;
   y?: number;
+  /** Tamaño de la zona, en % de la imagen. Viaja siempre que viaje `x`. */
+  w?: number;
+  h?: number;
+}
+
+interface ActividadFila {
+  nombre?: string;
+  link?: string;
+  enlace?: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
 }
 
 interface FilaActividad {
   id: string;
   unidad: string | null;
   leccion: string;
-  actividades: { nombre?: string; link?: string; enlace?: string; x?: number; y?: number }[] | null;
+  actividades: ActividadFila[] | null;
 }
 
 const CURSOS = TIPOS_CURSO.map((c) => c.tipo) as readonly string[];
@@ -67,6 +92,8 @@ function juegosDeFila(fila: FilaActividad): Juego[] {
     const enlace = (a.link ?? a.enlace ?? "").trim();
     const nombre = (a.nombre ?? "").trim();
     if (enlace === "" || nombre === "") return [];
+    const x = a.x;
+    const y = a.y;
     return [
       {
         cursoRefId: fila.id,
@@ -74,7 +101,14 @@ function juegosDeFila(fila: FilaActividad): Juego[] {
         leccion: fila.leccion,
         nombre,
         enlace,
-        ...(typeof a.x === "number" && typeof a.y === "number" ? { x: a.x, y: a.y } : {}),
+        ...(typeof x === "number" && typeof y === "number"
+          ? {
+              x,
+              y,
+              w: typeof a.w === "number" ? a.w : ANCHO_ZONA,
+              h: typeof a.h === "number" ? a.h : ALTO_ZONA,
+            }
+          : {}),
       },
     ];
   });
@@ -92,6 +126,35 @@ export async function juegosDeUnidad(
   }
   const filas = await actividadesDelNivel(curso, nivel);
   return filas.filter((f) => unidadMapa(f.unidad) === unidad).flatMap(juegosDeFila);
+}
+
+export interface LeccionSinCasilla {
+  leccion: string;
+  unidad: string;
+  actividades: number;
+}
+
+/**
+ * Lecciones del nivel que TIENEN actividades pero cuya unidad no es casilla.
+ *
+ * Es el aviso que faltaba: cargar cinco juegos en una lección de "Unidad 0" y
+ * no verlos en el mapa parece un fallo, y no lo es. Sin esta lista el editor
+ * solo puede decir "esta unidad no tiene juegos", que es cierto y no ayuda.
+ */
+export async function leccionesSinCasilla(
+  curso: string,
+  nivel: string,
+): Promise<LeccionSinCasilla[]> {
+  if (!CURSOS.includes(curso) || !NIVELES_CODIGO.includes(nivel)) return [];
+  const filas = await actividadesDelNivel(curso, nivel);
+  const sueltas: LeccionSinCasilla[] = [];
+  for (const f of filas) {
+    if (unidadMapa(f.unidad) !== null) continue;
+    const cuantas = juegosDeFila(f).length;
+    if (cuantas === 0) continue;
+    sueltas.push({ leccion: f.leccion, unidad: f.unidad ?? "(sin unidad)", actividades: cuantas });
+  }
+  return sueltas;
 }
 
 /** Juegos de TODAS las casillas de un nivel, para el panel del alumno. */
@@ -117,14 +180,16 @@ export interface Posicion {
   /** Sin x/y se QUITA de la lámina y el juego vuelve a la lista. */
   x?: number;
   y?: number;
+  w?: number;
+  h?: number;
 }
 
 /**
- * Guarda dónde va cada juego sobre la lámina.
+ * Guarda la zona que ocupa cada juego sobre la lámina.
  *
- * Solo toca `x`/`y` de la actividad indicada: nombre y enlace se leen y se
- * vuelven a escribir tal cual, para que este editor no pueda estropear lo que
- * se carga en Gestión de Contenido.
+ * Solo toca `x`/`y`/`w`/`h` de la actividad indicada: nombre y enlace se leen y
+ * se vuelven a escribir tal cual, para que este editor no pueda estropear lo
+ * que se carga en Gestión de Contenido.
  */
 export async function guardarPosicionesUnidad(input: {
   actorUserId: string;
@@ -138,8 +203,16 @@ export async function guardarPosicionesUnidad(input: {
     if (tieneX !== tieneY) {
       throw new ValidationError("Media coordenada no ubica nada: hacen falta las dos.");
     }
+    if (!tieneX && (typeof p.w === "number" || typeof p.h === "number")) {
+      throw new ValidationError("Un tamaño sin posición no dibuja ninguna zona.");
+    }
     if (tieneX && tieneY && (!dentro(p.x as number) || !dentro(p.y as number))) {
       throw new ValidationError("La posición debe estar entre 0 y 100 %.");
+    }
+    for (const lado of [p.w, p.h]) {
+      if (typeof lado === "number" && (!Number.isFinite(lado) || lado <= 0 || lado > 100)) {
+        throw new ValidationError("El tamaño de la zona debe estar entre 0 y 100 %.");
+      }
     }
   }
 
@@ -172,11 +245,16 @@ export async function guardarPosicionesUnidad(input: {
         }
         const copia = { ...a };
         if (typeof p.x === "number" && typeof p.y === "number") {
-          copia.x = Math.round(p.x * 10) / 10;
-          copia.y = Math.round(p.y * 10) / 10;
+          const pct = (v: number) => Math.round(v * 10) / 10;
+          copia.x = pct(p.x);
+          copia.y = pct(p.y);
+          copia.w = pct(typeof p.w === "number" ? p.w : ANCHO_ZONA);
+          copia.h = pct(typeof p.h === "number" ? p.h : ALTO_ZONA);
         } else {
           delete copia.x;
           delete copia.y;
+          delete copia.w;
+          delete copia.h;
         }
         actividades[p.indice] = copia;
         actualizadas++;
