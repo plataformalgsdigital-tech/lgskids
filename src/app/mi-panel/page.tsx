@@ -744,6 +744,51 @@ export default function MiPanelPage() {
     );
 
   // Marcador posicionado por hotspot (%). `node` es el contenido (VoBo, premio…).
+  /**
+   * Botón de una unidad sobre un mapa de isla. `marca` pone
+   * `pointerEvents:none` en el contenedor, así que el botón lo repone; y frena
+   * la propagación porque el banner de arriba abre el lightbox al clic.
+   *
+   * Se pintan TODAS las unidades, no solo las vistas: la lámina se puede
+   * consultar aunque el niño no haya llegado.
+   */
+  const botonUnidad = (nivelCodigo: string, indice: number, vistas: number, tam: string) => (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setUnidadAbierta({ nivel: nivelCodigo, unidad: indice + 1 });
+      }}
+      title={`Unidad ${String(indice + 1)}`}
+      aria-label={`Abrir la Unidad ${String(indice + 1)}`}
+      style={{
+        pointerEvents: "auto",
+        border: "none",
+        background: "none",
+        padding: 0,
+        cursor: "pointer",
+        display: "block",
+        width: tam,
+        height: tam,
+      }}
+    >
+      {indice < vistas ? (
+        voboEl(tam)
+      ) : (
+        <span
+          style={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            border: "2px dashed rgba(255,255,255,.75)",
+            background: "rgba(20,25,50,.25)",
+          }}
+        />
+      )}
+    </button>
+  );
+
   const marca = (key: string, p: { x: number; y: number }, node: ReactNode) => (
     <div
       key={key}
@@ -1184,6 +1229,25 @@ export default function MiPanelPage() {
                         objectFit: "cover",
                       }}
                     />
+                    {/*
+                      Unidades sobre el banner del panel: el niño no tiene por
+                      qué entrar a Avance para abrir su unidad. Los hotspots van
+                      en % de la IMAGEN y el banner se pinta con `cover` en
+                      16:9, que es la proporción recomendada del arte.
+                    */}
+                    {(data.hotspots?.isla?.[nivelActual?.codigo ?? ""]?.unidades ?? []).map(
+                      (p, i) =>
+                        marca(
+                          `banner-u${String(i)}`,
+                          p,
+                          botonUnidad(
+                            nivelActual?.codigo ?? "",
+                            i,
+                            nivelActual?.leccionesCompletadas ?? 0,
+                            "2.1rem",
+                          ),
+                        ),
+                    )}
                     <span
                       aria-hidden
                       style={{
@@ -2506,39 +2570,7 @@ export default function MiPanelPage() {
                                   marca(
                                     `u${i}`,
                                     p,
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setUnidadAbierta({ nivel: n.codigo, unidad: i + 1 })
-                                      }
-                                      title={`Unidad ${String(i + 1)}`}
-                                      aria-label={`Abrir la Unidad ${String(i + 1)}`}
-                                      style={{
-                                        pointerEvents: "auto",
-                                        border: "none",
-                                        background: "none",
-                                        padding: 0,
-                                        cursor: "pointer",
-                                        display: "block",
-                                        width: "2.8rem",
-                                        height: "2.8rem",
-                                      }}
-                                    >
-                                      {i < n.leccionesCompletadas ? (
-                                        voboEl("2.8rem")
-                                      ) : (
-                                        <span
-                                          style={{
-                                            display: "block",
-                                            width: "100%",
-                                            height: "100%",
-                                            borderRadius: "50%",
-                                            border: "2px dashed rgba(255,255,255,.75)",
-                                            background: "rgba(20,25,50,.25)",
-                                          }}
-                                        />
-                                      )}
-                                    </button>,
+                                    botonUnidad(n.codigo, i, n.leccionesCompletadas, "2.8rem"),
                                   ),
                                 )}
                                 {/* Unidad actual: aro que late */}
