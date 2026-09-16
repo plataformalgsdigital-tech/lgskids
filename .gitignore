@@ -24,6 +24,10 @@ dist/
 # conservan en disco y en Drive. Ver arte/README.md.
 arte/personajes-fuente/
 imagenes/
+# Audio y video de ORIGEN de los cuadernillos (~151 MB solo Junior Rookie).
+# Se sube a `files` con `pnpm libro:audios`; git se queda los binarios para
+# siempre y aquí no aportan nada que la base no tenga ya.
+Audios/
 
 # Logs y depuración
 *.log

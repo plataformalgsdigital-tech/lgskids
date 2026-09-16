@@ -1,7 +1,7 @@
 import { descargarArchivo, listarArchivos, subirArchivo } from "@/modules/files";
 import { ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
-import { UNIDADES_MAPA } from "../domain/unidad-mapa";
+import { PARADAS, PARADA_WELCOME, UNIDADES_MAPA, paradaValida } from "../domain/unidad-mapa";
 
 /**
  * Arte curricular (no dato de menores). Reutiliza el módulo `files` (storage +
@@ -18,15 +18,26 @@ import { UNIDADES_MAPA } from "../domain/unidad-mapa";
  *    que lo prende/apaga vive en `aviso-login.ts`.
  */
 
-export type ArteTipo = "banner" | "premio" | "unidad" | "vobo" | "mapa" | "aviso_login";
+export type ArteTipo =
+  | "banner"
+  | "premio"
+  | "unidad"
+  | "insignia"
+  | "vobo"
+  | "mapa"
+  | "aviso_login";
 
-/** Unidades que marca el mapa de cada isla. La define el dominio. */
+/** Unidades NUMERADAS que marca el mapa. El Welcome (parada 0) va aparte. */
 export const UNIDADES_POR_NIVEL = UNIDADES_MAPA;
 
 const ENTIDAD_POR_TIPO: Record<ArteTipo, string> = {
   banner: "catalog_imagen_curso",
   premio: "catalog_premio_nivel",
   unidad: "catalog_imagen_unidad",
+  // Insignia que se gana al cerrar CADA parada de la isla, Welcome incluido
+  // ("Let's chat about me", "Let's explore", …). Distinta del `premio`, que es
+  // uno por NIVEL y corona el LEVEL UP.
+  insignia: "catalog_insignia_parada",
   mapa: "catalog_mapa_curso",
   vobo: "catalog_vobo",
   aviso_login: "login_aviso",
@@ -54,10 +65,11 @@ function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: 
   // La lámina de unidad va por NÚMERO (1..4), el mismo que marca el mapa: en
   // `catalog_curso` la unidad es texto libre y colgar de ahí la clave la haría
   // frágil ("Unidad 0", "Repaso 3", erratas incluidas).
-  if (tipo === "unidad") {
+  if (tipo === "unidad" || tipo === "insignia") {
     if (!unidadValida(unidad)) {
       throw new ValidationError(
-        `Unidad inválida: ${String(unidad)} (1 a ${String(UNIDADES_POR_NIVEL)}).`,
+        `Parada inválida: ${String(unidad)} (${String(PARADA_WELCOME)} a ` +
+          `${String(UNIDADES_MAPA)}; la ${String(PARADA_WELCOME)} es el Welcome).`,
       );
     }
     return `${curso}:${nivel}:${String(unidad)}`;
@@ -67,12 +79,7 @@ function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: 
 }
 
 function unidadValida(unidad?: number): boolean {
-  return (
-    typeof unidad === "number" &&
-    Number.isInteger(unidad) &&
-    unidad >= 1 &&
-    unidad <= UNIDADES_POR_NIVEL
-  );
+  return paradaValida(unidad);
 }
 
 /** ¿los parámetros forman una clave válida para el tipo? (sin lanzar). */
@@ -81,8 +88,15 @@ function claveValida(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: nu
   if (!CURSOS.includes(curso ?? "")) return false;
   if (tipo === "mapa") return true;
   if (!nivelValido(nivel ?? "")) return false;
-  return tipo === "unidad" ? unidadValida(unidad) : true;
+  return tipo === "unidad" || tipo === "insignia" ? unidadValida(unidad) : true;
 }
+
+/**
+ * El arte es SIEMPRE una imagen. `files` acepta además PDF y audio, así que
+ * aquí se acota: un mp3 guardado como banner no falla al subirlo, falla al
+ * pintarlo — mucho después y mucho más difícil de entender.
+ */
+const MIMES_ARTE = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export async function subirArte(input: {
   actorUserId: string;
@@ -95,6 +109,9 @@ export async function subirArte(input: {
   mime: string;
   bytes: Buffer;
 }): Promise<{ id: string }> {
+  if (!MIMES_ARTE.has(input.mime)) {
+    throw new ValidationError(`El arte debe ser una imagen JPG, PNG o WebP (llegó ${input.mime}).`);
+  }
   return subirArchivo({
     actorUserId: input.actorUserId,
     nombreOriginal: input.nombreOriginal,
@@ -173,13 +190,31 @@ export async function descargarImagenCurso(id: string): Promise<{
   return descargarArchivo(id);
 }
 
-/** Láminas de las unidades de un nivel: `{ 1: url|null, ... 4: url|null }`. */
+/**
+ * Láminas de las paradas de un nivel: `{ 0: url|null, ... 4: url|null }`.
+ *
+ * Incluye la parada 0 (Welcome): el mapa nuevo le da cartel propio, así que
+ * también puede tener su lámina.
+ */
 export async function imagenesUnidadNivel(
   curso: string,
   nivel: string,
 ): Promise<Record<number, string | null>> {
-  const ids = await Promise.all(
-    Array.from({ length: UNIDADES_POR_NIVEL }, (_, i) => arteId("unidad", curso, nivel, i + 1)),
-  );
-  return Object.fromEntries(ids.map((id, i) => [i + 1, id])) as Record<number, string | null>;
+  const ids = await Promise.all(PARADAS.map((p) => arteId("unidad", curso, nivel, p)));
+  return Object.fromEntries(PARADAS.map((p, i) => [p, ids[i] ?? null])) as Record<
+    number,
+    string | null
+  >;
+}
+
+/** Insignias de las paradas de un nivel: `{ 0: url|null, ... 4: url|null }`. */
+export async function insigniasDeNivel(
+  curso: string,
+  nivel: string,
+): Promise<Record<number, string | null>> {
+  const ids = await Promise.all(PARADAS.map((p) => arteId("insignia", curso, nivel, p)));
+  return Object.fromEntries(PARADAS.map((p, i) => [p, ids[i] ?? null])) as Record<
+    number,
+    string | null
+  >;
 }

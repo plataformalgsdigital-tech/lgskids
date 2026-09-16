@@ -5,8 +5,9 @@
 
 ## Qué es
 
-Plataforma de gestión académica de **LGS Kids** (inglés para niños 6–13
-años). Dominio: `lgskidsplataforma.com`. Multi-país: CL, CO, EC, PE.
+Plataforma de gestión académica de **LGS Kids** (inglés para niños 5–13
+años: **JUNIOR 5–9, YOUNGSTER 10–13**). Dominio: `lgskidsplataforma.com`.
+Multi-país: CL, CO, EC, PE.
 
 **Modelo de cohortes con horario fijo**: el niño NO agenda; se matricula en
 un salón y asiste a lo que el salón programe. La lista de sesión se deriva
@@ -147,7 +148,23 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   existan WHATSAPP_TOKEN/PHONE_ID; `notificarPremiosPendientes` cada 15
   min arma el mensaje de medalla/diploma al WhatsApp REAL del apoderado.
   Files: StoragePort + LocalStorage (STORAGE_DIR) — PRIVADO por defecto,
-  descarga solo autenticada, MIME allowlist (pdf/jpg/png/webp), 10 MB máx,
+  **optimización al subir (2026-09-11)**: toda imagen pasa por `sharp` en
+  `files/infrastructure/optimizar-imagen.ts` → WebP q82 acotado a 1600 px
+  (`LADO_MAXIMO`). NUNCA lanza: si falla, guarda el original — perder la subida
+  por no poder encogerla sería cambiar peso por pérdida de datos. Conserva ALFA
+  (los premios y el VoBo son PNG transparentes) y no agranda lo pequeño. El tope
+  de 10 MB se mide sobre lo que sube el usuario, no sobre lo que queda en disco.
+  Backfill: `pnpm imagenes:optimizar [--aplicar]` (`reoptimizarImagenes`)
+  reescribe el MISMO archivo —mismo id y clave— porque las URLs ya están
+  repartidas por los paneles y los hotspots cuelgan de ellas. La primera pasada
+  dejó **86 MB en 14 MB (−84 %)** en 44 imágenes.
+  El arte se sirve con `Cache-Control: private, max-age=31536000, immutable`:
+  los bytes de un id no cambian nunca (subir arte nuevo crea otro archivo y
+  otra URL), y los 5 minutos de antes hacían rebajar megas en cada visita.
+  descarga solo autenticada, MIME allowlist (pdf/jpg/png/webp + **mp3/m4a**
+  desde 2026-09-11, para la narración del libro interactivo; el VIDEO queda
+  fuera a propósito: los del libro llegan a 47 MB y eso es trabajo de un CDN,
+  no de una ruta autenticada de Node), 10 MB máx,
   claves impredecibles; adaptador Spaces se enchufa en Fase 11. Reporting:
   asistencia por salón/mes con `AT TIME ZONE cl.timezone` EN SQL,
   ocupación de salones, contratos por país (con alcance). UI:
@@ -200,7 +217,9 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   `subirArte`/`arteId` con tipos **banner** (`catalog_imagen_curso` por CURSO:NIVEL,
   admite `NIVEL_TODOS`), **premio** (`catalog_premio_nivel` por CURSO:NIVEL),
   **mapa** (`catalog_mapa_curso` por curso) y **vobo** (`catalog_vobo`, GLOBAL).
-  Todo se sirve por `/api/catalog/imagen-curso/[id]`. UI `/panel/mantenimiento-cursos/imagenes`
+  Todo se sirve por `/api/catalog/imagen-curso/[id]`. **`subirArte` acota a JPG/PNG/WebP**
+  (2026-09-11): antes no restringía nada y `files` ya acepta audio, así que un mp3 guardado
+  como banner no fallaba al subirse sino al pintarse. UI `/panel/mantenimiento-cursos/imagenes`
   gana selector de Tipo (previo cuadrado con tablero para PNG transparentes). En
   "¿Cómo voy?" el premio de cada nivel se muestra como imagen (respaldo emoji),
   sombreado→a color al completar.
@@ -249,13 +268,111 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
     desincronizaran. El editor `/panel/mantenimiento-cursos/juegos`
     (`catalogo.gestionar`, `GET|PUT /api/catalog/unidad-juegos`) ya no crea ni edita
     nada — solo decide DÓNDE va cada actividad sobre la lámina.
-  - **De la unidad de texto a la casilla**: `catalog_curso.unidad` es texto libre y
+  - **De la unidad de texto a la PARADA**: `catalog_curso.unidad` es texto libre y
     trae "Unidad 0", "Repaso 3" y erratas como "Evalucion 6". `unidadMapa`
-    (`catalog/domain/unidad-mapa.ts`, con pruebas) es LA regla: solo "Unidad 1".."Unidad
-    4" caen en el mapa; "Unidad 0" es el cartel WELCOME y repasos y evaluaciones no
-    tienen casilla. Lo que no mapea no se pierde —sigue en su lección—, solo que no se
-    abre desde el mapa. `UNIDADES_MAPA = 4` es la única constante (la reusa
-    `imagen-curso.ts`).
+    (`catalog/domain/unidad-mapa.ts`, con pruebas) es LA regla. **Desde 2026-09-11 la
+    isla tiene CINCO paradas**: el **Welcome (parada 0)** y las unidades 1–4 — así está
+    dibujado el mapa nuevo ("Welcome", "1 All about me", …) y así premia el libro, que
+    entrega DOS insignias en el cuadernillo `UNIT 0-1`. Antes la "Unidad 0" se
+    descartaba por considerarse solo un cartel. Repasos y evaluaciones siguen sin
+    parada; lo que no mapea no se pierde —sigue en su lección—, solo que no se abre
+    desde el mapa. Constantes: `PARADA_WELCOME = 0`, `UNIDADES_MAPA = 4` (la unidad
+    NUMERADA más alta), `PARADAS_MAPA = 5` y `PARADAS = [0..4]`; `paradaValida` y
+    `etiquetaParada` (la 0 se muestra "Welcome", nunca "Unidad 0").
+  - **Libro interactivo (2026-09-11, migración `20260911100000_libro_interactivo`)**: el
+    cuadernillo impreso como DATO. `catalog_libro` (uno por curso·nivel·código, p.ej.
+    "UNIT 0-1") + `catalog_libro_pagina` (una por página numerada, con `elementos` JSONB)
+    + `catalog_insignia` (el NOMBRE de la insignia por curso·nivel·parada; el ARTE va por
+    `files` con la misma clave). Los elementos van en JSONB a propósito: la transcripción
+    real da **86 elementos de 13 tipos** y seis de ellos aparecen UNA vez —normalizar eso
+    serían quince tablas casi vacías—; mismo criterio que `catalog_curso.quiz` y
+    `catalog_arte_hotspot.data`. `importarLibro` valida lo que el lector da por hecho
+    (lista de elementos, `tipo` e `id` presentes, **ids únicos por página** — con los que
+    se guarda la respuesta del niño) y REEMPLAZA el libro entero en una transacción: un
+    libro a medio importar parece que funcionó. **`pagina` y `pliego` son distintos**: el
+    PDF va en pliegos (una hoja = dos páginas numeradas) y manda la página.
+    Transcripciones en `content/libros/*.json`; se cargan con
+    `pnpm libro:importar <archivo>`, que además CUENTA lo que quedó marcado `confirmar`.
+    Lo que tiene `clave` es evaluable y entra por `registrarIntento`; lo `libre` es
+    portafolio y NO toca progresión (regla 4).
+  - **La página tiene DOS números** (`20260911140000`): `pagina` es el ORDEN de lectura
+    (denso desde 0) y `numero_impreso` el que el niño ve en el papel, **NULL en las
+    portadas** de cada parada, que ocupan pliego entero y no llevan número. Mezclarlos
+    desalineó el libro entero: contar la portada de "All about me" como página 15 corrió
+    todas las demás una posición. En JUNIOR·ROOKIE UNIT 0-1 son **55 páginas** = 53
+    impresas + 2 portadas. Al mapear un PDF nuevo, **verificar renderizando y leyendo el
+    número impreso**, no deduciéndolo: el PDF abre con portada + MY BADGES + CONTENTS,
+    así que el contenido arranca en la página 3.
+  - **Imagen de página** (`imagen_file_id`, migración `20260911120000`): el cuadernillo es
+    un objeto visual y sin el dibujo no es el cuadernillo. Es UNA CAPA — los elementos
+    siguen en `elementos` y se pintan aparte—, así que el rediseño cambia esta columna y
+    nada más. Se extrae con `pnpm libro:paginas "<pdf>" <CURSO> <NIVEL> "<CÓDIGO>"`, que
+    rasteriza cada pliego con `pdftoppm` (poppler) y lo parte por la mitad: la página de
+    ORDEN menor es la izquierda. El recorte sale ya en WebP porque el ráster crudo de un
+    pliego denso pasa de 10 MB y ese tope se mide sobre lo que ENTRA.
+  - **Audio del cuadernillo** (`catalog_libro_audio`, migración `20260915000000`): la
+    narración que sustituye a los globos del impreso. La llave es el **PLIEGO, no la
+    página**, porque es la única que el material da: `PAG16-07.mp3` dice "hoja 16" y esa
+    hoja son DOS páginas impresas (23 y 24); cuál de las 13 pistas va a cuál no está
+    escrito en ninguna parte. `elemento_id` queda NULL hasta que alguien las escuche.
+    `PAGnn` = diapositiva del digibook = página del PDF (verificado: las diapositivas con
+    audio incrustado y los nombres de la carpeta coinciden 13 de 14). Se sube con
+    `pnpm libro:audios <carpeta> <CURSO> <NIVEL> "<CÓDIGO>"`; el VIDEO se salta a
+    propósito (hasta 47 MB). Junior Rookie: **34 pistas, 17 MB, 19 de 55 páginas con
+    sonido** — el impreso tampoco tenía más.
+  - **Reemplazar un archivo EXIGE soltar el anterior**: `subirArchivo` siempre crea uno
+    nuevo, así que reimportar los audios dejaba otros 34 huérfanos con sus bytes en disco.
+    `files` expone `eliminarArchivo` y `registrarAudioLibro` borra el que reemplaza —
+    FUERA de la transacción, porque borrar bytes no se deshace. Probado en
+    `libro-integration.test.ts`.
+  - **La narración NO suena sola**: los navegadores bloquean el autoplay con sonido, y a
+    un niño de 6 años el audio sorpresa le estorba. Botones, y una pista a la vez.
+  - **`/api/catalog/libro-audio/[id]` comprueba que el archivo SEA una pista** antes de
+    servirlo: sin eso sería una puerta para pedir cualquier archivo de `files` —incluidas
+    las fotos de menores— con solo tener sesión.
+  - **El libro del niño incluye los niveles YA COMPLETADOS** (2026-09-15): terminar Rookie
+    no puede quitarle el cuadernillo de Rookie. `/api/student/libro` devuelve el nivel en
+    curso más los completados, con el actual primero; `nivel` puede venir en la URL pero
+    se contrasta contra la progresión del propio niño (400 si no lo ha alcanzado).
+  - **Escena: el rediseño como dato** (`escena` JSONB, migración `20260915100000`). La
+    imagen de página es la hoja del PDF aplanada, con el arte VIEJO quemado dentro. Una
+    `escena` arma la página por capas con el personaje CANÓNICO de `public/personajes/`;
+    cuando existe manda, y cuando no se sigue pintando la imagen. Así el rediseño avanza
+    página a página sin romper las que ya se leen. Tres plantillas en `EscenaLibro`
+    (`/mi-panel`): **`portada`** (la estación, con el mapa de fondo), **`titulo`** (el cartel
+    que abre un tema, sobre pergamino; admite `subtitulo`) e **`insignia`** (cierre de
+    parada, personaje celebrando + medalla). Junior Rookie UNIT 0-1: **8 de 55** páginas
+    rediseñadas (órdenes 0, 3, 7, 13, 14, 15, 53, 54).
+  - **Solo llevan escena las páginas cuyo dibujo es personaje + título.** Donde el dibujo
+    ES el ejercicio —la tabla de números, la lámina para colorear, el crucigrama— quitar
+    la imagen borraría el contenido. De las 55: 39 son ejercicio, 7 son solo imagen
+    (tablas de referencia) y 9 se pueden rehacer enteras.
+  - **El fondo de la portada REFERENCIA el banner, no lo copia**: `fondo: {arte: "banner"}`
+    se resuelve en `leerLibro` con `imagenCursoIdResuelto(curso, nivel)` y viaja como
+    `fondoUrl`. Si cambian el banner del nivel, la portada lo sigue sin tocar el libro.
+  - **Lo que la escena ya pinta no se repite debajo** (`cubiertosPorEscena`): el globo
+    (`globo.de` nombra el elemento narración) y, en una escena de insignia, el elemento
+    insignia. Con escena tampoco se pinta el título chico de arriba: iba dentro en grande.
+  - **Reimportar la transcripción CONSERVA la imagen de página** por número de página:
+    antes reemplazar las filas la borraba y había que volver a rasterizar el PDF (~12 min).
+  - **Poses de celebración** (2026-09-16): `rocky-celebrando`, `simba-celebrando` y
+    `emma-confeti` (distinta de `emma-celebrando`, que es el puño en alto). El origen está
+    en `imagenes/Personajes/` y trae **transparencia real**; las 27 `ChatGPT Image…` de esa
+    misma carpeta son OPACAS (tablero quemado), pero sus poses ya están limpias en
+    `public/personajes/`. Se derivan recortando el borde y a 440 px de ancho, como las
+    otras 19, para que `Personaje` las escale por altura igual. `Dodo_celebrando.png` es el
+    pájaro de OTRO diseño que ya estaba registrado sin usar como `coco-celebrando`.
+  - **Trampa del modo desarrollo**: la primera vez que se pide
+    `/api/catalog/imagen-curso/[id]`, Next compila la ruta y la imagen tarda segundos. Una
+    captura de pantalla inmediata muestra la portada sin mapa aunque el dato esté bien.
+  - **Insignia por parada** (arte tipo `insignia`, `catalog_insignia_parada`, clave
+    `CURSO:NIVEL:PARADA`): la que se gana al cerrar cada parada ("Let's chat about me",
+    "Let's explore"…). Es DISTINTA del `premio`, que es uno por NIVEL y corona el LEVEL
+    UP. Se enciende con lo mismo que ya enciende el VoBo — NO tiene estado propio.
+  - **El Welcome del hotspot va en `data.welcome`, NO al inicio de `unidades[]`**: ese
+    arreglo es posicional (`unidades[0]` = Unidad 1) y los hotspots de Junior ya están
+    marcados; meterlo dentro correría todos los marcadores una posición en silencio.
+    Solo aplica al scope ISLA (en el MAPA cada isla es un punto único).
   - **El enlace ES el cartel dibujado (2026-09-11)**: no se marca un punto sino una
     ZONA — `x`/`y` del centro más `w`/`h` del recuadro, todo en % de la imagen y
     guardado DENTRO de la actividad. El cartel ya está pintado en la lámina, así que

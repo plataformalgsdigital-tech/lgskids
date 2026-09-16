@@ -5,6 +5,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
+import type { ClavePersonaje } from "@/ui/Personaje";
 import { apiFetch } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 
@@ -199,17 +200,473 @@ const NAV_ITEMS: {
   emoji: string;
   href?: string;
   menu?: boolean;
-  action?: "comovoy" | "historial" | "avance" | "perfil";
+  action?: "comovoy" | "historial" | "avance" | "perfil" | "libro";
 }[] = [
   { label: "Actividades", emoji: "✨", menu: true },
   { label: "Recursos", emoji: "🔗", menu: true },
-  { label: "Material", emoji: "📖" },
+  { label: "Material", emoji: "📖", action: "libro" },
   { label: "Historial", emoji: "📘", action: "historial" },
   { label: "Avance", emoji: "🗺️", action: "avance" },
   { label: "¿Cómo voy?", emoji: "📊", action: "comovoy" },
   { label: "Instructivos", emoji: "🎥" },
   { label: "Perfil", emoji: "👤", action: "perfil" },
 ];
+
+/** Una página del cuadernillo tal y como la sirve `/api/student/libro`. */
+interface ElementoAlumno {
+  tipo: string;
+  id: string;
+  titulo?: string;
+  instruccion?: string;
+  guion?: string;
+  personaje?: string;
+  url?: string | null;
+  contenido?: string | string[];
+  libre?: boolean;
+  campos?: { id: string; enunciado?: string; pista?: string }[];
+  [k: string]: unknown;
+}
+interface LibroAlumno {
+  codigo: string;
+  titulo: string | null;
+  paginas: {
+    /** Orden de lectura. Lo que se muestra es `numeroImpreso`. */
+    pagina: number;
+    numeroImpreso?: number | null;
+    parada: number;
+    titulo?: string | null;
+    elementos: ElementoAlumno[];
+    imagenUrl?: string | null;
+    escena?: Record<string, unknown> | null;
+    audios?: { id: string; orden: number; url: string }[];
+  }[];
+}
+
+function botonLibro(deshabilitado: boolean): CSSProperties {
+  return {
+    border: "1.5px solid #d8dce6",
+    background: deshabilitado ? "#f4f6fb" : "#fff",
+    color: deshabilitado ? "#aab" : "inherit",
+    borderRadius: "0.6rem",
+    padding: "0.5rem 0.9rem",
+    fontWeight: 700,
+    cursor: deshabilitado ? "default" : "pointer",
+  };
+}
+
+/**
+ * Un elemento del cuadernillo.
+ *
+ * Cada tipo se pinta como lo que ES. Los campos de respuesta se muestran pero
+ * NO se guardan todavía: escribir una nota exige pasar por `registrarIntento`,
+ * y abrir aquí un camino propio rompería la regla 4.
+ */
+function ElementoLibroVista({ el }: { el: ElementoAlumno }) {
+  const caja: CSSProperties = {
+    padding: "0.7rem 0.85rem",
+    borderRadius: "0.7rem",
+    background: "#f6f8fd",
+    border: "1px solid #e6eaf3",
+  };
+
+  if (el.tipo === "video" && typeof el.url === "string") {
+    return (
+      <a href={el.url} target="_blank" rel="noopener noreferrer" style={{ ...caja, display: "block", color: "inherit", textDecoration: "none" }}>
+        <strong>▶️ {el.titulo ?? "Video"}</strong>
+        <span style={{ display: "block", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+          Se abre en YouTube
+        </span>
+      </a>
+    );
+  }
+  if (el.tipo === "narracion") {
+    return (
+      <div style={{ ...caja, background: "#fffdf2", borderColor: "#f3e6b8" }}>
+        💬 <em>{el.guion}</em>
+        {typeof el.personaje === "string" && (
+          <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+            {" "}
+            — {el.personaje}
+          </span>
+        )}
+      </div>
+    );
+  }
+  if (el.tipo === "referencia") {
+    const items = Array.isArray(el.contenido) ? el.contenido : [el.contenido ?? ""];
+    return (
+      <div style={caja}>
+        {items.map((t, i) => (
+          <div key={i}>{t}</div>
+        ))}
+      </div>
+    );
+  }
+  if (el.tipo === "insignia") {
+    return (
+      <div style={{ ...caja, background: "#f2fbf4", borderColor: "#bfe6c8" }}>
+        🎖️ <strong>{String(el.nombre ?? "Insignia")}</strong>
+      </div>
+    );
+  }
+  if (el.tipo === "dibujo") {
+    return (
+      <div style={caja}>
+        🎨 {el.instruccion ?? "Dibuja"}
+        <div style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+          El lienzo para dibujar llega pronto.
+        </div>
+      </div>
+    );
+  }
+  const campos = Array.isArray(el.campos) ? el.campos : [];
+  return (
+    <div style={caja}>
+      <strong>{el.instruccion ?? el.tipo}</strong>
+      {campos.length > 0 && (
+        <ul style={{ margin: "0.4rem 0 0", paddingLeft: "1.1rem" }}>
+          {campos.map((c) => (
+            <li key={c.id} style={{ fontSize: "0.88rem" }}>
+              {c.enunciado ?? c.pista ?? c.id}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * Una página REDISEÑADA, armada por capas en vez de la hoja aplanada.
+ *
+ * Tres plantillas, porque el cuadernillo tiene tres clases de página que se
+ * pueden rehacer enteras sin perder ejercicio:
+ *  - `portada`: la estación del mapa. De fondo el BANNER vigente del nivel —la
+ *    isla—, referenciado y nunca copiado, con el narrador que da la bienvenida.
+ *  - `titulo`: el cartel que abre un tema ("I can color!"), sobre pergamino.
+ *  - `insignia`: el cierre de una parada, con el personaje celebrando.
+ *
+ * El personaje es SIEMPRE el canónico de `public/personajes/`, no el que venía
+ * quemado en el ráster. Las páginas cuyo dibujo ES el ejercicio (una tabla, una
+ * lámina para colorear) no llevan escena: quitarles la imagen borraría el
+ * contenido.
+ */
+function EscenaLibro({ escena }: { escena: Record<string, unknown> }) {
+  const plantilla = typeof escena["plantilla"] === "string" ? escena["plantilla"] : "titulo";
+  const titulo = typeof escena["titulo"] === "string" ? escena["titulo"] : null;
+  const subtitulo = typeof escena["subtitulo"] === "string" ? escena["subtitulo"] : null;
+  const fondoUrl = typeof escena["fondoUrl"] === "string" ? escena["fondoUrl"] : null;
+  const estacion = typeof escena["estacion"] === "number" ? escena["estacion"] : null;
+  const insignia = typeof escena["insignia"] === "string" ? escena["insignia"] : null;
+  const per = escena["personaje"] as { quien?: string; alto?: string } | undefined;
+  const globo = escena["globo"] as { texto?: string } | undefined;
+  const quien = (per?.quien ?? "rocky") as ClavePersonaje;
+
+  const bocadillo =
+    typeof globo?.texto === "string" ? (
+      <div
+        style={{
+          position: "relative",
+          background: "white",
+          border: "2px solid #4CAF50",
+          borderRadius: "1.2rem",
+          padding: "0.8rem 1rem",
+          maxWidth: "17rem",
+          fontWeight: 600,
+          lineHeight: 1.35,
+          color: "#152230",
+          boxShadow: "0 4px 14px rgba(0,0,0,.22)",
+        }}
+      >
+        {globo.texto}
+        {/* La colita del globo, apuntando al personaje. */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: "-10px",
+            bottom: "1.4rem",
+            width: 0,
+            height: 0,
+            borderTop: "8px solid transparent",
+            borderBottom: "8px solid transparent",
+            borderRight: "10px solid #4CAF50",
+          }}
+        />
+      </div>
+    ) : null;
+
+  // —— PORTADA: la estación sobre el mapa de la isla ——————————————————
+  if (plantilla === "portada") {
+    return (
+      <div
+        style={{
+          position: "relative",
+          borderRadius: "0.9rem",
+          overflow: "hidden",
+          marginBottom: "0.9rem",
+          minHeight: "26rem",
+          background: "#0B3B63",
+          display: "flex",
+          alignItems: "flex-end",
+        }}
+      >
+        {fondoUrl !== null && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={fondoUrl}
+            alt=""
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        )}
+        {/* Velo inferior: el mapa es muy vivo y sin él el título no se lee. */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(11,59,99,0) 35%, rgba(11,59,99,.55) 70%, rgba(6,32,56,.92) 100%)",
+          }}
+        />
+        {estacion !== null && (
+          <div
+            aria-label={`Estación ${String(estacion)}`}
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              width: "4.4rem",
+              height: "4.4rem",
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              background: "radial-gradient(circle at 35% 30%, #FFE08A, #D9A12B 70%)",
+              border: "3px dashed rgba(255,255,255,.85)",
+              boxShadow: "0 4px 14px rgba(0,0,0,.35)",
+              fontSize: "2rem",
+              fontWeight: 800,
+              color: "#3A2A05",
+            }}
+          >
+            {estacion}
+          </div>
+        )}
+        <div
+          style={{
+            position: "relative",
+            display: "flex",
+            alignItems: "flex-end",
+            gap: "0.6rem",
+            flexWrap: "wrap",
+            padding: "1rem 1.2rem",
+            width: "100%",
+          }}
+        >
+          <Personaje quien={quien} alto={per?.alto ?? "13rem"} className="lgs-float" />
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", flex: "1 1 14rem" }}>
+            {bocadillo}
+            {titulo !== null && (
+              <h4
+                style={{
+                  margin: 0,
+                  color: "#F4C542",
+                  fontSize: "clamp(2rem, 7vw, 3.2rem)",
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  textShadow: "0 3px 10px rgba(0,0,0,.55)",
+                }}
+              >
+                {titulo}
+              </h4>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // —— INSIGNIA: el cierre de una parada ——————————————————————————————
+  if (plantilla === "insignia") {
+    return (
+      <div
+        style={{
+          position: "relative",
+          borderRadius: "0.9rem",
+          overflow: "hidden",
+          marginBottom: "0.9rem",
+          minHeight: "24rem",
+          padding: "1.6rem 1.2rem",
+          // Halo dorado sobre el azul del mar: el mismo lenguaje que la
+          // brújula que corona el mapa.
+          background:
+            "radial-gradient(circle at 70% 45%, rgba(244,197,66,.45), transparent 55%), linear-gradient(160deg, #0B3B63, #062038)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "1.2rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <Personaje quien={quien} alto={per?.alto ?? "15rem"} className="lgs-float" />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "0.8rem",
+            textAlign: "center",
+          }}
+        >
+          <span
+            style={{
+              color: "#F4C542",
+              fontSize: "clamp(1.6rem, 6vw, 2.6rem)",
+              fontWeight: 800,
+              letterSpacing: "0.02em",
+              textShadow: "0 3px 10px rgba(0,0,0,.5)",
+            }}
+          >
+            {titulo ?? "YOU WIN!"}
+          </span>
+          {insignia !== null && (
+            // Medalla dibujada con CSS: la ranura de arte `insignia` ya existe y
+            // la reemplaza en cuanto se suba la imagen de la parada.
+            <div
+              style={{
+                width: "9rem",
+                height: "9rem",
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                background: "radial-gradient(circle at 35% 30%, #FFE7A3, #D9A12B 60%, #9C6B14)",
+                border: "5px solid #F9E2A0",
+                boxShadow: "0 0 0 6px rgba(244,197,66,.25), 0 8px 22px rgba(0,0,0,.45)",
+                fontSize: "3rem",
+              }}
+              aria-hidden
+            >
+              ★
+            </div>
+          )}
+          {insignia !== null && (
+            <span
+              style={{
+                background: "#2E6FA3",
+                color: "white",
+                fontWeight: 700,
+                padding: "0.35rem 1.1rem",
+                borderRadius: "0.3rem",
+                boxShadow: "0 3px 8px rgba(0,0,0,.3)",
+              }}
+            >
+              {insignia}
+            </span>
+          )}
+          {bocadillo}
+        </div>
+      </div>
+    );
+  }
+
+  // —— TÍTULO: el cartel que abre un tema, sobre pergamino ——————————————
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: "0.9rem",
+        overflow: "hidden",
+        marginBottom: "0.9rem",
+        // Escenario: el pergamino sobre el azul del mar, que es la paleta del
+        // mapa de la isla. Degradado, no una imagen: pesa cero y escala.
+        background: "linear-gradient(#0B3B63 0 20%, #E9DABA 20% 88%, #0B3B63 88% 100%)",
+        padding: "4.6rem 1.2rem 2rem",
+        minHeight: "26rem",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {titulo !== null && (
+        <h4
+          style={{
+            position: "absolute",
+            top: "1.5rem",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            margin: 0,
+            color: "#DCEBF5",
+            fontSize: "clamp(1.4rem, 5vw, 2.2rem)",
+            fontWeight: 800,
+            letterSpacing: "-0.01em",
+            textShadow: "0 2px 6px rgba(0,0,0,.35)",
+          }}
+        >
+          {titulo}
+        </h4>
+      )}
+      {subtitulo !== null && (
+        <p
+          style={{
+            margin: "0 0 0.8rem",
+            maxWidth: "34rem",
+            textAlign: "center",
+            color: "#3A2A05",
+            fontSize: "clamp(1.05rem, 3vw, 1.35rem)",
+            fontWeight: 700,
+            lineHeight: 1.3,
+          }}
+        >
+          {subtitulo}
+        </p>
+      )}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: "0.6rem",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          maxWidth: "100%",
+        }}
+      >
+        <Personaje quien={quien} alto={per?.alto ?? "14rem"} className="lgs-float" />
+        {bocadillo}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Elementos que la escena YA pinta, para no repetirlos en la lista de abajo.
+ *
+ * El globo es del personaje que lo dice (`globo.de`). La insignia, en cambio,
+ * no se nombra: en una escena de insignia, la medalla ES el elemento insignia
+ * de la página, y mostrarlo otra vez debajo escribía su nombre dos veces.
+ */
+function cubiertosPorEscena(
+  escena: Record<string, unknown> | null | undefined,
+  elementos: { id: string; tipo: string }[],
+): Set<string> {
+  const ids = new Set<string>();
+  if (escena == null) return ids;
+  const g = escena["globo"] as { de?: unknown } | undefined;
+  if (typeof g?.de === "string") ids.add(g.de);
+  if (escena["plantilla"] === "insignia") {
+    for (const e of elementos) if (e.tipo === "insignia") ids.add(e.id);
+  }
+  return ids;
+}
 
 function fechaLarga(iso: string): string {
   return new Date(iso).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
@@ -227,6 +684,12 @@ export default function MiPanelPage() {
   const [verComoVoy, setVerComoVoy] = useState(false); // modal "¿Cómo voy?"
   const [verHistorial, setVerHistorial] = useState(false); // modal "Historial de clases"
   const [verAvance, setVerAvance] = useState(false); // modal "Avance" (mapa del curso)
+  // Modal "Material": el cuadernillo. Se carga al abrirlo, no con el dashboard:
+  // son 54 páginas y la mayoría de las visitas al panel no lo abren.
+  const [verLibro, setVerLibro] = useState(false);
+  const [libro, setLibro] = useState<LibroAlumno | null>(null);
+  const [libroPagina, setLibroPagina] = useState(0);
+  const [libroMsg, setLibroMsg] = useState<string | null>(null);
   const [verPerfil, setVerPerfil] = useState(false); // modal "Perfil"
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -321,6 +784,42 @@ export default function MiPanelPage() {
       cancelado = true;
     };
   }, []);
+
+  /**
+   * Carga el cuadernillo del niño. El curso y el nivel los decide el servidor
+   * a partir de su matrícula: aquí no se manda ninguno.
+   */
+  async function abrirLibro() {
+    if (libro !== null) return; // ya cargado en esta visita
+    setLibroMsg(null);
+    try {
+      const lista = await apiFetch("/api/student/libro");
+      if (!lista.ok) {
+        setLibroMsg("No pudimos abrir tu material.");
+        return;
+      }
+      const { libros } = (await lista.json()) as { libros: { codigo: string; nivel: string }[] };
+      const primero = libros[0];
+      if (primero === undefined) {
+        setLibroMsg("Tu material todavía no está cargado.");
+        return;
+      }
+      // El nivel viaja junto al código: la lista puede traer cuadernillos de
+      // niveles YA COMPLETADOS, y sin él el detalle los buscaría en el actual.
+      const res = await apiFetch(
+        `/api/student/libro?codigo=${encodeURIComponent(primero.codigo)}` +
+          `&nivel=${encodeURIComponent(primero.nivel)}`,
+      );
+      if (!res.ok) {
+        setLibroMsg("No pudimos abrir tu material.");
+        return;
+      }
+      setLibro((await res.json()) as LibroAlumno);
+      setLibroPagina(0);
+    } catch {
+      setLibroMsg("No pudimos abrir tu material.");
+    }
+  }
 
   async function subirFoto(archivo: File) {
     setSubiendoFoto(true);
@@ -1093,6 +1592,21 @@ export default function MiPanelPage() {
                   onClick={() => {
                     setAvanceNivel(null);
                     setVerAvance(true);
+                  }}
+                  style={base}
+                >
+                  {inner}
+                </button>
+              );
+            }
+            if (it.action === "libro") {
+              return (
+                <button
+                  key={it.label}
+                  type="button"
+                  onClick={() => {
+                    setVerLibro(true);
+                    void abrirLibro();
                   }}
                   style={base}
                 >
@@ -2645,6 +3159,248 @@ export default function MiPanelPage() {
                     })()
                   )}
                 </div>
+              </div>
+            </div>
+          );
+        })()}
+
+      {/*
+        MATERIAL: el cuadernillo, página por página.
+        Es el primer paso del lector: pinta lo que cada elemento ES (el video,
+        la consigna, la narración del personaje) y deja los campos visibles
+        pero sin guardar todavía — escribir respuestas exige pasar por
+        `registrarIntento`, que es la única puerta a la progresión (regla 4).
+      */}
+      {verLibro &&
+        (() => {
+          const pag = libro?.paginas[libroPagina];
+          const total = libro?.paginas.length ?? 0;
+          return (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mi material"
+              onClick={() => setVerLibro(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 80,
+                background: "rgba(8,11,24,0.78)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1rem",
+                overflowY: "auto",
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "#fff",
+                  borderRadius: "1rem",
+                  width: "min(52rem, 100%)",
+                  maxHeight: "92vh",
+                  overflowY: "auto",
+                  padding: "1.2rem",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "1rem",
+                  }}
+                >
+                  <strong style={{ fontSize: "1.1rem" }}>
+                    📖 {libro?.titulo ?? "Mi material"}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() => setVerLibro(false)}
+                    style={{
+                      border: "none",
+                      background: "#eef1f7",
+                      borderRadius: "0.5rem",
+                      padding: "0.35rem 0.7rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                {libroMsg !== null && (
+                  <p style={{ color: "var(--texto-suave)", marginTop: "1rem" }}>{libroMsg}</p>
+                )}
+                {libroMsg === null && libro === null && (
+                  <p style={{ color: "var(--texto-suave)", marginTop: "1rem" }}>Abriendo…</p>
+                )}
+
+                {pag !== undefined && (
+                  <>
+                    <p
+                      style={{
+                        fontSize: "0.78rem",
+                        letterSpacing: "0.05em",
+                        color: "var(--lgs-verde)",
+                        fontWeight: 800,
+                        marginTop: "0.9rem",
+                      }}
+                    >
+                      {/* Se muestra el número IMPRESO, para que cuadre con la
+                          copia en papel. Las portadas no llevan ninguno. */}
+                      {typeof pag.numeroImpreso === "number"
+                        ? `PÁGINA ${String(pag.numeroImpreso)}`
+                        : "PORTADA"}{" "}
+                      · {pag.parada === 0 ? "WELCOME" : `UNIDAD ${pag.parada}`}
+                    </p>
+                    {/* Con escena, el título ya va dentro de ella en grande: repetirlo
+                        aquí en chico ponía la misma frase dos veces seguidas. */}
+                    {pag.escena == null && (
+                      <h3 style={{ margin: "0.2rem 0 0.8rem" }}>{pag.titulo ?? ""}</h3>
+                    )}
+
+                    {/*
+                      ESCENA rediseñada. Cuando existe manda sobre la hoja
+                      aplanada, que trae el arte VIEJO quemado dentro —el
+                      mapache antiguo, los globos con erratas—. Así el rediseño
+                      avanza página a página sin romper las que ya se leen.
+                    */}
+                    {pag.escena !== null && pag.escena !== undefined ? (
+                      <EscenaLibro escena={pag.escena} />
+                    ) : null}
+
+                    {/* La página dibujada es la protagonista mientras no haya
+                        escena: el cuadernillo es un objeto visual y sin el
+                        dibujo no es el cuadernillo. */}
+                    {pag.escena == null && typeof pag.imagenUrl === "string" && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={pag.imagenUrl}
+                        alt={`Página ${String(pag.pagina)}${pag.titulo !== null && pag.titulo !== undefined ? `: ${pag.titulo}` : ""}`}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          height: "auto",
+                          borderRadius: "0.7rem",
+                          border: "1px solid #e3e7f0",
+                          marginBottom: "0.9rem",
+                        }}
+                      />
+                    )}
+
+                    {/*
+                      La narración. NO suena sola: los navegadores bloquean el
+                      autoplay con sonido, y a un niño de 6 años el audio
+                      sorpresa le estorba más de lo que le ayuda. Él decide.
+                      Las pistas vienen por PLIEGO, así que las dos páginas de
+                      una hoja comparten lista hasta que alguien las asigne.
+                    */}
+                    {pag.audios !== undefined && pag.audios.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "0.4rem",
+                          alignItems: "center",
+                          padding: "0.6rem 0.7rem",
+                          borderRadius: "0.7rem",
+                          background: "#eef4ff",
+                          marginBottom: "0.9rem",
+                        }}
+                      >
+                        <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#2a4d8f" }}>
+                          🔊 Escucha
+                        </span>
+                        {pag.audios.map((a, i) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => {
+                              const el = document.getElementById(
+                                `audio-${a.id}`,
+                              ) as HTMLAudioElement | null;
+                              if (el === null) return;
+                              // Una a la vez: dos pistas encimadas no se
+                              // entienden, y el niño perdería la que quería.
+                              document.querySelectorAll("audio").forEach((o) => {
+                                if (o !== el) o.pause();
+                              });
+                              if (el.paused) void el.play();
+                              else el.pause();
+                            }}
+                            aria-label={`Reproducir pista ${String(i + 1)}`}
+                            style={{
+                              border: "1.5px solid #2a4d8f",
+                              background: "white",
+                              color: "#2a4d8f",
+                              borderRadius: "999px",
+                              padding: "0.25rem 0.7rem",
+                              fontWeight: 700,
+                              fontSize: "0.8rem",
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            ▶ {i + 1}
+                          </button>
+                        ))}
+                        {pag.audios.map((a) => (
+                          <audio key={`el-${a.id}`} id={`audio-${a.id}`} src={a.url} preload="none" />
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+                      {/* Si la escena ya pinta el globo de un elemento, ese
+                          elemento NO se repite abajo: el niño vería dos veces
+                          la misma frase, una en el bocadillo y otra en la
+                          lista. `escena.globo.de` nombra cuál es. */}
+                      {pag.elementos
+                        .filter((e) => !cubiertosPorEscena(pag.escena, pag.elementos).has(e.id))
+                        .map((e) => (
+                          <ElementoLibroVista key={e.id} el={e} />
+                        ))}
+                      {pag.elementos.length === 0 &&
+                        (pag.imagenUrl === null || pag.imagenUrl === undefined) && (
+                          <p style={{ color: "var(--texto-suave)" }}>
+                            Esta página es solo ilustración.
+                          </p>
+                        )}
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginTop: "1.2rem",
+                        gap: "0.6rem",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        disabled={libroPagina === 0}
+                        onClick={() => setLibroPagina((n) => Math.max(0, n - 1))}
+                        style={botonLibro(libroPagina === 0)}
+                      >
+                        ← Anterior
+                      </button>
+                      <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                        {libroPagina + 1} de {total}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={libroPagina >= total - 1}
+                        onClick={() => setLibroPagina((n) => Math.min(total - 1, n + 1))}
+                        style={botonLibro(libroPagina >= total - 1)}
+                      >
+                        Siguiente →
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );

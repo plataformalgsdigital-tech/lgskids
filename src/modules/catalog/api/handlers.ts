@@ -10,6 +10,7 @@ import {
   type ArteTipo,
 } from "../application/imagen-curso";
 import { getHotspots, setHotspots } from "../application/hotspots";
+import { paradaValida } from "../domain/unidad-mapa";
 import {
   descargarAvisoLoginPublico,
   getAvisoLogin,
@@ -267,22 +268,30 @@ export const referenciaQuizPutHandler = handlerWithAuth(async (request, auth, co
 });
 
 // ============================================================
-// Arte curricular (banner · premio · mapa · vobo) por curso/nivel
+// Arte curricular (banner · premio · unidad · insignia · mapa · vobo) por curso/nivel
 // ============================================================
 
 const TIPOS_ARTE: readonly ArteTipo[] = [
   "banner",
   "premio",
   "unidad",
+  "insignia",
   "mapa",
   "vobo",
   "aviso_login",
 ];
 
-/** La unidad llega como texto en el formulario/query; sin número válido, no aplica. */
+/**
+ * La parada llega como texto en el formulario/query; sin número válido, no aplica.
+ *
+ * OJO con el CERO: es la parada Welcome, no "ausente". Un `n > 0` aquí la
+ * descartaba en silencio y el arte del Welcome se guardaba en la clave del
+ * nivel entero, sin que nada fallara.
+ */
 function unidadParam(v: string | null | undefined): number | undefined {
+  if (typeof v !== "string" || v.trim() === "") return undefined;
   const n = Number(v);
-  return Number.isInteger(n) && n > 0 ? n : undefined;
+  return paradaValida(n) ? n : undefined;
 }
 function tipoArte(v: string | null | undefined): ArteTipo {
   return (TIPOS_ARTE as readonly string[]).includes(v ?? "") ? (v as ArteTipo) : "banner";
@@ -340,7 +349,12 @@ export const imagenCursoServeHandler = handlerWithAuth(async (_request, _auth, c
     headers: {
       "Content-Type": meta.mime,
       "Content-Disposition": "inline",
-      "Cache-Control": "private, max-age=300",
+      // Los bytes de un id NO cambian nunca: subir arte nuevo crea otro
+      // archivo y por tanto otra URL. Con 5 minutos el navegador volvía a
+      // bajar el mismo banner de megas cada vez que el niño entraba, que era
+      // la mitad del problema de "a veces no carga". Sigue siendo `private`:
+      // es material del alumno y no debe quedar en cachés compartidas.
+      "Cache-Control": "private, max-age=31536000, immutable",
     },
   });
 });

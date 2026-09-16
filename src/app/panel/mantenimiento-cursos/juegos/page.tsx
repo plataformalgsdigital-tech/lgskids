@@ -51,7 +51,9 @@ interface Arrastre {
 
 const CURSOS = ["JUNIOR", "YOUNGSTER"];
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"];
-const UNIDADES = [1, 2, 3, 4];
+/** Paradas de la isla: el Welcome (0) y las cuatro unidades. */
+const UNIDADES = [0, 1, 2, 3, 4];
+const etiquetaParada = (p: number) => (p === 0 ? "Welcome" : `Unidad ${String(p)}`);
 /** Bajo esto el gesto fue un clic, no un arrastre: se usa el tamaño estándar. */
 const MINIMO_ARRASTRE = 1.5;
 
@@ -266,11 +268,11 @@ export default function JuegosUnidadPage() {
           </select>
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-          <span style={rotulo}>Unidad</span>
+          <span style={rotulo}>Parada</span>
           <select value={unidad} onChange={(e) => setUnidad(Number(e.target.value))} style={input}>
             {UNIDADES.map((u) => (
               <option key={u} value={u}>
-                Unidad {u}
+                {etiquetaParada(u)}
               </option>
             ))}
           </select>

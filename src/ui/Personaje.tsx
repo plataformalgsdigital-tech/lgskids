@@ -9,7 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
  * dependen de campaña ni de nivel, así que NO pasan por el módulo `files`
  * (que sirve arte por CURSO:NIVEL y datos privados de menores).
  *
- * Solo se muestran en JUNIOR (6–9 años); en Youngster resultan infantiles.
+ * Solo se muestran en JUNIOR (5–9 años); en Youngster (10–13) resultan infantiles.
  * Quien los use debe decidir esa condición — este componente no la asume.
  */
 export type ClavePersonaje =
@@ -33,7 +33,11 @@ export type ClavePersonaje =
   | "coco-triste"
   | "rocky-alegre"
   | "rocky-picaro"
-  | "rocky-uy";
+  | "rocky-uy"
+  // Celebración con confeti (2026-09-16): para las páginas de insignia
+  | "rocky-celebrando"
+  | "simba-celebrando"
+  | "emma-confeti";
 
 type Ficha = { alt: string; ancho: number; alto: number };
 
@@ -70,6 +74,10 @@ const FICHAS: Record<ClavePersonaje, Ficha> = {
   "rocky-alegre": { alt: NOMBRE["rocky"]!, ancho: 440, alto: 698 },
   "rocky-picaro": { alt: NOMBRE["rocky"]!, ancho: 440, alto: 742 },
   "rocky-uy": { alt: NOMBRE["rocky"]!, ancho: 440, alto: 721 },
+  "rocky-celebrando": { alt: NOMBRE["rocky"]!, ancho: 440, alto: 483 },
+  "simba-celebrando": { alt: NOMBRE["simba"]!, ancho: 440, alto: 543 },
+  // Distinta de emma-celebrando (puño en alto): esta salta entre confeti.
+  "emma-confeti": { alt: NOMBRE["emma"]!, ancho: 440, alto: 707 },
 };
 
 /**

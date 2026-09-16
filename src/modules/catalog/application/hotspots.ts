@@ -10,13 +10,21 @@ import {
 /**
  * Hotspots del arte curricular (pantalla "Avance"). Coordenadas en % (0..100)
  * sobre una imagen:
- *  - scope ISLA → sobre el banner del nivel: `unidades[]` + `premio`.
+ *  - scope ISLA → sobre el banner del nivel: `welcome` + `unidades[]` + `premio`.
  *  - scope MAPA → sobre el mapa del curso: `unidades[]` + `centro` (de esa isla).
+ *
+ * El **Welcome va en su propio campo**, NO al principio de `unidades[]`. Ese
+ * arreglo es POSICIONAL —`unidades[0]` es la Unidad 1— y los hotspots de Junior
+ * ya están marcados: meter el Welcome dentro correría todos los marcadores una
+ * posición, en silencio y sobre datos buenos.
  */
 
 export type Punto = { x: number; y: number };
 export type HotspotScope = "ISLA" | "MAPA";
 export interface HotspotData {
+  /** Parada 0 de la isla. Puede faltar: el arte viejo no la tenía. */
+  welcome: Punto | null;
+  /** Posicional: `unidades[0]` es la Unidad 1. */
   unidades: Punto[];
   premio: Punto | null;
   centro: Punto | null;
@@ -38,14 +46,24 @@ function normPunto(p: unknown): Punto | null {
 }
 
 function normData(raw: unknown): HotspotData {
-  const o = (raw ?? {}) as { unidades?: unknown; premio?: unknown; centro?: unknown };
+  const o = (raw ?? {}) as {
+    welcome?: unknown;
+    unidades?: unknown;
+    premio?: unknown;
+    centro?: unknown;
+  };
   const unidades = Array.isArray(o.unidades)
     ? o.unidades
         .map(normPunto)
         .filter((x): x is Punto => x !== null)
         .slice(0, 8)
     : [];
-  return { unidades, premio: normPunto(o.premio), centro: normPunto(o.centro) };
+  return {
+    welcome: normPunto(o.welcome),
+    unidades,
+    premio: normPunto(o.premio),
+    centro: normPunto(o.centro),
+  };
 }
 
 function validar(scope: string, curso: string, nivel: string): void {

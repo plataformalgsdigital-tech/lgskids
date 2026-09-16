@@ -29,8 +29,10 @@ export default function EditorMapaPage() {
   const [nivel, setNivel] = useState<string>("ROOKIE");
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [unidades, setUnidades] = useState<(Punto | null)[]>(Array(N_UNIDADES).fill(null));
+  // Parada 0 de la isla. Va aparte de `unidades[]`, que es posicional.
+  const [welcome, setWelcome] = useState<Punto | null>(null);
   const [especial, setEspecial] = useState<Punto | null>(null); // premio (ISLA) o centro (MAPA)
-  const [tool, setTool] = useState<string>("u0"); // u0..u3 | esp
+  const [tool, setTool] = useState<string>("wel"); // wel | u0..u3 | esp
   const [msg, setMsg] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -49,17 +51,21 @@ export default function EditorMapaPage() {
     if (imgRes.ok) url = ((await imgRes.json()) as { url: string | null }).url;
     const us: (Punto | null)[] = Array(N_UNIDADES).fill(null);
     let esp: Punto | null = null;
+    let wel: Punto | null = null;
     if (hsRes.ok) {
       const d = (await hsRes.json()) as {
+        welcome?: Punto | null;
         unidades?: Punto[];
         premio?: Punto | null;
         centro?: Punto | null;
       };
       (d.unidades ?? []).slice(0, N_UNIDADES).forEach((p, i) => (us[i] = p));
       esp = scope === "MAPA" ? (d.centro ?? null) : (d.premio ?? null);
+      wel = d.welcome ?? null;
     }
     setImgUrl(url);
     setUnidades(us);
+    setWelcome(wel);
     setEspecial(esp);
     setMsg(null);
   }, [curso, scope, nivel]);
@@ -80,13 +86,16 @@ export default function EditorMapaPage() {
     const p = { x, y };
     if (tool === "esp") {
       setEspecial(p);
+    } else if (tool === "wel") {
+      setWelcome(p);
     } else {
       const i = Number(tool.slice(1));
       setUnidades((prev) => prev.map((v, k) => (k === i ? p : v)));
     }
-    // Avanza al siguiente punto para marcar rápido
+    // Avanza al siguiente punto para marcar rápido: Welcome → 1..4 → especial.
     setTool((t) => {
       if (t === "esp") return "esp";
+      if (t === "wel") return "u0";
       const i = Number(t.slice(1));
       return i < N_UNIDADES - 1 ? `u${i + 1}` : "esp";
     });
@@ -96,10 +105,12 @@ export default function EditorMapaPage() {
     setOcupado(true);
     setMsg(null);
     try {
+      const us = unidades.filter((p): p is Punto => p !== null);
+      // El Welcome solo existe sobre la ISLA: en el MAPA cada isla es UN punto.
       const data =
         scope === "MAPA"
-          ? { unidades: unidades.filter((p): p is Punto => p !== null), centro: especial }
-          : { unidades: unidades.filter((p): p is Punto => p !== null), premio: especial };
+          ? { unidades: us, centro: especial }
+          : { welcome, unidades: us, premio: especial };
       const res = await apiFetch("/api/catalog/hotspots", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -120,11 +131,16 @@ export default function EditorMapaPage() {
 
   function limpiar() {
     setUnidades(Array(N_UNIDADES).fill(null));
+    setWelcome(null);
     setEspecial(null);
-    setTool("u0");
+    setTool(scope === "MAPA" ? "u0" : "wel");
   }
 
   const marcadores: { punto: Punto | null; label: string; tool: string; color: string }[] = [
+    // El Welcome solo se marca sobre la isla, y en verde para distinguirlo.
+    ...(scope === "MAPA"
+      ? []
+      : [{ punto: welcome, label: "W", tool: "wel", color: "#1b7f4d" }]),
     ...unidades.map((p, i) => ({
       punto: p,
       label: String(i + 1),
@@ -151,8 +167,11 @@ export default function EditorMapaPage() {
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Editor de mapa (hotspots)</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-        Marca dónde va cada <strong>unidad (1–4)</strong> y el{" "}
-        <strong>{etiquetaEsp.toLowerCase()}</strong> sobre la imagen. Elige un punto y haz{" "}
+        Marca dónde va cada parada —{scope === "MAPA" ? "" : "el "}
+        {scope === "MAPA" ? "" : <strong>Welcome (W)</strong>}
+        {scope === "MAPA" ? "" : " y "}
+        <strong>unidades 1–4</strong>— y el <strong>{etiquetaEsp.toLowerCase()}</strong> sobre la
+        imagen. Elige un punto y haz{" "}
         <strong>clic sobre la imagen</strong>; se guarda como coordenada %. Lo usa la pantalla{" "}
         <strong>Avance</strong> del alumno.
       </p>
@@ -212,6 +231,11 @@ export default function EditorMapaPage() {
         <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)", fontWeight: 700 }}>
           Marcar:
         </span>
+        {scope !== "MAPA" && (
+          <button type="button" style={toolBtn("wel")} onClick={() => setTool("wel")}>
+            Welcome {welcome !== null && "✓"}
+          </button>
+        )}
         {[0, 1, 2, 3].map((i) => (
           <button key={i} type="button" style={toolBtn(`u${i}`)} onClick={() => setTool(`u${i}`)}>
             Unidad {i + 1} {unidades[i] !== null && "✓"}

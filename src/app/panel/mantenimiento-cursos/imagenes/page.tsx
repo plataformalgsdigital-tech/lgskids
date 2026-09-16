@@ -5,10 +5,16 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
-type Tipo = "banner" | "premio" | "unidad" | "mapa" | "vobo";
+type Tipo = "banner" | "premio" | "unidad" | "insignia" | "mapa" | "vobo";
 
-/** Unidades que marca el mapa de cada isla. */
-const UNIDADES = [1, 2, 3, 4];
+/**
+ * Paradas de la isla: el Welcome (0) y las cuatro unidades.
+ *
+ * La 0 NO se llama "Unidad 0": en el mapa su cartel dice "Welcome" y el
+ * cuadernillo le entrega su propia insignia.
+ */
+const PARADAS = [0, 1, 2, 3, 4];
+const etiquetaParada = (p: number) => (p === 0 ? "Welcome" : `Unidad ${String(p)}`);
 
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
 
@@ -22,7 +28,8 @@ const TIPOS: {
 }[] = [
   { valor: "banner", etiqueta: "Banner del nivel (mapa de la isla)", ayuda: "16:9 · recomendado 1600×900. JPG/PNG/WebP.", cuadrada: false },
   { valor: "premio", etiqueta: "Premio del nivel", ayuda: "PNG con fondo transparente, cuadrado ~512×512 (brújula, llave, corona, estrella, tesoro).", cuadrada: true },
-  { valor: "unidad", etiqueta: "Lámina de la unidad", ayuda: "La que se abre al tocar “Unidad N” en el mapa de la isla. Se muestra COMPLETA, sin recortar; cualquier proporción sirve (recomendado 1000×1300). JPG/PNG/WebP.", cuadrada: false, libre: true },
+  { valor: "unidad", etiqueta: "Lámina de la parada", ayuda: "La que se abre al tocar la parada en el mapa de la isla (Welcome o “Unidad N”). Se muestra COMPLETA, sin recortar; cualquier proporción sirve (recomendado 1000×1300). JPG/PNG/WebP.", cuadrada: false, libre: true },
+  { valor: "insignia", etiqueta: "Insignia de la parada", ayuda: "La que se gana al cerrar esa parada (“Let’s chat about me”, “Let’s explore”…). PNG con fondo transparente, cuadrado ~512×512. Distinta del premio, que es uno por NIVEL.", cuadrada: true },
   { valor: "mapa", etiqueta: "Mapa del curso completo", ayuda: "El mapa con TODAS las islas. 16:9 · recomendado 1920×1080.", cuadrada: false },
   { valor: "vobo", etiqueta: "Sello VoBo (global)", ayuda: "PNG transparente cuadrado del personaje con el visto (marca de unidad vista).", cuadrada: true },
 ];
@@ -52,8 +59,8 @@ export default function ImagenesCursoPage() {
 
   const def = TIPOS.find((t) => t.valor === tipo) ?? TIPOS[0]!;
   const usaCurso = tipo !== "vobo";
-  const usaNivel = tipo === "banner" || tipo === "premio" || tipo === "unidad";
-  const usaUnidad = tipo === "unidad";
+  const usaNivel = tipo === "banner" || tipo === "premio" || tipo === "unidad" || tipo === "insignia";
+  const usaUnidad = tipo === "unidad" || tipo === "insignia";
   const nivelesDisp = tipo === "banner" ? NIVELES_BANNER : NIVELES_REALES;
 
   // La query de consulta/subida solo lleva los parámetros que aplican al tipo.
@@ -76,7 +83,8 @@ export default function ImagenesCursoPage() {
   // Cambiar de tipo: corrige el nivel si dejó de ser válido (premio no admite TODOS).
   function cambiarTipo(t: Tipo) {
     setTipo(t);
-    if ((t === "premio" || t === "unidad") && nivel === "TODOS") setNivel("ROOKIE");
+    if ((t === "premio" || t === "unidad" || t === "insignia") && nivel === "TODOS")
+      setNivel("ROOKIE");
   }
 
   useEffect(() => {
@@ -142,7 +150,8 @@ export default function ImagenesCursoPage() {
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Imágenes de curso</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-        Arte curricular del panel del alumno: <strong>banners/mapas de nivel</strong>,{" "}
+        Arte curricular del panel del alumno: <strong>banners/mapas de nivel</strong>, las{" "}
+        <strong>láminas</strong> e <strong>insignias</strong> de cada parada,{" "}
         <strong>premios</strong>, el <strong>mapa del curso</strong> y el <strong>sello VoBo</strong>.
       </p>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem", marginTop: "0.3rem" }}>
@@ -186,15 +195,15 @@ export default function ImagenesCursoPage() {
         )}
         {usaUnidad && (
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Unidad</span>
+            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Parada</span>
             <select
               value={unidad}
               onChange={(e) => setUnidad(Number(e.target.value))}
               style={{ ...input, width: "16rem" }}
             >
-              {UNIDADES.map((u) => (
-                <option key={u} value={u}>
-                  Unidad {u}
+              {PARADAS.map((p) => (
+                <option key={p} value={p}>
+                  {etiquetaParada(p)}
                 </option>
               ))}
             </select>
@@ -253,7 +262,15 @@ export default function ImagenesCursoPage() {
           ) : (
             <div style={{ textAlign: "center", opacity: 0.9 }}>
               <div style={{ fontSize: "2.4rem", lineHeight: 1 }}>
-                {tipo === "vobo" ? "✅" : tipo === "premio" ? "🏆" : tipo === "unidad" ? "📄" : "🗺️"}
+                {tipo === "vobo"
+                  ? "✅"
+                  : tipo === "premio"
+                    ? "🏆"
+                    : tipo === "insignia"
+                      ? "🎖️"
+                      : tipo === "unidad"
+                        ? "📄"
+                        : "🗺️"}
               </div>
               <div style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>Sin imagen aún</div>
             </div>

@@ -3,7 +3,13 @@ import { execute, queryRows } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
-import { UNIDADES_MAPA, unidadMapa } from "../domain/unidad-mapa";
+import {
+  PARADAS,
+  PARADA_WELCOME,
+  UNIDADES_MAPA,
+  paradaValida,
+  unidadMapa,
+} from "../domain/unidad-mapa";
 
 /**
  * JUEGOS de una unidad del mapa.
@@ -17,9 +23,10 @@ import { UNIDADES_MAPA, unidadMapa } from "../domain/unidad-mapa";
  * guardada dentro de la propia actividad. Nombre y enlace se siguen editando
  * donde siempre.
  *
- * Qué lección cae en qué casilla lo decide `unidadMapa`: solo "Unidad 1".."4".
- * La "Unidad 0" es la bienvenida y los repasos/evaluaciones no tienen casilla,
- * así que sus actividades existen pero no se abren desde el mapa.
+ * Qué lección cae en qué parada lo decide `unidadMapa`: "Unidad 0".."Unidad 4",
+ * donde la 0 es el **Welcome** (parada de pleno derecho desde 2026-09-11, con su
+ * propia insignia). Los repasos y las evaluaciones no tienen parada, así que sus
+ * actividades existen pero no se abren desde el mapa.
  */
 
 /**
@@ -121,8 +128,11 @@ export async function juegosDeUnidad(
   unidad: number,
 ): Promise<Juego[]> {
   exigirCursoNivel(curso, nivel);
-  if (!Number.isInteger(unidad) || unidad < 1 || unidad > UNIDADES_MAPA) {
-    throw new ValidationError(`Unidad inválida: ${String(unidad)} (1 a ${String(UNIDADES_MAPA)}).`);
+  if (!paradaValida(unidad)) {
+    throw new ValidationError(
+      `Parada inválida: ${String(unidad)} (${String(PARADA_WELCOME)} a ` +
+        `${String(UNIDADES_MAPA)}; la ${String(PARADA_WELCOME)} es el Welcome).`,
+    );
   }
   const filas = await actividadesDelNivel(curso, nivel);
   return filas.filter((f) => unidadMapa(f.unidad) === unidad).flatMap(juegosDeFila);
@@ -135,11 +145,13 @@ export interface LeccionSinCasilla {
 }
 
 /**
- * Lecciones del nivel que TIENEN actividades pero cuya unidad no es casilla.
+ * Lecciones del nivel que TIENEN actividades pero cuya unidad no es parada.
  *
- * Es el aviso que faltaba: cargar cinco juegos en una lección de "Unidad 0" y
- * no verlos en el mapa parece un fallo, y no lo es. Sin esta lista el editor
- * solo puede decir "esta unidad no tiene juegos", que es cierto y no ayuda.
+ * Es el aviso que faltaba: cargar cinco juegos en una lección de "Repaso 1" o
+ * "Evaluacion 2" y no verlos en el mapa parece un fallo, y no lo es. Sin esta
+ * lista el editor solo puede decir "esta parada no tiene juegos", que es cierto
+ * y no ayuda. (La "Unidad 0" SÍ es parada desde 2026-09-11 — es el Welcome —,
+ * así que ya no aparece aquí.)
  */
 export async function leccionesSinCasilla(
   curso: string,
@@ -165,7 +177,7 @@ export async function juegosDeNivel(
   if (!CURSOS.includes(curso) || !NIVELES_CODIGO.includes(nivel)) return {};
   const filas = await actividadesDelNivel(curso, nivel);
   const mapa: Record<number, Juego[]> = {};
-  for (let u = 1; u <= UNIDADES_MAPA; u++) mapa[u] = [];
+  for (const p of PARADAS) mapa[p] = [];
   for (const f of filas) {
     const u = unidadMapa(f.unidad);
     if (u === null) continue;
