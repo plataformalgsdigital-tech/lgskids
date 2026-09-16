@@ -10,8 +10,12 @@
 export {
   subirArchivo,
   descargarArchivo,
+  eliminarArchivo,
   listarArchivos,
   TAMANO_MAXIMO_BYTES,
 } from "./application/archivos";
+export { reoptimizarImagenes, UMBRAL_REOPTIMIZAR } from "./application/reoptimizar";
+export type { ResultadoReoptimizar } from "./application/reoptimizar";
+export { LADO_MAXIMO } from "./infrastructure/optimizar-imagen";
 export type { StoragePort } from "./application/storage-port";
 export { setStorageForTests } from "./infrastructure/local-storage";
