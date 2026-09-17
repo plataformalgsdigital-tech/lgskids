@@ -331,7 +331,13 @@ export async function leerLibro(
       escena:
         f.escena == null
           ? null
-          : { ...f.escena, fondoUrl: (f.escena["fondo"] as { arte?: unknown } | undefined)?.arte === "banner" ? bannerUrl : null },
+          : {
+              ...f.escena,
+              fondoUrl:
+                (f.escena["fondo"] as { arte?: unknown } | undefined)?.arte === "banner"
+                  ? bannerUrl
+                  : null,
+            },
       pliego: f.pliego,
       audios: (f.pliego === null ? [] : (porPliego.get(f.pliego) ?? [])).map((p) => ({
         id: p.id,
@@ -344,8 +350,7 @@ export async function leerLibro(
       elementos: f.elementos ?? [],
       // Se sirve por la MISMA ruta que el resto del arte: autenticada, privada
       // y con la caché larga que ya tiene.
-      imagenUrl:
-        f.imagen_file_id !== null ? `/api/catalog/imagen-curso/${f.imagen_file_id}` : null,
+      imagenUrl: f.imagen_file_id !== null ? `/api/catalog/imagen-curso/${f.imagen_file_id}` : null,
     })),
   };
 }

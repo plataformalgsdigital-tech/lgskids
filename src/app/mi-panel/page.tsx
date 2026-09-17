@@ -271,7 +271,12 @@ function ElementoLibroVista({ el }: { el: ElementoAlumno }) {
 
   if (el.tipo === "video" && typeof el.url === "string") {
     return (
-      <a href={el.url} target="_blank" rel="noopener noreferrer" style={{ ...caja, display: "block", color: "inherit", textDecoration: "none" }}>
+      <a
+        href={el.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ ...caja, display: "block", color: "inherit", textDecoration: "none" }}
+      >
         <strong>▶️ {el.titulo ?? "Video"}</strong>
         <span style={{ display: "block", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
           Se abre en YouTube
@@ -335,7 +340,6 @@ function ElementoLibroVista({ el }: { el: ElementoAlumno }) {
     </div>
   );
 }
-
 
 /**
  * Una página REDISEÑADA, armada por capas en vez de la hoja aplanada.
@@ -472,7 +476,9 @@ function EscenaLibro({ escena }: { escena: Record<string, unknown> }) {
           }}
         >
           <Personaje quien={quien} alto={per?.alto ?? "13rem"} className="lgs-float" />
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", flex: "1 1 14rem" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "0.6rem", flex: "1 1 14rem" }}
+          >
             {bocadillo}
             {titulo !== null && (
               <h4
@@ -3347,7 +3353,12 @@ export default function MiPanelPage() {
                           </button>
                         ))}
                         {pag.audios.map((a) => (
-                          <audio key={`el-${a.id}`} id={`audio-${a.id}`} src={a.url} preload="none" />
+                          <audio
+                            key={`el-${a.id}`}
+                            id={`audio-${a.id}`}
+                            src={a.url}
+                            preload="none"
+                          />
                         ))}
                       </div>
                     )}

@@ -282,19 +282,19 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   - **Libro interactivo (2026-09-11, migración `20260911100000_libro_interactivo`)**: el
     cuadernillo impreso como DATO. `catalog_libro` (uno por curso·nivel·código, p.ej.
     "UNIT 0-1") + `catalog_libro_pagina` (una por página numerada, con `elementos` JSONB)
-    + `catalog_insignia` (el NOMBRE de la insignia por curso·nivel·parada; el ARTE va por
-    `files` con la misma clave). Los elementos van en JSONB a propósito: la transcripción
-    real da **86 elementos de 13 tipos** y seis de ellos aparecen UNA vez —normalizar eso
-    serían quince tablas casi vacías—; mismo criterio que `catalog_curso.quiz` y
-    `catalog_arte_hotspot.data`. `importarLibro` valida lo que el lector da por hecho
-    (lista de elementos, `tipo` e `id` presentes, **ids únicos por página** — con los que
-    se guarda la respuesta del niño) y REEMPLAZA el libro entero en una transacción: un
-    libro a medio importar parece que funcionó. **`pagina` y `pliego` son distintos**: el
-    PDF va en pliegos (una hoja = dos páginas numeradas) y manda la página.
-    Transcripciones en `content/libros/*.json`; se cargan con
-    `pnpm libro:importar <archivo>`, que además CUENTA lo que quedó marcado `confirmar`.
-    Lo que tiene `clave` es evaluable y entra por `registrarIntento`; lo `libre` es
-    portafolio y NO toca progresión (regla 4).
+    - `catalog_insignia` (el NOMBRE de la insignia por curso·nivel·parada; el ARTE va por
+      `files` con la misma clave). Los elementos van en JSONB a propósito: la transcripción
+      real da **86 elementos de 13 tipos** y seis de ellos aparecen UNA vez —normalizar eso
+      serían quince tablas casi vacías—; mismo criterio que `catalog_curso.quiz` y
+      `catalog_arte_hotspot.data`. `importarLibro` valida lo que el lector da por hecho
+      (lista de elementos, `tipo` e `id` presentes, **ids únicos por página** — con los que
+      se guarda la respuesta del niño) y REEMPLAZA el libro entero en una transacción: un
+      libro a medio importar parece que funcionó. **`pagina` y `pliego` son distintos**: el
+      PDF va en pliegos (una hoja = dos páginas numeradas) y manda la página.
+      Transcripciones en `content/libros/*.json`; se cargan con
+      `pnpm libro:importar <archivo>`, que además CUENTA lo que quedó marcado `confirmar`.
+      Lo que tiene `clave` es evaluable y entra por `registrarIntento`; lo `libre` es
+      portafolio y NO toca progresión (regla 4).
   - **La página tiene DOS números** (`20260911140000`): `pagina` es el ORDEN de lectura
     (denso desde 0) y `numero_impreso` el que el niño ve en el papel, **NULL en las
     portadas** de cada parada, que ocupan pliego entero y no llevan número. Mezclarlos

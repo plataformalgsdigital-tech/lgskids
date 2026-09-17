@@ -27,8 +27,8 @@ El material de origen vive FUERA del repositorio, en
 - `Audios/<unidad>/` — las pistas, nombradas `PAG<nn>-<nn>`
 
 **Cada PDF termina con un ANSWER KEY**: los pliegos en miniatura con las
-respuestas en rojo y la marca *"Espacio libre para ser llenado por el
-explorador"* donde NO hay respuesta correcta. Esa marca es la que separa el
+respuestas en rojo y la marca _"Espacio libre para ser llenado por el
+explorador"_ donde NO hay respuesta correcta. Esa marca es la que separa el
 ejercicio **evaluable** del **portafolio**, y ya la decidió el equipo de
 contenido: aquí solo se transcribe.
 

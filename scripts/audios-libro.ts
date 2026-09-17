@@ -87,7 +87,9 @@ async function main(): Promise<void> {
     process.stdout.write(`\r  ${String(subidas)} pistas`);
   }
 
-  console.log(`\n✔ ${String(subidas)} pistas subidas · ${String(saltados)} saltadas (video u otro)`);
+  console.log(
+    `\n✔ ${String(subidas)} pistas subidas · ${String(saltados)} saltadas (video u otro)`,
+  );
   console.log(`  ${String(Math.round(bytesOrig / 1024))} kB de audio`);
 
   // Qué páginas impresas quedan con sonido: es lo que el niño va a notar.
@@ -110,9 +112,7 @@ async function main(): Promise<void> {
   );
   console.log("\n  pliego → páginas impresas (pistas)");
   for (const c of cobertura) {
-    console.log(
-      `    ${String(c.pliego).padStart(2)} → ${c.paginas.padEnd(14)} (${c.pistas})`,
-    );
+    console.log(`    ${String(c.pliego).padStart(2)} → ${c.paginas.padEnd(14)} (${c.pistas})`);
   }
 
   const sin = await queryRows<{ n: string }>(

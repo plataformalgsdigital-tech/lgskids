@@ -138,9 +138,7 @@ export default function EditorMapaPage() {
 
   const marcadores: { punto: Punto | null; label: string; tool: string; color: string }[] = [
     // El Welcome solo se marca sobre la isla, y en verde para distinguirlo.
-    ...(scope === "MAPA"
-      ? []
-      : [{ punto: welcome, label: "W", tool: "wel", color: "#1b7f4d" }]),
+    ...(scope === "MAPA" ? [] : [{ punto: welcome, label: "W", tool: "wel", color: "#1b7f4d" }]),
     ...unidades.map((p, i) => ({
       punto: p,
       label: String(i + 1),
@@ -171,9 +169,8 @@ export default function EditorMapaPage() {
         {scope === "MAPA" ? "" : <strong>Welcome (W)</strong>}
         {scope === "MAPA" ? "" : " y "}
         <strong>unidades 1–4</strong>— y el <strong>{etiquetaEsp.toLowerCase()}</strong> sobre la
-        imagen. Elige un punto y haz{" "}
-        <strong>clic sobre la imagen</strong>; se guarda como coordenada %. Lo usa la pantalla{" "}
-        <strong>Avance</strong> del alumno.
+        imagen. Elige un punto y haz <strong>clic sobre la imagen</strong>; se guarda como
+        coordenada %. Lo usa la pantalla <strong>Avance</strong> del alumno.
       </p>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>

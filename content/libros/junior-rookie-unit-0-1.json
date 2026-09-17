@@ -5,10 +5,7 @@
     "libro": "UNIT 0-1",
     "fuente": "PRINT/PRINTBOOK-UNIT 0-1 JUN-ROO.pdf (38 pliegos · 53 páginas numeradas + answer key + créditos)",
     "transcrito": "2026-09-11",
-    "paradas": [
-      0,
-      1
-    ],
+    "paradas": [0, 1],
     "nota": "`pagina` es el ORDEN de lectura (denso desde 0). `numeroImpreso` es el número que el niño ve en el papel y es NULL en las portadas de cada parada, que ocupan pliego entero y no llevan número. `pliego` es la página REAL del PDF y `mitad` dice si la página es la izquierda, la derecha o el pliego completo."
   },
   "insignias": [
@@ -582,20 +579,14 @@
                   "der": "Good evening"
                 }
               ],
-              "distractores": [
-                "Good night"
-              ],
+              "distractores": ["Good night"],
               "corregido": "El answer key del impreso unía luna→Good night, lo que contradecía la página 19 (luna→Good Evening, cama→Good Night). Se unifica la regla: amanecer=morning · sol=afternoon · luna=evening · cama=night. Como aquí NO hay dibujo de cama, «Good night» queda de distractor."
             },
             {
               "tipo": "audio",
               "id": "p17-escucha",
               "instruccion": "Listen and repeat",
-              "pistas": [
-                "amanecer",
-                "sol",
-                "luna"
-              ],
+              "pistas": ["amanecer", "sol", "luna"],
               "archivos": null,
               "confirmar": "mapeo a los archivos de Audios/0-1 sin establecer"
             }
@@ -640,12 +631,7 @@
               "id": "p19-resaltar",
               "instruccion": "Highlight greetings vocabulary",
               "sobre": "letra de la canción",
-              "clave": [
-                "Good morning",
-                "Good afternoon",
-                "Good evening",
-                "Good night"
-              ]
+              "clave": ["Good morning", "Good afternoon", "Good evening", "Good night"]
             },
             {
               "tipo": "texto",
@@ -688,12 +674,7 @@
             {
               "tipo": "referencia",
               "id": "p20-frases",
-              "contenido": [
-                "What's your name?",
-                "My name is…",
-                "How are you?",
-                "How old are you?"
-              ]
+              "contenido": ["What's your name?", "My name is…", "How are you?", "How old are you?"]
             }
           ],
           "confirmar": "IP DE TERCEROS: aparece Charlie Brown (Peanuts). Sustituir en el rediseño.",
@@ -709,12 +690,7 @@
               "tipo": "texto",
               "id": "p21-dialogo",
               "instruccion": "Read and complete",
-              "banco": [
-                "Goodbye",
-                "How are you?",
-                "Hello!",
-                "My name is Cindy"
-              ],
+              "banco": ["Goodbye", "How are you?", "Hello!", "My name is Cindy"],
               "campos": [
                 {
                   "id": "1izq",
@@ -773,11 +749,7 @@
             {
               "tipo": "referencia",
               "id": "p22-edades",
-              "contenido": [
-                "I am 5 years old",
-                "I am 6 years old",
-                "I am 4 years old"
-              ]
+              "contenido": ["I am 5 years old", "I am 6 years old", "I am 4 years old"]
             }
           ],
           "confirmar": "la ilustración lleva marca de agua visible de freepik; sustituir en el rediseño",
@@ -931,23 +903,12 @@
             {
               "tipo": "referencia",
               "id": "p26-gramatica",
-              "contenido": [
-                "I am happy!",
-                "She is happy!",
-                "We are happy!"
-              ]
+              "contenido": ["I am happy!", "She is happy!", "We are happy!"]
             },
             {
               "tipo": "referencia",
               "id": "p26-emociones",
-              "contenido": [
-                "angry",
-                "surprised",
-                "excited",
-                "scared",
-                "happy",
-                "sad"
-              ]
+              "contenido": ["angry", "surprised", "excited", "scared", "happy", "sad"]
             }
           ],
           "mitad": "entera",
@@ -1104,10 +1065,7 @@
             {
               "tipo": "referencia",
               "id": "p30-ejemplo",
-              "contenido": [
-                "My favorite color is pink.",
-                "I like yellow."
-              ]
+              "contenido": ["My favorite color is pink.", "I like yellow."]
             },
             {
               "tipo": "texto",
@@ -1147,10 +1105,7 @@
               "id": "p32-circula",
               "instruccion": "Read and circle colors' vocabulary",
               "sobre": "The cat is gray. The cat likes to play. Jon plays with the cat. Jon loves the gray cat!",
-              "clave": [
-                "gray",
-                "gray"
-              ]
+              "clave": ["gray", "gray"]
             },
             {
               "tipo": "texto",
@@ -1468,10 +1423,7 @@
             {
               "tipo": "referencia",
               "id": "p39-regla",
-              "contenido": [
-                "Numbers from 13 to 19 finish in teen",
-                "Ten base numbers finish in ty"
-              ]
+              "contenido": ["Numbers from 13 to 19 finish in teen", "Ten base numbers finish in ty"]
             }
           ],
           "mitad": "izq",
@@ -1515,18 +1467,7 @@
               "tipo": "sopa",
               "id": "p41-sopa",
               "instruccion": "Can you find the words for these numbers?",
-              "objetivos": [
-                "10",
-                "20",
-                "30",
-                "40",
-                "50",
-                "60",
-                "70",
-                "80",
-                "90",
-                "100"
-              ],
+              "objetivos": ["10", "20", "30", "40", "50", "60", "70", "80", "90", "100"],
               "claveVisible": [
                 "SEVENTY",
                 "FORTY",

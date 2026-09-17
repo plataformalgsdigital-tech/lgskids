@@ -32,7 +32,7 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
       sharp:
-        specifier: ^0.35.4
+        specifier: '>=0.35.0'
         version: 0.35.4(@types/node@26.1.1)
       zod:
         specifier: ^4.4.3

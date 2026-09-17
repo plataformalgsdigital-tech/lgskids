@@ -19,13 +19,7 @@ import { PARADAS, PARADA_WELCOME, UNIDADES_MAPA, paradaValida } from "../domain/
  */
 
 export type ArteTipo =
-  | "banner"
-  | "premio"
-  | "unidad"
-  | "insignia"
-  | "vobo"
-  | "mapa"
-  | "aviso_login";
+  "banner" | "premio" | "unidad" | "insignia" | "vobo" | "mapa" | "aviso_login";
 
 /** Unidades NUMERADAS que marca el mapa. El Welcome (parada 0) va aparte. */
 export const UNIDADES_POR_NIVEL = UNIDADES_MAPA;
