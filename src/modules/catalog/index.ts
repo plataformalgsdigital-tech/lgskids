@@ -51,20 +51,6 @@ export {
   guardarPosicionesUnidad,
 } from "./application/unidad-juegos";
 export { ANCHO_ZONA, ALTO_ZONA } from "./application/unidad-juegos";
-export {
-  importarLibro,
-  leerLibro,
-  listarLibros,
-  insigniasDeNivelNombres,
-} from "./application/libro";
-export type { LibroEntrada, PaginaLibro, ElementoLibro } from "./application/libro";
-export {
-  audiosDeLibro,
-  registrarAudioLibro,
-  libroIdPorCodigo,
-  audioPerteneceALibro,
-} from "./application/libro-audio";
-export type { PistaLibro } from "./application/libro-audio";
 export type { Juego, Posicion, LeccionSinCasilla } from "./application/unidad-juegos";
 export {
   PARADAS,

@@ -25,10 +25,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:arch && pnpm format:check && pnpm build && pnpm audit --prod --audit-level high",
     "demo:sesion": "tsx scripts/demo-sesion.ts",
-    "libro:importar": "tsx scripts/importar-libro.ts",
-    "imagenes:optimizar": "tsx scripts/optimizar-imagenes.ts",
-    "libro:paginas": "tsx scripts/paginas-libro.ts",
-    "libro:audios": "tsx scripts/audios-libro.ts"
+    "imagenes:optimizar": "tsx scripts/optimizar-imagenes.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

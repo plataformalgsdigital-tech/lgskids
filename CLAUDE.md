@@ -162,9 +162,9 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   los bytes de un id no cambian nunca (subir arte nuevo crea otro archivo y
   otra URL), y los 5 minutos de antes hacían rebajar megas en cada visita.
   descarga solo autenticada, MIME allowlist (pdf/jpg/png/webp + **mp3/m4a**
-  desde 2026-09-11, para la narración del libro interactivo; el VIDEO queda
-  fuera a propósito: los del libro llegan a 47 MB y eso es trabajo de un CDN,
-  no de una ruta autenticada de Node), 10 MB máx,
+  desde 2026-09-11, para narración de material; el VIDEO queda
+  fuera a propósito: los del cuadernillo llegan a 47 MB y eso es trabajo de un
+  CDN, no de una ruta autenticada de Node), 10 MB máx,
   claves impredecibles; adaptador Spaces se enchufa en Fase 11. Reporting:
   asistencia por salón/mes con `AT TIME ZONE cl.timezone` EN SQL,
   ocupación de salones, contratos por país (con alcance). UI:
@@ -279,82 +279,27 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
     desde el mapa. Constantes: `PARADA_WELCOME = 0`, `UNIDADES_MAPA = 4` (la unidad
     NUMERADA más alta), `PARADAS_MAPA = 5` y `PARADAS = [0..4]`; `paradaValida` y
     `etiquetaParada` (la 0 se muestra "Welcome", nunca "Unidad 0").
-  - **Libro interactivo (2026-09-11, migración `20260911100000_libro_interactivo`)**: el
-    cuadernillo impreso como DATO. `catalog_libro` (uno por curso·nivel·código, p.ej.
-    "UNIT 0-1") + `catalog_libro_pagina` (una por página numerada, con `elementos` JSONB)
-    - `catalog_insignia` (el NOMBRE de la insignia por curso·nivel·parada; el ARTE va por
-      `files` con la misma clave). Los elementos van en JSONB a propósito: la transcripción
-      real da **86 elementos de 13 tipos** y seis de ellos aparecen UNA vez —normalizar eso
-      serían quince tablas casi vacías—; mismo criterio que `catalog_curso.quiz` y
-      `catalog_arte_hotspot.data`. `importarLibro` valida lo que el lector da por hecho
-      (lista de elementos, `tipo` e `id` presentes, **ids únicos por página** — con los que
-      se guarda la respuesta del niño) y REEMPLAZA el libro entero en una transacción: un
-      libro a medio importar parece que funcionó. **`pagina` y `pliego` son distintos**: el
-      PDF va en pliegos (una hoja = dos páginas numeradas) y manda la página.
-      Transcripciones en `content/libros/*.json`; se cargan con
-      `pnpm libro:importar <archivo>`, que además CUENTA lo que quedó marcado `confirmar`.
-      Lo que tiene `clave` es evaluable y entra por `registrarIntento`; lo `libre` es
-      portafolio y NO toca progresión (regla 4).
-  - **La página tiene DOS números** (`20260911140000`): `pagina` es el ORDEN de lectura
-    (denso desde 0) y `numero_impreso` el que el niño ve en el papel, **NULL en las
-    portadas** de cada parada, que ocupan pliego entero y no llevan número. Mezclarlos
-    desalineó el libro entero: contar la portada de "All about me" como página 15 corrió
-    todas las demás una posición. En JUNIOR·ROOKIE UNIT 0-1 son **55 páginas** = 53
-    impresas + 2 portadas. Al mapear un PDF nuevo, **verificar renderizando y leyendo el
-    número impreso**, no deduciéndolo: el PDF abre con portada + MY BADGES + CONTENTS,
-    así que el contenido arranca en la página 3.
-  - **Imagen de página** (`imagen_file_id`, migración `20260911120000`): el cuadernillo es
-    un objeto visual y sin el dibujo no es el cuadernillo. Es UNA CAPA — los elementos
-    siguen en `elementos` y se pintan aparte—, así que el rediseño cambia esta columna y
-    nada más. Se extrae con `pnpm libro:paginas "<pdf>" <CURSO> <NIVEL> "<CÓDIGO>"`, que
-    rasteriza cada pliego con `pdftoppm` (poppler) y lo parte por la mitad: la página de
-    ORDEN menor es la izquierda. El recorte sale ya en WebP porque el ráster crudo de un
-    pliego denso pasa de 10 MB y ese tope se mide sobre lo que ENTRA.
-  - **Audio del cuadernillo** (`catalog_libro_audio`, migración `20260915000000`): la
-    narración que sustituye a los globos del impreso. La llave es el **PLIEGO, no la
-    página**, porque es la única que el material da: `PAG16-07.mp3` dice "hoja 16" y esa
-    hoja son DOS páginas impresas (23 y 24); cuál de las 13 pistas va a cuál no está
-    escrito en ninguna parte. `elemento_id` queda NULL hasta que alguien las escuche.
-    `PAGnn` = diapositiva del digibook = página del PDF (verificado: las diapositivas con
-    audio incrustado y los nombres de la carpeta coinciden 13 de 14). Se sube con
-    `pnpm libro:audios <carpeta> <CURSO> <NIVEL> "<CÓDIGO>"`; el VIDEO se salta a
-    propósito (hasta 47 MB). Junior Rookie: **34 pistas, 17 MB, 19 de 55 páginas con
-    sonido** — el impreso tampoco tenía más.
-  - **Reemplazar un archivo EXIGE soltar el anterior**: `subirArchivo` siempre crea uno
-    nuevo, así que reimportar los audios dejaba otros 34 huérfanos con sus bytes en disco.
-    `files` expone `eliminarArchivo` y `registrarAudioLibro` borra el que reemplaza —
-    FUERA de la transacción, porque borrar bytes no se deshace. Probado en
-    `libro-integration.test.ts`.
-  - **La narración NO suena sola**: los navegadores bloquean el autoplay con sonido, y a
-    un niño de 6 años el audio sorpresa le estorba. Botones, y una pista a la vez.
-  - **`/api/catalog/libro-audio/[id]` comprueba que el archivo SEA una pista** antes de
-    servirlo: sin eso sería una puerta para pedir cualquier archivo de `files` —incluidas
-    las fotos de menores— con solo tener sesión.
-  - **El libro del niño incluye los niveles YA COMPLETADOS** (2026-09-15): terminar Rookie
-    no puede quitarle el cuadernillo de Rookie. `/api/student/libro` devuelve el nivel en
-    curso más los completados, con el actual primero; `nivel` puede venir en la URL pero
-    se contrasta contra la progresión del propio niño (400 si no lo ha alcanzado).
-  - **Escena: el rediseño como dato** (`escena` JSONB, migración `20260915100000`). La
-    imagen de página es la hoja del PDF aplanada, con el arte VIEJO quemado dentro. Una
-    `escena` arma la página por capas con el personaje CANÓNICO de `public/personajes/`;
-    cuando existe manda, y cuando no se sigue pintando la imagen. Así el rediseño avanza
-    página a página sin romper las que ya se leen. Tres plantillas en `EscenaLibro`
-    (`/mi-panel`): **`portada`** (la estación, con el mapa de fondo), **`titulo`** (el cartel
-    que abre un tema, sobre pergamino; admite `subtitulo`) e **`insignia`** (cierre de
-    parada, personaje celebrando + medalla). Junior Rookie UNIT 0-1: **8 de 55** páginas
-    rediseñadas (órdenes 0, 3, 7, 13, 14, 15, 53, 54).
-  - **Solo llevan escena las páginas cuyo dibujo es personaje + título.** Donde el dibujo
-    ES el ejercicio —la tabla de números, la lámina para colorear, el crucigrama— quitar
-    la imagen borraría el contenido. De las 55: 39 son ejercicio, 7 son solo imagen
-    (tablas de referencia) y 9 se pueden rehacer enteras.
-  - **El fondo de la portada REFERENCIA el banner, no lo copia**: `fondo: {arte: "banner"}`
-    se resuelve en `leerLibro` con `imagenCursoIdResuelto(curso, nivel)` y viaja como
-    `fondoUrl`. Si cambian el banner del nivel, la portada lo sigue sin tocar el libro.
-  - **Lo que la escena ya pinta no se repite debajo** (`cubiertosPorEscena`): el globo
-    (`globo.de` nombra el elemento narración) y, en una escena de insignia, el elemento
-    insignia. Con escena tampoco se pinta el título chico de arriba: iba dentro en grande.
-  - **Reimportar la transcripción CONSERVA la imagen de página** por número de página:
-    antes reemplazar las filas la borraba y había que volver a rasterizar el PDF (~12 min).
+  - **Libro interactivo: RETIRADO (2026-09-17)**. El visor del cuadernillo salió
+    del panel del niño por decisión del negocio —el resultado no convenció— y el
+    material se rehará DESDE CERO. Se fue el CÓDIGO: `application/libro.ts` y
+    `libro-audio.ts`, `/api/student/libro`, `/api/catalog/libro-audio/[id]`, los
+    scripts `libro:importar|paginas|audios`, la prueba de integración y las
+    transcripciones de `content/libros/`. El botón **Material** de `/mi-panel` quedó
+    como acceso futuro: ahí entrará el diseño nuevo.
+  - **Lo que NO se tocó**: el arte (mapas, láminas de unidad, premios, insignias,
+    personajes, banners) sigue intacto en `files` y en sus tablas. Y las tablas del
+    libro —`catalog_libro`, `catalog_libro_pagina`, `catalog_libro_audio`,
+    `catalog_insignia`— siguen creadas CON SUS DATOS (55 páginas y 34 pistas de
+    Junior·Rookie) pero sin una línea de código que las lea: están DORMIDAS a
+    propósito. Borrarlas exige una migración destructiva y dejaría huérfanos en
+    `files` los archivos que se pidió conservar; se decide al definir el diseño
+    nuevo. Las migraciones ya aplicadas (`20260911100000`, `…120000`, `…140000`,
+    `20260915000000`, `20260915100000`) NO se revierten: el historial no se reescribe.
+  - `files` sigue aceptando **mp3/m4a** aunque hoy nadie los sirva: el cuadernillo
+    nuevo volverá a necesitar narración y el MIME vive en un módulo compartido.
+  - Cómo estaba hecho —pliegos vs. `numero_impreso`, escenas por capas, audio por
+    pliego, ids únicos por página— está en el commit `a400d97`. Si el diseño nuevo
+    repite alguna de esas decisiones, ahí están los porqués y las trampas ya pagadas.
   - **Poses de celebración** (2026-09-16): `rocky-celebrando`, `simba-celebrando` y
     `emma-confeti` (distinta de `emma-celebrando`, que es el puño en alto). El origen está
     en `imagenes/Personajes/` y trae **transparencia real**; las 27 `ChatGPT Image…` de esa
