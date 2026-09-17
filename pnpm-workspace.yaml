@@ -10,12 +10,23 @@ allowBuilds:
 
 # Overrides de seguridad: versiones parchadas de dependencias transitivas
 # hasta que Next actualice sus rangos.
-# - sharp <0.35: CVEs de libvips (GHSA-f88m-g3jw-g9cj)
-# - postcss <=8.5.11: lectura arbitraria via sourceMappingURL (GHSA-6g55-p6wh-862q)
-# - nanoid <3.3.18: bucle infinito con generadores propios (GHSA-2v37-7h3g-55p8);
-#   se fija dentro de la línea 3.3 —">=3.3.18" a secas resuelve nanoid 6 y
-#   arrastra postcss a una versión ANTERIOR, peor que el aviso que cierra.
+#
+# TODOS van ACOTADOS a su línea (^). Un override reemplaza el especificador de
+# cada paquete que pide esa dependencia, así que un ">=" abierto no solo sube:
+# también puede dejarla ABAJO. Pasó dos veces:
+#   · nanoid ">=3.3.18" resolvió nanoid 6 y arrastró postcss a una versión
+#     anterior a la que este mismo archivo ya subía.
+#   · postcss ">=8.5.12" sustituyó el "8.5.23" EXACTO que pide Next 16.3.4 por
+#     un rango abierto, y el lockfile se quedó en 8.5.21 —vulnerable a
+#     GHSA-fxqj-rqcc-2cmp—: el override de seguridad tenía a postcss POR DEBAJO
+#     de lo que Next ya exigía.
+#
+# - sharp <0.35: CVEs de libvips (GHSA-f88m-g3jw-g9cj). Es dependencia directa
+#   desde la optimización de imágenes al subir.
+# - postcss <=8.5.22: lectura arbitraria de archivos .map vía sourceMappingURL
+#   (GHSA-6g55-p6wh-862q, y su arreglo incompleto GHSA-fxqj-rqcc-2cmp).
+# - nanoid <3.3.18: bucle infinito con generadores propios (GHSA-2v37-7h3g-55p8).
 overrides:
-  sharp: ">=0.35.0"
-  postcss: ">=8.5.12"
+  sharp: "^0.35.0"
+  postcss: "^8.5.23"
   nanoid: "^3.3.18"

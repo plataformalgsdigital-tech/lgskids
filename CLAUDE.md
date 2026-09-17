@@ -477,14 +477,38 @@ Ultimate Stage (5 niveles; duración 2/2/3/3/2 meses).
 
 ```bash
 pnpm dev          # desarrollo
-pnpm verify       # lint + tipos + pruebas + arquitectura + build (cierre de fase)
+pnpm verify       # lint + tipos + pruebas + arquitectura + formato + build + audit
+                  # — los mismos pasos estáticos de CI, en el mismo orden
 # OJO: `pnpm test` SALTA las pruebas de integración si faltan las variables.
 # CI sí las corre, así que en local pueden verse 13/23 archivos "en verde"
-# mientras CI está en rojo. Para correrlas de verdad:
+# mientras CI está en rojo. Para correrlas de verdad (con el contenedor ARRIBA:
+# si Docker Desktop está cerrado, las 12 fallan con ECONNREFUSED 5432 y parece
+# que el código se rompió):
 INTEGRATION_TESTS=1 DATABASE_URL=postgresql://kids:kids_dev@localhost:5432/kids2026 pnpm test
 pnpm test:arch    # solo límites de módulos (dependency-cruiser)
 docker compose -f infra/docker/docker-compose.yml up -d   # Postgres local
 ```
+
+**Lo que `verify` NO cubre de CI** (2026-09-16, costó un push en rojo). Hasta esa
+fecha `verify` tampoco corría `format:check` ni `audit`; se sumaron. Quedan fuera
+dos pasos que no caben en un script local, y hay que comprobarlos a mano cuando
+se toca lo que miden:
+
+- **Instalación congelada** — tras tocar dependencias u overrides. En local
+  `pnpm install --frozen-lockfile` MIENTE: con `node_modules` ya presente dice
+  "Already up to date" y se salta la comprobación del lockfile. Hay que correrlo
+  en un worktree limpio (`git worktree add --detach <dir> HEAD`), sin
+  `node_modules`. Así se escapó un `ERR_PNPM_OUTDATED_LOCKFILE`: `pnpm add` anota
+  el especificador del manifiesto, pero la comprobación congelada lo compara ya
+  con el override aplicado.
+- **Migraciones y seed sobre una base VACÍA** — tras agregar migraciones. En local
+  se aplican de a una sobre una base con datos; CI las aplica todas desde cero.
+  Crear una base desechable en el contenedor y apuntarle `DATABASE_URL` y
+  `DIRECT_DATABASE_URL` antes de `pnpm migrate:deploy` y `pnpm seed`.
+- **Worktree con `node_modules` enlazado**: si se le hace un junction al
+  `node_modules` real para ahorrar la instalación, **quitar el junction ANTES de
+  borrar el worktree** (`cmd //c rmdir <dir>\node_modules`). Un borrado recursivo
+  lo sigue y se lleva las dependencias reales.
 
 ## Estructura
 
@@ -545,9 +569,17 @@ pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
   de package.json**: pnpm 11 ignora ese campo (solo avisa). Ese archivo lleva
   también `allowBuilds`, la lista de paquetes autorizados a ejecutar scripts de
   instalación — no borrarla al editar.
-- Al fijar un override, **acotar la línea de versión**: `nanoid: ">=3.3.18"`
-  resuelve nanoid 6 y arrastra postcss a una versión anterior a la que otro
-  override ya subía por seguridad. Va `^3.3.18`.
+- Al fijar un override, **acotar la línea de versión** (`^`). Un override
+  REEMPLAZA el especificador de cada paquete que pide esa dependencia, así que un
+  `>=` abierto no solo sube: también puede dejarla ABAJO. Pasó dos veces:
+  - `nanoid: ">=3.3.18"` resolvió nanoid 6 y arrastró postcss a una versión
+    anterior a la que otro override ya subía por seguridad. Va `^3.3.18`.
+  - `postcss: ">=8.5.12"` (2026-09-16) sustituyó el `8.5.23` EXACTO que pide Next
+    16.3.4 por un rango abierto, y el lockfile se quedó en **8.5.21**, vulnerable
+    a GHSA-fxqj-rqcc-2cmp. El override de seguridad tenía a postcss POR DEBAJO de
+    lo que Next ya exigía. Va `^8.5.23` (resuelve 8.5.28). `sharp` se acotó igual:
+    `^0.35.0`. Tras el cambio, `pnpm audit --prod` no reporta nada en ninguna
+    severidad.
 
 ## Intake de beneficiarios desde LGS (2026-08-19, ADR-0010)
 
