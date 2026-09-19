@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
+import { descargarArchivo } from "@/modules/files";
 import { handler, handlerWithAuth, json } from "@/platform/http/handler";
-import { ValidationError } from "@/platform/errors";
+import { NotFoundError, ValidationError } from "@/platform/errors";
 import {
   arteId,
   descargarImagenCurso,
@@ -10,6 +11,16 @@ import {
   type ArteTipo,
 } from "../application/imagen-curso";
 import { getHotspots, setHotspots } from "../application/hotspots";
+import {
+  TAMANO_MAXIMO_MATERIAL,
+  archivoDeMaterial,
+  eliminarMaterial,
+  estadoMaterial,
+  subirMaterial,
+  tipoMaterialValido,
+  type ArchivoMaterial,
+} from "../application/material";
+import { CSP_LIBRO, inyectarPuente } from "../domain/libro-interactivo";
 import { paradaValida } from "../domain/unidad-mapa";
 import {
   descargarAvisoLoginPublico,
@@ -356,6 +367,114 @@ export const imagenCursoServeHandler = handlerWithAuth(async (_request, _auth, c
       // es material del alumno y no debe quedar en cachés compartidas.
       "Cache-Control": "private, max-age=31536000, immutable",
     },
+  });
+});
+
+// ============================================================
+// Material del alumno (libro interactivo HTML + libro imprimible PDF)
+// ============================================================
+
+function textoForm(form: FormData, campo: string): string {
+  const v = form.get(campo);
+  return typeof v === "string" ? v : "";
+}
+
+/** GET /api/catalog/material — qué hay cargado, por curso y nivel. */
+export const materialEstadoHandler = handlerWithAuth(async (_request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_VER);
+  return json({ tamanoMaximo: TAMANO_MAXIMO_MATERIAL, cursos: await estadoMaterial() });
+});
+
+/** POST /api/catalog/material — multipart (tipo, curso, nivel, archivo). Reemplaza. */
+export const materialSubirHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const form = await request.formData().catch(() => null);
+  const archivo = form?.get("archivo");
+  if (form === null || !(archivo instanceof File)) {
+    throw new ValidationError("Envía multipart/form-data con tipo, curso, nivel y 'archivo'.");
+  }
+  const tipo = textoForm(form, "tipo");
+  if (!tipoMaterialValido(tipo)) {
+    throw new ValidationError("Tipo inválido: 'interactivo' o 'imprimible'.");
+  }
+  const r = await subirMaterial({
+    actorUserId: auth.userId,
+    tipo,
+    curso: textoForm(form, "curso"),
+    nivel: textoForm(form, "nivel"),
+    nombreOriginal: archivo.name,
+    bytes: Buffer.from(await archivo.arrayBuffer()),
+  });
+  return json(r, { status: 201 });
+});
+
+/** DELETE /api/catalog/material?tipo=&curso=&nivel= — quita el material del nivel. */
+export const materialEliminarHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const q = request.nextUrl.searchParams;
+  const tipo = q.get("tipo");
+  if (!tipoMaterialValido(tipo)) {
+    throw new ValidationError("Tipo inválido: 'interactivo' o 'imprimible'.");
+  }
+  return json(
+    await eliminarMaterial({
+      actorUserId: auth.userId,
+      tipo,
+      curso: q.get("curso") ?? "",
+      nivel: q.get("nivel") ?? "",
+    }),
+  );
+});
+
+/**
+ * La respuesta que SIRVE un material ya autorizado. La comparten la vista
+ * previa del equipo y la del niño, que autorizan distinto pero deben servir
+ * exactamente igual.
+ *
+ * El HTML sale con el puente inyectado y la CSP de la caja (origen opaco, sin
+ * red, solo enmarcable por la plataforma). El PDF, en línea o como descarga.
+ * Los bytes de un id no cambian nunca —reemplazar crea otro archivo—, de ahí
+ * la caché inmutable: 30 MB se bajan una vez por dispositivo.
+ */
+export async function respuestaMaterial(
+  id: string,
+  material: ArchivoMaterial,
+  opciones: { descargar: boolean },
+): Promise<NextResponse> {
+  const { bytes } = await descargarArchivo(id);
+  const cache = "private, max-age=31536000, immutable";
+  if (material.tipo === "interactivo") {
+    return new NextResponse(new Uint8Array(inyectarPuente(bytes)), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Security-Policy": CSP_LIBRO,
+        "Content-Disposition": "inline",
+        "Cache-Control": cache,
+      },
+    });
+  }
+  const nombre = encodeURIComponent(material.nombreOriginal);
+  return new NextResponse(new Uint8Array(bytes), {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `${opciones.descargar ? "attachment" : "inline"}; filename*=UTF-8''${nombre}`,
+      "Cache-Control": cache,
+    },
+  });
+}
+
+/** GET /api/catalog/material/[id][?descargar=1] — vista previa del equipo. */
+export const materialVerHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_VER);
+  const id = await idParam(context);
+  const material = await archivoDeMaterial(id);
+  if (material === null) throw new NotFoundError("El material no existe.");
+  return respuestaMaterial(id, material, {
+    descargar: request.nextUrl.searchParams.get("descargar") === "1",
   });
 });
 

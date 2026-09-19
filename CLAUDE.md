@@ -164,7 +164,8 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   descarga solo autenticada, MIME allowlist (pdf/jpg/png/webp + **mp3/m4a**
   desde 2026-09-11, para narración de material; el VIDEO queda
   fuera a propósito: los del cuadernillo llegan a 47 MB y eso es trabajo de un
-  CDN, no de una ruta autenticada de Node), 10 MB máx,
+  CDN, no de una ruta autenticada de Node), 10 MB máx (quien llama puede pasar su
+  propia `PoliticaArchivo`: el material del alumno admite HTML y 80 MB),
   claves impredecibles; adaptador Spaces se enchufa en Fase 11. Reporting:
   asistencia por salón/mes con `AT TIME ZONE cl.timezone` EN SQL,
   ocupación de salones, contratos por país (con alcance). UI:
@@ -206,8 +207,8 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
 - **Nav superior + modales (2026-08-26, estilo MOSAICO)**: bajo el encabezado hay
   una barra (`NAV_ITEMS`) con botón verde **Inscripción Clubes** y accesos
   Actividades/Recursos/Material/**Historial**/**Avance**/**¿Cómo voy?**/Instructivos/
-  Perfil. **¿Cómo voy?**, **Historial** y **Avance** abren MODAL (no viven en el
-  cuerpo); el resto es acceso futuro. "¿Cómo voy?" = progreso del nivel + acordeón
+  Perfil. **¿Cómo voy?**, **Historial**, **Avance** y **Material** abren MODAL (no viven
+  en el cuerpo); el resto es acceso futuro. "¿Cómo voy?" = progreso del nivel + acordeón
   de niveles→Stages. El banner del curso ya no lleva texto (va en un encabezado
   aparte, 16:9) y hace lightbox al clic. **Mis próximas clases** vive en la columna
   derecha y muestra la **ventana de 14 días** (`agendaProximas(classroom, dias=14)`,
@@ -217,7 +218,10 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   `subirArte`/`arteId` con tipos **banner** (`catalog_imagen_curso` por CURSO:NIVEL,
   admite `NIVEL_TODOS`), **premio** (`catalog_premio_nivel` por CURSO:NIVEL),
   **mapa** (`catalog_mapa_curso` por curso) y **vobo** (`catalog_vobo`, GLOBAL).
-  Todo se sirve por `/api/catalog/imagen-curso/[id]`. **`subirArte` acota a JPG/PNG/WebP**
+  Todo se sirve por `/api/catalog/imagen-curso/[id]`, que desde 2026-09-19 **solo sirve
+  imágenes** (`descargarImagenCurso` mira el MIME con `metaArchivo` antes de leer): servía
+  CUALQUIER id de `files` en línea, y con el HTML del libro interactivo guardado eso era
+  ejecutarlo fuera de su caja, con la sesión de quien abriera el enlace. **`subirArte` acota a JPG/PNG/WebP**
   (2026-09-11): antes no restringía nada y `files` ya acepta audio, así que un mp3 guardado
   como banner no fallaba al subirse sino al pintarse. UI `/panel/mantenimiento-cursos/imagenes`
   gana selector de Tipo (previo cuadrado con tablero para PNG transparentes). En
@@ -284,22 +288,72 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
     material se rehará DESDE CERO. Se fue el CÓDIGO: `application/libro.ts` y
     `libro-audio.ts`, `/api/student/libro`, `/api/catalog/libro-audio/[id]`, los
     scripts `libro:importar|paginas|audios`, la prueba de integración y las
-    transcripciones de `content/libros/`. El botón **Material** de `/mi-panel` quedó
-    como acceso futuro: ahí entrará el diseño nuevo.
+    transcripciones de `content/libros/`. Lo reemplazó el **Material del alumno**
+    (2026-09-19, ver abajo), que NO usa nada de aquello.
   - **Lo que NO se tocó**: el arte (mapas, láminas de unidad, premios, insignias,
     personajes, banners) sigue intacto en `files` y en sus tablas. Y las tablas del
     libro —`catalog_libro`, `catalog_libro_pagina`, `catalog_libro_audio`,
     `catalog_insignia`— siguen creadas CON SUS DATOS (55 páginas y 34 pistas de
     Junior·Rookie) pero sin una línea de código que las lea: están DORMIDAS a
     propósito. Borrarlas exige una migración destructiva y dejaría huérfanos en
-    `files` los archivos que se pidió conservar; se decide al definir el diseño
-    nuevo. Las migraciones ya aplicadas (`20260911100000`, `…120000`, `…140000`,
+    `files` los archivos que se pidió conservar. El material nuevo no las usa, así que
+    la decisión de tirarlas sigue abierta. Las migraciones ya aplicadas (`20260911100000`, `…120000`, `…140000`,
     `20260915000000`, `20260915100000`) NO se revierten: el historial no se reescribe.
   - `files` sigue aceptando **mp3/m4a** aunque hoy nadie los sirva: el cuadernillo
     nuevo volverá a necesitar narración y el MIME vive en un módulo compartido.
   - Cómo estaba hecho —pliegos vs. `numero_impreso`, escenas por capas, audio por
     pliego, ids únicos por página— está en el commit `a400d97`. Si el diseño nuevo
     repite alguna de esas decisiones, ahí están los porqués y las trampas ya pagadas.
+- **Material del alumno (2026-09-19)**: el botón **Material** de `/mi-panel` abre un
+  modal con, por cada nivel ALCANZADO (el actual primero, más los completados), el
+  **libro interactivo** y el **libro para descargar**. Diseño los entrega hechos: un
+  HTML autocontenido (Junior·Rookie: 31 MB, 20 imágenes y un video de 17 MB en base64,
+  un solo `<script>`) y un PDF. La plataforma NO los transforma: los guarda y los sirve.
+  - **Carga**: `/panel/mantenimiento-cursos/material` (tarjeta "Material del alumno"),
+    tabla curso × nivel × tipo con Subir/Reemplazar/Ver/Quitar. `application/material.ts`
+    los guarda en `files` con entidad `catalog_material_interactivo|imprimible` y clave
+    `CURSO:NIVEL` (solo niveles reales, sin "TODOS"). **Reemplazar suelta el anterior**
+    DESPUÉS de subir el nuevo: un fallo a medias deja el viejo, no el nivel vacío. El
+    tipo lo decide el CONTENIDO (`esHtml`/`esPdf` en `domain/libro-interactivo.ts`), no
+    la extensión ni el MIME del navegador — en Windows un .html puede llegar sin tipo.
+  - **Política de subida por llamada** (`PoliticaArchivo` en `files`): el material admite
+    HTML y hasta **80 MB** (`TAMANO_MAXIMO_MATERIAL`) SIN ampliar la lista global —
+    contratos, fotos y arte siguen en PDF/imagen/audio y 10 MB—. No hay proxy, así que el
+    tope de 10 MB de `proxyClientMaxBodySize` no aplica a las subidas.
+  - **La caja** (lo esencial): el HTML trae su propio JavaScript y servido desde el
+    origen de la plataforma podría leer la sesión del niño. Se sirve con `CSP_LIBRO`:
+    `sandbox` SIN `allow-same-origin` (origen opaco "null"), `connect-src 'none'`,
+    medios solo `data:`/`blob:` y `frame-ancestors 'self'`; el iframe lleva el mismo
+    `sandbox` (`SANDBOX_LIBRO`, que viaja en la respuesta para que el panel no lo copie).
+    Cada permiso responde a algo que el libro usa: `allow-forms` porque el examen es un
+    `<form>` (sin él ni se dispara `submit`), `allow-modals` por `alert`/`confirm`,
+    `allow-downloads` por "Exportar resultados". `next.config.ts` abre `SAMEORIGIN` SOLO
+    para `/api/(catalog|student)/material/:id` — gana la última regla que coincide.
+  - **El puente de almacenamiento**: en origen opaco el libro pierde su `localStorage`,
+    que es donde guarda el progreso. `inyectarPuente` mete como PRIMER script del
+    `<head>` un sustituto en memoria que manda cada cambio al panel por `postMessage`;
+    el panel lo guarda en SU `localStorage` con clave `lgs-material:<personaId>:<nivel>`
+    (dos hermanos en la misma tableta no se pisan) y al reabrir se lo devuelve por el
+    `name` del iframe — `window.name` es lo único que un documento aislado lee de forma
+    síncrona antes de que corra su script. El panel acepta solo mensajes de ESE iframe
+    (compara la ventana: el origen es "null") y solo pares texto→texto. El progreso vive
+    en el dispositivo, igual que en el HTML original; llevarlo al servidor es otra decisión.
+  - **Verificado en Chrome real** (CDP, con el libro real): origen `null`,
+    `document.cookie` → SecurityError, `fetch` a la API bloqueado por la CSP, y el
+    progreso sobrevive a cerrar y reabrir. **Trampa para quien lo pruebe**: Chrome corre
+    el iframe con sandbox en OTRO proceso; no aparece en `Page.getFrameTree` del padre y
+    hay que adjuntarse con `Target.setAutoAttach` (llega con URL vacía).
+  - **Quién ve qué**: el niño por `/api/student/material` (lista) y
+    `/api/student/material/[id]` (sirve), que exigen que el archivo SEA material
+    (`archivoDeMaterial`) y que sea de SU curso y de un nivel ALCANZADO (`alcance.ts`, la
+    misma regla de nivel que el dashboard); si no, 404. El equipo, por
+    `/api/catalog/material/[id]` con `catalogo.ver`. Caché inmutable: los bytes de un id
+    no cambian, así que los 30 MB se bajan una vez por dispositivo.
+  - Las pruebas de integración usan `setPrefijoMaterialParaPruebas`: la clave
+    `JUNIOR:ROOKIE` es la del libro REAL en la base de desarrollo y "reemplazarlo" en una
+    prueba lo borraría.
+  - **Contenido a revisar con diseño**: el libro de Rookie trae dentro un desplegable
+    "Respuestas y pistas para el docente" que el niño también puede abrir.
   - **Poses de celebración** (2026-09-16): `rocky-celebrando`, `simba-celebrando` y
     `emma-confeti` (distinta de `emma-celebrando`, que es el puño en alto). El origen está
     en `imagenes/Personajes/` y trae **transparencia real**; las 27 `ChatGPT Image…` de esa
@@ -771,6 +825,23 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   `wp-theme/.../assets/`).
 - **Hotspots del MAPA de YOUNGSTER** sin cargar: la pantalla "Avance" dibuja el mapa
   sin marcadores hasta que se marquen en `/panel/mantenimiento-cursos/mapa`.
+- **Material del alumno por cargar** (2026-09-19): solo JUNIOR·ROOKIE tiene libro
+  interactivo y PDF, y únicamente en la base LOCAL — producción no existe aún (Fase 11).
+  Faltan los otros 4 niveles de Junior y los 5 de Youngster; se suben por
+  `/panel/mantenimiento-cursos/material`, sin tocar código. Los originales están en
+  `Libros/<Curso>/<Nivel>/` (ignorado por git).
+- **Progreso del libro interactivo solo en el dispositivo**: el puente lo guarda en el
+  `localStorage` del panel, igual que el HTML original. Si el niño cambia de tableta a
+  computador, empieza de cero. Llevarlo al servidor es decisión del negocio. Si se
+  hace, es portafolio, NO progresión: las respuestas del libro no pasan por
+  `registrarIntento` y no deben mover medallas (regla 4).
+- **El libro de Rookie muestra las respuestas al niño**: trae un desplegable
+  "Respuestas y pistas para el docente" dentro del mismo HTML. Es contenido de diseño,
+  no de la plataforma, que sirve el archivo tal cual.
+- **Almacenamiento en producción**: el material se sirve desde disco local (`files`,
+  `STORAGE_DIR`). Con 30 MB por libro y caché inmutable alcanza para empezar; con
+  Spaces (Fase 11) conviene revisar si se sirve desde el CDN con URL firmada, sin
+  perder la caja (la CSP va en la respuesta y el iframe mantiene su `sandbox`).
 - Restos en Hostinger: el título del sitio WordPress sigue siendo
   "lgskidsplataforma", el `/index.html` viejo sigue alcanzable y quedó el tema
   duplicado `lgs-kids-landing-old-6a8f390177c2e`.

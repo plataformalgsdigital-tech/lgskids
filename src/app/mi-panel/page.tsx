@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
@@ -199,19 +199,60 @@ const NAV_ITEMS: {
   emoji: string;
   href?: string;
   menu?: boolean;
-  action?: "comovoy" | "historial" | "avance" | "perfil";
+  action?: "comovoy" | "historial" | "avance" | "perfil" | "material";
 }[] = [
   { label: "Actividades", emoji: "✨", menu: true },
   { label: "Recursos", emoji: "🔗", menu: true },
-  // Material: aquí irá el nuevo cuadernillo, diseñado desde cero. El visor
-  // anterior se retiró (2026-09-17); hasta entonces queda como acceso futuro.
-  { label: "Material", emoji: "📖" },
+  // Material: el libro interactivo y el libro para descargar de cada nivel.
+  { label: "Material", emoji: "📖", action: "material" },
   { label: "Historial", emoji: "📘", action: "historial" },
   { label: "Avance", emoji: "🗺️", action: "avance" },
   { label: "¿Cómo voy?", emoji: "📊", action: "comovoy" },
   { label: "Instructivos", emoji: "🎥" },
   { label: "Perfil", emoji: "👤", action: "perfil" },
 ];
+
+/** Lo que devuelve `/api/student/material`. */
+interface MaterialAlumno {
+  /** Id del niño: separa el progreso de dos hermanos en la misma tableta. */
+  alumno: string;
+  niveles: {
+    nivel: string;
+    actual: boolean;
+    interactivoUrl: string | null;
+    imprimibleUrl: string | null;
+  }[];
+  /** La caja del visor: permisos del iframe y cómo habla el puente. */
+  libro: { sandbox: string; prefijo: string; mensaje: string };
+}
+
+/**
+ * El libro interactivo corre aislado (origen opaco) y no tiene
+ * `localStorage` propio: un puente que el servidor le inyecta manda aquí cada
+ * cambio de su progreso, y este panel lo guarda en el SUYO, por niño y nivel.
+ * Tope: el almacenamiento del navegador ronda 5 MB por sitio y lo comparte
+ * todo el panel.
+ */
+const TOPE_PROGRESO_LIBRO = 2_000_000;
+const claveProgresoLibro = (alumno: string, nivel: string) => `lgs-material:${alumno}:${nivel}`;
+
+/** Solo pares texto→texto: es lo único que un `localStorage` puede contener. */
+function soloTextos(o: unknown): Record<string, string> {
+  if (typeof o !== "object" || o === null) return {};
+  return Object.fromEntries(
+    Object.entries(o as Record<string, unknown>).filter(
+      (e): e is [string, string] => typeof e[1] === "string",
+    ),
+  );
+}
+
+function leerProgresoLibro(clave: string): Record<string, string> {
+  try {
+    return soloTextos(JSON.parse(window.localStorage.getItem(clave) ?? "{}"));
+  } catch {
+    return {}; // sin almacenamiento (modo privado, cuota): el libro empieza de cero
+  }
+}
 
 function fechaLarga(iso: string): string {
   return new Date(iso).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
@@ -230,6 +271,22 @@ export default function MiPanelPage() {
   const [verHistorial, setVerHistorial] = useState(false); // modal "Historial de clases"
   const [verAvance, setVerAvance] = useState(false); // modal "Avance" (mapa del curso)
   const [verPerfil, setVerPerfil] = useState(false); // modal "Perfil"
+  // Modal "Material": se carga al abrirlo, no con el dashboard.
+  const [verMaterial, setVerMaterial] = useState(false);
+  const [material, setMaterial] = useState<MaterialAlumno | null>(null);
+  const [materialMsg, setMaterialMsg] = useState<string | null>(null);
+  /**
+   * Libro interactivo abierto. `nombre` es el `name` del iframe, con el que el
+   * libro recibe su progreso guardado: se calcula UNA vez al abrir, porque
+   * cambiarlo después no llega al documento ya cargado.
+   */
+  const [libroAbierto, setLibroAbierto] = useState<{
+    nivel: string;
+    url: string;
+    nombre: string;
+  } | null>(null);
+  const [libroCargado, setLibroCargado] = useState(false);
+  const marcoLibro = useRef<HTMLIFrameElement | null>(null);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
@@ -260,7 +317,7 @@ export default function MiPanelPage() {
 
   // Cerrar overlays (lightbox / modales) con la tecla Escape
   useEffect(() => {
-    if (!verImagen && !verComoVoy && !verHistorial && !verAvance) return;
+    if (!verImagen && !verComoVoy && !verHistorial && !verAvance && !verMaterial) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setVerImagen(false);
@@ -268,11 +325,48 @@ export default function MiPanelPage() {
         setVerHistorial(false);
         if (avanceNivel !== null) setAvanceNivel(null);
         else setVerAvance(false);
+        // Con el libro abierto, Escape cierra el libro y deja el modal a la
+        // vista. (Solo llega aquí si el foco está fuera del iframe.)
+        if (libroAbierto !== null) setLibroAbierto(null);
+        else setVerMaterial(false);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [verImagen, verComoVoy, verHistorial, verAvance, verPerfil, avanceNivel]);
+  }, [
+    verImagen,
+    verComoVoy,
+    verHistorial,
+    verAvance,
+    verPerfil,
+    avanceNivel,
+    verMaterial,
+    libroAbierto,
+  ]);
+
+  // Progreso del libro interactivo: lo que el puente manda desde el iframe se
+  // guarda aquí, por niño y nivel. Solo se acepta lo que viene de ESE iframe
+  // —el origen es "null" por la caja, así que se compara la ventana, no el
+  // origen— y con la forma de un `localStorage`.
+  useEffect(() => {
+    if (libroAbierto === null || material === null) return;
+    const clave = claveProgresoLibro(material.alumno, libroAbierto.nivel);
+    const tipo = material.libro.mensaje;
+    function onMensaje(e: MessageEvent) {
+      if (e.source === null || e.source !== marcoLibro.current?.contentWindow) return;
+      const m = e.data as { tipo?: unknown; datos?: unknown } | null;
+      if (m?.tipo !== tipo) return;
+      const texto = JSON.stringify(soloTextos(m.datos));
+      if (texto.length > TOPE_PROGRESO_LIBRO) return;
+      try {
+        window.localStorage.setItem(clave, texto);
+      } catch {
+        // Sin almacenamiento: el libro sigue funcionando durante la sesión.
+      }
+    }
+    window.addEventListener("message", onMensaje);
+    return () => window.removeEventListener("message", onMensaje);
+  }, [libroAbierto, material]);
 
   useEffect(() => {
     let cancelado = false;
@@ -323,6 +417,29 @@ export default function MiPanelPage() {
       cancelado = true;
     };
   }, []);
+
+  /** Carga los libros del niño. Curso y niveles los decide el servidor. */
+  async function abrirMaterial() {
+    setVerMaterial(true);
+    if (material !== null) return; // ya cargado en esta visita
+    setMaterialMsg(null);
+    try {
+      const res = await apiFetch("/api/student/material");
+      if (!res.ok) {
+        setMaterialMsg("No pudimos abrir tu material.");
+        return;
+      }
+      setMaterial((await res.json()) as MaterialAlumno);
+    } catch {
+      setMaterialMsg("No pudimos abrir tu material.");
+    }
+  }
+
+  function abrirLibro(m: MaterialAlumno, nivel: string, url: string) {
+    const guardado = leerProgresoLibro(claveProgresoLibro(m.alumno, nivel));
+    setLibroCargado(false);
+    setLibroAbierto({ nivel, url, nombre: m.libro.prefijo + JSON.stringify(guardado) });
+  }
 
   async function subirFoto(archivo: File) {
     setSubiendoFoto(true);
@@ -1096,6 +1213,18 @@ export default function MiPanelPage() {
                     setAvanceNivel(null);
                     setVerAvance(true);
                   }}
+                  style={base}
+                >
+                  {inner}
+                </button>
+              );
+            }
+            if (it.action === "material") {
+              return (
+                <button
+                  key={it.label}
+                  type="button"
+                  onClick={() => void abrirMaterial()}
                   style={base}
                 >
                   {inner}
@@ -2324,6 +2453,260 @@ export default function MiPanelPage() {
               </button>
             </div>
             <div style={{ padding: "1.25rem" }}>{listaHistorial}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal "Material": libro interactivo y libro para descargar, por nivel */}
+      {verMaterial && (
+        <div
+          onClick={() => setVerMaterial(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mi material"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(8,11,24,0.55)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "2rem 1rem",
+            overflowY: "auto",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "36rem",
+              background: "white",
+              borderRadius: "1rem",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "1.1rem 1.25rem",
+                borderBottom: "1px solid #eef1f7",
+              }}
+            >
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>📖 Mi material</h2>
+              <button
+                type="button"
+                onClick={() => setVerMaterial(false)}
+                aria-label="Cerrar"
+                style={{
+                  width: "2.2rem",
+                  height: "2.2rem",
+                  borderRadius: "50%",
+                  border: "1px solid #e3e7f0",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: "1.1rem",
+                  lineHeight: 1,
+                  color: "var(--texto-suave)",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: "1.25rem", display: "grid", gap: "0.9rem" }}>
+              {materialMsg !== null && <p style={{ color: "var(--texto-suave)" }}>{materialMsg}</p>}
+              {materialMsg === null && material === null && (
+                <p style={{ color: "var(--texto-suave)" }}>Cargando tu material…</p>
+              )}
+              {material !== null &&
+                material.niveles.every(
+                  (n) => n.interactivoUrl === null && n.imprimibleUrl === null,
+                ) && (
+                  <VacioConPersonaje
+                    quien="coco"
+                    titulo="Tu material todavía no está listo."
+                    detalle="Muy pronto vas a encontrar aquí tu libro."
+                  />
+                )}
+              {material?.niveles
+                .filter((n) => n.interactivoUrl !== null || n.imprimibleUrl !== null)
+                .map((n) => {
+                  const nombreNivel = niveles.find((x) => x.codigo === n.nivel)?.nombre ?? n.nivel;
+                  const accion: CSSProperties = {
+                    flex: "1 1 12rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.45rem",
+                    padding: "0.8rem 1rem",
+                    borderRadius: "0.8rem",
+                    fontWeight: 800,
+                    fontSize: "0.95rem",
+                    textDecoration: "none",
+                    cursor: "pointer",
+                  };
+                  return (
+                    <div
+                      key={n.nivel}
+                      style={{
+                        border: n.actual ? "2px solid var(--lgs-azul)" : "1px solid #e3e7f0",
+                        borderRadius: "0.9rem",
+                        padding: "0.9rem 1rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <strong style={{ fontSize: "1.05rem" }}>{nombreNivel}</strong>
+                        {n.actual && (
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              fontWeight: 800,
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: "999px",
+                              background: "var(--lgs-azul)",
+                              color: "white",
+                            }}
+                          >
+                            Nivel actual
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.6rem",
+                          flexWrap: "wrap",
+                          marginTop: "0.7rem",
+                        }}
+                      >
+                        {n.interactivoUrl !== null && (
+                          <button
+                            type="button"
+                            onClick={() => abrirLibro(material, n.nivel, n.interactivoUrl ?? "")}
+                            style={{
+                              ...accion,
+                              border: "none",
+                              background: "var(--lgs-verde)",
+                              color: "#1b2a10",
+                            }}
+                          >
+                            📖 Libro interactivo
+                          </button>
+                        )}
+                        {n.imprimibleUrl !== null && (
+                          <a
+                            href={n.imprimibleUrl}
+                            download
+                            style={{
+                              ...accion,
+                              border: "1.5px solid #d8dce6",
+                              background: "white",
+                              color: "inherit",
+                            }}
+                          >
+                            ⬇️ Descargar libro
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/*
+        Libro interactivo a pantalla completa. El iframe lleva la MISMA caja que
+        la CSP del servidor (`sandbox` sin allow-same-origin): el libro no puede
+        tocar la sesión del niño ni la plataforma. `name` le entrega su
+        progreso guardado; lo nuevo vuelve por postMessage (efecto de arriba).
+      */}
+      {libroAbierto !== null && material !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Libro interactivo"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 80,
+            background: "#0a0e1e",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              padding: "0.55rem 0.9rem",
+              background: "linear-gradient(120deg, var(--lgs-azul) 0%, var(--lgs-purpura) 140%)",
+              color: "white",
+            }}
+          >
+            <strong style={{ fontSize: "1rem" }}>
+              📖 {niveles.find((x) => x.codigo === libroAbierto.nivel)?.nombre ?? "Mi libro"}
+            </strong>
+            <button
+              type="button"
+              onClick={() => setLibroAbierto(null)}
+              style={{
+                border: "none",
+                borderRadius: "999px",
+                padding: "0.45rem 1rem",
+                background: "white",
+                color: "var(--lgs-azul)",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              ✕ Cerrar libro
+            </button>
+          </div>
+          <div style={{ position: "relative", flex: 1 }}>
+            {!libroCargado && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  color: "white",
+                  textAlign: "center",
+                  padding: "1rem",
+                }}
+              >
+                <div>
+                  <Personaje quien="coco" alto="7rem" className="lgs-float" />
+                  <p style={{ marginTop: "0.75rem", fontWeight: 700 }}>Abriendo tu libro…</p>
+                </div>
+              </div>
+            )}
+            <iframe
+              ref={marcoLibro}
+              key={libroAbierto.url}
+              src={libroAbierto.url}
+              name={libroAbierto.nombre}
+              sandbox={material.libro.sandbox}
+              allow="fullscreen"
+              title="Libro interactivo"
+              onLoad={() => setLibroCargado(true)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                border: 0,
+                background: "white",
+                opacity: libroCargado ? 1 : 0,
+              }}
+            />
           </div>
         </div>
       )}

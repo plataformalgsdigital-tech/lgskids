@@ -24,6 +24,15 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
+      // El libro interactivo se abre DENTRO del panel, en un iframe: su ruta
+      // es la única que la plataforma puede enmarcar (SAMEORIGIN, y la CSP de
+      // la respuesta lo repite con `frame-ancestors 'self'`). Va DESPUÉS de la
+      // regla general porque, cuando dos reglas fijan la misma cabecera, gana
+      // la última.
+      {
+        source: "/api/:area(catalog|student)/material/:id",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
 };

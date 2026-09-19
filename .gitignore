@@ -24,10 +24,15 @@ dist/
 # conservan en disco y en Drive. Ver arte/README.md.
 arte/personajes-fuente/
 imagenes/
-# Audio y video de ORIGEN de los cuadernillos (~151 MB solo Junior Rookie).
-# Se sube a `files` con `pnpm libro:audios`; git se queda los binarios para
-# siempre y aquí no aportan nada que la base no tenga ya.
+# Audio y video de ORIGEN de los cuadernillos (~151 MB solo Junior Rookie),
+# del libro interactivo ya retirado. Git se queda los binarios para siempre.
 Audios/
+# Material del alumno de ORIGEN: el libro interactivo (.html, ~31 MB) y el
+# imprimible (.pdf) de cada nivel, más los videos. Se suben por
+# /panel/mantenimiento-cursos/material y viven en `files`; aquí solo pesarían.
+# Además, sin ignorarlos Prettier revisa el HTML de 31 MB y `pnpm verify` falla.
+Libros/
+Videos/
 
 # Logs y depuración
 *.log

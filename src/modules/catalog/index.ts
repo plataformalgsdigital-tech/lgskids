@@ -31,7 +31,29 @@ export {
   avisoLoginActivarHandler,
   hotspotsInfoHandler,
   hotspotsGuardarHandler,
+  materialEstadoHandler,
+  materialSubirHandler,
+  materialEliminarHandler,
+  materialVerHandler,
+  respuestaMaterial,
 } from "./api/handlers";
+export {
+  archivoDeMaterial,
+  materialVigente,
+  TIPOS_MATERIAL,
+  TAMANO_MAXIMO_MATERIAL,
+} from "./application/material";
+export type {
+  ArchivoMaterial,
+  MaterialResumen,
+  MaterialTipo,
+  MaterialNivel,
+} from "./application/material";
+export {
+  SANDBOX_LIBRO,
+  PREFIJO_NOMBRE_LIBRO,
+  MENSAJE_ALMACEN_LIBRO,
+} from "./domain/libro-interactivo";
 export { getHotspotsCurso } from "./application/hotspots";
 export type { HotspotData, Punto, HotspotScope } from "./application/hotspots";
 export {

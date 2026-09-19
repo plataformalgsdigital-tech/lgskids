@@ -55,6 +55,13 @@ const TARJETAS: Tarjeta[] = [
     href: "/panel/mantenimiento-cursos/imagenes",
   },
   {
+    titulo: "Material del alumno",
+    desc: "Libro interactivo (HTML) y libro para descargar (PDF) de cada nivel. Se abren desde “Material” en el panel del niño.",
+    emoji: "📖",
+    color: "var(--lgs-azul)",
+    href: "/panel/mantenimiento-cursos/material",
+  },
+  {
     titulo: "Enlaces de juegos",
     desc: "Los juegos de cada unidad. El niño los abre al tocar “Unidad N” en el mapa de su isla.",
     emoji: "🎮",
