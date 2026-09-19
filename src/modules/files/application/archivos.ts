@@ -28,6 +28,20 @@ const MIME_PERMITIDOS = new Map<string, string>([
 
 export const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024; // 10 MB
 
+/**
+ * Reglas de subida PROPIAS de quien llama, en lugar de las generales.
+ *
+ * Existe por el material del alumno: el libro interactivo es un HTML de 30 MB
+ * y el imprimible un PDF de 27 MB. Ampliar la lista GLOBAL para ellos dejaría
+ * entrar HTML y archivos enormes por cualquier camino de subida (contratos,
+ * fotos, arte); con una política por llamada, solo el material los admite.
+ */
+export interface PoliticaArchivo {
+  /** MIME → extensión con la que se guarda. */
+  mimes: ReadonlyMap<string, string>;
+  tamanoMaximo: number;
+}
+
 export interface ArchivoMeta {
   id: string;
   nombreOriginal: string;
@@ -45,15 +59,21 @@ export async function subirArchivo(input: {
   bytes: Buffer;
   entidad?: string | null;
   entidadId?: string | null;
+  politica?: PoliticaArchivo;
 }): Promise<{ id: string }> {
-  const extension = MIME_PERMITIDOS.get(input.mime);
+  const mimes = input.politica?.mimes ?? MIME_PERMITIDOS;
+  const tamanoMaximo = input.politica?.tamanoMaximo ?? TAMANO_MAXIMO_BYTES;
+  const extension = mimes.get(input.mime);
   if (extension === undefined) {
+    const aceptados = [...new Set(mimes.values())].map((e) => e.toUpperCase()).join(", ");
     throw new ValidationError(
-      `Tipo de archivo no permitido (${input.mime}). Aceptados: PDF, JPG, PNG, WebP, MP3, M4A.`,
+      `Tipo de archivo no permitido (${input.mime || "desconocido"}). Aceptados: ${aceptados}.`,
     );
   }
-  if (input.bytes.length === 0 || input.bytes.length > TAMANO_MAXIMO_BYTES) {
-    throw new ValidationError("El archivo debe pesar entre 1 byte y 10 MB.");
+  if (input.bytes.length === 0 || input.bytes.length > tamanoMaximo) {
+    throw new ValidationError(
+      `El archivo debe pesar entre 1 byte y ${String(Math.round(tamanoMaximo / 1024 / 1024))} MB.`,
+    );
   }
 
   // Las imágenes se encogen ANTES de guardarse: es el único punto por el que
@@ -64,7 +84,7 @@ export async function subirArchivo(input: {
   const opt = await optimizarImagen(input.bytes, input.mime);
   const bytes = opt.bytes;
   const mime = opt.mime;
-  const extensionFinal = MIME_PERMITIDOS.get(mime) ?? extension;
+  const extensionFinal = mimes.get(mime) ?? MIME_PERMITIDOS.get(mime) ?? extension;
   if (opt.final < opt.original) {
     logger.info("Imagen optimizada al subirla", {
       de: input.mime,
@@ -103,6 +123,23 @@ export async function subirArchivo(input: {
     payload: { nombre: input.nombreOriginal, mime: input.mime, bytes: input.bytes.length },
   });
   return { id };
+}
+
+/**
+ * Los datos de un archivo SIN leer sus bytes.
+ *
+ * Quien sirve por id tiene que comprobar primero QUÉ es ese archivo (a qué
+ * entidad pertenece, qué tipo tiene); leer 30 MB para luego rechazarlos sería
+ * pagar la descarga entera de cada petición indebida.
+ */
+export async function metaArchivo(id: string): Promise<ArchivoMeta | null> {
+  return queryOne<ArchivoMeta>(
+    `SELECT id, nombre_original AS "nombreOriginal", mime, size_bytes AS "sizeBytes",
+            entidad, entidad_id AS "entidadId", created_at AS "createdAt"
+       FROM files_object
+      WHERE id = $1`,
+    [id],
+  );
 }
 
 /** Descarga AUTENTICADA (no hay URLs públicas — datos de menores). */

@@ -1,5 +1,5 @@
-import { descargarArchivo, listarArchivos, subirArchivo } from "@/modules/files";
-import { ValidationError } from "@/platform/errors";
+import { descargarArchivo, listarArchivos, metaArchivo, subirArchivo } from "@/modules/files";
+import { NotFoundError, ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
 import { PARADAS, PARADA_WELCOME, UNIDADES_MAPA, paradaValida } from "../domain/unidad-mapa";
 
@@ -177,10 +177,22 @@ export async function voboId(): Promise<string | null> {
   return arteId("vobo");
 }
 
+/**
+ * Sirve arte por id, y SOLO imágenes.
+ *
+ * Esta ruta sirve en línea con el MIME guardado, y `files` guarda también PDF,
+ * audio y el HTML del libro interactivo. Sin el filtro, el id de ese HTML
+ * abierto aquí correría fuera de su caja, en el origen de la plataforma y con
+ * la sesión de quien lo abra.
+ */
 export async function descargarImagenCurso(id: string): Promise<{
   meta: { nombreOriginal: string; mime: string };
   bytes: Buffer;
 }> {
+  const meta = await metaArchivo(id);
+  if (meta === null || !MIMES_ARTE.has(meta.mime)) {
+    throw new NotFoundError("La imagen no existe.");
+  }
   return descargarArchivo(id);
 }
 

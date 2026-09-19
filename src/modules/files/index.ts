@@ -12,8 +12,10 @@ export {
   descargarArchivo,
   eliminarArchivo,
   listarArchivos,
+  metaArchivo,
   TAMANO_MAXIMO_BYTES,
 } from "./application/archivos";
+export type { ArchivoMeta, PoliticaArchivo } from "./application/archivos";
 export { reoptimizarImagenes, UMBRAL_REOPTIMIZAR } from "./application/reoptimizar";
 export type { ResultadoReoptimizar } from "./application/reoptimizar";
 export { LADO_MAXIMO } from "./infrastructure/optimizar-imagen";
