@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
+import { VisorLibro, type CajaLibro } from "@/ui/VisorLibro";
 import { apiFetch } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 
@@ -220,39 +221,16 @@ interface MaterialAlumno {
     nivel: string;
     actual: boolean;
     interactivoUrl: string | null;
+    /** Base con token de los videos del libro (`videos/7-1.mp4` sale de ahí). */
+    videosBase: string | null;
     imprimibleUrl: string | null;
   }[];
   /** La caja del visor: permisos del iframe y cómo habla el puente. */
-  libro: { sandbox: string; prefijo: string; mensaje: string };
+  libro: CajaLibro;
 }
 
-/**
- * El libro interactivo corre aislado (origen opaco) y no tiene
- * `localStorage` propio: un puente que el servidor le inyecta manda aquí cada
- * cambio de su progreso, y este panel lo guarda en el SUYO, por niño y nivel.
- * Tope: el almacenamiento del navegador ronda 5 MB por sitio y lo comparte
- * todo el panel.
- */
-const TOPE_PROGRESO_LIBRO = 2_000_000;
+/** Progreso del libro en este dispositivo: por NIÑO y nivel (ver `VisorLibro`). */
 const claveProgresoLibro = (alumno: string, nivel: string) => `lgs-material:${alumno}:${nivel}`;
-
-/** Solo pares texto→texto: es lo único que un `localStorage` puede contener. */
-function soloTextos(o: unknown): Record<string, string> {
-  if (typeof o !== "object" || o === null) return {};
-  return Object.fromEntries(
-    Object.entries(o as Record<string, unknown>).filter(
-      (e): e is [string, string] => typeof e[1] === "string",
-    ),
-  );
-}
-
-function leerProgresoLibro(clave: string): Record<string, string> {
-  try {
-    return soloTextos(JSON.parse(window.localStorage.getItem(clave) ?? "{}"));
-  } catch {
-    return {}; // sin almacenamiento (modo privado, cuota): el libro empieza de cero
-  }
-}
 
 function fechaLarga(iso: string): string {
   return new Date(iso).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
@@ -275,18 +253,12 @@ export default function MiPanelPage() {
   const [verMaterial, setVerMaterial] = useState(false);
   const [material, setMaterial] = useState<MaterialAlumno | null>(null);
   const [materialMsg, setMaterialMsg] = useState<string | null>(null);
-  /**
-   * Libro interactivo abierto. `nombre` es el `name` del iframe, con el que el
-   * libro recibe su progreso guardado: se calcula UNA vez al abrir, porque
-   * cambiarlo después no llega al documento ya cargado.
-   */
+  /** Libro interactivo abierto (lo pinta `VisorLibro`). */
   const [libroAbierto, setLibroAbierto] = useState<{
     nivel: string;
     url: string;
-    nombre: string;
+    videosBase: string | null;
   } | null>(null);
-  const [libroCargado, setLibroCargado] = useState(false);
-  const marcoLibro = useRef<HTMLIFrameElement | null>(null);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
@@ -343,30 +315,6 @@ export default function MiPanelPage() {
     verMaterial,
     libroAbierto,
   ]);
-
-  // Progreso del libro interactivo: lo que el puente manda desde el iframe se
-  // guarda aquí, por niño y nivel. Solo se acepta lo que viene de ESE iframe
-  // —el origen es "null" por la caja, así que se compara la ventana, no el
-  // origen— y con la forma de un `localStorage`.
-  useEffect(() => {
-    if (libroAbierto === null || material === null) return;
-    const clave = claveProgresoLibro(material.alumno, libroAbierto.nivel);
-    const tipo = material.libro.mensaje;
-    function onMensaje(e: MessageEvent) {
-      if (e.source === null || e.source !== marcoLibro.current?.contentWindow) return;
-      const m = e.data as { tipo?: unknown; datos?: unknown } | null;
-      if (m?.tipo !== tipo) return;
-      const texto = JSON.stringify(soloTextos(m.datos));
-      if (texto.length > TOPE_PROGRESO_LIBRO) return;
-      try {
-        window.localStorage.setItem(clave, texto);
-      } catch {
-        // Sin almacenamiento: el libro sigue funcionando durante la sesión.
-      }
-    }
-    window.addEventListener("message", onMensaje);
-    return () => window.removeEventListener("message", onMensaje);
-  }, [libroAbierto, material]);
 
   useEffect(() => {
     let cancelado = false;
@@ -435,10 +383,8 @@ export default function MiPanelPage() {
     }
   }
 
-  function abrirLibro(m: MaterialAlumno, nivel: string, url: string) {
-    const guardado = leerProgresoLibro(claveProgresoLibro(m.alumno, nivel));
-    setLibroCargado(false);
-    setLibroAbierto({ nivel, url, nombre: m.libro.prefijo + JSON.stringify(guardado) });
+  function abrirLibro(nivel: string, url: string, videosBase: string | null) {
+    setLibroAbierto({ nivel, url, videosBase });
   }
 
   async function subirFoto(archivo: File) {
@@ -2585,7 +2531,9 @@ export default function MiPanelPage() {
                         {n.interactivoUrl !== null && (
                           <button
                             type="button"
-                            onClick={() => abrirLibro(material, n.nivel, n.interactivoUrl ?? "")}
+                            onClick={() =>
+                              abrirLibro(n.nivel, n.interactivoUrl ?? "", n.videosBase)
+                            }
                             style={{
                               ...accion,
                               border: "none",
@@ -2619,96 +2567,17 @@ export default function MiPanelPage() {
         </div>
       )}
 
-      {/*
-        Libro interactivo a pantalla completa. El iframe lleva la MISMA caja que
-        la CSP del servidor (`sandbox` sin allow-same-origin): el libro no puede
-        tocar la sesión del niño ni la plataforma. `name` le entrega su
-        progreso guardado; lo nuevo vuelve por postMessage (efecto de arriba).
-      */}
+      {/* Libro interactivo a pantalla completa: ver `src/ui/VisorLibro.tsx`. */}
       {libroAbierto !== null && material !== null && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Libro interactivo"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 80,
-            background: "#0a0e1e",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "0.75rem",
-              padding: "0.55rem 0.9rem",
-              background: "linear-gradient(120deg, var(--lgs-azul) 0%, var(--lgs-purpura) 140%)",
-              color: "white",
-            }}
-          >
-            <strong style={{ fontSize: "1rem" }}>
-              📖 {niveles.find((x) => x.codigo === libroAbierto.nivel)?.nombre ?? "Mi libro"}
-            </strong>
-            <button
-              type="button"
-              onClick={() => setLibroAbierto(null)}
-              style={{
-                border: "none",
-                borderRadius: "999px",
-                padding: "0.45rem 1rem",
-                background: "white",
-                color: "var(--lgs-azul)",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              ✕ Cerrar libro
-            </button>
-          </div>
-          <div style={{ position: "relative", flex: 1 }}>
-            {!libroCargado && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "grid",
-                  placeItems: "center",
-                  color: "white",
-                  textAlign: "center",
-                  padding: "1rem",
-                }}
-              >
-                <div>
-                  <Personaje quien="coco" alto="7rem" className="lgs-float" />
-                  <p style={{ marginTop: "0.75rem", fontWeight: 700 }}>Abriendo tu libro…</p>
-                </div>
-              </div>
-            )}
-            <iframe
-              ref={marcoLibro}
-              key={libroAbierto.url}
-              src={libroAbierto.url}
-              name={libroAbierto.nombre}
-              sandbox={material.libro.sandbox}
-              allow="fullscreen"
-              title="Libro interactivo"
-              onLoad={() => setLibroCargado(true)}
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                border: 0,
-                background: "white",
-                opacity: libroCargado ? 1 : 0,
-              }}
-            />
-          </div>
-        </div>
+        <VisorLibro
+          key={libroAbierto.url}
+          url={libroAbierto.url}
+          titulo={niveles.find((x) => x.codigo === libroAbierto.nivel)?.nombre ?? "Mi libro"}
+          caja={material.libro}
+          claveProgreso={claveProgresoLibro(material.alumno, libroAbierto.nivel)}
+          videosBase={libroAbierto.videosBase}
+          onCerrar={() => setLibroAbierto(null)}
+        />
       )}
 
       {/* Modal "Avance": mapa del curso → islas con VoBos y premios (hotspots) */}

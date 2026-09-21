@@ -34,6 +34,7 @@ export const GET = handlerWithAuth(async (request, auth, context) => {
     throw new NotFoundError("Ese material no está en tu recorrido.");
   }
   return respuestaMaterial(id, material, {
-    descargar: new URL(request.url).searchParams.get("descargar") === "1",
+    descargar: request.nextUrl.searchParams.get("descargar") === "1",
+    origen: request.nextUrl.origin,
   });
 });

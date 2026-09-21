@@ -1,6 +1,8 @@
 /**
- * Libro interactivo: un HTML autocontenido (imágenes y video en base64, un solo
- * <script>) que se sirve TAL CUAL lo entregó diseño, dentro de una caja.
+ * Libro interactivo: un HTML autocontenido que se sirve TAL CUAL lo entregó
+ * diseño, dentro de una caja. Las imágenes van dentro en base64; los videos, ya
+ * no: el libro los pide por ruta relativa (`videos/7-1.mp4`, ver
+ * `video-libro.ts`).
  *
  * La caja es la clave. Ese HTML trae su propio JavaScript, y servido desde el
  * origen de la plataforma podría leer la sesión del niño y llamar a la API en
@@ -42,43 +44,63 @@ export const SANDBOX_LIBRO =
 
 /**
  * CSP del libro. Además de la caja: nada sale a la red (`connect-src 'none'`,
- * imágenes y medios solo `data:`/`blob:`) y solo la propia plataforma puede
- * enmarcarlo. `form-action 'none'` frena el envío real del examen, que el
- * libro ya cancela.
+ * imágenes solo `data:`/`blob:`) y solo la propia plataforma puede enmarcarlo.
+ * `form-action 'none'` frena el envío real del examen, que el libro ya cancela.
+ *
+ * `baseVideos` (`https://…/api/material/<id>/`) es la ÚNICA puerta abierta: los
+ * videos del libro y la `<base>` que pone el puente pueden apuntar ahí y a
+ * ningún otro lado. Termina en `/`, así que la CSP lo trata como prefijo de
+ * ruta: sirve para los videos de ESTE libro, no para el resto de la API.
  */
-export const CSP_LIBRO = [
-  `sandbox ${SANDBOX_LIBRO}`,
-  "default-src 'none'",
-  "script-src 'unsafe-inline'",
-  "style-src 'unsafe-inline'",
-  "img-src data: blob:",
-  "media-src data: blob:",
-  "font-src data:",
-  "connect-src 'none'",
-  "frame-ancestors 'self'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join("; ");
+export function cspLibro(baseVideos: string | null): string {
+  return [
+    `sandbox ${SANDBOX_LIBRO}`,
+    "default-src 'none'",
+    "script-src 'unsafe-inline'",
+    "style-src 'unsafe-inline'",
+    "img-src data: blob:",
+    baseVideos === null ? "media-src data: blob:" : `media-src data: blob: ${baseVideos}`,
+    "font-src data:",
+    "connect-src 'none'",
+    "frame-ancestors 'self'",
+    `base-uri ${baseVideos ?? "'none'"}`,
+    "form-action 'none'",
+  ].join("; ");
+}
 
 /**
  * El puente. Va en ES5 y sin dependencias: corre ANTES que el script del
  * libro, en cualquier navegador que el niño tenga.
+ *
+ * Lee lo que el panel le deja en `window.name`, `{v:2, datos, videos}`:
+ * - `datos`: el progreso guardado; sustituye `localStorage` y devuelve cada
+ *   cambio al panel.
+ * - `videos`: la base con token (`/api/material/<id>/t/<token>/`). Se pone como
+ *   `<base>` del documento, así la ruta relativa `videos/7-1.mp4` que escribe
+ *   diseño llega autorizada: desde la caja el navegador NO manda la cookie de
+ *   sesión. Solo se aceptan rutas del propio sitio (`/…`, nunca `//otro`), y la
+ *   CSP (`base-uri`) lo vuelve a exigir.
+ * Un `window.name` antiguo (solo el progreso, sin `v`) se sigue entendiendo.
  *
  * `sessionStorage` también se sustituye (en memoria, sin guardar): en un origen
  * opaco lanza igual que `localStorage`, y un libro futuro que lo use sin
  * try/catch se caería entero.
  */
 export const PUENTE_ALMACEN = `(function(){
-var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},d={};
+var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},d={},base=null;
+function propio(o,k){return Object.prototype.hasOwnProperty.call(o,k);}
+function textos(o){var r={};if(o&&typeof o==="object"){for(var k in o){if(propio(o,k)&&typeof o[k]==="string"){r[k]=o[k];}}}return r;}
 try{var n=window.name;if(n&&n.indexOf(P)===0){var o=JSON.parse(n.slice(P.length));
-if(o&&typeof o==="object"){for(var k in o){if(Object.prototype.hasOwnProperty.call(o,k)&&typeof o[k]==="string"){d[k]=o[k];}}}}}catch(e){}
-function avisar(){try{window.name=P+JSON.stringify(d);}catch(e){}
+if(o&&o.v===2){d=textos(o.datos);var b=o.videos;if(typeof b==="string"&&b.charAt(0)==="/"&&b.charAt(1)!=="/"){base=b;}}
+else{d=textos(o);}}}catch(e){}
+if(base){try{var e=document.createElement("base");e.href=base;var h=document.head||document.documentElement;h.insertBefore(e,h.firstChild);}catch(x){}}
+function avisar(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base});}catch(e){}
 try{if(window.parent&&window.parent!==window){window.parent.postMessage({tipo:T,datos:d},"*");}}catch(e){}}
 function almacen(m,guardar){var s={
-getItem:function(k){k=String(k);return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null;},
+getItem:function(k){k=String(k);return propio(m,k)?m[k]:null;},
 setItem:function(k,v){m[String(k)]=String(v);if(guardar)avisar();},
 removeItem:function(k){delete m[String(k)];if(guardar)avisar();},
-clear:function(){for(var k in m){if(Object.prototype.hasOwnProperty.call(m,k))delete m[k];}if(guardar)avisar();},
+clear:function(){for(var k in m){if(propio(m,k))delete m[k];}if(guardar)avisar();},
 key:function(i){var ks=Object.keys(m);return i>=0&&i<ks.length?ks[i]:null;}};
 Object.defineProperty(s,"length",{get:function(){return Object.keys(m).length;}});return s;}
 try{Object.defineProperty(window,"localStorage",{value:almacen(d,true),configurable:true});}catch(e){}

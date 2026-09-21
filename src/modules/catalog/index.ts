@@ -54,6 +54,18 @@ export {
   PREFIJO_NOMBRE_LIBRO,
   MENSAJE_ALMACEN_LIBRO,
 } from "./domain/libro-interactivo";
+export {
+  videosLibroListarHandler,
+  videosLibroSubirHandler,
+  videoLibroConfirmarHandler,
+  videoLibroEliminarHandler,
+  videoLibroPrevioHandler,
+  videoLibroServirHandler,
+  materialVisorHandler,
+} from "./api/video-handlers";
+export { baseVideosLibro } from "./application/video-libro";
+export type { VideoLibro } from "./application/video-libro";
+export { rutaVideoLibro } from "./domain/video-libro";
 export { getHotspotsCurso } from "./application/hotspots";
 export type { HotspotData, Punto, HotspotScope } from "./application/hotspots";
 export {

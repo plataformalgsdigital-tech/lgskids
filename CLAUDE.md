@@ -304,56 +304,6 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   - Cómo estaba hecho —pliegos vs. `numero_impreso`, escenas por capas, audio por
     pliego, ids únicos por página— está en el commit `a400d97`. Si el diseño nuevo
     repite alguna de esas decisiones, ahí están los porqués y las trampas ya pagadas.
-- **Material del alumno (2026-09-19)**: el botón **Material** de `/mi-panel` abre un
-  modal con, por cada nivel ALCANZADO (el actual primero, más los completados), el
-  **libro interactivo** y el **libro para descargar**. Diseño los entrega hechos: un
-  HTML autocontenido (Junior·Rookie: 31 MB, 20 imágenes y un video de 17 MB en base64,
-  un solo `<script>`) y un PDF. La plataforma NO los transforma: los guarda y los sirve.
-  - **Carga**: `/panel/mantenimiento-cursos/material` (tarjeta "Material del alumno"),
-    tabla curso × nivel × tipo con Subir/Reemplazar/Ver/Quitar. `application/material.ts`
-    los guarda en `files` con entidad `catalog_material_interactivo|imprimible` y clave
-    `CURSO:NIVEL` (solo niveles reales, sin "TODOS"). **Reemplazar suelta el anterior**
-    DESPUÉS de subir el nuevo: un fallo a medias deja el viejo, no el nivel vacío. El
-    tipo lo decide el CONTENIDO (`esHtml`/`esPdf` en `domain/libro-interactivo.ts`), no
-    la extensión ni el MIME del navegador — en Windows un .html puede llegar sin tipo.
-  - **Política de subida por llamada** (`PoliticaArchivo` en `files`): el material admite
-    HTML y hasta **80 MB** (`TAMANO_MAXIMO_MATERIAL`) SIN ampliar la lista global —
-    contratos, fotos y arte siguen en PDF/imagen/audio y 10 MB—. No hay proxy, así que el
-    tope de 10 MB de `proxyClientMaxBodySize` no aplica a las subidas.
-  - **La caja** (lo esencial): el HTML trae su propio JavaScript y servido desde el
-    origen de la plataforma podría leer la sesión del niño. Se sirve con `CSP_LIBRO`:
-    `sandbox` SIN `allow-same-origin` (origen opaco "null"), `connect-src 'none'`,
-    medios solo `data:`/`blob:` y `frame-ancestors 'self'`; el iframe lleva el mismo
-    `sandbox` (`SANDBOX_LIBRO`, que viaja en la respuesta para que el panel no lo copie).
-    Cada permiso responde a algo que el libro usa: `allow-forms` porque el examen es un
-    `<form>` (sin él ni se dispara `submit`), `allow-modals` por `alert`/`confirm`,
-    `allow-downloads` por "Exportar resultados". `next.config.ts` abre `SAMEORIGIN` SOLO
-    para `/api/(catalog|student)/material/:id` — gana la última regla que coincide.
-  - **El puente de almacenamiento**: en origen opaco el libro pierde su `localStorage`,
-    que es donde guarda el progreso. `inyectarPuente` mete como PRIMER script del
-    `<head>` un sustituto en memoria que manda cada cambio al panel por `postMessage`;
-    el panel lo guarda en SU `localStorage` con clave `lgs-material:<personaId>:<nivel>`
-    (dos hermanos en la misma tableta no se pisan) y al reabrir se lo devuelve por el
-    `name` del iframe — `window.name` es lo único que un documento aislado lee de forma
-    síncrona antes de que corra su script. El panel acepta solo mensajes de ESE iframe
-    (compara la ventana: el origen es "null") y solo pares texto→texto. El progreso vive
-    en el dispositivo, igual que en el HTML original; llevarlo al servidor es otra decisión.
-  - **Verificado en Chrome real** (CDP, con el libro real): origen `null`,
-    `document.cookie` → SecurityError, `fetch` a la API bloqueado por la CSP, y el
-    progreso sobrevive a cerrar y reabrir. **Trampa para quien lo pruebe**: Chrome corre
-    el iframe con sandbox en OTRO proceso; no aparece en `Page.getFrameTree` del padre y
-    hay que adjuntarse con `Target.setAutoAttach` (llega con URL vacía).
-  - **Quién ve qué**: el niño por `/api/student/material` (lista) y
-    `/api/student/material/[id]` (sirve), que exigen que el archivo SEA material
-    (`archivoDeMaterial`) y que sea de SU curso y de un nivel ALCANZADO (`alcance.ts`, la
-    misma regla de nivel que el dashboard); si no, 404. El equipo, por
-    `/api/catalog/material/[id]` con `catalogo.ver`. Caché inmutable: los bytes de un id
-    no cambian, así que los 30 MB se bajan una vez por dispositivo.
-  - Las pruebas de integración usan `setPrefijoMaterialParaPruebas`: la clave
-    `JUNIOR:ROOKIE` es la del libro REAL en la base de desarrollo y "reemplazarlo" en una
-    prueba lo borraría.
-  - **Contenido a revisar con diseño**: el libro de Rookie trae dentro un desplegable
-    "Respuestas y pistas para el docente" que el niño también puede abrir.
   - **Poses de celebración** (2026-09-16): `rocky-celebrando`, `simba-celebrando` y
     `emma-confeti` (distinta de `emma-celebrando`, que es el puño en alto). El origen está
     en `imagenes/Personajes/` y trae **transparencia real**; las 27 `ChatGPT Image…` de esa
@@ -397,6 +347,117 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   - **Trampa**: reimportar por CSV esa lección SOBRESCRIBE `actividades` y se lleva las
     posiciones; hay que volver a colocarlas.
   - El dashboard expone `unidades` y `juegosUnidad` por nivel.
+- **Material del alumno (2026-09-19)**: el botón **Material** de `/mi-panel` abre un
+  modal con, por cada nivel ALCANZADO (el actual primero, más los completados), el
+  **libro interactivo** y el **libro para descargar**. Diseño los entrega hechos: un
+  HTML autocontenido (imágenes en base64, un solo `<script>`) y un PDF. Desde 2026-09-21
+  los VIDEOS no van dentro del HTML: se suben aparte (ver "Videos del libro" abajo).
+  La plataforma NO transforma el libro: lo guarda y lo sirve con el puente inyectado.
+  - **Carga**: `/panel/mantenimiento-cursos/material` (tarjeta "Material del alumno"),
+    tabla curso × nivel × tipo con Subir/Reemplazar/Ver/Quitar. `application/material.ts`
+    los guarda en `files` con entidad `catalog_material_interactivo|imprimible` y clave
+    `CURSO:NIVEL` (solo niveles reales, sin "TODOS"). **Reemplazar suelta el anterior**
+    DESPUÉS de subir el nuevo: un fallo a medias deja el viejo, no el nivel vacío. El
+    tipo lo decide el CONTENIDO (`esHtml`/`esPdf` en `domain/libro-interactivo.ts`), no
+    la extensión ni el MIME del navegador — en Windows un .html puede llegar sin tipo.
+  - **Política de subida por llamada** (`PoliticaArchivo` en `files`): el material admite
+    HTML y hasta **80 MB** (`TAMANO_MAXIMO_MATERIAL`) SIN ampliar la lista global —
+    contratos, fotos y arte siguen en PDF/imagen/audio y 10 MB—. No hay proxy, así que el
+    tope de 10 MB de `proxyClientMaxBodySize` no aplica a las subidas.
+  - **La caja** (lo esencial): el HTML trae su propio JavaScript y servido desde el
+    origen de la plataforma podría leer la sesión del niño. Se sirve con `cspLibro(base)`:
+    `sandbox` SIN `allow-same-origin` (origen opaco "null"), `connect-src 'none'`,
+    imágenes solo `data:`/`blob:`, `frame-ancestors 'self'`, y `media-src`/`base-uri`
+    abiertos SOLO a `<origen>/api/material/<id>/` (los videos de ESE libro; el `origen`
+    es el de la petición). El iframe lleva el mismo `sandbox` (`SANDBOX_LIBRO`, que
+    viaja en la respuesta para que el panel no lo copie).
+    Cada permiso responde a algo que el libro usa: `allow-forms` porque el examen es un
+    `<form>` (sin él ni se dispara `submit`), `allow-modals` por `alert`/`confirm`,
+    `allow-downloads` por "Exportar resultados". `next.config.ts` abre `SAMEORIGIN` SOLO
+    para `/api/(catalog|student)/material/:id` — gana la última regla que coincide.
+  - **El puente de almacenamiento**: en origen opaco el libro pierde su `localStorage`,
+    que es donde guarda el progreso. `inyectarPuente` mete como PRIMER script del
+    `<head>` un sustituto en memoria que manda cada cambio al panel por `postMessage`;
+    el panel lo guarda en SU `localStorage` con clave `lgs-material:<personaId>:<nivel>`
+    (dos hermanos en la misma tableta no se pisan) y al reabrir se lo devuelve por el
+    `name` del iframe — `window.name` es lo único que un documento aislado lee de forma
+    síncrona antes de que corra su script. Formato `lgs-material:{v:2, datos, videos}`
+    (`videos` = base con token de sus videos; el formato viejo, solo `datos`, se sigue
+    entendiendo). El panel acepta solo mensajes de ESE iframe (compara la ventana: el
+    origen es "null") y solo pares texto→texto. El progreso vive en el dispositivo, igual
+    que en el HTML original; llevarlo al servidor es otra decisión.
+  - **Un solo visor**: `src/ui/VisorLibro.tsx` (iframe, puente, progreso). Lo usan
+    `/mi-panel` y la vista previa del equipo `/panel/mantenimiento-cursos/material/ver/[id]`
+    (el botón "Ver" del libro en Material), para que el equipo vea EXACTAMENTE lo que ve
+    el niño, videos incluidos. El progreso del equipo va aparte (`lgs-material:equipo:<id>`).
+  - **Verificado en Chrome real** (CDP, con el libro real): origen `null`,
+    `document.cookie` → SecurityError, `fetch` a la API bloqueado por la CSP, y el
+    progreso sobrevive a cerrar y reabrir. **Trampa para quien lo pruebe**: Chrome corre
+    el iframe con sandbox en OTRO proceso; no aparece en `Page.getFrameTree` del padre y
+    hay que adjuntarse con `Target.setAutoAttach` (llega con URL vacía).
+  - **Quién ve qué**: el niño por `/api/student/material` (lista) y
+    `/api/student/material/[id]` (sirve), que exigen que el archivo SEA material
+    (`archivoDeMaterial`) y que sea de SU curso y de un nivel ALCANZADO (`alcance.ts`, la
+    misma regla de nivel que el dashboard); si no, 404. El equipo, por
+    `/api/catalog/material/[id]` con `catalogo.ver`. Caché inmutable: los bytes de un id
+    no cambian, así que los 30 MB se bajan una vez por dispositivo.
+  - Las pruebas de integración usan `setPrefijoMaterialParaPruebas`: la clave
+    `JUNIOR:ROOKIE` es la del libro REAL en la base de desarrollo y "reemplazarlo" en una
+    prueba lo borraría.
+  - **Contenido a revisar con diseño**: el libro de Rookie trae dentro un desplegable
+    "Respuestas y pistas para el docente" que el niño también puede abrir.
+- **Videos del libro (2026-09-21)**: los videos incrustados en base64 llevaban el libro
+  de Rookie a 105 MB y el niño bajaba 11 minutos de canciones antes de ver la página 1.
+  Sin ellos, el mismo libro (CON_PASSPORT) pesa **22,6 MB** y cada video se baja al darle
+  play. Guía para diseño y para quien carga: `docs/operacion/libro-interactivo-videos.md`.
+  - **Contrato con diseño**: el libro pide cada video por RUTA RELATIVA
+    `videos/<página>-<n>.mp4`. La **página es la que VE el niño** ("Página 10 / 28"),
+    NO el índice del código del libro (`openPage(9)`, clave `"9"` de `LESSON_VIDEOS`),
+    que va uno por detrás. Se comprobó en el libro: con los dos números en juego, quien
+    carga miraría "Página 10" y pondría el video en la 9. Diseño lo prueba en su equipo
+    con una carpeta `videos/` junto al HTML: es cómo funciona cualquier sitio web.
+  - **Carga**: `/panel/mantenimiento-cursos/videos` (tarjeta "Videos del libro"): curso,
+    nivel, página, n° en la página y archivo (con previo local) → **Subir y comprimir** →
+    queda "Por revisar" con el previo YA comprimido y el antes/después → **Confirmar y
+    publicar**. Publicados: Ver / Reemplazar / Borrar. Tabla `catalog_material_video`
+    (migración `20260921000000`), estados PROCESANDO → BORRADOR → PUBLICADO | ERROR, índice
+    único parcial: UN publicado por (curso, nivel, página, n). La casilla es del LIBRO, no
+    del HTML: reemplazar el HTML no toca los videos. Un BORRADOR nunca se sirve al niño.
+  - **Confirmar reemplaza en una transacción** (borra la fila publicada vieja y publica la
+    nueva; el niño nunca ve la casilla vacía) y el archivo viejo se suelta DESPUÉS.
+  - **Compresión** (`infrastructure/comprimir-video.ts`, `ffmpeg-static`): 360p, H.264
+    Main, CRF 28 con techo 400 kb/s, AAC 64 kb/s, `faststart`, sin metadatos. Validada a
+    ojo contra el original: los 5 videos de 720p de Rookie pasaron de 63,2 a 22,1 MB.
+    **Nunca agranda**: si el video ya viene ligero (H.264/AAC, ≤360p, ≤800 kb/s) se
+    REEMPAQUETA sin recodificar —los 12 de CON_PASSPORT se procesan en 10 s en vez de 7
+    min—, y si recodificar lo agrandara, se queda el original (recodificar los de
+    CON_PASSPORT daba +50 a +90 %).
+  - **Se comprime DESPUÉS de responder** (`after()` de Next): la subida responde 202 y la
+    pantalla consulta el estado cada 2,5 s. **De a uno** (`procesarVideoLibro` encadena
+    una cola): ffmpeg usa todos los núcleos y la plataforma debe seguir respondiendo a los
+    niños en clase. Lo que lleva >20 min PROCESANDO (el servidor se reinició a mitad) se
+    marca ERROR al listar; el plazo cuenta desde que EMPIEZA a comprimir, no desde la cola.
+  - **Servir sin cookie, con token**: PROBADO en Chrome — las peticiones que salen del
+    libro aislado llegan al servidor SIN la cookie de sesión (SameSite no aplica a un
+    origen opaco). El panel entrega al libro, por `window.name`, la base
+    `/api/material/<id>/t/<token>/`; el puente la pone como `<base>` y la ruta relativa
+    `videos/7-1.mp4` sale sola hacia la ruta autorizada. Token = HMAC-SHA256 (con
+    `AUTH_JWT_SECRET`) de libro + vencimiento (12 h); lo emiten SOLO
+    `/api/student/material` (tras comprobar el alcance) y el visor del equipo. La ruta
+    `/api/material/[id]/t/[token]/videos/[archivo]` NO usa sesión a propósito, sirve solo
+    lo PUBLICADO y responde 404 a todo fallo. El HTML sigue siendo el mismo para todos y
+    su caché inmutable vale: el token viaja en `window.name`, no en el HTML.
+  - **Rangos** (`platform/http/rango.ts`): el video se sirve con 206 y `Content-Range`.
+    Sin eso Safari/iPad NO reproduce (sondea con `bytes=0-1`). Hoy se lee el archivo
+    entero y se recorta (videos de 1–5 MB); con Spaces conviene leer solo el tramo.
+  - **`ffmpeg-static`**: en `allowBuilds` (descarga el binario de su plataforma al
+    instalar: Windows en desarrollo, Linux en CI y servidor) y en
+    `serverExternalPackages` de `next.config.ts` (calcula la ruta al binario con
+    `__dirname`; empaquetado por Next apuntaría a una carpeta que no existe).
+  - Pruebas: `video-libro.test.ts` (casilla y token), `rango.test.ts`, y
+    `video-libro-integration.test.ts` con ffmpeg REAL y clips sintéticos (compresión,
+    publicar, reemplazar soltando el archivo, nunca agrandar, error legible, interrumpido).
+    Usa YOUNGSTER·ULTIMATE y páginas ≥ 900 para no tocar material vivo.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:
   la `nota_privada` de la misma fila es del equipo y NUNCA viaja al panel del niño.
@@ -564,6 +625,12 @@ pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
   acceso a datos va por SQL parametrizado con `pg`— y como dependencia de
   producción arrastraba el CLI de Prisma y sus avisos de seguridad al grafo
   desplegado. Si algún día se adopta el client, hay que moverlo de vuelta.
+- **`ffmpeg-static` 5.3.0 (2026-09-21)**, dependencia de PRODUCCIÓN: comprime los
+  videos del libro en el servidor. Su binario (ffmpeg 6.1.1 en Windows) se descarga al
+  instalar, por eso está en `allowBuilds`; va en `serverExternalPackages`. Es un
+  binario GPL que se ejecuta como proceso aparte y no se distribuye a los usuarios.
+  Procesa archivos que sube el EQUIPO (`catalogo.gestionar`), nunca los niños, con
+  tiempo máximo de 10 min por video.
 - **Los overrides de pnpm viven en `pnpm-workspace.yaml`, NO en el campo `pnpm`
   de package.json**: pnpm 11 ignora ese campo (solo avisa). Ese archivo lleva
   también `allowBuilds`, la lista de paquetes autorizados a ejecutar scripts de
@@ -804,7 +871,18 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 - Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. **CI activo**
   (`.github/workflows/ci.yml`: lint, tipos, pruebas CON integración contra un
   Postgres de servicio, arquitectura y build). Falta definir protección de `main`
-  —hoy se empuja directo— y hay PRs de Dependabot abiertos sin revisar.
+  —hoy se empuja directo—.
+  **Ramas (2026-09-21)**: se trabaja en `main`. `feature/bootstrap-platform` está
+  sincronizada con su remota y TODO su contenido ya está en `main`: se puede borrar.
+  **PRs de Dependabot abiertos, SIN mezclar a propósito** — cada uno pide revisión:
+  - #10 "dependencias-menores": CI verde, pero sube Next 16.3.5, React 19.3, Zod 4.6,
+    Prisma 7.10 y más. Probar con `verify` completo antes de mezclar.
+  - #5 TypeScript 5.9.3 → 6.0.3: CI verde, pero ver la advertencia de Versiones (TS 7
+    rompe Next/ESLint/depcruise); confirmar a mano antes de subir de versión mayor.
+  - #1 setup-node 7, #2 checkout 7, #3 pnpm/action-setup 6: CI en ROJO; no mezclar
+    hasta ver por qué fallan.
+    Al empujar a `main`, Dependabot rebasa sus PRs solo; si choca con `pnpm-lock.yaml`,
+    pedirle `@dependabot rebase`.
 - Docker Desktop SÍ está instalado; `docker compose -f infra/docker/...` levanta
   Postgres local.
 - **Escopar el registro de intentos de quiz al salón del guía**: `POST
@@ -822,14 +900,26 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   `imagenes/` (~96 MB) están en `.gitignore` — git carga los binarios para siempre.
   Se conservan en disco; si se necesitan versionados, van a Drive o a Git LFS. Lo
   que SÍ está versionado es lo derivado que la app sirve (`public/personajes/`,
-  `wp-theme/.../assets/`).
+  `wp-theme/.../assets/`). Igual `Audios/`, `Libros/` y `Videos/`.
+  **Trampa ya pagada (2026-09-21)**: esas reglas van ANCLADAS a la raíz (`/Videos/`).
+  Sin la barra inicial valen para cualquier carpeta con ese nombre y, como en Windows
+  git ignora mayúsculas (`core.ignorecase`), `Videos/` se comía
+  `src/app/api/.../videos/` e `imagenes/` cualquier archivo nuevo de
+  `src/app/panel/mantenimiento-cursos/imagenes/`: código que nunca se habría subido.
+  Al sumar una regla, comprobar con `git check-ignore -v <ruta de código>`.
 - **Hotspots del MAPA de YOUNGSTER** sin cargar: la pantalla "Avance" dibuja el mapa
   sin marcadores hasta que se marquen en `/panel/mantenimiento-cursos/mapa`.
-- **Material del alumno por cargar** (2026-09-19): solo JUNIOR·ROOKIE tiene libro
-  interactivo y PDF, y únicamente en la base LOCAL — producción no existe aún (Fase 11).
-  Faltan los otros 4 niveles de Junior y los 5 de Youngster; se suben por
-  `/panel/mantenimiento-cursos/material`, sin tocar código. Los originales están en
+- **Material del alumno por cargar** (2026-09-21): solo JUNIOR·ROOKIE tiene libro,
+  PDF y sus 12 videos, y únicamente en la base LOCAL — producción no existe aún (Fase
+  11). Ese libro es una conversión HECHA AQUÍ del CON_PASSPORT de diseño (los 12 videos
+  cambiados por `videos/<página>-<n>.mp4`), no una entrega de diseño: **diseño tiene que
+  exportar así** los próximos (guía en `docs/operacion/libro-interactivo-videos.md`).
+  Faltan los otros 4 niveles de Junior y los 5 de Youngster; se suben por Material del
+  alumno y Videos del libro, sin tocar código. Los originales están en
   `Libros/<Curso>/<Nivel>/` (ignorado por git).
+- **Derechos de las canciones**: los videos de los libros son descargas de YouTube de
+  terceros (Planet Pop, LARVA KIDS, ABCmouse, Lingokids, CoComelon, The Singing Walrus…).
+  Subirlos a la plataforma es redistribuirlos: confirmar permiso o sustituirlos.
 - **Progreso del libro interactivo solo en el dispositivo**: el puente lo guarda en el
   `localStorage` del panel, igual que el HTML original. Si el niño cambia de tableta a
   computador, empieza de cero. Llevarlo al servidor es decisión del negocio. Si se
@@ -839,9 +929,12 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   "Respuestas y pistas para el docente" dentro del mismo HTML. Es contenido de diseño,
   no de la plataforma, que sirve el archivo tal cual.
 - **Almacenamiento en producción**: el material se sirve desde disco local (`files`,
-  `STORAGE_DIR`). Con 30 MB por libro y caché inmutable alcanza para empezar; con
+  `STORAGE_DIR`). Con ~23 MB por libro y caché inmutable alcanza para empezar; con
   Spaces (Fase 11) conviene revisar si se sirve desde el CDN con URL firmada, sin
-  perder la caja (la CSP va en la respuesta y el iframe mantiene su `sandbox`).
+  perder la caja (la CSP va en la respuesta y el iframe mantiene su `sandbox`). Los
+  videos se leen enteros para responder un rango: con Spaces, leer solo el tramo. Los
+  temporales de compresión van a `os.tmpdir()` y se borran siempre; el servidor
+  necesita ahí unos cientos de MB libres.
 - Restos en Hostinger: el título del sitio WordPress sigue siendo
   "lgskidsplataforma", el `/index.html` viejo sigue alcanzable y quedó el tema
   duplicado `lgs-kids-landing-old-6a8f390177c2e`.

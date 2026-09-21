@@ -3,6 +3,7 @@ import {
   MENSAJE_ALMACEN_LIBRO,
   PREFIJO_NOMBRE_LIBRO,
   SANDBOX_LIBRO,
+  baseVideosLibro,
   materialVigente,
 } from "@/modules/catalog";
 import { bootstrapIdentity } from "@/modules/identity";
@@ -37,6 +38,10 @@ export const GET = handlerWithAuth(async (_request, auth) => {
         nivel,
         actual: nivel === actual,
         interactivoUrl: interactivo !== null ? url(interactivo.id) : null,
+        // La base de SUS videos, con un token recién firmado: el libro la usa
+        // para pedir `videos/7-1.mp4` sin cookie. Se emite aquí porque aquí ya
+        // se comprobó que el niño alcanzó este nivel.
+        videosBase: interactivo !== null ? baseVideosLibro(interactivo.id) : null,
         imprimibleUrl: imprimible !== null ? `${url(imprimible.id)}?descargar=1` : null,
       };
     }),

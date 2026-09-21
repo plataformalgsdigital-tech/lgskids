@@ -1,7 +1,7 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import {
-  CSP_LIBRO,
+  cspLibro,
   MENSAJE_ALMACEN_LIBRO,
   PREFIJO_NOMBRE_LIBRO,
   PUENTE_ALMACEN,
@@ -48,14 +48,28 @@ describe("inyectarPuente", () => {
 });
 
 describe("la caja del libro", () => {
+  const VIDEOS = "https://app.lgskidsplataforma.com/api/material/abc/";
+
   it("NUNCA lleva allow-same-origin: con él dejaría de ser una caja", () => {
     expect(SANDBOX_LIBRO).not.toContain("allow-same-origin");
-    expect(CSP_LIBRO).toContain(`sandbox ${SANDBOX_LIBRO}`);
+    expect(cspLibro(VIDEOS)).toContain(`sandbox ${SANDBOX_LIBRO}`);
   });
 
   it("el libro no sale a la red y solo lo enmarca la plataforma", () => {
-    expect(CSP_LIBRO).toContain("connect-src 'none'");
-    expect(CSP_LIBRO).toContain("frame-ancestors 'self'");
+    expect(cspLibro(VIDEOS)).toContain("connect-src 'none'");
+    expect(cspLibro(VIDEOS)).toContain("frame-ancestors 'self'");
+  });
+
+  it("la única salida es la ruta de SUS videos: medios y <base>, nada más", () => {
+    const csp = cspLibro(VIDEOS);
+    expect(csp).toContain(`media-src data: blob: ${VIDEOS}`);
+    expect(csp).toContain(`base-uri ${VIDEOS}`);
+    expect(csp).toContain("img-src data: blob:;");
+  });
+
+  it("sin ruta de videos, la caja queda cerrada del todo", () => {
+    expect(cspLibro(null)).toContain("media-src data: blob:;");
+    expect(cspLibro(null)).toContain("base-uri 'none'");
   });
 });
 
@@ -86,28 +100,56 @@ describe("verificación de contenido", () => {
 describe("puente de almacenamiento", () => {
   function montar(nombre: string) {
     const enviados: unknown[] = [];
+    const bases: string[] = [];
     const ventana: Record<string, unknown> = {
       name: nombre,
       parent: { postMessage: (m: unknown) => enviados.push(JSON.parse(JSON.stringify(m))) },
     };
-    runInNewContext(PUENTE_ALMACEN, { window: ventana });
+    // Lo justo de `document` para ver la <base> que pone el puente.
+    const documento = {
+      head: {
+        firstChild: null,
+        insertBefore: (el: { tag: string; href: string }) => bases.push(el.href),
+      },
+      createElement: (tag: string) => ({ tag, href: "" }),
+    };
+    runInNewContext(PUENTE_ALMACEN, { window: ventana, document: documento });
     const almacen = ventana["localStorage"] as Storage;
-    return { ventana, almacen, enviados };
+    return { ventana, almacen, enviados, bases };
   }
+  const v2 = (o: object) => `${PREFIJO_NOMBRE_LIBRO}${JSON.stringify({ v: 2, ...o })}`;
 
   it("arranca con el progreso que le entrega el panel por window.name", () => {
-    const { almacen } = montar(`${PREFIJO_NOMBRE_LIBRO}{"lgs-rookie-v1":"{\\"a\\":1}"}`);
+    const { almacen } = montar(v2({ datos: { "lgs-rookie-v1": '{"a":1}' }, videos: null }));
     expect(almacen.getItem("lgs-rookie-v1")).toBe('{"a":1}');
     expect(almacen.getItem("otra")).toBeNull();
     expect(almacen.length).toBe(1);
   });
 
+  it("entiende el window.name ANTIGUO (solo el progreso) de quien ya tenía el libro abierto", () => {
+    const { almacen } = montar(`${PREFIJO_NOMBRE_LIBRO}{"lgs-rookie-v1":"x"}`);
+    expect(almacen.getItem("lgs-rookie-v1")).toBe("x");
+  });
+
+  it("pone la base de los videos para que `videos/7-1.mp4` llegue con su token", () => {
+    const { bases } = montar(v2({ datos: {}, videos: "/api/material/abc/t/123.firma/" }));
+    expect(bases).toEqual(["/api/material/abc/t/123.firma/"]);
+  });
+
+  it("no acepta una base de OTRO sitio: ni absoluta ni `//otro`", () => {
+    expect(montar(v2({ datos: {}, videos: "https://malo.com/x/" })).bases).toEqual([]);
+    expect(montar(v2({ datos: {}, videos: "//malo.com/x/" })).bases).toEqual([]);
+    expect(montar(v2({ datos: {}, videos: null })).bases).toEqual([]);
+  });
+
   it("cada cambio viaja al panel completo y queda en window.name para una recarga", () => {
-    const { ventana, almacen, enviados } = montar("");
+    const base = "/api/material/abc/t/123.firma/";
+    const { ventana, almacen, enviados } = montar(v2({ datos: {}, videos: base }));
     almacen.setItem("k", "v");
     almacen.setItem("n", 5 as unknown as string); // localStorage guarda texto
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { k: "v", n: "5" } });
-    expect(ventana["name"]).toBe(`${PREFIJO_NOMBRE_LIBRO}{"k":"v","n":"5"}`);
+    // La recarga conserva también la base de los videos.
+    expect(ventana["name"]).toBe(v2({ datos: { k: "v", n: "5" }, videos: base }));
 
     almacen.removeItem("k");
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { n: "5" } });

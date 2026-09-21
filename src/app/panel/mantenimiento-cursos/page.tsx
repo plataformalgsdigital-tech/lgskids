@@ -62,6 +62,13 @@ const TARJETAS: Tarjeta[] = [
     href: "/panel/mantenimiento-cursos/material",
   },
   {
+    titulo: "Videos del libro",
+    desc: "Los videos del libro interactivo, por página. Se comprimen al subirlos; revisa el previo y confirma para publicarlos.",
+    emoji: "🎬",
+    color: "var(--lgs-magenta)",
+    href: "/panel/mantenimiento-cursos/videos",
+  },
+  {
     titulo: "Enlaces de juegos",
     desc: "Los juegos de cada unidad. El niño los abre al tocar “Unidad N” en el mapa de su isla.",
     emoji: "🎮",

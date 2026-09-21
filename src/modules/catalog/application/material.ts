@@ -27,8 +27,9 @@ export type MaterialTipo = "interactivo" | "imprimible";
 export const TIPOS_MATERIAL: readonly MaterialTipo[] = ["interactivo", "imprimible"];
 
 /**
- * Tope por archivo. El libro de Junior·Rookie pesa 31 MB (17 de ellos, un
- * video incrustado) y su PDF 27 MB; el margen es para niveles más largos.
+ * Tope por archivo. Con los videos aparte (ver `video-libro.ts`) el libro de
+ * Junior·Rookie pesa 22,6 MB y su PDF hasta 47 MB; el margen es para niveles
+ * más largos. Un libro que no entra casi siempre trae videos incrustados.
  */
 export const TAMANO_MAXIMO_MATERIAL = 80 * 1024 * 1024;
 
@@ -71,7 +72,7 @@ export function tipoMaterialValido(v: unknown): v is MaterialTipo {
  * Clave `CURSO:NIVEL`. Solo niveles REALES: a diferencia del banner, aquí no
  * hay "TODOS" — cada nivel tiene su propio libro.
  */
-function clave(curso: string, nivel: string): string {
+export function claveMaterial(curso: string, nivel: string): string {
   if (!CURSOS.includes(curso)) throw new ValidationError(`Curso inválido: ${curso}.`);
   if (!CODIGOS_NIVEL.includes(nivel)) throw new ValidationError(`Nivel inválido: ${nivel}.`);
   return `${curso}:${nivel}`;
@@ -110,7 +111,7 @@ export async function subirMaterial(input: {
   nombreOriginal: string;
   bytes: Buffer;
 }): Promise<{ id: string }> {
-  const entidadId = clave(input.curso, input.nivel);
+  const entidadId = claveMaterial(input.curso, input.nivel);
   const mime = verificarContenido(input.tipo, input.nombreOriginal, input.bytes);
   const anteriores = await listarArchivos({ entidad: entidad(input.tipo), entidadId });
   const r = await subirArchivo({
@@ -145,7 +146,7 @@ export async function materialVigente(
 ): Promise<MaterialResumen | null> {
   const [a] = await listarArchivos({
     entidad: entidad(tipo),
-    entidadId: clave(curso, nivel),
+    entidadId: claveMaterial(curso, nivel),
     limit: 1,
   });
   return a === undefined ? null : resumen(a);
@@ -196,7 +197,7 @@ export async function eliminarMaterial(input: {
   curso: string;
   nivel: string;
 }): Promise<{ eliminados: number }> {
-  const entidadId = clave(input.curso, input.nivel);
+  const entidadId = claveMaterial(input.curso, input.nivel);
   const archivos = await listarArchivos({ entidad: entidad(input.tipo), entidadId });
   for (const a of archivos) await eliminarArchivo(a.id);
   await registrarAuditoria({

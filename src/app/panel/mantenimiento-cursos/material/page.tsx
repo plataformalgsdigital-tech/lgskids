@@ -249,7 +249,13 @@ export default function MaterialAlumnoPage() {
                           <>
                             {actual !== null && (
                               <a
-                                href={`/api/catalog/material/${actual.id}`}
+                                href={
+                                  // El libro se revisa en el MISMO visor del niño,
+                                  // con sus videos; el PDF, tal cual.
+                                  c.tipo === "interactivo"
+                                    ? `/panel/mantenimiento-cursos/material/ver/${actual.id}`
+                                    : `/api/catalog/material/${actual.id}`
+                                }
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={boton}

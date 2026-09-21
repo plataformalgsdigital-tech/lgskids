@@ -20,7 +20,7 @@ import {
   tipoMaterialValido,
   type ArchivoMaterial,
 } from "../application/material";
-import { CSP_LIBRO, inyectarPuente } from "../domain/libro-interactivo";
+import { cspLibro, inyectarPuente } from "../domain/libro-interactivo";
 import { paradaValida } from "../domain/unidad-mapa";
 import {
   descargarAvisoLoginPublico,
@@ -435,14 +435,17 @@ export const materialEliminarHandler = handlerWithAuth(async (request, auth) => 
  * exactamente igual.
  *
  * El HTML sale con el puente inyectado y la CSP de la caja (origen opaco, sin
- * red, solo enmarcable por la plataforma). El PDF, en línea o como descarga.
+ * red, solo enmarcable por la plataforma). Su única salida es la ruta de SUS
+ * videos, `<origen>/api/material/<id>/`: `origen` es el de la petición, para
+ * que la CSP nombre el mismo sitio que ve el navegador (localhost, la IP de la
+ * red o el dominio). El PDF, en línea o como descarga.
  * Los bytes de un id no cambian nunca —reemplazar crea otro archivo—, de ahí
  * la caché inmutable: 30 MB se bajan una vez por dispositivo.
  */
 export async function respuestaMaterial(
   id: string,
   material: ArchivoMaterial,
-  opciones: { descargar: boolean },
+  opciones: { descargar: boolean; origen: string },
 ): Promise<NextResponse> {
   const { bytes } = await descargarArchivo(id);
   const cache = "private, max-age=31536000, immutable";
@@ -450,7 +453,7 @@ export async function respuestaMaterial(
     return new NextResponse(new Uint8Array(inyectarPuente(bytes)), {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Content-Security-Policy": CSP_LIBRO,
+        "Content-Security-Policy": cspLibro(`${opciones.origen}/api/material/${id}/`),
         "Content-Disposition": "inline",
         "Cache-Control": cache,
       },
@@ -475,6 +478,7 @@ export const materialVerHandler = handlerWithAuth(async (request, auth, context)
   if (material === null) throw new NotFoundError("El material no existe.");
   return respuestaMaterial(id, material, {
     descargar: request.nextUrl.searchParams.get("descargar") === "1",
+    origen: request.nextUrl.origin,
   });
 });
 

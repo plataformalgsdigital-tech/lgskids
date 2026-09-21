@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // `ffmpeg-static` calcula la ruta a su binario con __dirname: empaquetado
+  // por Next apuntaría a una carpeta que no existe. Se carga tal cual desde
+  // node_modules (Next ya hace lo mismo por su cuenta con `sharp`).
+  serverExternalPackages: ["ffmpeg-static"],
   // Cabeceras de seguridad básicas (sección 7 del diseño).
   // CSP completa se afinará cuando exista la interfaz real.
   // La pantalla se llama Calendario: /panel/salones se renombró a

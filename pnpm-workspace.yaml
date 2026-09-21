@@ -4,6 +4,9 @@
 allowBuilds:
   "@prisma/engines": true
   esbuild: true
+  # Descarga el binario de ffmpeg de su plataforma al instalarse: es lo que
+  # comprime los videos del libro al subirlos.
+  ffmpeg-static: true
   prisma: true
   sharp: true
   unrs-resolver: true
