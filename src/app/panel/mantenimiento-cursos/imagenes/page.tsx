@@ -26,12 +26,46 @@ const TIPOS: {
   /** Se muestra con SU proporción, sin recortar (lámina vertical). */
   libre?: boolean;
 }[] = [
-  { valor: "banner", etiqueta: "Banner del nivel (mapa de la isla)", ayuda: "16:9 · recomendado 1600×900. JPG/PNG/WebP.", cuadrada: false },
-  { valor: "premio", etiqueta: "Premio del nivel", ayuda: "PNG con fondo transparente, cuadrado ~512×512 (brújula, llave, corona, estrella, tesoro).", cuadrada: true },
-  { valor: "unidad", etiqueta: "Lámina de la parada", ayuda: "La que se abre al tocar la parada en el mapa de la isla (Welcome o “Unidad N”). Se muestra COMPLETA, sin recortar; cualquier proporción sirve (recomendado 1000×1300). JPG/PNG/WebP.", cuadrada: false, libre: true },
-  { valor: "insignia", etiqueta: "Insignia de la parada", ayuda: "La que se gana al cerrar esa parada (“Let’s chat about me”, “Let’s explore”…). PNG con fondo transparente, cuadrado ~512×512. Distinta del premio, que es uno por NIVEL.", cuadrada: true },
-  { valor: "mapa", etiqueta: "Mapa del curso completo", ayuda: "El mapa con TODAS las islas. 16:9 · recomendado 1920×1080.", cuadrada: false },
-  { valor: "vobo", etiqueta: "Sello VoBo (global)", ayuda: "PNG transparente cuadrado del personaje con el visto (marca de unidad vista).", cuadrada: true },
+  {
+    valor: "banner",
+    etiqueta: "Banner del nivel (mapa de la isla)",
+    ayuda: "16:9 · recomendado 1600×900. JPG/PNG/WebP.",
+    cuadrada: false,
+  },
+  {
+    valor: "premio",
+    etiqueta: "Premio del nivel",
+    ayuda:
+      "PNG con fondo transparente, cuadrado ~512×512 (brújula, llave, corona, estrella, tesoro).",
+    cuadrada: true,
+  },
+  {
+    valor: "unidad",
+    etiqueta: "Lámina de la parada",
+    ayuda:
+      "La que se abre al tocar la parada en el mapa de la isla (Welcome o “Unidad N”). Se muestra COMPLETA, sin recortar; cualquier proporción sirve (recomendado 1000×1300). JPG/PNG/WebP.",
+    cuadrada: false,
+    libre: true,
+  },
+  {
+    valor: "insignia",
+    etiqueta: "Insignia de la parada",
+    ayuda:
+      "La que se gana al cerrar esa parada (“Let’s chat about me”, “Let’s explore”…). PNG con fondo transparente, cuadrado ~512×512. Distinta del premio, que es uno por NIVEL.",
+    cuadrada: true,
+  },
+  {
+    valor: "mapa",
+    etiqueta: "Mapa del curso completo",
+    ayuda: "El mapa con TODAS las islas. 16:9 · recomendado 1920×1080.",
+    cuadrada: false,
+  },
+  {
+    valor: "vobo",
+    etiqueta: "Sello VoBo (global)",
+    ayuda: "PNG transparente cuadrado del personaje con el visto (marca de unidad vista).",
+    cuadrada: true,
+  },
 ];
 
 // Niveles reales; "TODOS" solo aplica al banner (respaldo del curso).
@@ -59,7 +93,8 @@ export default function ImagenesCursoPage() {
 
   const def = TIPOS.find((t) => t.valor === tipo) ?? TIPOS[0]!;
   const usaCurso = tipo !== "vobo";
-  const usaNivel = tipo === "banner" || tipo === "premio" || tipo === "unidad" || tipo === "insignia";
+  const usaNivel =
+    tipo === "banner" || tipo === "premio" || tipo === "unidad" || tipo === "insignia";
   const usaUnidad = tipo === "unidad" || tipo === "insignia";
   const nivelesDisp = tipo === "banner" ? NIVELES_BANNER : NIVELES_REALES;
 
@@ -140,8 +175,7 @@ export default function ImagenesCursoPage() {
 
   const muestraUrl = previo ?? actualUrl;
   // Tablero de ajedrez para PNGs transparentes (premio/vobo).
-  const checker =
-    "repeating-conic-gradient(#e9edf5 0% 25%, #ffffff 0% 50%) 50% / 18px 18px";
+  const checker = "repeating-conic-gradient(#e9edf5 0% 25%, #ffffff 0% 50%) 50% / 18px 18px";
 
   return (
     <main style={{ padding: "2rem", maxWidth: "54rem", margin: "0 auto" }}>
@@ -152,7 +186,8 @@ export default function ImagenesCursoPage() {
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
         Arte curricular del panel del alumno: <strong>banners/mapas de nivel</strong>, las{" "}
         <strong>láminas</strong> e <strong>insignias</strong> de cada parada,{" "}
-        <strong>premios</strong>, el <strong>mapa del curso</strong> y el <strong>sello VoBo</strong>.
+        <strong>premios</strong>, el <strong>mapa del curso</strong> y el{" "}
+        <strong>sello VoBo</strong>.
       </p>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem", marginTop: "0.3rem" }}>
         📐 {def.ayuda} Máx. 10 MB.
@@ -161,7 +196,11 @@ export default function ImagenesCursoPage() {
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Tipo</span>
-          <select value={tipo} onChange={(e) => cambiarTipo(e.target.value as Tipo)} style={{ ...input, width: "20rem" }}>
+          <select
+            value={tipo}
+            onChange={(e) => cambiarTipo(e.target.value as Tipo)}
+            style={{ ...input, width: "20rem" }}
+          >
             {TIPOS.map((t) => (
               <option key={t.valor} value={t.valor}>
                 {t.etiqueta}
@@ -172,7 +211,11 @@ export default function ImagenesCursoPage() {
         {usaCurso && (
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
             <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Curso</span>
-            <select value={curso} onChange={(e) => setCurso(e.target.value as Curso)} style={{ ...input, width: "12rem" }}>
+            <select
+              value={curso}
+              onChange={(e) => setCurso(e.target.value as Curso)}
+              style={{ ...input, width: "12rem" }}
+            >
               {CURSOS.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -184,7 +227,11 @@ export default function ImagenesCursoPage() {
         {usaNivel && (
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
             <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Nivel</span>
-            <select value={nivel} onChange={(e) => setNivel(e.target.value)} style={{ ...input, width: "16rem" }}>
+            <select
+              value={nivel}
+              onChange={(e) => setNivel(e.target.value)}
+              style={{ ...input, width: "16rem" }}
+            >
               {nivelesDisp.map((n) => (
                 <option key={n} value={n}>
                   {ETIQUETA_NIVEL[n] ?? n}
@@ -279,8 +326,21 @@ export default function ImagenesCursoPage() {
       </div>
 
       {/* Subir */}
-      <div style={{ marginTop: "1.25rem", display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onArchivo} style={input} />
+      <div
+        style={{
+          marginTop: "1.25rem",
+          display: "flex",
+          gap: "0.75rem",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={onArchivo}
+          style={input}
+        />
         <button
           type="button"
           onClick={() => void subir()}
@@ -299,7 +359,15 @@ export default function ImagenesCursoPage() {
         </button>
       </div>
       {msg !== null && (
-        <p style={{ marginTop: "0.75rem", fontWeight: 600, color: msg.startsWith("✔") ? "#1b5e20" : "#c62828" }}>{msg}</p>
+        <p
+          style={{
+            marginTop: "0.75rem",
+            fontWeight: 600,
+            color: msg.startsWith("✔") ? "#1b5e20" : "#c62828",
+          }}
+        >
+          {msg}
+        </p>
       )}
     </main>
   );

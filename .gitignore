@@ -22,17 +22,23 @@ dist/
 # salen por proceso public/personajes/ y el arte que se sube por el panel.
 # Fuera del repositorio porque git carga los binarios para siempre; se
 # conservan en disco y en Drive. Ver arte/README.md.
-arte/personajes-fuente/
-imagenes/
+#
+# OJO: las carpetas de origen van ANCLADAS a la raíz (`/imagenes/`). Sin la
+# barra inicial la regla vale para CUALQUIER carpeta con ese nombre, y como en
+# Windows git ignora mayúsculas (`core.ignorecase`), `Videos/` se comía
+# `src/app/api/.../videos/` y `imagenes/` cualquier archivo nuevo de
+# `src/app/panel/mantenimiento-cursos/imagenes/`: código que nunca se subía.
+/arte/personajes-fuente/
+/imagenes/
 # Audio y video de ORIGEN de los cuadernillos (~151 MB solo Junior Rookie),
 # del libro interactivo ya retirado. Git se queda los binarios para siempre.
-Audios/
-# Material del alumno de ORIGEN: el libro interactivo (.html, ~31 MB) y el
-# imprimible (.pdf) de cada nivel, más los videos. Se suben por
-# /panel/mantenimiento-cursos/material y viven en `files`; aquí solo pesarían.
-# Además, sin ignorarlos Prettier revisa el HTML de 31 MB y `pnpm verify` falla.
-Libros/
-Videos/
+/Audios/
+# Material del alumno de ORIGEN: el libro interactivo (.html) y el imprimible
+# (.pdf) de cada nivel, más los videos. Se suben por Mantenimiento Académico
+# (Material del alumno, Videos del libro) y viven en `files`; aquí solo pesarían.
+# Además, sin ignorarlos Prettier revisa el HTML de 100 MB y `pnpm verify` falla.
+/Libros/
+/Videos/
 
 # Logs y depuración
 *.log
