@@ -85,6 +85,23 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   contrato = ALTA ÚNICA transaccional** (credenciales autogeneradas +
   correo sintético + rol alumno por país; Fase 7 le sumará matrícula).
   OnHold/reactivar extiende `final_contrato` por los días pausados.
+  **Duración fija (2026-09-21)**: `final_contrato` = inicio + **12 meses**
+  (`finalDeContrato`, `MESES_CONTRATO`; el día 31 o el 29-feb caen al último día
+  del mes). YA NO se recibe: el wizard de reservas dejó de pedirlo y la puerta
+  del intake lo ignora (Zod descarta el campo sin error, así que LGS no se rompe
+  si lo sigue mandando). La migración `20260921100000` recalculó los contratos
+  vivos como inicio + 12 meses + los días que ya se habían extendido. La cuenta
+  del alumno se DESACTIVA cuando vence: 12 meses + pausas + 2 días de gracia.
+  **El barrido de vencidos solo mira APROBADO**: antes también tomaba ONHOLD y
+  podía inactivar a un niño PAUSADO, cuyo `final_contrato` todavía no incluye los
+  días que la reactivación le va a sumar.
+  **Renovación (2026-09-22)**: el niño que VUELVE tras vencer (persona y cuenta
+  INACTIVAS por la cascada) puede recibir un contrato nuevo —`crearContrato` ya no
+  exige beneficiario activo, solo titular— y **aprobarlo lo reactiva**: persona
+  ACTIVA, cuenta ACTIVA con el MISMO usuario y rol alumno del país del contrato
+  nuevo (`reactivarUsuarioTx`; `aprobarContrato` devuelve `reactivado`). Antes se
+  rechazaba el contrato y, aunque se forzara, la cuenta seguía apagada con el
+  contrato vigente. Probado en `ciclo-contrato-integration.test.ts`.
   Inactivar = cascada sincronizada (contrato+persona+credenciales+sesiones)
   solo si no hay otros contratos vivos. Worker: barrido de vencidos cada
   6 h. Permisos: personas.gestionar/ver, contratos.gestionar/ver.
@@ -176,14 +193,183 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
 ## Gestión de roles y permisos (2026-07-23)
 
 - **Rol = conjunto de permisos marcables** (RBAC editable desde el panel).
-  UI /panel/usuarios con 2 pestañas: Usuarios (crear staff con password
-  inicial + asignar roles con alcance por país) y Roles (crear rol + marcar
+  UI /panel/usuarios con 2 pestañas: Usuarios (crear staff —usuario y clave
+  GENERADOS, ver "Cuentas de usuario"— + asignar roles con alcance por país) y Roles (crear rol + marcar
   sus permisos con checkboxes). `superadmin` es INTOCABLE (siempre todos
   los permisos; la app y el seed lo fuerzan). El seed llena permisos de un
   rol NO-superadmin solo si está vacío → respeta ediciones del panel.
   Editar permisos de un rol invalida toda la caché de perfiles.
 - Desde 2026-08-26 el árbol de permisos incluye los del MENÚ (`seccion.*` y
   `menu.*`), separados de los funcionales — ver "Menú por secciones y Tablero".
+
+## Cuentas de usuario (2026-09-21)
+
+Migración `20260921100000_cuentas_usuario`.
+
+- **Usuario y clave se GENERAN, nunca se reciben**, para el alumno y para el
+  staff. El alta de ambos pasa por `crearCuentaTx` (`application/alta-cuenta.ts`),
+  que es el ÚNICO camino:
+  - usuario = inicial del nombre + primer apellido + 4 dígitos (`baseUsername`;
+    respaldo `alumno` o `staff`);
+  - clave = `generarPasswordInicial` (4 sílabas + 2 dígitos, se puede dictar por
+    teléfono);
+  - la unicidad la resuelve `INSERT … ON CONFLICT (username) DO NOTHING RETURNING`
+    con hasta 25 intentos: dos altas simultáneas con el mismo nombre no chocan.
+    La clave se devuelve UNA vez (`Cache-Control: no-store`) y la cuenta nace con
+    `debe_cambiar_password`.
+- **Dónde van los demás datos de cada tipo de usuario** (`identity_user` solo
+  guarda la cuenta):
+  - **alumno** → `people_person` (lo llena el contrato);
+  - **guía** → `scheduling_guia` (su ficha por enlace, ver "Alta del guía por
+    enlace");
+  - **staff** (admin, coordinador…) → `identity_perfil`, con nombres, apellidos,
+    teléfono y número de identificación (`doc_numero`, desde 2026-09-22). Es
+    nueva: antes el staff no tenía dónde guardar su nombre.
+    `listarUsuarios` toma el nombre de la primera que tenga (`COALESCE`), y el
+    buscador también busca por nombre.
+- **Bóveda de claves: el superadmin PUEDE VER cualquier clave.** Lo decidió el
+  negocio sabiendo el costo: con el hash solo, una fuga de la base no entrega
+  claves; con la copia, las entrega si además se filtra la llave. Mitigaciones:
+  - la copia (`password_cifrada`) va cifrada con **AES-256-GCM**, con el `userId`
+    como dato autenticado (AAD), en `infrastructure/boveda-claves.ts`. Una copia
+    movida a la fila de otro usuario no se descifra;
+  - la llave `PASSWORD_VAULT_KEY` (base64, 32 bytes) vive FUERA de la base, en el
+    entorno: robar la base no alcanza. Sin llave, la bóveda queda apagada: no se
+    guardan copias y "Ver clave" responde `BOVEDA_APAGADA`;
+  - el login SIGUE verificando contra el hash argon2id; la copia nunca autentica;
+  - consultarla exige el ROL superadmin (`profile.esSuperadmin`), no un permiso.
+    Ningún permiso editable en el panel la concede, así que un admin con todos
+    los permisos tampoco la ve;
+  - cada consulta queda en la auditoría (`identity.clave_consultada`);
+  - se guarda copia en el alta, en el restablecimiento y cuando el usuario cambia
+    su propia clave (`changePassword`, vía `BovedaClavesPort`).
+    **Las cuentas anteriores a esta migración NO tienen copia** (`SIN_COPIA`) hasta
+    que se les restablezca la clave o la cambien.
+    **Rotar la llave** deja ilegibles las copias existentes (`ILEGIBLE`); todavía no
+    hay script de recifrado.
+- **"Cambiar clave al entrar" se hace cumplir en el SERVIDOR**: con la marca
+  encendida, el autenticador responde **403 `DEBE_CAMBIAR_PASSWORD`**
+  (`DebeCambiarPasswordError`) a toda ruta salvo `/api/auth/me` y
+  `/api/auth/change-password` (`PERMITIDAS_CON_CLAVE_PENDIENTE`). Frena también
+  una sesión YA abierta: el access token sigue vivo sus 15 minutos, pero no le
+  sirve de nada. En el cliente, `apiFetch` (`irACambiarClaveSiCorresponde`), el
+  layout del panel y `/mi-panel` llevan a `/panel/cambiar-password`.
+  El panel de usuarios la PRENDE y la APAGA (`PATCH /api/identity/users/[id]`).
+  **Con la marca encendida el layout del panel NO dibuja el menú**: solo el
+  formulario, un aviso que explica por qué (y que en "Contraseña actual" va la
+  clave con la que acaba de entrar) y "Cerrar sesión". Con el menú a la vista,
+  cada opción rebotaba al cambio de clave sin explicación y parecía que
+  "Usuarios y roles no funciona". Al guardar se va a `/login?clave=cambiada`,
+  que lo confirma: las sesiones se cierran y hay que volver a entrar.
+- **Olvidé mi clave = solicitud al equipo**, no enlace por correo. El correo del
+  alumno es sintético y el niño no tiene buzón.
+  - `POST /api/public/olvido-clave` (sin sesión) registra en
+    `identity_solicitud_clave` y responde SIEMPRE lo mismo (202), exista o no el
+    usuario, para que no sirva para descubrir cuentas;
+  - como mucho **5 por IP y hora** (`MAX_SOLICITUDES_POR_IP_HORA`);
+  - hay UNA pendiente por cuenta (índice único parcial): pedirla otra vez
+    actualiza el contacto;
+  - el panel las lista arriba de Usuarios y marca la cuenta con 🔔.
+    **Restablecer** (`POST /api/identity/users/[id]/restablecer-clave`) hace todo
+    en una transacción: clave nueva generada, marca de cambiarla encendida,
+    sesiones revocadas y solicitud ATENDIDA.
+- **Quién administra la cuenta de quién** (`requisitoParaGestionarCuenta`): hace
+  falta tanto como para otorgar el rol MÁS ALTO de esa cuenta
+  (`requisitoParaOtorgar`):
+  - `superadmin` → solo otro superadmin;
+  - `guia` → `usuarios.gestionar`;
+  - cualquier otro rol → `roles.asignar`.
+    Rige al crear con rol inicial, al asignar rol, al restablecer y al tocar la
+    marca de cambiar clave.
+    **Trampa ya pagada**: antes, `usuarios.gestionar` bastaba para crear un admin o
+    un superadmin, y `roles.asignar` bastaba para dar la llave maestra. Así un
+    coordinador podía fabricarse un admin, o restablecer la clave de uno y entrar
+    como él.
+- Endpoints nuevos:
+  - `POST|GET /api/identity/users`;
+  - `PATCH /api/identity/users/[id]`;
+  - `POST …/[id]/restablecer-clave`;
+  - `GET …/[id]/clave` (solo superadmin);
+  - `GET /api/identity/solicitudes-clave` y
+    `POST /api/identity/solicitudes-clave/[id]/descartar`.
+    Auditoría: `identity.usuario_staff_creado`, `identity.clave_restablecida`,
+    `identity.clave_consultada`, `identity.debe_cambiar_encendido|apagado`,
+    `identity.clave_solicitada` e `identity.solicitud_clave_descartada`.
+- **Pruebas locales de la bóveda**: `cuentas-integration.test.ts` salta los casos
+  de la bóveda si falta `PASSWORD_VAULT_KEY`, como la prueba de sesión con
+  `AUTH_JWT_SECRET`. CI define las dos con valores SOLO de prueba.
+- **El seed crea `admin` y `superadmin` con "cambiar clave al entrar"** y con la
+  clave que dan las variables `SEED_*`, así que sin copia en la bóveda. En su
+  primera entrada van a `/panel/cambiar-password`: no es un fallo. Al cambiarla,
+  les queda copia.
+
+## Gestión de usuarios por tipo (2026-09-22, estilo MOSAICO)
+
+Migración `20260922000000_ficha_administrativo`. `/panel/usuarios` dejó de ser una
+lista con un alta genérica: la pestaña Usuarios es un **tablero con una tarjeta
+por tipo** y un enlace a la consulta. Cada alta llena la cuenta Y la tabla donde
+vive la ficha de ese tipo. **Sin tarjeta Comercial**: en KIDS no hay equipo
+comercial (vende LGS y llega por Reservas); lo decidió el negocio.
+
+- **Estudiante** (`/panel/usuarios/estudiante`): NO crea cuentas a mano (regla 5).
+  Busca al niño (`GET /api/contracts/estudiantes?q=` → `buscarEstudiantes`: N° de
+  contrato o LGS, documento, nombre o usuario, con alcance por país) y muestra su
+  ficha, apoderados, contratos y el estado de su cuenta: "Ya tiene cuenta… no se
+  puede duplicar", "INACTIVA: se reactiva al aprobar la renovación" o "aún no
+  tiene: nace al aprobar su contrato". La acción es **Aprobar contrato** —el MISMO
+  alta única de `/api/contracts/[id]/approve`—, más restablecer y ver clave.
+  `searchContracts` ganó documento de niño y titular, y `ContractListItem` ganó
+  `userId`, `cuentaEstado` y `beneficiarioEstado`; lista y búsqueda comparten
+  ahora las columnas en `SELECT_ITEM` (antes estaban copiadas).
+- **Administrativo** (`/panel/usuarios/administrativo`): rol* (de la matriz,
+  menos alumno/guía/apoderado, que tienen su propia puerta; superadmin solo se
+  ofrece a un superadmin), plataforma (alcance del rol), nombre*, apellido*,
+  correo*, celular y N° de identificación. `POST /api/identity/users` ahora EXIGE
+  rol y correo y rechaza guía/alumno/apoderado.
+- **Guía** (`/panel/usuarios/guia` → `POST /api/scheduling/guias/alta`, multipart,
+  `crearGuia` en `scheduling/application/alta-guia.ts`): cuenta + rol `guia`
+  GLOBAL + ficha `scheduling_guia` + foto, en UNA transacción (una sala de Zoom
+  ajena deshace todo). Dos modos: **completo** (foto y documento obligatorios,
+  como MOSAICO) o **con enlace** (basta nombre, apellido y correo; se emite el
+  enlace de `/nuevo-guia` y él completa el resto). La foto se sube ANTES con el id
+  de la cuenta reservado (`crearCuentaTx` acepta `id`) y se suelta si la
+  transacción falla. La cuenta la arma `crearCuentaStaffTx` (identity), el mismo
+  núcleo del administrativo, que `scheduling` compone dentro de su transacción.
+- **Consultar** (`/panel/usuarios/consultar`): filtros por tipo (derivado en SQL:
+  persona → estudiante; rol guía → guía; otro rol → administrativo) y estado,
+  buscador por usuario/nombre/correo/documento, hasta 500 filas
+  (`MAX_USUARIOS_LISTA`) y **exportar CSV** (`;` + BOM para el Excel en español;
+  **sin claves**, a propósito: un archivo con todas las claves es una fuga lista
+  para mandar). Por cuenta: cambiar clave al entrar, restablecer, ver clave,
+  asignar y **quitar rol**, editar (el administrativo en línea; alumno y guía
+  enlazan a su ficha en Kids y Guías), **inactivar/reactivar** y **eliminar**.
+- **Correo real único**: índice `identity_user_email_real_unico` sobre
+  `LOWER(email)` de los no sintéticos; `exigirCorreoLibre` contesta antes con el
+  usuario que ya lo tiene. Los hermanos siguen compartiendo el correo del
+  apoderado, que vive en `people_person`, no en la cuenta.
+- **Inactivar/reactivar** (`PATCH …/users/[id]` con `estado`, `cambiarEstadoCuenta`):
+  solo staff y guías. La del ALUMNO sigue a su contrato —si el panel la
+  reactivara, un niño con contrato vencido volvería a entrar—. Nadie se inactiva
+  a sí mismo ni a `sistema-lgs`.
+- **Eliminar** (`DELETE …/users/[id]`, `eliminarCuenta`): SOLO una cuenta sin
+  historia. Borrar arrastraría en cascada la estadística mensual del guía y
+  dejaría sesiones y eventos sin autor, así que `SQL_MOTIVOS_NO_BORRAR` lista lo
+  que lo impide (ya entró, es alumno, tiene salones, dictó o cerró sesiones,
+  tiene estadística, creó eventos/refuerzos/enlaces) y la lista usa ese MISMO
+  fragmento para pintar el botón. Con historia: 409 y se inactiva. Suelta la foto
+  del guía, que no cuelga de la cuenta por clave foránea.
+- **Quitar rol** (`DELETE /api/access/user-roles`, `quitarRol`): hace falta lo
+  mismo que para otorgarlo y para administrar esa cuenta. Nunca el propio, nunca
+  el de alumno (lo pone el contrato) y nunca el último superadmin ACTIVO.
+- **Editar la ficha del guía ya no borra su foto**: `guardarFichaGuia` escribía
+  `foto_file_id = NULL` cuando no se la mandaban, y el PUT de `/panel/guias` no la
+  manda. Ahora "no vino" = no se toca.
+- Pruebas: `identity/tests/gestion-usuarios-integration.test.ts`,
+  `scheduling/tests/alta-guia-integration.test.ts` y la renovación en contratos.
+  **Trampa para quien pruebe el enlace**: `scheduling_guia_invitacion.creado_por`
+  es clave foránea, así que emitirlo exige un actor REAL (el UUID de ceros de las
+  pruebas no sirve), y una cuenta que emitió enlaces no se puede borrar sin
+  quitarlos antes.
 
 ## Panel del alumno (2026-07-23)
 
@@ -683,9 +869,11 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 
 ## Alta del guía por enlace (2026-08-29)
 
-- La CUENTA del guía se sigue creando en **Usuarios y roles** (usuario + rol con
-  alcance por país). Lo nuevo es que administración no tiene que llenarle la ficha:
-  desde **/panel/guias** emite un **enlace** y el guía carga sus propios datos en el
+- Desde 2026-09-22 el guía se da de alta en **Usuarios y roles › Guía** (ver
+  "Gestión de usuarios por tipo"): con su ficha completa o, marcando "que complete
+  su ficha por enlace", solo con nombre, apellido y correo, y el enlace sale en esa
+  misma pantalla. Desde **/panel/guias** se edita la ficha y se REEMITE el
+  **enlace**; el guía carga sus propios datos en el
   wizard público **`/nuevo-guia`** (3 pasos, como MOSAICO): datos básicos → contacto
   → Zoom y foto.
 - **Diferencia deliberada con MOSAICO**: allí `/nuevo-guia` es una página ABIERTA
@@ -891,11 +1079,19 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   `verificarAccesoGuia`). El intento no lleva sesión/salón, así que hay que
   derivar la matrícula ACTIVA del niño y comparar `guia_user_id` con el actor
   cuando este no tenga `salones.gestionar`.
-- **No hay restablecimiento de contraseña**: ni el admin puede resetear la de un
-  guía, ni el guía pedirla. El enlace de `/nuevo-guia` completa la ficha pero NO
-  fija contraseña — se dejó fuera a propósito: un enlace que fija clave es, en la
-  práctica, un enlace de recuperación, y eso amplía la superficie de seguridad.
-  Decisión abierta con el negocio.
+- **El enlace de `/nuevo-guia` NO fija contraseña**, y fue a propósito: un enlace
+  que fija clave es, en la práctica, un enlace de recuperación. Desde 2026-09-21
+  la clave se RESTABLECE desde el panel de usuarios (ver "Cuentas de usuario").
+- **`PASSWORD_VAULT_KEY` en producción** (Fase 11): generarla aparte
+  (`openssl rand -base64 32`) y guardarla FUERA de la base y de sus respaldos. Si
+  se pierde, las copias quedan ilegibles; las cuentas siguen entrando, porque el
+  login usa el hash.
+- **La renovación por la puerta de LGS todavía no funciona**: desde 2026-09-22 un
+  niño que vuelve se renueva con un contrato nuevo en Contratos y al aprobarlo
+  recupera su cuenta, pero `crearReservaBeneficiario` (intake y `/panel/reservas`)
+  crea SIEMPRE personas nuevas y rechaza el documento de un niño que ya existe
+  (`exigirDocLibre`). Falta que la reserva reutilice a la persona existente
+  (titular, apoderado y niño) en vez de rechazarla.
 - **Arte de ORIGEN fuera del repositorio**: `arte/personajes-fuente/` (~34 MB) e
   `imagenes/` (~96 MB) están en `.gitignore` — git carga los binarios para siempre.
   Se conservan en disco; si se necesitan versionados, van a Drive o a Git LFS. Lo

@@ -142,6 +142,8 @@ export async function guardarFichaGuia(input: {
     }
   }
 
+  // `fotoFileId` sin venir = la foto no se toca. Antes se escribía NULL: editar
+  // la ficha desde Guías (que no manda la foto) borraba la que el guía subió.
   await execute(
     `INSERT INTO scheduling_guia
        (guia_user_id, nombres, apellidos, doc_numero, email, telefono, pais,
@@ -152,7 +154,9 @@ export async function guardarFichaGuia(input: {
             doc_numero = EXCLUDED.doc_numero, email = EXCLUDED.email,
             telefono = EXCLUDED.telefono, pais = EXCLUDED.pais,
             domicilio = EXCLUDED.domicilio, fecha_nacimiento = EXCLUDED.fecha_nacimiento,
-            zoom_url = EXCLUDED.zoom_url, foto_file_id = EXCLUDED.foto_file_id,
+            zoom_url = EXCLUDED.zoom_url,
+            foto_file_id = CASE WHEN $12 THEN EXCLUDED.foto_file_id
+                                ELSE scheduling_guia.foto_file_id END,
             actualizado_en = now()`,
     [
       input.guiaUserId,
@@ -166,6 +170,7 @@ export async function guardarFichaGuia(input: {
       input.fechaNacimiento === "" ? null : (input.fechaNacimiento ?? null),
       zoom,
       input.fotoFileId ?? null,
+      input.fotoFileId !== undefined,
     ],
     input.client,
   );

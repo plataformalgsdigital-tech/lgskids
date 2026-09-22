@@ -36,6 +36,21 @@ const envSchema = z.object({
   /** Vida del refresh token en días (default 30). */
   AUTH_REFRESH_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
 
+  /**
+   * Llave de la BÓVEDA DE CLAVES: 32 bytes en base64. Con ella se guarda,
+   * además del hash, una copia CIFRADA (AES-256-GCM) de cada contraseña para
+   * que el superadmin pueda consultarla (decisión del negocio, 2026-09-21).
+   * Es distinta de AUTH_JWT_SECRET a propósito: rotar una no toca la otra, y
+   * vive fuera de la base, así que robar la base no basta para leer claves.
+   * Sin ella no se guarda ninguna copia y la consulta queda apagada.
+   */
+  PASSWORD_VAULT_KEY: z
+    .string()
+    .refine((v) => Buffer.from(v, "base64").length === 32, {
+      message: "PASSWORD_VAULT_KEY debe ser 32 bytes en base64.",
+    })
+    .optional(),
+
   /** "1" activa las pruebas de integración contra base real (CI). */
   INTEGRATION_TESTS: z.string().optional(),
 
@@ -99,6 +114,12 @@ export function requireAuthSecret(): string {
     );
   }
   return secret;
+}
+
+/** Llave de la bóveda de claves, o null si no está configurada (función apagada). */
+export function llaveBovedaClaves(): Buffer | null {
+  const v = env().PASSWORD_VAULT_KEY;
+  return v === undefined ? null : Buffer.from(v, "base64");
 }
 
 /** Solo para pruebas: limpia la caché de configuración. */

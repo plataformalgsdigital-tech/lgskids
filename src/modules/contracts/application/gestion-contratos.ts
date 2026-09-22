@@ -8,6 +8,7 @@ import {
 import {
   inactivarUsuarioTx,
   provisionarUsuarioAlumno,
+  reactivarUsuarioTx,
   type AlumnoProvisionado,
 } from "@/modules/identity";
 import {
@@ -24,7 +25,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors
 import { logger } from "@/platform/logging/logger";
 import { validarEdadParaTipo } from "../domain/edad";
 import { validarExternalRef } from "../domain/external-ref";
-import { contratoVencido, fechaUtcHoy } from "../domain/vigencia";
+import { contratoVencido, fechaUtcHoy, finalDeContrato } from "../domain/vigencia";
 import {
   beneficiarioTieneOtrosContratosVivos,
   cerrarOnhold,
@@ -52,9 +53,16 @@ function diasEntre(desde: string, hasta: string): number {
 }
 
 /**
- * Crea un contrato en estado PENDIENTE. Valida: personas activas, país del
+ * Crea un contrato en estado PENDIENTE. Valida: titular activo, país del
  * contrato, y EDAD del niño a la fecha de inicio contra su fecha de
  * nacimiento (sección 2.5 — nunca se confía en el dato tipeado).
+ *
+ * El niño PUEDE estar inactivo: es la RENOVACIÓN de quien vuelve tras vencer
+ * su contrato anterior (la cascada lo dejó INACTIVO). El alta única lo
+ * reactiva al aprobar; antes esto se rechazaba y la única salida era darlo de
+ * alta otra vez, con otro documento o duplicado.
+ *
+ * El FIN no se recibe: es inicio + 12 meses (`finalDeContrato`).
  */
 export async function crearContrato(input: {
   actorUserId: string;
@@ -63,12 +71,9 @@ export async function crearContrato(input: {
   countryCode: string;
   tipoCurso: "JUNIOR" | "YOUNGSTER";
   inicio: string;
-  finalContrato: string;
   ip?: string | null;
 }): Promise<string> {
-  if (input.finalContrato <= input.inicio) {
-    throw new ValidationError("final_contrato debe ser posterior al inicio.");
-  }
+  const finalContrato = finalDeContrato(input.inicio);
   const [titular, beneficiario] = await Promise.all([
     findPersonById(input.titularId),
     findPersonById(input.beneficiarioId),
@@ -76,15 +81,15 @@ export async function crearContrato(input: {
   if (titular === null || titular.estado !== "ACTIVA") {
     throw new NotFoundError("El titular no existe o está inactivo.");
   }
-  if (beneficiario === null || beneficiario.estado !== "ACTIVA") {
-    throw new NotFoundError("El beneficiario no existe o está inactivo.");
+  if (beneficiario === null) {
+    throw new NotFoundError("El beneficiario no existe.");
   }
   if (beneficiario.fechaNacimiento === null) {
     throw new ValidationError("El beneficiario no tiene fecha de nacimiento registrada.");
   }
   validarEdadParaTipo(beneficiario.fechaNacimiento, input.inicio, input.tipoCurso);
 
-  const id = await insertContract(input);
+  const id = await insertContract({ ...input, finalContrato });
   await registrarAuditoria({
     actorUserId: input.actorUserId,
     accion: "contracts.creado",
@@ -123,7 +128,6 @@ export async function crearReservaBeneficiario(input: {
   countryCode: string;
   tipoCurso: "JUNIOR" | "YOUNGSTER";
   inicio: string;
-  finalContrato: string;
   classroomId: string;
   titular: PersonInput;
   titularEsApoderado?: boolean | undefined;
@@ -132,9 +136,8 @@ export async function crearReservaBeneficiario(input: {
   parentesco?: string | null | undefined;
   ip?: string | null;
 }): Promise<{ contractId: string; externalRef: string; enrollmentId: string }> {
-  if (input.finalContrato <= input.inicio) {
-    throw new ValidationError("final_contrato debe ser posterior al inicio.");
-  }
+  // El fin no se recibe (ni de LGS ni del asistente): inicio + 12 meses.
+  const finalContrato = finalDeContrato(input.inicio);
   if (!input.nino.fechaNacimiento) {
     throw new ValidationError("El niño necesita fecha de nacimiento.");
   }
@@ -168,7 +171,7 @@ export async function crearReservaBeneficiario(input: {
         countryCode: input.countryCode,
         tipoCurso: input.tipoCurso,
         inicio: input.inicio,
-        finalContrato: input.finalContrato,
+        finalContrato,
         externalRef: input.externalRef,
         firmado: true,
       },
@@ -213,6 +216,11 @@ export async function crearReservaBeneficiario(input: {
  * se aprovisionan aquí (username autogenerado + correo sintético + rol
  * alumno con alcance del país del contrato). En la Fase 7 este MISMO caso de
  * uso sumará la matrícula al salón y sus inscripciones. No hay otro camino.
+ *
+ * Si el niño VUELVE (renovación: persona y cuenta quedaron INACTIVAS al vencer
+ * el contrato anterior), aquí se REACTIVAN, conservando su usuario: la
+ * activación del alumno ocurre al aprobar, igual que la primera vez. Antes la
+ * cuenta seguía apagada y el niño, con contrato vigente, no podía entrar.
  */
 export async function aprobarContrato(input: {
   actorUserId: string;
@@ -220,7 +228,12 @@ export async function aprobarContrato(input: {
   /** Si viene, el alta única incluye la MATRÍCULA en ese salón (Fase 7). */
   classroomId?: string | null;
   ip?: string | null;
-}): Promise<{ credenciales: AlumnoProvisionado | null; enrollmentId: string | null }> {
+}): Promise<{
+  credenciales: AlumnoProvisionado | null;
+  enrollmentId: string | null;
+  /** Id de la cuenta existente que se reactivó (renovación). */
+  reactivado: string | null;
+}> {
   const contrato = await findContractById(input.contractId);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
   if (contrato.estado !== "PENDIENTE") {
@@ -229,14 +242,18 @@ export async function aprobarContrato(input: {
     );
   }
   const beneficiario = await findPersonById(contrato.beneficiarioId);
-  if (beneficiario === null || beneficiario.estado !== "ACTIVA") {
-    throw new ConflictError("El beneficiario no está activo.");
+  if (beneficiario === null) {
+    throw new ConflictError("El beneficiario no existe.");
   }
 
   const resultado = await withTransaction(async (tx) => {
     await setContractEstado(contrato.id, "APROBADO", tx);
+    if (beneficiario.estado !== "ACTIVA") {
+      await setPersonEstado(beneficiario.id, "ACTIVA", tx);
+    }
 
     let credenciales: AlumnoProvisionado | null = null;
+    let reactivado: string | null = null;
     if (beneficiario.userId === null) {
       credenciales = await provisionarUsuarioAlumno(tx, {
         nombres: beneficiario.nombres,
@@ -245,6 +262,16 @@ export async function aprobarContrato(input: {
       await linkUser(beneficiario.id, credenciales.userId, tx);
       await asignarRolTx(tx, {
         userId: credenciales.userId,
+        roleCode: ROLES.ALUMNO,
+        countryCode: contrato.countryCode,
+      });
+    } else {
+      if (await reactivarUsuarioTx(tx, beneficiario.userId)) {
+        reactivado = beneficiario.userId;
+      }
+      // El contrato nuevo puede ser de OTRO país: el rol lo sigue (idempotente).
+      await asignarRolTx(tx, {
+        userId: beneficiario.userId,
         roleCode: ROLES.ALUMNO,
         countryCode: contrato.countryCode,
       });
@@ -261,7 +288,7 @@ export async function aprobarContrato(input: {
         tipoCursoContrato: contrato.tipoCurso,
       });
     }
-    return { credenciales, enrollmentId };
+    return { credenciales, enrollmentId, reactivado };
   });
 
   await registrarAuditoria({
@@ -273,6 +300,7 @@ export async function aprobarContrato(input: {
       beneficiarioId: contrato.beneficiarioId,
       credencialesCreadas: resultado.credenciales !== null,
       ...(resultado.credenciales !== null && { username: resultado.credenciales.username }),
+      ...(resultado.reactivado !== null && { cuentaReactivada: resultado.reactivado }),
       ...(resultado.enrollmentId !== null && { enrollmentId: resultado.enrollmentId }),
     },
     ip: input.ip ?? null,
@@ -285,7 +313,11 @@ export async function aprobarReservaPorExternalRef(input: {
   actorUserId: string;
   externalRef: string;
   ip?: string | null;
-}): Promise<{ credenciales: AlumnoProvisionado | null; enrollmentId: string | null }> {
+}): Promise<{
+  credenciales: AlumnoProvisionado | null;
+  enrollmentId: string | null;
+  reactivado: string | null;
+}> {
   const contrato = await findContractByExternalRef(input.externalRef);
   if (contrato === null) {
     throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);

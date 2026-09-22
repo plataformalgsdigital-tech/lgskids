@@ -43,7 +43,6 @@ async function crearNinoConContrato(n: number): Promise<{ ninoId: string; contra
     countryCode: "CO",
     tipoCurso: "JUNIOR",
     inicio: "2026-08-03",
-    finalContrato: "2026-12-20",
   });
   return { ninoId, contractId };
 }

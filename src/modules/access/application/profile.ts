@@ -1,4 +1,11 @@
 import { ForbiddenError } from "@/platform/errors";
+import {
+  PERMISOS,
+  ROLES,
+  requisitoParaGestionarCuenta,
+  requisitoParaOtorgar,
+  type RequisitoOtorgar,
+} from "../domain/permisos";
 import type { AccessProfileData, PermissionGrant, RoleAssignment } from "./ports";
 
 /**
@@ -50,6 +57,42 @@ export class AccessProfile {
     if (!this.hasPermission(code, countryCode)) {
       throw new ForbiddenError("No tienes permiso para esta operación.", {
         details: { permiso: code, ...(countryCode !== undefined && { pais: countryCode }) },
+      });
+    }
+  }
+
+  /**
+   * ¿Tiene el ROL superadmin? No es lo mismo que tener todos los permisos: un
+   * admin también los tiene, y lo que es solo del superadmin (otorgar la llave
+   * maestra, consultar claves) se decide por el ROL, que ningún permiso editable
+   * en el panel puede conceder.
+   */
+  get esSuperadmin(): boolean {
+    return this.roleCodes.includes(ROLES.SUPERADMIN);
+  }
+
+  private cumple(requisito: RequisitoOtorgar): boolean {
+    if (requisito === "superadmin") return this.esSuperadmin;
+    if (requisito === "roles.asignar") return this.hasPermission(PERMISOS.ROLES_ASIGNAR);
+    return this.hasPermission(PERMISOS.USUARIOS_GESTIONAR);
+  }
+
+  /** Lanza si no puede otorgar ese rol (ver `requisitoParaOtorgar`). */
+  requirePuedeOtorgarRol(roleCode: string): void {
+    const requisito = requisitoParaOtorgar(roleCode);
+    if (!this.cumple(requisito)) {
+      throw new ForbiddenError(`No puedes otorgar el rol '${roleCode}'.`, {
+        details: { requiere: requisito },
+      });
+    }
+  }
+
+  /** Lanza si no puede administrar la cuenta de alguien con esos roles. */
+  requirePuedeGestionarCuentaDe(rolesDelOtro: readonly string[]): void {
+    const requisito = requisitoParaGestionarCuenta(rolesDelOtro);
+    if (!this.cumple(requisito)) {
+      throw new ForbiddenError("No puedes administrar la cuenta de este usuario.", {
+        details: { requiere: requisito },
       });
     }
   }

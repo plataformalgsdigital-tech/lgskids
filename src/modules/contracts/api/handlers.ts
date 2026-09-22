@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
+import { buscarEstudiantes } from "../application/estudiantes";
 import {
   aprobarContrato,
   crearContrato,
@@ -34,7 +35,6 @@ const reservaSchema = z.object({
   countryCode: paisSchema,
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
   inicio: z.string().regex(ISO_DATE),
-  finalContrato: z.string().regex(ISO_DATE),
   classroomId: z.uuid(),
   titular: personaSchema,
   titularEsApoderado: z.boolean().optional(),
@@ -52,7 +52,6 @@ const crearSchema = z.object({
     .transform((c) => c.toUpperCase()),
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
   inicio: z.string().regex(ISO_DATE),
-  finalContrato: z.string().regex(ISO_DATE),
 });
 
 function ip(request: Request): string | null {
@@ -102,6 +101,25 @@ const listarSchema = z.object({
   finalHasta: ISO_DATE_OPT,
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+/**
+ * GET /api/contracts/estudiantes?q= — el niño con sus contratos y su cuenta,
+ * para la tarjeta Estudiante de Gestión de Usuarios. Alcance por país.
+ */
+export const buscarEstudiantesHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CONTRATOS_VER);
+  const q = z
+    .string()
+    .max(80)
+    .parse(request.nextUrl.searchParams.get("q") ?? "");
+  return json({
+    estudiantes: await buscarEstudiantes({ q, countryScope: auth.countryScope }),
+    // Solo deciden qué botones ofrece la pantalla; el servidor lo vuelve a exigir.
+    puedeAprobar: profile.hasPermission(PERMISOS.CONTRATOS_GESTIONAR),
+    puedeVerClaves: profile.esSuperadmin,
+  });
 });
 
 /** GET /api/contracts — con alcance por país + filtros. */

@@ -11,7 +11,7 @@ import {
   ponerEnPausa,
   reactivar,
 } from "../application/gestion-contratos";
-import { findContractById } from "../infrastructure/contract-repository";
+import { findContractById, findContratosVencidos } from "../infrastructure/contract-repository";
 
 /**
  * INTEGRACIÓN del ciclo de vida completo del contrato (secciones 2.4/2.5):
@@ -27,6 +27,7 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
   let ninoId: string;
   let apoderadoId: string;
   let contractId: string;
+  let renovacionId: string | undefined;
   let username: string | undefined;
 
   beforeAll(async () => {
@@ -56,9 +57,9 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
 
   afterAll(async () => {
     // Limpieza en orden inverso de dependencias.
-    if (contractId !== undefined) {
-      await execute(`DELETE FROM contracts_contract WHERE id = $1`, [contractId]);
-    }
+    await execute(`DELETE FROM contracts_contract WHERE id = ANY($1)`, [
+      [contractId, renovacionId].filter((id) => id !== undefined),
+    ]);
     if (username !== undefined) {
       await execute(`DELETE FROM identity_user WHERE username = $1`, [username]);
     }
@@ -76,7 +77,6 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
         countryCode: "CO",
         tipoCurso: "YOUNGSTER",
         inicio: "2026-08-03",
-        finalContrato: "2026-12-20",
       }),
     ).rejects.toThrow();
 
@@ -87,9 +87,10 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
       countryCode: "CO",
       tipoCurso: "JUNIOR",
       inicio: "2026-08-03",
-      finalContrato: "2026-12-20",
     });
     expect(contractId).toBeTruthy();
+    // El fin no se escribe: es inicio + 12 meses.
+    expect((await findContractById(contractId))?.finalContrato).toBe("2027-08-03");
   });
 
   it("APROBAR = alta única: credenciales con username autogenerado, correo sintético y rol alumno CO", async () => {
@@ -123,6 +124,17 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
 
   it("OnHold y reactivar: los días pausados EXTIENDEN final_contrato", async () => {
     await ponerEnPausa({ actorUserId: ACTOR, contractId, motivo: "viaje familiar" });
+
+    // Un contrato EN PAUSA no vence aunque su fin original ya haya pasado: el
+    // fin se extiende al reactivar. Antes el barrido lo desactivaba igual.
+    await execute(`UPDATE contracts_contract SET final_contrato = '2020-01-01' WHERE id = $1`, [
+      contractId,
+    ]);
+    expect((await findContratosVencidos(1000)).map((c) => c.id)).not.toContain(contractId);
+    await execute(`UPDATE contracts_contract SET final_contrato = '2027-08-03' WHERE id = $1`, [
+      contractId,
+    ]);
+
     // Simular que la pausa empezó hace 10 días.
     await execute(
       `UPDATE contracts_onhold SET desde = desde - 10 WHERE contract_id = $1 AND hasta IS NULL`,
@@ -130,11 +142,11 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
     );
     const resultado = await reactivar({ actorUserId: ACTOR, contractId });
     expect(resultado.diasExtendidos).toBe(10);
-    expect(resultado.nuevoFinal).toBe("2026-12-30"); // 2026-12-20 + 10
+    expect(resultado.nuevoFinal).toBe("2027-08-13"); // inicio + 12 meses + 10 días
 
     const contrato = await findContractById(contractId);
     expect(contrato?.estado).toBe("APROBADO");
-    expect(contrato?.finalContrato).toBe("2026-12-30");
+    expect(contrato?.finalContrato).toBe("2027-08-13");
   });
 
   it("INACTIVAR dispara la cascada sincronizada: contrato + persona + credenciales + sesiones", async () => {
@@ -164,5 +176,29 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
     await expect(
       inactivarContrato({ actorUserId: ACTOR, contractId, motivo: "repetido a propósito" }),
     ).resolves.toBeUndefined();
+  });
+
+  it("RENOVACIÓN: el niño que vuelve recibe contrato nuevo y, al aprobarlo, recupera su MISMA cuenta", async () => {
+    // Antes esto se rechazaba ("beneficiario inactivo") y, aunque se forzara,
+    // la cuenta seguía apagada con el contrato nuevo vigente.
+    renovacionId = await crearContrato({
+      actorUserId: ACTOR,
+      titularId: apoderadoId,
+      beneficiarioId: ninoId,
+      countryCode: "CO",
+      tipoCurso: "JUNIOR",
+      inicio: "2027-09-01", // 9 años: sigue en JUNIOR
+    });
+    const r = await aprobarContrato({ actorUserId: ACTOR, contractId: renovacionId });
+    expect(r.credenciales).toBeNull(); // no se crea otra cuenta
+    expect(r.reactivado).not.toBeNull();
+
+    const fila = await queryOne<{ persona: string; cuenta: string; username: string }>(
+      `SELECT p.estado::text AS persona, u.estado::text AS cuenta, u.username
+         FROM people_person p JOIN identity_user u ON u.id = p.user_id
+        WHERE p.id = $1`,
+      [ninoId],
+    );
+    expect(fila).toEqual({ persona: "ACTIVA", cuenta: "ACTIVO", username });
   });
 });

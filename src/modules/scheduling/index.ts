@@ -80,6 +80,8 @@ export {
   MAX_SALONES_COMPARTIDOS,
   DURACIONES_TALLER,
 } from "./application/crear-evento";
+export { crearGuia, MIMES_FOTO_GUIA } from "./application/alta-guia";
+export type { DatosAltaGuia } from "./application/alta-guia";
 export {
   crearEventoAdmin,
   eventosAdmin,

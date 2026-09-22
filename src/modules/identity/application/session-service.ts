@@ -5,6 +5,7 @@ import { logger } from "@/platform/logging/logger";
 import { validarPassword } from "../domain/password-policy";
 import type {
   AuditWriterPort,
+  BovedaClavesPort,
   LoginAttemptRepositoryPort,
   PasswordHasherPort,
   RefreshTokenRepositoryPort,
@@ -46,6 +47,8 @@ export interface SessionDeps {
   hasher: PasswordHasherPort;
   tokens: TokenServicePort;
   audit: AuditWriterPort;
+  /** Bóveda de claves. Sin ella no se guarda copia de la clave nueva. */
+  boveda?: BovedaClavesPort;
   /** Inyectable para pruebas. */
   now?: () => Date;
 }
@@ -220,7 +223,10 @@ export class SessionService {
     validarPassword(input.passwordNueva);
 
     const nuevoHash = await this.deps.hasher.hash(input.passwordNueva);
-    await this.deps.users.updatePassword(user.id, nuevoHash, false);
+    // También la que elige el usuario queda consultable por el superadmin
+    // (decisión del negocio; ver `boveda-claves.ts`).
+    const cifrada = this.deps.boveda?.copia(input.passwordNueva, user.id) ?? null;
+    await this.deps.users.updatePassword(user.id, nuevoHash, false, cifrada);
     // Toda sesión previa muere: si alguien tenía el refresh robado, se corta.
     await this.deps.refreshTokens.revokeAllForUser(user.id, "cambio de contraseña");
     await this.deps.audit.registrar({

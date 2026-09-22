@@ -6,7 +6,7 @@ import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
 import { VisorLibro, type CajaLibro } from "@/ui/VisorLibro";
-import { apiFetch } from "@/ui/api-fetch";
+import { apiFetch, irACambiarClaveSiCorresponde } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 
 /** Marca que ya se ofreció subir la foto: no se insiste en cada visita. */
@@ -328,6 +328,8 @@ export default function MiPanelPage() {
         }
         res = await fetch("/api/student/dashboard");
       }
+      // Clave pendiente de cambiar (primer ingreso o restablecida): a cambiarla.
+      if (await irACambiarClaveSiCorresponde(res)) return;
       if (res.status === 403) {
         router.replace("/panel");
         return;

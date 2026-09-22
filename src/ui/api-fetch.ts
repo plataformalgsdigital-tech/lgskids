@@ -24,6 +24,26 @@ function refrescarSesion(): Promise<boolean> {
   return refrescoEnCurso;
 }
 
+/** Adonde va quien tiene pendiente cambiar la clave. */
+export const RUTA_CAMBIAR_CLAVE = "/panel/cambiar-password";
+
+/**
+ * El servidor responde 403 `DEBE_CAMBIAR_PASSWORD` a todo mientras la cuenta
+ * tenga pendiente cambiar la clave (tras el alta o un restablecimiento). Ante
+ * eso no hay nada que mostrar: se lleva al usuario a cambiarla, desde
+ * cualquier pantalla.
+ */
+export async function irACambiarClaveSiCorresponde(res: Response): Promise<boolean> {
+  if (res.status !== 403 || typeof window === "undefined") return false;
+  const cuerpo = (await res
+    .clone()
+    .json()
+    .catch(() => null)) as { error?: { code?: string } } | null;
+  if (cuerpo?.error?.code !== "DEBE_CAMBIAR_PASSWORD") return false;
+  if (window.location.pathname !== RUTA_CAMBIAR_CLAVE) window.location.replace(RUTA_CAMBIAR_CLAVE);
+  return true;
+}
+
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   let res = await fetch(input, init);
   if (res.status === 401) {
@@ -32,5 +52,6 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
       res = await fetch(input, init);
     }
   }
+  await irACambiarClaveSiCorresponde(res);
   return res;
 }

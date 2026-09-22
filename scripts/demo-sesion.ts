@@ -116,7 +116,6 @@ async function main(): Promise<void> {
       countryCode: "CO",
       tipoCurso: "JUNIOR",
       inicio: "2026-08-03",
-      finalContrato: "2026-12-20",
     });
 
     // Aprobar CON salón = alta única + matrícula ACTIVA en un solo lugar.

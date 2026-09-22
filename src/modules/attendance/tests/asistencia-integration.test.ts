@@ -117,7 +117,6 @@ describe.runIf(RUN)("asistencia y cuestionarios (integración)", () => {
       countryCode: "CO",
       tipoCurso: "JUNIOR",
       inicio: "2026-08-03",
-      finalContrato: "2026-12-20",
     });
     await aprobarContrato({ actorUserId: ACTOR, contractId, classroomId });
     const persona = await queryOne<{ user_id: string | null }>(

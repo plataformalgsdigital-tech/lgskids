@@ -1,15 +1,29 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 export default function CambiarPasswordPage() {
-  const router = useRouter();
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  // Llegar aquí OBLIGADO (cuenta nueva o clave restablecida) no es lo mismo que
+  // venir a cambiarla por gusto: hay que decir por qué y qué va en "actual".
+  const [obligado, setObligado] = useState(false);
+
+  useEffect(() => {
+    let vigente = true;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { user?: { debeCambiarPassword?: boolean } | null } | null) => {
+        if (vigente) setObligado(d?.user?.debeCambiarPassword === true);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -33,8 +47,9 @@ export default function CambiarPasswordPage() {
         );
         return;
       }
-      // Sesiones revocadas: volver a entrar con la contraseña nueva.
-      router.replace("/login");
+      // Sesiones revocadas: volver a entrar con la contraseña nueva. Navegación
+      // completa, no del router: el panel en memoria no debe sobrevivir.
+      window.location.replace("/login?clave=cambiada");
     } catch {
       setError("Error de conexión. Intenta nuevamente.");
     } finally {
@@ -65,6 +80,22 @@ export default function CambiarPasswordPage() {
         }}
       >
         <h1 style={{ fontSize: "1.4rem" }}>Cambia tu contraseña</h1>
+        {obligado && (
+          <p
+            role="status"
+            style={{
+              background: "#fff8e1",
+              border: "1px solid #ffe08a",
+              borderRadius: "0.6rem",
+              padding: "0.7rem 0.8rem",
+              fontSize: "0.88rem",
+            }}
+          >
+            <strong>Antes de seguir, cambia tu clave.</strong> Tu cuenta tiene una clave temporal
+            (se creó o se restableció). En <em>Contraseña actual</em> escribe la misma con la que
+            acabas de entrar. Hasta que la cambies no se abre el resto del panel.
+          </p>
+        )}
         <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
           Mínimo 10 caracteres, con letras y números. Al guardarla se cerrarán todas tus sesiones.
         </p>

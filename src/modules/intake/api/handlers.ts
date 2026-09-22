@@ -28,7 +28,8 @@ const reservaSchema = z.object({
   countryCode: paisSchema,
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
   inicio: z.string().regex(ISO_DATE),
-  finalContrato: z.string().regex(ISO_DATE),
+  // `finalContrato` YA NO se recibe (2026-09-21): el fin es inicio + 12 meses y
+  // lo calcula KIDS. Si LGS lo sigue mandando, Zod lo descarta sin error.
   classroomId: z.uuid(),
   titular: personaSchema,
   titularEsApoderado: z.boolean().optional(),

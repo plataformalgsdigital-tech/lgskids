@@ -36,6 +36,16 @@ export class ForbiddenError extends AppError {
   override readonly code = "FORBIDDEN";
 }
 
+/**
+ * 403 — La sesión es válida, pero la cuenta tiene pendiente cambiar la clave.
+ * Código propio para que el cliente sepa a dónde mandar al usuario en vez de
+ * mostrar "sin permiso".
+ */
+export class DebeCambiarPasswordError extends AppError {
+  override readonly status = 403;
+  override readonly code = "DEBE_CAMBIAR_PASSWORD";
+}
+
 /** 404 — El recurso no existe o no es visible para el solicitante. */
 export class NotFoundError extends AppError {
   override readonly status = 404;

@@ -30,6 +30,8 @@ jobs:
       DATABASE_URL: postgresql://kids:kids_ci@localhost:5432/kids2026_ci
       DIRECT_DATABASE_URL: postgresql://kids:kids_ci@localhost:5432/kids2026_ci
       AUTH_JWT_SECRET: ci-secret-solo-para-pruebas-0123456789abcdef
+      # Bóveda de claves SOLO para pruebas (32 bytes: "ci-boveda-solo-para-pruebas-0000").
+      PASSWORD_VAULT_KEY: Y2ktYm92ZWRhLXNvbG8tcGFyYS1wcnVlYmFzLTAwMDA=
       SEED_ADMIN_PASSWORD: CiAdminPass123
       INTEGRATION_TESTS: "1"
 

@@ -167,11 +167,17 @@ export async function beneficiarioTieneOtrosContratosVivos(
   return row !== null;
 }
 
-/** Contratos vivos ya VENCIDOS (regla única de +2 días, gemelo SQL). */
+/**
+ * Contratos vivos ya VENCIDOS (regla única de +2 días, gemelo SQL).
+ *
+ * Solo APROBADOS: uno EN PAUSA no vence durante la pausa. Su `final_contrato`
+ * se extiende recién al reactivar, así que mirarlo aquí desactivaba —sin
+ * vuelta atrás— a un niño pausado cuyo fin original caía dentro de la pausa.
+ */
 export async function findContratosVencidos(limit: number): Promise<ContractRecord[]> {
   return queryRows<ContractRecord>(
     `${SELECT_CONTRACT}
-      WHERE estado IN ('APROBADO', 'ONHOLD')
+      WHERE estado = 'APROBADO'
         AND ${SQL_CONTRATO_VENCIDO}
       ORDER BY final_contrato
       LIMIT $1`,
@@ -184,12 +190,17 @@ export interface ContractListItem extends ContractRecord {
   beneficiarioDocTipo: string;
   beneficiarioDocNumero: string;
   beneficiarioFechaNac: string | null;
+  /** ACTIVA | INACTIVA: inactiva tras vencer su último contrato. */
+  beneficiarioEstado: string;
   titular: string;
   titularDocTipo: string;
   titularDocNumero: string;
   titularTelefono: string | null;
   titularEmail: string | null;
+  /** Cuenta del alumno: nace al aprobar su primer contrato. */
+  userId: string | null;
   username: string | null;
+  cuentaEstado: string | null;
   /** Apoderados del beneficiario (relación people_guardianship). */
   apoderados: {
     nombre: string;
@@ -205,6 +216,42 @@ export interface ContractListItem extends ContractRecord {
   campania: string | null;
   enrollmentId: string | null;
 }
+
+/**
+ * Columnas y cruces de `ContractListItem`, UNA vez: la lista y la búsqueda
+ * devuelven lo mismo, y tenerlo copiado en las dos era pedir que una ganara
+ * un campo y la otra no.
+ */
+const SELECT_ITEM = `
+  SELECT c.id, c.numero, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
+         c.country_code AS "countryCode", c.tipo_curso AS "tipoCurso",
+         c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
+         c.estado, c.external_ref AS "externalRef",
+         b.nombres || ' ' || b.apellidos AS beneficiario,
+         b.doc_tipo AS "beneficiarioDocTipo", b.doc_numero AS "beneficiarioDocNumero",
+         b.fecha_nacimiento::text AS "beneficiarioFechaNac",
+         b.estado::text AS "beneficiarioEstado",
+         t.nombres || ' ' || t.apellidos AS titular,
+         t.doc_tipo AS "titularDocTipo", t.doc_numero AS "titularDocNumero",
+         t.telefono AS "titularTelefono", t.email AS "titularEmail",
+         u.id AS "userId", u.username, u.estado::text AS "cuentaEstado",
+         COALESCE((SELECT json_agg(json_build_object(
+                     'nombre', a.nombres || ' ' || a.apellidos,
+                     'docTipo', a.doc_tipo, 'docNumero', a.doc_numero,
+                     'telefono', a.telefono, 'parentesco', g.parentesco))
+                     FROM people_guardianship g
+                     JOIN people_person a ON a.id = g.apoderado_id
+                    WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
+         cl.nombre AS salon, ca.nombre AS campania,
+         e.id AS "enrollmentId"
+    FROM contracts_contract c
+    JOIN people_person b ON b.id = c.beneficiario_id
+    JOIN people_person t ON t.id = c.titular_id
+    LEFT JOIN identity_user u ON u.id = b.user_id
+    LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado IN ('ACTIVA', 'RESERVADA')
+    LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+    LEFT JOIN catalog_course cu ON cu.id = cl.course_id
+    LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id`;
 
 /** Lista con alcance por país (ADR-0009) y nombres resueltos. */
 export async function listContracts(params: {
@@ -254,34 +301,7 @@ export async function listContracts(params: {
   const offsetIdx = values.length;
 
   return queryRows<ContractListItem>(
-    `SELECT c.id, c.numero, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
-            c.country_code AS "countryCode", c.tipo_curso AS "tipoCurso",
-            c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
-            c.estado, c.external_ref AS "externalRef",
-            b.nombres || ' ' || b.apellidos AS beneficiario,
-            b.doc_tipo AS "beneficiarioDocTipo", b.doc_numero AS "beneficiarioDocNumero",
-            b.fecha_nacimiento::text AS "beneficiarioFechaNac",
-            t.nombres || ' ' || t.apellidos AS titular,
-            t.doc_tipo AS "titularDocTipo", t.doc_numero AS "titularDocNumero",
-            t.telefono AS "titularTelefono", t.email AS "titularEmail",
-            u.username,
-            COALESCE((SELECT json_agg(json_build_object(
-                        'nombre', a.nombres || ' ' || a.apellidos,
-                        'docTipo', a.doc_tipo, 'docNumero', a.doc_numero,
-                        'telefono', a.telefono, 'parentesco', g.parentesco))
-                        FROM people_guardianship g
-                        JOIN people_person a ON a.id = g.apoderado_id
-                       WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
-            cl.nombre AS salon, ca.nombre AS campania,
-            e.id AS "enrollmentId"
-       FROM contracts_contract c
-       JOIN people_person b ON b.id = c.beneficiario_id
-       JOIN people_person t ON t.id = c.titular_id
-       LEFT JOIN identity_user u ON u.id = b.user_id
-       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado IN ('ACTIVA', 'RESERVADA')
-       LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
-       LEFT JOIN catalog_course cu ON cu.id = cl.course_id
-       LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+    `${SELECT_ITEM}
       ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY c.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
@@ -290,9 +310,9 @@ export async function listContracts(params: {
 }
 
 /**
- * Búsqueda global de contratos: por NÚMERO exacto, o por nombre/apellido del
- * beneficiario o titular, o por username del alumno. Respeta el alcance por
- * país del solicitante.
+ * Búsqueda global de contratos: por NÚMERO exacto, o por nombre/apellido o
+ * DOCUMENTO del beneficiario o titular, username del alumno o N° LGS. Respeta
+ * el alcance por país del solicitante.
  */
 export async function searchContracts(params: {
   q: string;
@@ -312,40 +332,15 @@ export async function searchContracts(params: {
     values.push(`%${params.q}%`);
     const i = values.length;
     where.push(
-      `(b.nombres ILIKE $${i} OR b.apellidos ILIKE $${i} OR t.nombres ILIKE $${i} OR t.apellidos ILIKE $${i} OR u.username ILIKE $${i} OR c.external_ref ILIKE $${i})`,
+      `(b.nombres ILIKE $${i} OR b.apellidos ILIKE $${i} OR t.nombres ILIKE $${i}
+        OR t.apellidos ILIKE $${i} OR u.username ILIKE $${i} OR c.external_ref ILIKE $${i}
+        OR b.doc_numero ILIKE $${i} OR t.doc_numero ILIKE $${i})`,
     );
   }
   values.push(params.limit);
 
   return queryRows<ContractListItem>(
-    `SELECT c.id, c.numero, c.titular_id AS "titularId", c.beneficiario_id AS "beneficiarioId",
-            c.country_code AS "countryCode", c.tipo_curso AS "tipoCurso",
-            c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
-            c.estado, c.external_ref AS "externalRef",
-            b.nombres || ' ' || b.apellidos AS beneficiario,
-            b.doc_tipo AS "beneficiarioDocTipo", b.doc_numero AS "beneficiarioDocNumero",
-            b.fecha_nacimiento::text AS "beneficiarioFechaNac",
-            t.nombres || ' ' || t.apellidos AS titular,
-            t.doc_tipo AS "titularDocTipo", t.doc_numero AS "titularDocNumero",
-            t.telefono AS "titularTelefono", t.email AS "titularEmail",
-            u.username,
-            COALESCE((SELECT json_agg(json_build_object(
-                        'nombre', a.nombres || ' ' || a.apellidos,
-                        'docTipo', a.doc_tipo, 'docNumero', a.doc_numero,
-                        'telefono', a.telefono, 'parentesco', g.parentesco))
-                        FROM people_guardianship g
-                        JOIN people_person a ON a.id = g.apoderado_id
-                       WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
-            cl.nombre AS salon, ca.nombre AS campania,
-            e.id AS "enrollmentId"
-       FROM contracts_contract c
-       JOIN people_person b ON b.id = c.beneficiario_id
-       JOIN people_person t ON t.id = c.titular_id
-       LEFT JOIN identity_user u ON u.id = b.user_id
-       LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado IN ('ACTIVA', 'RESERVADA')
-       LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
-       LEFT JOIN catalog_course cu ON cu.id = cl.course_id
-       LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+    `${SELECT_ITEM}
       WHERE ${where.join(" AND ")}
       ORDER BY c.numero DESC
       LIMIT $${values.length}`,

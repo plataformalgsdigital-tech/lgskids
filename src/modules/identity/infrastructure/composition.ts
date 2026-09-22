@@ -2,6 +2,7 @@ import { registrarAuditoria } from "@/modules/audit";
 import { SessionService } from "../application/session-service";
 import type { AuditWriterPort } from "../application/ports";
 import { Argon2Hasher } from "./argon2-hasher";
+import { copiaCifrada } from "./boveda-claves";
 import { JwtTokenService } from "./jwt-token-service";
 import { PgLoginAttemptRepository } from "./login-attempt-repository";
 import { PgRefreshTokenRepository } from "./refresh-token-repository";
@@ -28,6 +29,7 @@ export function sessionService(): SessionService {
       hasher: new Argon2Hasher(),
       tokens: new JwtTokenService(),
       audit: auditWriter,
+      boveda: { copia: copiaCifrada },
     });
   }
   return service;

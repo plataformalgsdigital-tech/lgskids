@@ -2,10 +2,13 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
 
 /** Se recuerda por pestaña: el aviso no vuelve a saltar tras cerrarlo. */
 const AVISO_DESCARTADO = "lgs-kids:aviso-login-descartado";
+
+/** La URL de la página no cambia mientras está abierta: nada que escuchar. */
+const sinSuscripcion = () => () => {};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +17,46 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [avisoUrl, setAvisoUrl] = useState<string | null>(null);
+  // "¿Olvidaste tu clave?": deja una solicitud al equipo, que restablece la clave
+  // y la entrega. La respuesta es la misma exista o no el usuario.
+  const [olvido, setOlvido] = useState(false);
+  const [usuarioOlvido, setUsuarioOlvido] = useState("");
+  const [contactoOlvido, setContactoOlvido] = useState("");
+  const [msgOlvido, setMsgOlvido] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [enviandoOlvido, setEnviandoOlvido] = useState(false);
+  // Tras cambiar la clave se cierran las sesiones y se vuelve aquí: sin el
+  // aviso, parece que el cambio "sacó" al usuario. En el servidor no hay URL.
+  const claveCambiada = useSyncExternalStore(
+    sinSuscripcion,
+    () => new URLSearchParams(window.location.search).get("clave") === "cambiada",
+    () => false,
+  );
+
+  async function pedirClaveNueva() {
+    if (usuarioOlvido.trim() === "") {
+      setMsgOlvido({ ok: false, texto: "Escribe tu usuario." });
+      return;
+    }
+    setEnviandoOlvido(true);
+    setMsgOlvido(null);
+    try {
+      const res = await fetch("/api/public/olvido-clave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario: usuarioOlvido.trim(), contacto: contactoOlvido || null }),
+      });
+      const data: { mensaje?: string; error?: { message: string } } = await res.json();
+      setMsgOlvido(
+        res.ok
+          ? { ok: true, texto: data.mensaje ?? "Recibimos tu solicitud." }
+          : { ok: false, texto: data.error?.message ?? "No se pudo enviar la solicitud." },
+      );
+    } catch {
+      setMsgOlvido({ ok: false, texto: "Error de conexión. Intenta nuevamente." });
+    } finally {
+      setEnviandoOlvido(false);
+    }
+  }
 
   // Aviso de la pantalla de login: imagen que administración prende/apaga.
   // Si falla, el login sigue funcionando igual — nunca bloquea el ingreso.
@@ -115,6 +158,22 @@ export default function LoginPage() {
           Ingresa con tu usuario
         </p>
 
+        {claveCambiada && (
+          <p
+            role="status"
+            style={{
+              background: "#e8f5e9",
+              border: "1px solid #a5d6a7",
+              borderRadius: "0.6rem",
+              padding: "0.6rem 0.75rem",
+              fontSize: "0.88rem",
+              textAlign: "center",
+            }}
+          >
+            ✅ Clave cambiada. Entra con tu clave nueva.
+          </p>
+        )}
+
         <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
           <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Usuario</span>
           <input
@@ -171,6 +230,111 @@ export default function LoginPage() {
         >
           {cargando ? "Entrando…" : "Entrar"}
         </button>
+
+        {!olvido ? (
+          <button
+            type="button"
+            onClick={() => {
+              setOlvido(true);
+              setUsuarioOlvido(username);
+              setMsgOlvido(null);
+            }}
+            style={{
+              alignSelf: "center",
+              border: "none",
+              background: "none",
+              color: "var(--lgs-azul)",
+              fontSize: "0.88rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            ¿Olvidaste tu clave?
+          </button>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              padding: "0.9rem",
+              borderRadius: "0.8rem",
+              background: "#f4f6fb",
+            }}
+          >
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+              Déjanos tu usuario y cómo contactarte. El equipo de LGS Kids te enviará una clave
+              nueva; al entrar con ella te pediremos que la cambies.
+            </p>
+            <input
+              placeholder="Tu usuario"
+              value={usuarioOlvido}
+              onChange={(e) => setUsuarioOlvido(e.target.value)}
+              autoComplete="username"
+              style={{
+                padding: "0.55rem 0.7rem",
+                borderRadius: "0.5rem",
+                border: "1.5px solid #d8dce6",
+              }}
+            />
+            <input
+              placeholder="WhatsApp o correo para contactarte (opcional)"
+              value={contactoOlvido}
+              onChange={(e) => setContactoOlvido(e.target.value)}
+              maxLength={200}
+              style={{
+                padding: "0.55rem 0.7rem",
+                borderRadius: "0.5rem",
+                border: "1.5px solid #d8dce6",
+              }}
+            />
+            {msgOlvido !== null && (
+              <p
+                role="status"
+                style={{
+                  margin: 0,
+                  fontSize: "0.85rem",
+                  color: msgOlvido.ok ? "#1b5e20" : "#c62828",
+                }}
+              >
+                {msgOlvido.texto}
+              </p>
+            )}
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => void pedirClaveNueva()}
+                disabled={enviandoOlvido || msgOlvido?.ok === true}
+                style={{
+                  flex: 1,
+                  padding: "0.55rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  background: "var(--lgs-verde)",
+                  color: "#1b2a10",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {enviandoOlvido ? "Enviando…" : "Pedir clave nueva"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOlvido(false)}
+                style={{
+                  padding: "0.55rem 0.8rem",
+                  borderRadius: "0.6rem",
+                  border: "1px solid #d8dce6",
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Volver
+              </button>
+            </div>
+          </div>
+        )}
       </form>
 
       {avisoUrl !== null && (

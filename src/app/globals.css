@@ -41,3 +41,26 @@ a {
   color: var(--lgs-azul);
   text-decoration: none;
 }
+
+/* Tarjetas de Gestión de Usuarios: se levantan al pasar o enfocar. El
+   `!important` gana a la sombra en línea de la tarjeta en reposo. */
+.lgs-puerta-usuario {
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+.lgs-puerta-usuario:hover,
+.lgs-puerta-usuario:focus-visible {
+  box-shadow: 0 8px 22px rgba(20, 30, 60, 0.1) !important;
+  border-color: #c9cfe0 !important;
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lgs-puerta-usuario,
+  .lgs-puerta-usuario:hover,
+  .lgs-puerta-usuario:focus-visible {
+    transition: none;
+    transform: none;
+  }
+}

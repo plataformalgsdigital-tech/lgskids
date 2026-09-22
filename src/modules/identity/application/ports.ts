@@ -17,8 +17,20 @@ export interface UserRecord {
 export interface UserRepositoryPort {
   findByUsername(username: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
-  updatePassword(id: string, passwordHash: string, debeCambiar: boolean): Promise<void>;
+  /** `cifrada`: copia de la bóveda (null = sin copia). */
+  updatePassword(
+    id: string,
+    passwordHash: string,
+    debeCambiar: boolean,
+    cifrada?: string | null,
+  ): Promise<void>;
   touchUltimoLogin(id: string): Promise<void>;
+}
+
+/** Bóveda de claves: copia cifrada consultable por el superadmin. */
+export interface BovedaClavesPort {
+  /** Copia cifrada de `clave` para esa cuenta, o null si la bóveda está apagada. */
+  copia(clave: string, userId: string): string | null;
 }
 
 export interface RefreshTokenRecord {

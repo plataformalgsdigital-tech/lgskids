@@ -95,7 +95,6 @@ async function main(): Promise<void> {
     countryCode: "CO",
     tipoCurso: TIPO_CURSO,
     inicio: "2026-08-03",
-    finalContrato: "2026-12-20",
   }).catch(async () => {
     // titular debe existir/activo: usar el apoderado del niño.
     const apo = await queryOne<{ apoderado_id: string }>(
@@ -109,7 +108,6 @@ async function main(): Promise<void> {
       countryCode: "CO",
       tipoCurso: TIPO_CURSO,
       inicio: "2026-08-03",
-      finalContrato: "2026-12-20",
     });
   });
 

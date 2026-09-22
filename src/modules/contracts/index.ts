@@ -23,11 +23,16 @@ export {
 export {
   contratoVencido,
   fechaUtcHoy,
+  finalDeContrato,
   DIAS_GRACIA_VENCIMIENTO,
+  MESES_CONTRATO,
   SQL_CONTRATO_VENCIDO,
 } from "./domain/vigencia";
 export { edadEnFecha, validarEdadParaTipo } from "./domain/edad";
+export { buscarEstudiantes } from "./application/estudiantes";
+export type { EstudianteEncontrado } from "./application/estudiantes";
 export {
+  buscarEstudiantesHandler,
   crearContratoHandler,
   crearReservaHandler,
   listarContratosHandler,

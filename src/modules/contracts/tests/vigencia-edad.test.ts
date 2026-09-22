@@ -1,7 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "@/platform/errors";
 import { edadEnFecha, validarEdadParaTipo } from "../domain/edad";
-import { contratoVencido } from "../domain/vigencia";
+import { contratoVencido, finalDeContrato } from "../domain/vigencia";
+
+describe("finalDeContrato — inicio + 12 meses", () => {
+  it("un año exacto después del inicio", () => {
+    expect(finalDeContrato("2026-08-03")).toBe("2027-08-03");
+    expect(finalDeContrato("2026-12-31")).toBe("2027-12-31");
+  });
+
+  it("recorta al último día del mes si el día no existe (como Postgres)", () => {
+    expect(finalDeContrato("2024-02-29")).toBe("2025-02-28");
+    expect(finalDeContrato("2026-01-31", 1)).toBe("2026-02-28");
+    expect(finalDeContrato("2027-01-31", 13)).toBe("2028-02-29"); // 2028 es bisiesto
+  });
+
+  it("cruza años con cualquier cantidad de meses", () => {
+    expect(finalDeContrato("2026-11-15", 3)).toBe("2027-02-15");
+    expect(finalDeContrato("2026-05-01", 24)).toBe("2028-05-01");
+  });
+});
 
 describe("contratoVencido — LA función única (+2 días de gracia)", () => {
   const final = "2026-08-10";

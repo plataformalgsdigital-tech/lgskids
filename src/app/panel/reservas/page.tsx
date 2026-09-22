@@ -181,7 +181,6 @@ export default function ReservasPage() {
   const [externalRef, setExternalRef] = useState("");
   const [pais, setPais] = useState("CL");
   const [inicio, setInicio] = useState("");
-  const [finalContrato, setFinalContrato] = useState("");
   const [titular, setTitular] = useState<Persona>(personaVacia());
   // Paso 2
   const [titularEsApoderado, setTitularEsApoderado] = useState(true);
@@ -241,8 +240,7 @@ export default function ReservasPage() {
 
   function validarPaso1(): boolean {
     if (externalRef.trim() === "") return setErr("Ingresa el N° de contrato LGS.");
-    if (inicio === "" || finalContrato === "") return setErr("Ingresa inicio y fin del contrato.");
-    if (finalContrato <= inicio) return setErr("El fin debe ser posterior al inicio.");
+    if (inicio === "") return setErr("Ingresa el inicio del contrato.");
     if (titular.nombres === "" || titular.apellidos === "" || titular.docNumero === "")
       return setErr("Completa los datos del titular.");
     setError(null);
@@ -279,7 +277,6 @@ export default function ReservasPage() {
         countryCode: pais,
         tipoCurso,
         inicio,
-        finalContrato,
         classroomId,
         titular: conPais(titular),
         titularEsApoderado,
@@ -387,16 +384,9 @@ export default function ReservasPage() {
                   style={inputStyle}
                 />
               </label>
-              <label>
-                <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Fin del contrato</span>
-                <input
-                  type="date"
-                  value={finalContrato}
-                  onChange={(e) => setFinalContrato(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-              </label>
+              <span style={{ alignSelf: "end", fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+                Fin del contrato: <strong>12 meses desde el inicio</strong> (se calcula solo)
+              </span>
             </div>
             <h3 style={{ margin: "0.5rem 0 0", fontSize: "0.95rem" }}>Titular</h3>
             <CamposPersona

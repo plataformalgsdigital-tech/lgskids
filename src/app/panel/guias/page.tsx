@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
@@ -212,8 +213,9 @@ export default function GuiasPage() {
     <main>
       <h1 style={{ fontSize: "1.6rem", marginBottom: "0.35rem" }}>Guías</h1>
       <p style={{ color: "var(--texto-suave)", marginBottom: "1.25rem" }}>
-        Datos de contacto y sala de Zoom. La cuenta y los roles se crean en{" "}
-        <strong>Usuarios y roles</strong>; aquí se completa la ficha.
+        Datos de contacto y sala de Zoom. Un guía nuevo se da de alta en{" "}
+        <Link href="/panel/usuarios/guia">Usuarios y roles › Guía</Link>, con su ficha o con enlace;
+        aquí se edita la ficha y se reenvía el enlace.
       </p>
 
       {error !== null && (

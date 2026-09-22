@@ -35,12 +35,20 @@ export class PgUserRepository implements UserRepositoryPort {
     return row === null ? null : toRecord(row);
   }
 
-  async updatePassword(id: string, passwordHash: string, debeCambiar: boolean): Promise<void> {
+  async updatePassword(
+    id: string,
+    passwordHash: string,
+    debeCambiar: boolean,
+    cifrada: string | null = null,
+  ): Promise<void> {
+    // La copia se REEMPLAZA siempre, también por null: una copia de la clave
+    // anterior mostraría al superadmin una clave que ya no sirve.
     await execute(
       `UPDATE identity_user
-         SET password_hash = $2, debe_cambiar_password = $3, updated_at = now()
+         SET password_hash = $2, debe_cambiar_password = $3, password_cifrada = $4,
+             updated_at = now()
        WHERE id = $1`,
-      [id, passwordHash, debeCambiar],
+      [id, passwordHash, debeCambiar, cifrada],
     );
   }
 

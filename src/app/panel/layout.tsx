@@ -13,7 +13,7 @@ import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
  */
 
 interface Me {
-  user: { id: string; username: string } | null;
+  user: { id: string; username: string; debeCambiarPassword?: boolean } | null;
   permisos: { code: string }[];
 }
 
@@ -202,8 +202,18 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
         router.replace("/login");
         return;
       }
+      const datos = (await res.json()) as Me;
+      // Clave pendiente de cambiar: el servidor ya rechaza todo lo demás, así
+      // que ni se dibuja el panel; se va directo a cambiarla.
+      if (
+        datos.user?.debeCambiarPassword === true &&
+        window.location.pathname !== "/panel/cambiar-password"
+      ) {
+        window.location.replace("/panel/cambiar-password");
+        return;
+      }
       if (!cancelado) {
-        setMe((await res.json()) as Me);
+        setMe(datos);
       }
     }
     void cargar();
@@ -221,6 +231,41 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       <main style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
         <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
       </main>
+    );
+  }
+
+  // Con la clave pendiente de cambiar, el servidor rechaza todo salvo el
+  // cambio: un menú a la vista solo llevaría a pantallas que rebotan aquí sin
+  // decir por qué. Se muestra la pantalla de cambio sola, con la salida.
+  if (me.user?.debeCambiarPassword === true) {
+    return (
+      <div style={{ position: "relative" }}>
+        <Image
+          src="/logo.jpg"
+          alt="LGS Kids"
+          width={48}
+          height={43}
+          style={{ position: "absolute", top: "1rem", left: "1rem", height: "auto" }}
+        />
+        <button
+          onClick={() => void salir()}
+          style={{
+            position: "absolute",
+            top: "1rem",
+            right: "1rem",
+            padding: "0.5rem 0.9rem",
+            borderRadius: "0.6rem",
+            border: "1px solid #e3e7f0",
+            background: "white",
+            cursor: "pointer",
+            fontSize: "0.88rem",
+            fontWeight: 600,
+          }}
+        >
+          🚪 Cerrar sesión
+        </button>
+        {children}
+      </div>
     );
   }
 

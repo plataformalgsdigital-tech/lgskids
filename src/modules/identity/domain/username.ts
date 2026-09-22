@@ -21,13 +21,15 @@ function normalizar(texto: string): string {
 /**
  * Base del username: inicial del primer nombre + primer apellido
  * (ej. "María José" + "García Ñuñez" → "mgarcia"). El sufijo numérico lo
- * agrega el aprovisionador hasta encontrar uno libre.
+ * agrega quien crea la cuenta hasta encontrar uno libre. Es la misma regla
+ * para alumnos y staff (desde 2026-09-21 el staff tampoco elige su usuario);
+ * `respaldo` es el prefijo cuando el nombre no deja al menos 2 letras.
  */
-export function baseUsername(nombres: string, apellidos: string): string {
+export function baseUsername(nombres: string, apellidos: string, respaldo = "alumno"): string {
   const inicial = normalizar(nombres.trim().split(/\s+/)[0] ?? "");
   const apellido = normalizar(apellidos.trim().split(/\s+/)[0] ?? "");
   const base = `${inicial.slice(0, 1)}${apellido}`.slice(0, 20);
-  return base.length >= 2 ? base : `alumno${base}`;
+  return base.length >= 2 ? base : `${respaldo}${base}`;
 }
 
 /** Correo sintético interno (no enrutable) para un username dado. */

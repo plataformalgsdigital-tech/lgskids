@@ -75,6 +75,40 @@ export const ROLES = {
 
 export type RoleCode = (typeof ROLES)[keyof typeof ROLES];
 
+/**
+ * Qué hace falta para OTORGAR un rol, sea al crear la cuenta o después.
+ *
+ * Antes bastaba `usuarios.gestionar` para crear una cuenta con CUALQUIER rol
+ * inicial: un coordinador (que no tiene `roles.asignar`) podía fabricarse un
+ * admin o un superadmin llamando a la API. Y cualquiera con `roles.asignar`
+ * (un admin) podía otorgar la llave maestra.
+ * - superadmin → solo otro superadmin.
+ * - guía → basta `usuarios.gestionar`: coordinación da de alta a sus guías.
+ * - todo lo demás (admin, coordinador, alumno, apoderado y los roles creados
+ *   en el panel) → `roles.asignar`.
+ */
+export type RequisitoOtorgar = "superadmin" | "roles.asignar" | "usuarios.gestionar";
+
+export function requisitoParaOtorgar(roleCode: string): RequisitoOtorgar {
+  if (roleCode === ROLES.SUPERADMIN) return "superadmin";
+  if (roleCode === ROLES.GUIA) return "usuarios.gestionar";
+  return "roles.asignar";
+}
+
+/**
+ * Qué hace falta para administrar la CUENTA de otro (restablecer su clave,
+ * prender o apagar "debe cambiar clave"): tanto como para otorgarle su rol
+ * más alto. Si no, un coordinador podría restablecer la clave de un admin y
+ * entrar como él.
+ */
+export function requisitoParaGestionarCuenta(rolesDelOtro: readonly string[]): RequisitoOtorgar {
+  if (rolesDelOtro.includes(ROLES.SUPERADMIN)) return "superadmin";
+  if (rolesDelOtro.some((r) => r === ROLES.ADMIN || r === ROLES.COORDINADOR)) {
+    return "roles.asignar";
+  }
+  return "usuarios.gestionar";
+}
+
 /** Matriz rol → permisos que el seed materializa. */
 export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
   superadmin: Object.values(PERMISOS),
