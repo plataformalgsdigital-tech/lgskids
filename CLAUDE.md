@@ -187,8 +187,26 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   asistencia por salón/mes con `AT TIME ZONE cl.timezone` EN SQL,
   ocupación de salones, contratos por país (con alcance). UI:
   /panel/reportes. Permisos: reportes.ver, archivos.gestionar/ver.
-- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11. Siguiente: Fase 11
-  (despliegue DigitalOcean — requisitos en docs/runbooks/).
+- **Fase 11 (despliegue) completada (2026-09-24)**: la plataforma CORRE en
+  DigitalOcean. App Platform `lgskids` (región nyc) con tres componentes —`web`,
+  el worker `tareas` y el trabajo de pre-despliegue `migrar`—, base `kids2026`
+  dentro del clúster `lgs-db` (PostgreSQL 18, usuario propio `kids2026_app`) y
+  archivos en **Spaces `lgs-kids`** (nyc3, llave acotada a ese bucket). En
+  `https://app.lgskidsplataforma.com` (CNAME desde Hostinger, que sigue sirviendo
+  la landing en la raíz del dominio). **Detalle, comandos y trampas: `docs/runbooks/despliegue.md`** —
+  leerlo ANTES de tocar el despliegue. Lo esencial:
+  - **La imagen se construye AQUÍ y se sube al registro** (`registry.digitalocean.com/lgskids/web`),
+    no en DigitalOcean: su integración con GitHub no tiene acceso al repositorio de
+    la organización. Empujar la etiqueta `latest` dispara el despliegue solo.
+  - **El disco del contenedor es EFÍMERO**: por eso `files` usa Spaces en
+    producción (`SPACES_*`, las cuatro o ninguna). Sin ellas la app arranca
+    guardando en un disco que se borra en el siguiente despliegue.
+  - **La base exige TLS con SU CA** (`DATABASE_CA_CERT`) y filtra por fuentes
+    confiables: una app nueva hay que AGREGARLA (`firewalls append`), o falla con
+    `P1001` como si la base estuviera caída.
+  - El seed se corrió UNA vez a mano; `admin` y `superadmin` nacieron con
+    "cambiar clave al entrar".
+- Plan de fases: ver `PROMPT_KIDS2026.md` sección 11.
 
 ## Gestión de roles y permisos (2026-07-23)
 
@@ -1129,9 +1147,11 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
-- Despliegue a DigitalOcean (Fase 11) pendiente: sin él, la puerta de servicio
-  no puede recibir llamadas reales de LGS (KIDS debe ser público + la clave
-  `LGS_INTAKE_API_KEY` provisionada en ambos sistemas).
+- **Entregar a LGS la clave del intake**: KIDS ya es público
+  (`https://app.lgskidsplataforma.com`) y tiene su `LGS_INTAKE_API_KEY` puesta,
+  pero del otro lado hay que provisionar la MISMA clave para que
+  `/api/kids-intake/*` deje de responder 401. La clave está en el spec de la app
+  (cifrada): si se perdió, se rota y se cambia en los dos sistemas.
 - Procedimiento operativo para cuando el desfase CL–CO sea de 2 h (verano
   austral): el negocio lo definirá más adelante.
 - Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. **CI activo**
@@ -1160,10 +1180,10 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 - **El enlace de `/nuevo-guia` NO fija contraseña**, y fue a propósito: un enlace
   que fija clave es, en la práctica, un enlace de recuperación. Desde 2026-09-21
   la clave se RESTABLECE desde el panel de usuarios (ver "Cuentas de usuario").
-- **`PASSWORD_VAULT_KEY` en producción** (Fase 11): generarla aparte
-  (`openssl rand -base64 32`) y guardarla FUERA de la base y de sus respaldos. Si
-  se pierde, las copias quedan ilegibles; las cuentas siguen entrando, porque el
-  login usa el hash.
+- **Respaldar `PASSWORD_VAULT_KEY` FUERA de DigitalOcean**: ya está generada y
+  puesta en la app (2026-09-24), pero hoy su única copia vive en el spec cifrado.
+  Si se pierde, las copias de las claves quedan ilegibles —las cuentas siguen
+  entrando, porque el login usa el hash— y no hay script de recifrado.
 - **La renovación por la puerta de LGS todavía no funciona**: desde 2026-09-22 un
   niño que vuelve se renueva con un contrato nuevo en Contratos y al aprobarlo
   recupera su cuenta, pero `crearReservaBeneficiario` (intake y `/panel/reservas`)
@@ -1184,8 +1204,9 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 - **Hotspots del MAPA de YOUNGSTER** sin cargar: la pantalla "Avance" dibuja el mapa
   sin marcadores hasta que se marquen en `/panel/mantenimiento-cursos/mapa`.
 - **Material del alumno por cargar** (2026-09-21): solo JUNIOR·ROOKIE tiene libro,
-  PDF y sus 12 videos, y únicamente en la base LOCAL — producción no existe aún (Fase
-  11). Ese libro es una conversión HECHA AQUÍ del CON_PASSPORT de diseño (los 12 videos
+  PDF y sus 12 videos, y únicamente en la base LOCAL. **Producción ya existe
+  (2026-09-24) y está VACÍA de material**: hay que subirlo por las pantallas de
+  Mantenimiento Académico, empezando por el libro de Rookie. Ese libro es una conversión HECHA AQUÍ del CON_PASSPORT de diseño (los 12 videos
   cambiados por `videos/<página>-<n>.mp4`), no una entrega de diseño: **diseño tiene que
   exportar así** los próximos (guía en `docs/operacion/libro-interactivo-videos.md`).
   Faltan los otros 4 niveles de Junior y los 5 de Youngster; se suben por Material del
@@ -1215,13 +1236,15 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
 - **El libro de Rookie muestra las respuestas al niño**: trae un desplegable
   "Respuestas y pistas para el docente" dentro del mismo HTML. Es contenido de diseño,
   no de la plataforma, que sirve el archivo tal cual.
-- **Almacenamiento en producción**: el material se sirve desde disco local (`files`,
-  `STORAGE_DIR`). Con ~23 MB por libro y caché inmutable alcanza para empezar; con
-  Spaces (Fase 11) conviene revisar si se sirve desde el CDN con URL firmada, sin
-  perder la caja (la CSP va en la respuesta y el iframe mantiene su `sandbox`). Los
-  videos se leen enteros para responder un rango: con Spaces, leer solo el tramo. Los
-  temporales de compresión van a `os.tmpdir()` y se borran siempre; el servidor
-  necesita ahí unos cientos de MB libres.
+- **Almacenamiento**: en producción ya es Spaces (`lgs-kids`), y todo sale por las
+  rutas AUTENTICADAS de la plataforma —nada de CDN público ni URL firmadas, que es
+  lo que manda la regla 9 con datos de menores—. Queda por revisar si conviene
+  servir el MATERIAL (libros de ~23 MB, arte) desde el CDN con URL firmada, sin
+  perder la caja del libro (la CSP va en la respuesta y el iframe mantiene su
+  `sandbox`). Y los videos se leen ENTEROS para responder un rango: con Spaces eso
+  es una descarga completa por cada salto del reproductor — conviene pedir solo el
+  tramo (`Range` hacia S3). Los temporales de compresión van a `os.tmpdir()` y se
+  borran siempre; el contenedor necesita ahí unos cientos de MB libres.
 - Restos en Hostinger: el título del sitio WordPress sigue siendo
   "lgskidsplataforma", el `/index.html` viejo sigue alcanzable y quedó el tema
   duplicado `lgs-kids-landing-old-6a8f390177c2e`.
