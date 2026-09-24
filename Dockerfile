@@ -7,9 +7,24 @@
 # Node 24 y pnpm 11 son los mismos del desarrollo (ver "Versiones" en
 # CLAUDE.md): la instalación congelada tiene que resolver igual que en CI.
 FROM node:24-slim AS base
+# OpenSSL: el motor de Prisma lo necesita para hablar TLS con la base
+# administrada. La imagen `slim` no lo trae, y sin él las migraciones fallan
+# con "P1001: Can't reach database server" —que suena a red, pero es esto—.
+# `pg` no lo usa (va por el TLS de Node), así que el servicio web sí arrancaba.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 ENV PNPM_HOME=/pnpm
+ENV COREPACK_HOME=/corepack
 ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
+# `corepack enable` deja solo el atajo: el pnpm real se descarga la PRIMERA vez
+# que se invoca. En la imagen final eso pasaría en producción, con el usuario
+# `node`, que no puede escribir en las carpetas de root. Se baja aquí, de una
+# vez para todas las etapas, y se deja legible para cualquiera.
+RUN mkdir -p /pnpm /corepack \
+  && corepack enable \
+  && corepack prepare pnpm@11.16.0 --activate \
+  && chmod -R a+rX /pnpm /corepack
 WORKDIR /app
 
 # ---- dependencias ---------------------------------------------------------
@@ -48,4 +63,8 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "require('http').get('http://127.0.0.1:3000/api/health/live',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
-CMD ["pnpm", "start"]
+# Se invoca el binario directo, no `pnpm start`: en producción no hace falta el
+# gestor de paquetes para arrancar, y así el contenedor no depende de que
+# corepack pueda escribir su caché. Lo mismo hacen el worker y el trabajo de
+# migraciones en el spec de la app.
+CMD ["node_modules/.bin/next", "start"]
