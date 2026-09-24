@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
     return [
       { source: "/panel/salones", destination: "/panel/calendario", permanent: true },
       { source: "/panel/salones/:path*", destination: "/panel/calendario/:path*", permanent: true },
+      // La raíz de la APLICACIÓN es el login (2026-09-24). La landing de
+      // marketing vive en el dominio raíz (WordPress en Hostinger) y esta app
+      // se sirve en `app.lgskidsplataforma.com`: quien escribe esa dirección
+      // viene a entrar, no a leer el folleto. La página de `src/app/page.tsx`
+      // se conserva como fuente del diseño del tema de WordPress.
+      // TEMPORAL (307) a propósito: un 301 se queda pegado en el navegador y
+      // volver atrás costaría limpiar caché en cada equipo.
+      { source: "/", destination: "/login", permanent: false },
     ];
   },
 
