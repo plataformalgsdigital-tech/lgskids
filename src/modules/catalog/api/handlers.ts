@@ -20,8 +20,16 @@ import {
   tipoMaterialValido,
   type ArchivoMaterial,
 } from "../application/material";
-import { cspLibro, inyectarPuente } from "../domain/libro-interactivo";
-import { paradaValida } from "../domain/unidad-mapa";
+import {
+  CLAVE_AUTORIZACIONES_LIBRO,
+  MENSAJE_ALMACEN_LIBRO,
+  PREFIJO_NOMBRE_LIBRO,
+  cspLibro,
+  inyectarPuente,
+  valorAutorizacionesLibro,
+} from "../domain/libro-interactivo";
+import { baseVideosLibro } from "../application/video-libro";
+import { PARADAS, paradaValida } from "../domain/unidad-mapa";
 import {
   descargarAvisoLoginPublico,
   getAvisoLogin,
@@ -379,11 +387,50 @@ function textoForm(form: FormData, campo: string): string {
   return typeof v === "string" ? v : "";
 }
 
-/** GET /api/catalog/material — qué hay cargado, por curso y nivel. */
+/** "" = sin unidad (el libro interactivo, o el PDF antiguo de todo el nivel). */
+function paradaDeForm(valor: string): number | null {
+  if (valor.trim() === "") return null;
+  const n = Number(valor);
+  if (!paradaValida(n)) throw new ValidationError(`Unidad inválida: ${valor}.`);
+  return n;
+}
+
+/**
+ * GET /api/catalog/material — qué hay cargado, por curso y nivel.
+ *
+ * Cada libro interactivo viaja con lo que hace falta para abrirlo en SU
+ * pestaña, igual que lo ve el niño: la base de sus videos (con token) y la
+ * caja. Van AQUÍ y no en una segunda llamada porque `window.open` tiene que
+ * ocurrir en el mismo clic; tras esperar una respuesta, el navegador lo toma
+ * por ventana emergente y lo bloquea.
+ */
 export const materialEstadoHandler = handlerWithAuth(async (_request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
-  return json({ tamanoMaximo: TAMANO_MAXIMO_MATERIAL, cursos: await estadoMaterial() });
+  const cursos = await estadoMaterial();
+  return json({
+    tamanoMaximo: TAMANO_MAXIMO_MATERIAL,
+    cursos: Object.fromEntries(
+      Object.entries(cursos).map(([curso, filas]) => [
+        curso,
+        filas.map((f) => ({
+          ...f,
+          interactivo:
+            f.interactivo === null
+              ? null
+              : { ...f.interactivo, videosBase: baseVideosLibro(f.interactivo.id) },
+        })),
+      ]),
+    ),
+    libro: {
+      prefijo: PREFIJO_NOMBRE_LIBRO,
+      mensaje: MENSAJE_ALMACEN_LIBRO,
+      claveAutorizaciones: CLAVE_AUTORIZACIONES_LIBRO,
+    },
+    // En la vista previa del EQUIPO se abren todas las unidades: se revisa el
+    // libro entero. Al niño solo le llegan las que su guía le abrió.
+    autorizacionPrevia: valorAutorizacionesLibro(PARADAS),
+  });
 });
 
 /** POST /api/catalog/material — multipart (tipo, curso, nivel, archivo). Reemplaza. */
@@ -404,13 +451,19 @@ export const materialSubirHandler = handlerWithAuth(async (request, auth) => {
     tipo,
     curso: textoForm(form, "curso"),
     nivel: textoForm(form, "nivel"),
+    // El PDF va por unidad; el libro interactivo, por nivel (lo exige `subirMaterial`).
+    parada: paradaDeForm(textoForm(form, "parada")),
     nombreOriginal: archivo.name,
     bytes: Buffer.from(await archivo.arrayBuffer()),
   });
   return json(r, { status: 201 });
 });
 
-/** DELETE /api/catalog/material?tipo=&curso=&nivel= — quita el material del nivel. */
+/**
+ * DELETE /api/catalog/material?tipo=&curso=&nivel=&parada= — quita un material.
+ * Sin `parada` en el PDF se quita el del nivel entero, el que se cargaba antes
+ * de que fuera por unidad.
+ */
 export const materialEliminarHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
@@ -425,6 +478,7 @@ export const materialEliminarHandler = handlerWithAuth(async (request, auth) => 
       tipo,
       curso: q.get("curso") ?? "",
       nivel: q.get("nivel") ?? "",
+      parada: paradaDeForm(q.get("parada") ?? ""),
     }),
   );
 });

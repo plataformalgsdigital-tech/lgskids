@@ -98,13 +98,18 @@ describe("verificación de contenido", () => {
  * navegador del niño y lo que importa es su comportamiento, no su texto.
  */
 describe("puente de almacenamiento", () => {
-  function montar(nombre: string) {
+  /**
+   * `donde` es dónde está el panel: dentro de un iframe el puente le habla a
+   * `parent`; en su PROPIA pestaña, `parent` es la ventana misma y le habla a
+   * `opener`. "solo" = la pestaña quedó sin panel (el niño lo cerró).
+   */
+  function montar(nombre: string, donde: "parent" | "opener" | "solo" = "parent") {
     const enviados: unknown[] = [];
     const bases: string[] = [];
-    const ventana: Record<string, unknown> = {
-      name: nombre,
-      parent: { postMessage: (m: unknown) => enviados.push(JSON.parse(JSON.stringify(m))) },
-    };
+    const panel = { postMessage: (m: unknown) => enviados.push(JSON.parse(JSON.stringify(m))) };
+    const ventana: Record<string, unknown> = { name: nombre };
+    ventana["parent"] = donde === "parent" ? panel : ventana;
+    if (donde === "opener") ventana["opener"] = panel;
     // Lo justo de `document` para ver la <base> que pone el puente.
     const documento = {
       head: {
@@ -155,6 +160,18 @@ describe("puente de almacenamiento", () => {
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { n: "5" } });
     almacen.clear();
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: {} });
+  });
+
+  it("en su PROPIA pestaña el progreso viaja a quien la abrió", () => {
+    const { almacen, enviados } = montar(v2({ datos: {}, videos: null }), "opener");
+    almacen.setItem("k", "v");
+    expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { k: "v" } });
+  });
+
+  it("si ya no hay panel, el libro sigue: el progreso queda en su window.name", () => {
+    const { ventana, almacen } = montar(v2({ datos: {}, videos: null }), "solo");
+    expect(() => almacen.setItem("k", "v")).not.toThrow();
+    expect(ventana["name"]).toBe(v2({ datos: { k: "v" }, videos: null }));
   });
 
   it("descarta lo que no sea texto y sobrevive a un window.name ajeno o roto", () => {

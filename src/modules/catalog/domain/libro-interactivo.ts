@@ -13,9 +13,14 @@
  * El precio es que el libro pierde su `localStorage`, y ahí guarda el progreso
  * del niño (respuestas, diario, premios). El PUENTE lo devuelve: se inyecta al
  * principio del <head>, sustituye `localStorage` por un almacén en memoria y
- * manda cada cambio al panel que lo contiene, que lo guarda por niño. Al abrir,
- * el panel le devuelve lo guardado por `window.name`, que es lo único que un
- * documento aislado puede leer de forma síncrona antes de que corra su script.
+ * manda cada cambio al panel, que lo guarda por niño. Al abrir, el panel le
+ * devuelve lo guardado por `window.name`, que es lo único que un documento
+ * aislado puede leer de forma síncrona antes de que corra su script.
+ *
+ * El libro se abre en su PROPIA PESTAÑA (2026-09-22), así que el panel puede
+ * ser la ventana que lo contiene (iframe) o la que lo abrió (`opener`): el
+ * puente le habla a la que haya. Además guarda cada cambio en su `window.name`,
+ * que sobrevive a recargar esa pestaña aunque el panel ya no esté.
  *
  * Probado en Chrome real: origen "null", `document.cookie` lanza
  * SecurityError, lectura y escritura pasan por el puente y `speechSynthesis`
@@ -27,6 +32,27 @@ export const PREFIJO_NOMBRE_LIBRO = "lgs-material:";
 
 /** `tipo` del mensaje con el que el libro avisa al panel de un cambio. */
 export const MENSAJE_ALMACEN_LIBRO = "lgs-material-almacen";
+
+/**
+ * CONTRATO CON DISEÑO (2026-09-23) — qué unidades abrió el guía.
+ *
+ * El libro lee esta clave de su almacenamiento (el que le sustituye el puente)
+ * antes de decidir qué unidad se puede abrir:
+ *
+ *   lgs-autorizaciones = {"v":1,"unidades":[0,1]}
+ *
+ * Los números son los MISMOS del mapa y del libro (0 = Welcome/Puerto, 1..4).
+ * La lista es acumulativa: llegan todas las que el niño tiene abiertas.
+ *
+ * Si la clave NO está, el libro se comporta como siempre (abre por su cuenta).
+ * Así el mismo archivo sigue funcionando suelto, fuera de la plataforma.
+ */
+export const CLAVE_AUTORIZACIONES_LIBRO = "lgs-autorizaciones";
+
+/** Valor de esa clave, armado en UN solo lugar. */
+export function valorAutorizacionesLibro(paradas: readonly number[]): string {
+  return JSON.stringify({ v: 1, unidades: [...paradas].sort((a, b) => a - b) });
+}
 
 /**
  * Permisos de la caja. Cada uno responde a algo que el libro USA:
@@ -94,8 +120,10 @@ try{var n=window.name;if(n&&n.indexOf(P)===0){var o=JSON.parse(n.slice(P.length)
 if(o&&o.v===2){d=textos(o.datos);var b=o.videos;if(typeof b==="string"&&b.charAt(0)==="/"&&b.charAt(1)!=="/"){base=b;}}
 else{d=textos(o);}}}catch(e){}
 if(base){try{var e=document.createElement("base");e.href=base;var h=document.head||document.documentElement;h.insertBefore(e,h.firstChild);}catch(x){}}
+function panel(){try{if(window.parent&&window.parent!==window)return window.parent;}catch(e){}
+try{if(window.opener)return window.opener;}catch(e){}return null;}
 function avisar(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base});}catch(e){}
-try{if(window.parent&&window.parent!==window){window.parent.postMessage({tipo:T,datos:d},"*");}}catch(e){}}
+try{var w=panel();if(w)w.postMessage({tipo:T,datos:d},"*");}catch(e){}}
 function almacen(m,guardar){var s={
 getItem:function(k){k=String(k);return propio(m,k)?m[k]:null;},
 setItem:function(k,v){m[String(k)]=String(v);if(guardar)avisar();},

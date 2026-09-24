@@ -45,6 +45,7 @@ export {
 } from "./application/material";
 export type {
   ArchivoMaterial,
+  CasillaUnidad,
   MaterialResumen,
   MaterialTipo,
   MaterialNivel,
@@ -53,7 +54,18 @@ export {
   SANDBOX_LIBRO,
   PREFIJO_NOMBRE_LIBRO,
   MENSAJE_ALMACEN_LIBRO,
+  CLAVE_AUTORIZACIONES_LIBRO,
+  valorAutorizacionesLibro,
 } from "./domain/libro-interactivo";
+export {
+  autorizarMisiones,
+  autorizacionParaLibro,
+  misionesAutorizadas,
+  misionesDeNinos,
+  nivelDeNino,
+  revocarMision,
+} from "./application/misiones";
+export type { MisionAutorizada, NivelDeNino, ResultadoAutorizacion } from "./application/misiones";
 export {
   videosLibroListarHandler,
   videosLibroSubirHandler,
@@ -61,7 +73,6 @@ export {
   videoLibroEliminarHandler,
   videoLibroPrevioHandler,
   videoLibroServirHandler,
-  materialVisorHandler,
 } from "./api/video-handlers";
 export { baseVideosLibro } from "./application/video-libro";
 export type { VideoLibro } from "./application/video-libro";
@@ -93,6 +104,7 @@ export {
   UNIDADES_MAPA,
   etiquetaParada,
   paradaValida,
+  todasLasUnidades,
   unidadMapa,
 } from "./domain/unidad-mapa";
 export {

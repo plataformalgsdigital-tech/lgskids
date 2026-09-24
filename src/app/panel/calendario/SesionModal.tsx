@@ -95,6 +95,22 @@ const botonPrimario: CSSProperties = {
   color: "white",
 };
 
+/** Una unidad abierta a un niño (la misión de su libro). */
+interface Mision {
+  childPersonId: string;
+  curso: string;
+  nivel: string;
+  parada: number;
+  etiqueta: string;
+  autorizadoEn: string;
+  autorizadoPor: string | null;
+}
+
+interface Parada {
+  parada: number;
+  etiqueta: string;
+}
+
 /** Ficha en blanco: al guardar se vuelve a este estado. */
 const FICHA_VACIA = {
   estado: "PRESENTE" as EstadoAsistencia,
@@ -145,12 +161,26 @@ export function SesionModal({
   const [motivo, setMotivo] = useState("");
   const [repetirLeccion, setRepetirLeccion] = useState(false);
   const [cursoRefId, setCursoRefId] = useState("");
+  // Misiones: la unidad que el guía abre en clase (evaluación, juego y souvenir
+  // del libro). El NIVEL se elige —el libro es uno por nivel— y se sugiere el
+  // que trabaja la mayoría del grupo.
+  const [misiones, setMisiones] = useState<Mision[]>([]);
+  const [paradas, setParadas] = useState<Parada[]>([]);
+  const [niveles, setNiveles] = useState<{ codigo: string; nombre: string }[]>([]);
+  /** El nivel que trabaja cada niño: para sugerir el de la clase y avisar. */
+  const [nivelesNinos, setNivelesNinos] = useState<Record<string, string | null>>({});
+  const [nivelElegido, setNivelElegido] = useState("");
+  const [abriendoMision, setAbriendoMision] = useState(false);
+  const [paradaElegida, setParadaElegida] = useState(1);
+  /** Por defecto se abre a TODA la lista; aquí van los que el guía desmarca. */
+  const [excluidos, setExcluidos] = useState<Set<string>>(new Set());
 
   const cargar = useCallback(async () => {
     try {
-      const [rl, rr] = await Promise.all([
+      const [rl, rr, rm] = await Promise.all([
         apiFetch(`/api/attendance/sessions/${sessionId}`),
         apiFetch(`/api/scheduling/sessions/${sessionId}/registro`),
+        apiFetch(`/api/scheduling/sessions/${sessionId}/misiones`),
       ]);
       if (!rl.ok) {
         setError("No se pudo cargar la sesión.");
@@ -161,6 +191,16 @@ export function SesionModal({
       setLista(datos.lista);
       if (rr.ok) {
         setRepeticiones(((await rr.json()) as { repeticiones: Repeticion[] }).repeticiones);
+      }
+      if (rm.ok) {
+        const d = (await rm.json()) as {
+          misiones: Mision[];
+          paradas: Parada[];
+          niveles: { codigo: string; nombre: string }[];
+        };
+        setMisiones(d.misiones);
+        setParadas(d.paradas);
+        setNiveles(d.niveles);
       }
       setError(null);
     } catch {
@@ -251,6 +291,99 @@ export function SesionModal({
       setRegistrando(false);
       setPidiendoRepeticion(false);
       setMotivo("");
+      await cargar();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /**
+   * Al abrir el panel se pregunta el nivel que trabaja cada niño, y se sugiere
+   * el más repetido: es el de la clase. El nivel IMPORTA porque el libro es uno
+   * por nivel — abrir la Unidad 1 de Champion no abre nada en el de Rookie.
+   */
+  async function abrirPanelMision() {
+    setAbriendoMision((v) => !v);
+    if (Object.keys(nivelesNinos).length > 0) return;
+    const res = await apiFetch(`/api/scheduling/sessions/${sessionId}/misiones?conNiveles=1`);
+    if (!res.ok) return;
+    const d = (await res.json()) as { ninos?: { childPersonId: string; nivel: string | null }[] };
+    const porNino = Object.fromEntries((d.ninos ?? []).map((n) => [n.childPersonId, n.nivel]));
+    setNivelesNinos(porNino);
+    const cuenta = new Map<string, number>();
+    for (const nivel of Object.values(porNino)) {
+      if (nivel !== null) cuenta.set(nivel, (cuenta.get(nivel) ?? 0) + 1);
+    }
+    const masRepetido = [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    setNivelElegido(masRepetido ?? niveles[0]?.codigo ?? "");
+  }
+
+  /** Abre la unidad elegida, en el nivel de la clase, a los niños marcados. */
+  async function abrirMision() {
+    const elegidos = lista.map((f) => f.childPersonId).filter((id) => !excluidos.has(id));
+    if (elegidos.length === 0) {
+      setError("Marca al menos un niño.");
+      return;
+    }
+    setOcupado(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/scheduling/sessions/${sessionId}/misiones`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parada: paradaElegida,
+          nivel: nivelElegido === "" ? null : nivelElegido,
+          childPersonIds: elegidos,
+        }),
+      });
+      if (!res.ok) {
+        const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
+        setError(c.error?.message ?? "No se pudo abrir la misión.");
+        return;
+      }
+      const { resultados } = (await res.json()) as {
+        resultados: { childPersonId: string; nivel: string | null; yaEstaba: boolean }[];
+      };
+      const abiertas = resultados.filter((r) => r.nivel !== null && !r.yaEstaba).length;
+      const yaTenian = resultados.filter((r) => r.yaEstaba).length;
+      const sinMatricula = resultados.filter((r) => r.nivel === null).length;
+      const etiqueta = paradas.find((p) => p.parada === paradaElegida)?.etiqueta ?? "La unidad";
+      setAviso(
+        `${etiqueta}: abierta a ${String(abiertas)} niño(s)` +
+          (yaTenian > 0 ? `, ${String(yaTenian)} ya la tenía(n)` : "") +
+          (sinMatricula > 0 ? `. ${String(sinMatricula)} sin matrícula activa` : "") +
+          ".",
+      );
+      setAbriendoMision(false);
+      setExcluidos(new Set());
+      await cargar();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /** Cierra una unidad abierta por error: el niño deja de verla en su libro. */
+  async function cerrarMision(m: Mision, nombre: string) {
+    if (!window.confirm(`¿Cerrar ${m.etiqueta} de ${m.nivel} a ${nombre}?`)) return;
+    setOcupado(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/scheduling/sessions/${sessionId}/misiones`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          childPersonId: m.childPersonId,
+          curso: m.curso,
+          nivel: m.nivel,
+          parada: m.parada,
+        }),
+      });
+      if (!res.ok) {
+        setError("No se pudo cerrar la misión.");
+        return;
+      }
+      setAviso(`${m.etiqueta} cerrada a ${nombre}.`);
       await cargar();
     } finally {
       setOcupado(false);
@@ -575,6 +708,14 @@ export function SesionModal({
             >
               🔁 {pendiente !== null ? "Repetición solicitada" : "Solicitar repetir sesión"}
             </button>
+            <button
+              type="button"
+              style={{ ...boton, background: abriendoMision ? "#eef2ff" : "white" }}
+              disabled={ocupado}
+              onClick={() => void abrirPanelMision()}
+            >
+              🔓 Abrir misión
+            </button>
             {puedeGestionarSalones && (
               <button
                 type="button"
@@ -608,6 +749,203 @@ export function SesionModal({
               🔗 Recursos
             </button>
           </div>
+
+          {abriendoMision && (
+            <section style={{ ...caja, borderColor: "var(--lgs-verde)" }}>
+              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.35rem" }}>
+                Abrir la misión de una unidad
+              </h3>
+              <p
+                style={{
+                  fontSize: "0.82rem",
+                  color: "var(--texto-suave)",
+                  marginBottom: "0.7rem",
+                }}
+              >
+                En su libro se abre esa unidad: la evaluación, el juego y el souvenir. Cada niño la
+                recibe en el nivel que está trabajando. Se puede cerrar después si te equivocas.
+              </p>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.7rem",
+                }}
+              >
+                Nivel que trabaja la clase:
+                <select
+                  value={nivelElegido}
+                  onChange={(e) => setNivelElegido(e.target.value)}
+                  style={{
+                    padding: "0.35rem 0.5rem",
+                    borderRadius: "0.5rem",
+                    border: "1.5px solid #d8dce6",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {niveles.map((n) => (
+                    <option key={n.codigo} value={n.codigo}>
+                      {n.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                {paradas.map((p) => (
+                  <button
+                    key={p.parada}
+                    type="button"
+                    onClick={() => setParadaElegida(p.parada)}
+                    style={{
+                      ...boton,
+                      borderRadius: "1.2rem",
+                      background: paradaElegida === p.parada ? "var(--lgs-verde)" : "white",
+                      color: paradaElegida === p.parada ? "#1b2a10" : "inherit",
+                      fontWeight: paradaElegida === p.parada ? 800 : 600,
+                    }}
+                  >
+                    {p.etiqueta}
+                  </button>
+                ))}
+              </div>
+              <p
+                style={{
+                  margin: "0.5rem 0 0",
+                  fontSize: "0.78rem",
+                  color: "var(--texto-suave)",
+                }}
+              >
+                Abrir una unidad deja abierto todo lo anterior: el niño conserva el libro y el
+                cuaderno de las unidades que ya pasó.
+              </p>
+
+              <div
+                style={{
+                  marginTop: "0.8rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.3rem",
+                  maxHeight: "16rem",
+                  overflowY: "auto",
+                }}
+              >
+                {lista.map((f) => {
+                  const suyas = misiones.filter((m) => m.childPersonId === f.childPersonId);
+                  const nombre = `${f.nombres} ${f.apellidos}`;
+                  const suNivel = nivelesNinos[f.childPersonId];
+                  // Va en otro nivel: se le abre igual, pero en el libro que
+                  // abra la clase, no en el suyo. Mejor que lo sepa el guía.
+                  const otroNivel =
+                    suNivel !== undefined &&
+                    suNivel !== null &&
+                    nivelElegido !== "" &&
+                    suNivel !== nivelElegido;
+                  return (
+                    <div
+                      key={f.childPersonId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        flexWrap: "wrap",
+                        padding: "0.35rem 0.5rem",
+                        borderRadius: "0.5rem",
+                        background: "#f7f8fb",
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          cursor: "pointer",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!excluidos.has(f.childPersonId)}
+                          onChange={(e) =>
+                            setExcluidos((prev) => {
+                              const s = new Set(prev);
+                              if (e.target.checked) s.delete(f.childPersonId);
+                              else s.add(f.childPersonId);
+                              return s;
+                            })
+                          }
+                        />
+                        {nombre}
+                      </label>
+                      {otroNivel && (
+                        <span
+                          title={`Está trabajando ${suNivel ?? ""}`}
+                          style={{ fontSize: "0.72rem", fontWeight: 700, color: "#b26a00" }}
+                        >
+                          ⚠ va en {suNivel}
+                        </span>
+                      )}
+                      <span style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
+                        {suyas.map((m) => (
+                          <span
+                            key={`${m.nivel}-${String(m.parada)}`}
+                            title={`${m.nivel} · abierta por ${m.autorizadoPor ?? "el equipo"}`}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              padding: "0.1rem 0.25rem 0.1rem 0.5rem",
+                              borderRadius: "0.9rem",
+                              background: "#e0f5ec",
+                              color: "#1b6b47",
+                            }}
+                          >
+                            {m.etiqueta}
+                            <button
+                              type="button"
+                              aria-label={`Cerrar ${m.etiqueta} a ${nombre}`}
+                              disabled={ocupado}
+                              onClick={() => void cerrarMision(m, nombre)}
+                              style={{
+                                border: "none",
+                                background: "transparent",
+                                cursor: "pointer",
+                                color: "#1b6b47",
+                                fontWeight: 800,
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: "0.8rem", display: "flex", gap: "0.5rem" }}>
+                <button
+                  type="button"
+                  style={botonPrimario}
+                  disabled={ocupado}
+                  onClick={() => void abrirMision()}
+                >
+                  🔓 Abrir a {String(lista.length - excluidos.size)} niño(s)
+                </button>
+                <button type="button" style={boton} onClick={() => setAbriendoMision(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </section>
+          )}
 
           {registrando && (
             <section style={{ ...caja, borderColor: "var(--lgs-azul)" }}>

@@ -31,7 +31,7 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
 
   afterAll(async () => {
     // Filas Y bytes: dejar 2 libros de prueba en disco por corrida se acumula.
-    for (const tipo of ["interactivo", "imprimible"]) {
+    for (const tipo of ["interactivo", "imprimible", "actividades"]) {
       for (const a of await listarArchivos({ entidad: `${PREFIJO}_${tipo}`, limit: 200 })) {
         await eliminarArchivo(a.id);
       }
@@ -55,6 +55,7 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
       tipo: "interactivo",
       curso: "JUNIOR",
       nivel: "ROOKIE",
+      parada: null, // el libro interactivo es de TODO el nivel
       nombreOriginal: "Rookie_v1.html",
     });
     const estado = await estadoMaterial();
@@ -83,7 +84,7 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
   });
 
   it("el tipo lo decide el CONTENIDO, no la extensión", async () => {
-    const base = { actorUserId: ACTOR, curso: "JUNIOR", nivel: "CHAMPION" };
+    const base = { actorUserId: ACTOR, curso: "JUNIOR", nivel: "CHAMPION", parada: 1 };
     await expect(
       subirMaterial({ ...base, tipo: "interactivo", nombreOriginal: "libro.html", bytes: PDF }),
     ).rejects.toBeInstanceOf(ValidationError);
@@ -96,13 +97,32 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
   });
 
   it("solo niveles y cursos reales: no hay libro 'TODOS'", async () => {
-    const base = { actorUserId: ACTOR, tipo: "imprimible" as const, nombreOriginal: "l.pdf" };
+    const base = {
+      actorUserId: ACTOR,
+      tipo: "imprimible" as const,
+      nombreOriginal: "l.pdf",
+      parada: 1,
+    };
     await expect(
       subirMaterial({ ...base, curso: "JUNIOR", nivel: "TODOS", bytes: PDF }),
     ).rejects.toBeInstanceOf(ValidationError);
     await expect(
       subirMaterial({ ...base, curso: "ADULTOS", nivel: "ROOKIE", bytes: PDF }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("el PDF va POR UNIDAD: sin unidad, o con una que no existe, se rechaza", async () => {
+    const base = {
+      actorUserId: ACTOR,
+      tipo: "imprimible" as const,
+      curso: "JUNIOR",
+      nivel: "CHAMPION",
+      nombreOriginal: "u.pdf",
+      bytes: PDF,
+    };
+    // Sin unidad no hay quien lo abra: el guía abre unidades, no niveles.
+    await expect(subirMaterial(base)).rejects.toBeInstanceOf(ValidationError);
+    await expect(subirMaterial({ ...base, parada: 9 })).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("un archivo que NO es material no se sirve como material", async () => {
@@ -124,24 +144,70 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
     await expect(descargarImagenCurso(libro?.id ?? "")).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("sube el PDF y quitarlo borra el material del nivel", async () => {
-    await subirMaterial({
+  it("sube el PDF de UNA unidad, no pisa a las demás, y quitarlo la deja vacía", async () => {
+    const { id } = await subirMaterial({
       actorUserId: ACTOR,
       tipo: "imprimible",
       curso: "YOUNGSTER",
       nivel: "ELITE",
-      nombreOriginal: "Elite.pdf",
+      parada: 2,
+      nombreOriginal: "Elite_U2.pdf",
       bytes: PDF,
     });
-    expect(await materialVigente("imprimible", "YOUNGSTER", "ELITE")).not.toBeNull();
+    expect((await materialVigente("imprimible", "YOUNGSTER", "ELITE", 2))?.id).toBe(id);
+    // Cada unidad es su propia casilla: subir la 2 no llena la 1 ni la 3.
+    expect(await materialVigente("imprimible", "YOUNGSTER", "ELITE", 1)).toBeNull();
+    expect(await archivoDeMaterial(id)).toMatchObject({ tipo: "imprimible", parada: 2 });
+
+    const nivel = (await estadoMaterial())["YOUNGSTER"]?.find((n) => n.nivel === "ELITE");
+    expect(nivel?.imprimibles.map((p) => p.etiqueta)).toEqual([
+      "Welcome",
+      "Unidad 1",
+      "Unidad 2",
+      "Unidad 3",
+      "Unidad 4",
+    ]);
+    expect(nivel?.imprimibles.find((p) => p.parada === 2)?.archivo?.id).toBe(id);
+    expect(nivel?.imprimibleCompleto).toBeNull();
+
     const r = await eliminarMaterial({
       actorUserId: ACTOR,
       tipo: "imprimible",
       curso: "YOUNGSTER",
       nivel: "ELITE",
+      parada: 2,
     });
     expect(r.eliminados).toBe(1);
-    expect(await materialVigente("imprimible", "YOUNGSTER", "ELITE")).toBeNull();
+    expect(await materialVigente("imprimible", "YOUNGSTER", "ELITE", 2)).toBeNull();
+  });
+
+  it("el de ACTIVIDADES admite las dos formas: por unidad y el del nivel completo", async () => {
+    const base = {
+      actorUserId: ACTOR,
+      tipo: "actividades" as const,
+      curso: "YOUNGSTER",
+      nivel: "LEGENDARY",
+      bytes: PDF,
+    };
+    const unidad = await subirMaterial({ ...base, parada: 3, nombreOriginal: "Act_U3.pdf" });
+    // Sin unidad NO falla (a diferencia del imprimible): es el del nivel entero.
+    const completo = await subirMaterial({ ...base, nombreOriginal: "Act_completo.pdf" });
+    expect(unidad.id).not.toBe(completo.id);
+
+    expect((await materialVigente("actividades", "YOUNGSTER", "LEGENDARY", 3))?.id).toBe(unidad.id);
+    expect((await materialVigente("actividades", "YOUNGSTER", "LEGENDARY"))?.id).toBe(completo.id);
+    expect(await archivoDeMaterial(unidad.id)).toMatchObject({ tipo: "actividades", parada: 3 });
+    expect(await archivoDeMaterial(completo.id)).toMatchObject({
+      tipo: "actividades",
+      parada: null,
+    });
+
+    const nivel = (await estadoMaterial())["YOUNGSTER"]?.find((n) => n.nivel === "LEGENDARY");
+    expect(nivel?.actividades.find((p) => p.parada === 3)?.archivo?.id).toBe(unidad.id);
+    expect(nivel?.actividades.find((p) => p.parada === 1)?.archivo).toBeNull();
+    expect(nivel?.actividadesCompleto?.id).toBe(completo.id);
+    // Y no se mezcla con el libro para descargar, que es otra columna.
+    expect(nivel?.imprimibles.every((p) => p.archivo === null)).toBe(true);
   });
 });
 

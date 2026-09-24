@@ -51,3 +51,39 @@ export function unidadMapa(texto: string | null | undefined): number | null {
 export function etiquetaParada(n: number): string {
   return n === PARADA_WELCOME ? "Welcome" : `Unidad ${String(n)}`;
 }
+
+/**
+ * El camino abierto hasta donde llegó la clase: el Welcome más TODAS las
+ * unidades hasta la MÁS ALTA que se le abrió al niño.
+ *
+ * El curso avanza hacia adelante y no se vuelve atrás: un niño que va en la
+ * Unidad 3 ya pasó por la 1 y la 2, y su material —el PDF y el cuaderno de
+ * ejercicios de cada una— tiene que seguir a mano. Por eso lo abierto es un
+ * RECORRIDO, no una lista suelta de casillas: basta con abrirle la unidad que
+ * están trabajando para que tenga todo lo anterior.
+ *
+ * El Welcome va siempre, aunque no se haya abierto nada (es el punto de
+ * partida, igual que en el libro).
+ */
+export function caminoAbierto(paradas: readonly number[]): number[] {
+  const tope = paradas.reduce<number>(
+    (max, p) => (paradaValida(p) && p > max ? p : max),
+    PARADA_WELCOME,
+  );
+  return Array.from({ length: tope + 1 }, (_, i) => i);
+}
+
+/**
+ * ¿Están abiertas TODAS las unidades numeradas del nivel (1..4)?
+ *
+ * Es la llave del material "completo": el libro de actividades entero se
+ * habilita cuando el guía ya abrió el nivel completo. El Welcome no cuenta —
+ * está abierto siempre, como en el libro.
+ */
+export function todasLasUnidades(paradas: readonly number[]): boolean {
+  const abiertas = new Set(paradas);
+  for (let u = PARADA_WELCOME + 1; u <= UNIDADES_MAPA; u += 1) {
+    if (!abiertas.has(u)) return false;
+  }
+  return true;
+}

@@ -4,8 +4,10 @@ import {
   PARADAS_MAPA,
   PARADA_WELCOME,
   UNIDADES_MAPA,
+  caminoAbierto,
   etiquetaParada,
   paradaValida,
+  todasLasUnidades,
   unidadMapa,
 } from "../domain/unidad-mapa";
 
@@ -72,5 +74,35 @@ describe("unidad del catálogo → parada del mapa", () => {
     expect(etiquetaParada(PARADA_WELCOME)).toBe("Welcome");
     expect(etiquetaParada(1)).toBe("Unidad 1");
     expect(etiquetaParada(4)).toBe("Unidad 4");
+  });
+});
+
+/**
+ * Lo abierto es un RECORRIDO, no casillas sueltas: el niño que va en la Unidad
+ * 3 ya pasó por la 1 y la 2, y su material tiene que seguir a mano.
+ */
+describe("camino abierto", () => {
+  it("abrir la Unidad 3 deja abierto todo lo anterior", () => {
+    expect(caminoAbierto([3])).toEqual([0, 1, 2, 3]);
+  });
+
+  it("sin nada abierto queda solo el Welcome, que es el punto de partida", () => {
+    expect(caminoAbierto([])).toEqual([PARADA_WELCOME]);
+    expect(caminoAbierto([PARADA_WELCOME])).toEqual([PARADA_WELCOME]);
+  });
+
+  it("manda la más alta, en cualquier orden y sin repetir", () => {
+    expect(caminoAbierto([2, 1, 2])).toEqual([0, 1, 2]);
+    expect(caminoAbierto([4, 1])).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("una parada que no existe no estira el camino", () => {
+    expect(caminoAbierto([9])).toEqual([PARADA_WELCOME]);
+    expect(caminoAbierto([1, 9])).toEqual([0, 1]);
+  });
+
+  it("el nivel completo se abre solo al llegar a la última unidad", () => {
+    expect(todasLasUnidades(caminoAbierto([3]))).toBe(false);
+    expect(todasLasUnidades(caminoAbierto([UNIDADES_MAPA]))).toBe(true);
   });
 });

@@ -9,7 +9,6 @@ import { archivoDeMaterial } from "../application/material";
 import {
   archivoDeVideoLibro,
   archivoVideoPublicado,
-  baseVideosLibro,
   confirmarVideoLibro,
   eliminarVideoLibro,
   listarVideosLibro,
@@ -25,11 +24,6 @@ import {
   TAMANO_MAXIMO_VIDEO_SUBIDA,
   leerNombreArchivoVideo,
 } from "../domain/video-libro";
-import {
-  MENSAJE_ALMACEN_LIBRO,
-  PREFIJO_NOMBRE_LIBRO,
-  SANDBOX_LIBRO,
-} from "../domain/libro-interactivo";
 
 type Contexto = { params: Promise<Record<string, string | string[]>> };
 
@@ -124,31 +118,6 @@ export const videoLibroPrevioHandler = handlerWithAuth(async (request, auth, con
   return respuestaConRango(bytes, request.headers.get("range"), {
     "Content-Type": "video/mp4",
     "Cache-Control": "private, max-age=31536000, immutable",
-  });
-});
-
-/**
- * GET /api/catalog/material/[id]/visor — lo que necesita la vista previa del
- * libro del equipo para abrirlo IGUAL que lo ve el niño: URL, base de videos
- * con token y la configuración de la caja.
- */
-export const materialVisorHandler = handlerWithAuth(async (_request, auth, context) => {
-  const profile = await getAccessProfile(auth.userId);
-  profile.requirePermission(PERMISOS.CATALOGO_VER);
-  const id = uuid(await param(context, "id"));
-  const material = await archivoDeMaterial(id);
-  if (material === null || material.tipo !== "interactivo") {
-    throw new NotFoundError("Ese libro interactivo no existe.");
-  }
-  return json({
-    ...material,
-    url: `/api/catalog/material/${id}`,
-    videosBase: baseVideosLibro(id),
-    libro: {
-      sandbox: SANDBOX_LIBRO,
-      prefijo: PREFIJO_NOMBRE_LIBRO,
-      mensaje: MENSAJE_ALMACEN_LIBRO,
-    },
   });
 });
 

@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
-import { VisorLibro, type CajaLibro } from "@/ui/VisorLibro";
+import { abrirLibroEnPestana, type CajaLibro } from "@/ui/libro-pestana";
 import { apiFetch, irACambiarClaveSiCorresponde } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 
@@ -213,6 +213,16 @@ const NAV_ITEMS: {
   { label: "Perfil", emoji: "👤", action: "perfil" },
 ];
 
+/** Una unidad para descargar: se ve siempre, se habilita cuando la abren. */
+interface CasillaDescarga {
+  parada: number;
+  etiqueta: string;
+  /** ¿Hay archivo cargado? Si no, todavía no existe para nadie. */
+  cargado: boolean;
+  abierta: boolean;
+  url: string | null;
+}
+
 /** Lo que devuelve `/api/student/material`. */
 interface MaterialAlumno {
   /** Id del niño: separa el progreso de dos hermanos en la misma tableta. */
@@ -223,13 +233,36 @@ interface MaterialAlumno {
     interactivoUrl: string | null;
     /** Base con token de los videos del libro (`videos/7-1.mp4` sale de ahí). */
     videosBase: string | null;
-    imprimibleUrl: string | null;
+    /** Unidades que su guía le abrió en clase (0 = Welcome). */
+    misiones: { parada: number; etiqueta: string }[];
+    /** Lo mismo, ya armado para que lo lea el libro. */
+    autorizacion: string;
+    /** Un PDF por unidad; los cerrados vienen sin enlace, con su candado. */
+    imprimibles: CasillaDescarga[];
+    /** Libro de actividades, también por unidad. */
+    actividades: CasillaDescarga[];
+    /** El de actividades del nivel entero: se abre con las cuatro unidades. */
+    actividadesCompleto: { abierta: boolean; url: string | null } | null;
   }[];
-  /** La caja del visor: permisos del iframe y cómo habla el puente. */
+  /** La caja del libro: permisos de su pestaña y cómo habla el puente. */
   libro: CajaLibro;
 }
 
-/** Progreso del libro en este dispositivo: por NIÑO y nivel (ver `VisorLibro`). */
+/**
+ * ¿Hay algo cargado en este nivel? Las casillas por unidad llegan SIEMPRE (el
+ * niño ve el camino completo), así que contar casillas no sirve: hay que mirar
+ * si alguna tiene archivo.
+ */
+function tieneMaterial(n: MaterialAlumno["niveles"][number]): boolean {
+  return (
+    n.interactivoUrl !== null ||
+    n.actividadesCompleto !== null ||
+    n.imprimibles.some((p) => p.cargado) ||
+    n.actividades.some((p) => p.cargado)
+  );
+}
+
+/** Progreso del libro en este dispositivo: por NIÑO y nivel (ver `libro-pestana`). */
 const claveProgresoLibro = (alumno: string, nivel: string) => `lgs-material:${alumno}:${nivel}`;
 
 function fechaLarga(iso: string): string {
@@ -253,12 +286,8 @@ export default function MiPanelPage() {
   const [verMaterial, setVerMaterial] = useState(false);
   const [material, setMaterial] = useState<MaterialAlumno | null>(null);
   const [materialMsg, setMaterialMsg] = useState<string | null>(null);
-  /** Libro interactivo abierto (lo pinta `VisorLibro`). */
-  const [libroAbierto, setLibroAbierto] = useState<{
-    nivel: string;
-    url: string;
-    videosBase: string | null;
-  } | null>(null);
+  /** El libro se abre en SU pestaña; aquí solo se avisa si el navegador la frena. */
+  const [libroMsg, setLibroMsg] = useState<string | null>(null);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
@@ -297,24 +326,12 @@ export default function MiPanelPage() {
         setVerHistorial(false);
         if (avanceNivel !== null) setAvanceNivel(null);
         else setVerAvance(false);
-        // Con el libro abierto, Escape cierra el libro y deja el modal a la
-        // vista. (Solo llega aquí si el foco está fuera del iframe.)
-        if (libroAbierto !== null) setLibroAbierto(null);
-        else setVerMaterial(false);
+        setVerMaterial(false);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [
-    verImagen,
-    verComoVoy,
-    verHistorial,
-    verAvance,
-    verPerfil,
-    avanceNivel,
-    verMaterial,
-    libroAbierto,
-  ]);
+  }, [verImagen, verComoVoy, verHistorial, verAvance, verPerfil, avanceNivel, verMaterial]);
 
   useEffect(() => {
     let cancelado = false;
@@ -385,8 +402,25 @@ export default function MiPanelPage() {
     }
   }
 
-  function abrirLibro(nivel: string, url: string, videosBase: string | null) {
-    setLibroAbierto({ nivel, url, videosBase });
+  /**
+   * El libro se abre en SU PROPIA pestaña: así el niño lo deja abierto mientras
+   * usa el panel, y el libro tiene toda la pantalla. Su progreso vuelve aquí
+   * por el puente (ver `@/ui/libro-pestana`), así que esta pestaña debe seguir
+   * abierta para que se guarde.
+   */
+  function abrirLibro(nivel: string, url: string, videosBase: string | null, autorizacion: string) {
+    if (material === null) return;
+    setLibroMsg(
+      abrirLibroEnPestana({
+        url,
+        caja: material.libro,
+        claveProgreso: claveProgresoLibro(material.alumno, nivel),
+        videosBase,
+        autorizacion,
+      })
+        ? null
+        : "Tu navegador bloqueó la ventana del libro. Permite las ventanas emergentes de este sitio y vuelve a intentarlo.",
+    );
   }
 
   async function subirFoto(archivo: File) {
@@ -463,10 +497,16 @@ export default function MiPanelPage() {
     ordenActual !== undefined ? niveles.find((n) => n.orden === ordenActual + 1) : undefined;
   const totalLecc = niveles.reduce((a, n) => a + n.totalLecciones, 0);
   const compl = niveles.reduce((a, n) => a + n.leccionesCompletadas, 0);
+  /**
+   * La lección en curso dentro del nivel y SU unidad. Van a la par: el nivel
+   * tiene 4 lecciones y el mapa 4 unidades, y el panel ya las empareja por
+   * posición (la isla marca como vistas tantas unidades como lecciones lleva).
+   */
   const leccionActual =
     nivelActual !== undefined
       ? Math.min(nivelActual.leccionesCompletadas + 1, nivelActual.totalLecciones)
       : null;
+  const unidadActual = leccionActual;
 
   const inicioProxima = data.proxima != null ? new Date(data.proxima.startsAt).getTime() : null;
   const estadoZoomActual =
@@ -1013,6 +1053,7 @@ export default function MiPanelPage() {
               }}
             >
               {nivelActual.nombre}
+              {unidadActual !== null && ` · Unidad ${String(unidadActual)}`}
               {leccionActual !== null && ` · Lección ${String(leccionActual).padStart(2, "0")}`}
             </span>
           )}
@@ -2469,117 +2510,224 @@ export default function MiPanelPage() {
               {materialMsg === null && material === null && (
                 <p style={{ color: "var(--texto-suave)" }}>Cargando tu material…</p>
               )}
-              {material !== null &&
-                material.niveles.every(
-                  (n) => n.interactivoUrl === null && n.imprimibleUrl === null,
-                ) && (
-                  <VacioConPersonaje
-                    quien="coco"
-                    titulo="Tu material todavía no está listo."
-                    detalle="Muy pronto vas a encontrar aquí tu libro."
-                  />
-                )}
-              {material?.niveles
-                .filter((n) => n.interactivoUrl !== null || n.imprimibleUrl !== null)
-                .map((n) => {
-                  const nombreNivel = niveles.find((x) => x.codigo === n.nivel)?.nombre ?? n.nivel;
-                  const accion: CSSProperties = {
-                    flex: "1 1 12rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.45rem",
-                    padding: "0.8rem 1rem",
-                    borderRadius: "0.8rem",
-                    fontWeight: 800,
-                    fontSize: "0.95rem",
-                    textDecoration: "none",
-                    cursor: "pointer",
-                  };
-                  return (
-                    <div
-                      key={n.nivel}
-                      style={{
-                        border: n.actual ? "2px solid var(--lgs-azul)" : "1px solid #e3e7f0",
-                        borderRadius: "0.9rem",
-                        padding: "0.9rem 1rem",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <strong style={{ fontSize: "1.05rem" }}>{nombreNivel}</strong>
-                        {n.actual && (
-                          <span
-                            style={{
-                              fontSize: "0.7rem",
-                              fontWeight: 800,
-                              padding: "0.15rem 0.5rem",
-                              borderRadius: "999px",
-                              background: "var(--lgs-azul)",
-                              color: "white",
-                            }}
-                          >
-                            Nivel actual
-                          </span>
-                        )}
-                      </div>
-                      <div
+              {libroMsg !== null && (
+                <p
+                  role="alert"
+                  style={{
+                    background: "#fdecea",
+                    border: "1px solid #f5c2c0",
+                    color: "#b71c1c",
+                    borderRadius: "0.7rem",
+                    padding: "0.7rem 0.85rem",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {libroMsg}
+                </p>
+              )}
+              {material !== null && material.niveles.every((n) => !tieneMaterial(n)) && (
+                <VacioConPersonaje
+                  quien="coco"
+                  titulo="Tu material todavía no está listo."
+                  detalle="Muy pronto vas a encontrar aquí tu libro."
+                />
+              )}
+              {material?.niveles.filter(tieneMaterial).map((n) => {
+                const nombreNivel = niveles.find((x) => x.codigo === n.nivel)?.nombre ?? n.nivel;
+                const accion: CSSProperties = {
+                  flex: "1 1 12rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.45rem",
+                  padding: "0.8rem 1rem",
+                  borderRadius: "0.8rem",
+                  fontWeight: 800,
+                  fontSize: "0.95rem",
+                  textDecoration: "none",
+                  cursor: "pointer",
+                };
+                return (
+                  <div
+                    key={n.nivel}
+                    style={{
+                      border: n.actual ? "2px solid var(--lgs-azul)" : "1px solid #e3e7f0",
+                      borderRadius: "0.9rem",
+                      padding: "0.9rem 1rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <strong style={{ fontSize: "1.05rem" }}>{nombreNivel}</strong>
+                      {n.actual && (
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            padding: "0.15rem 0.5rem",
+                            borderRadius: "999px",
+                            background: "var(--lgs-azul)",
+                            color: "white",
+                          }}
+                        >
+                          Nivel actual
+                        </span>
+                      )}
+                    </div>
+                    {n.interactivoUrl !== null && (
+                      <p
                         style={{
-                          display: "flex",
-                          gap: "0.6rem",
-                          flexWrap: "wrap",
-                          marginTop: "0.7rem",
+                          margin: "0.45rem 0 0",
+                          fontSize: "0.85rem",
+                          color: "var(--texto-suave)",
                         }}
                       >
-                        {n.interactivoUrl !== null && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              abrirLibro(n.nivel, n.interactivoUrl ?? "", n.videosBase)
-                            }
-                            style={{
-                              ...accion,
-                              border: "none",
-                              background: "var(--lgs-verde)",
-                              color: "#1b2a10",
-                            }}
-                          >
-                            📖 Libro interactivo
-                          </button>
-                        )}
-                        {n.imprimibleUrl !== null && (
+                        {/* El Welcome (parada 0) está abierto siempre; si no hay
+                            ninguna unidad, todavía no empezaron las misiones. */}
+                        {!n.misiones.some((m) => m.parada > 0)
+                          ? "🔒 Tu guía abrirá las misiones en clase."
+                          : `🔓 Abiertas: ${n.misiones.map((m) => m.etiqueta).join(", ")}`}
+                      </p>
+                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.6rem",
+                        flexWrap: "wrap",
+                        marginTop: "0.7rem",
+                      }}
+                    >
+                      {n.interactivoUrl !== null && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            abrirLibro(
+                              n.nivel,
+                              n.interactivoUrl ?? "",
+                              n.videosBase,
+                              n.autorizacion,
+                            )
+                          }
+                          style={{
+                            ...accion,
+                            border: "none",
+                            background: "var(--lgs-verde)",
+                            color: "#1b2a10",
+                          }}
+                        >
+                          📖 Libro interactivo
+                        </button>
+                      )}
+                    </div>
+                    {(() => {
+                      /**
+                       * Las unidades SIEMPRE se ven; lo que cambia es si se
+                       * pueden bajar. Tres estados: lista (enlace), cerrada
+                       * (candado, la abre el guía) y todavía sin cargar.
+                       */
+                      const chip: CSSProperties = {
+                        ...accion,
+                        flex: "0 0 auto",
+                        padding: "0.5rem 0.9rem",
+                        fontSize: "0.85rem",
+                      };
+                      const casilla = (p: CasillaDescarga) =>
+                        p.url !== null ? (
                           <a
-                            href={n.imprimibleUrl}
+                            key={p.parada}
+                            href={p.url}
                             download
                             style={{
-                              ...accion,
+                              ...chip,
                               border: "1.5px solid #d8dce6",
                               background: "white",
                               color: "inherit",
                             }}
                           >
-                            ⬇️ Descargar libro
+                            ⬇️ {p.etiqueta}
                           </a>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                        ) : (
+                          <span
+                            key={p.parada}
+                            title={
+                              p.cargado ? "Tu guía la abrirá en clase" : "Todavía no está cargada"
+                            }
+                            style={{
+                              ...chip,
+                              border: "1.5px dashed #d8dce6",
+                              background: "#fafbfe",
+                              color: "var(--texto-suave)",
+                              cursor: "default",
+                              fontWeight: 600,
+                              opacity: p.cargado ? 1 : 0.6,
+                            }}
+                          >
+                            {p.cargado ? "🔒" : "⏳"} {p.etiqueta}
+                          </span>
+                        );
+                      const fila = (titulo: string, lista: CasillaDescarga[], extra?: ReactNode) =>
+                        lista.some((p) => p.cargado) || extra !== undefined ? (
+                          <>
+                            <p
+                              style={{
+                                margin: "0.9rem 0 0.4rem",
+                                fontSize: "0.85rem",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {titulo}
+                            </p>
+                            <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
+                              {lista.map(casilla)}
+                              {extra}
+                            </div>
+                          </>
+                        ) : null;
+
+                      const completo = n.actividadesCompleto;
+                      return (
+                        <>
+                          {fila("⬇️ Para imprimir, por unidad", n.imprimibles)}
+                          {fila(
+                            "✏️ Libro de actividades",
+                            n.actividades,
+                            completo === null ? undefined : completo.url !== null ? (
+                              <a
+                                href={completo.url}
+                                download
+                                style={{
+                                  ...chip,
+                                  border: "1.5px solid var(--lgs-verde)",
+                                  background: "white",
+                                  color: "inherit",
+                                }}
+                              >
+                                ⬇️ Nivel completo
+                              </a>
+                            ) : (
+                              <span
+                                title="Se abre cuando tu guía te abra las cuatro unidades"
+                                style={{
+                                  ...chip,
+                                  border: "1.5px dashed #d8dce6",
+                                  background: "#fafbfe",
+                                  color: "var(--texto-suave)",
+                                  cursor: "default",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                🔒 Nivel completo
+                              </span>
+                            ),
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
-      )}
-
-      {/* Libro interactivo a pantalla completa: ver `src/ui/VisorLibro.tsx`. */}
-      {libroAbierto !== null && material !== null && (
-        <VisorLibro
-          key={libroAbierto.url}
-          url={libroAbierto.url}
-          titulo={niveles.find((x) => x.codigo === libroAbierto.nivel)?.nombre ?? "Mi libro"}
-          caja={material.libro}
-          claveProgreso={claveProgresoLibro(material.alumno, libroAbierto.nivel)}
-          videosBase={libroAbierto.videosBase}
-          onCerrar={() => setLibroAbierto(null)}
-        />
       )}
 
       {/* Modal "Avance": mapa del curso → islas con VoBos y premios (hotspots) */}

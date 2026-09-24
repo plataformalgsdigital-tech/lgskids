@@ -399,7 +399,10 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
   aparte, 16:9) y hace lightbox al clic. **Mis próximas clases** vive en la columna
   derecha y muestra la **ventana de 14 días** (`agendaProximas(classroom, dias=14)`,
   incluye clubes). **Pie** con soporte por WhatsApp (Soporte Usuario/Académico/
-  Finanzas; números en la constante `SOPORTE`, hoy placeholder).
+  Finanzas; números en la constante `SOPORTE`, hoy placeholder). El rótulo de arriba a
+  la derecha dice **nivel · unidad · lección** (2026-09-23): las dos últimas van a la
+  par —el nivel tiene 4 lecciones y el mapa 4 unidades, y la isla ya marca como vistas
+  tantas unidades como lecciones lleva—, así que se derivan del MISMO número.
 - **Arte curricular por TIPO (2026-08-26)**: `imagen-curso.ts` se generalizó a
   `subirArte`/`arteId` con tipos **banner** (`catalog_imagen_curso` por CURSO:NIVEL,
   admite `NIVEL_TODOS`), **premio** (`catalog_premio_nivel` por CURSO:NIVEL),
@@ -534,15 +537,26 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
     posiciones; hay que volver a colocarlas.
   - El dashboard expone `unidades` y `juegosUnidad` por nivel.
 - **Material del alumno (2026-09-19)**: el botón **Material** de `/mi-panel` abre un
-  modal con, por cada nivel ALCANZADO (el actual primero, más los completados), el
-  **libro interactivo** y el **libro para descargar**. Diseño los entrega hechos: un
-  HTML autocontenido (imágenes en base64, un solo `<script>`) y un PDF. Desde 2026-09-21
+  modal con, por cada nivel ALCANZADO (el actual primero, más los completados), TRES
+  materiales: el **libro interactivo** (uno por nivel), el **libro para descargar** (un
+  PDF **por UNIDAD** desde 2026-09-23) y el **libro de actividades** (PDF por unidad Y,
+  además, uno del NIVEL COMPLETO). Diseño los entrega hechos: un HTML autocontenido
+  (imágenes en base64, un solo `<script>`) y los PDF. Desde 2026-09-21
   los VIDEOS no van dentro del HTML: se suben aparte (ver "Videos del libro" abajo).
   La plataforma NO transforma el libro: lo guarda y lo sirve con el puente inyectado.
   - **Carga**: `/panel/mantenimiento-cursos/material` (tarjeta "Material del alumno"),
-    tabla curso × nivel × tipo con Subir/Reemplazar/Ver/Quitar. `application/material.ts`
-    los guarda en `files` con entidad `catalog_material_interactivo|imprimible` y clave
-    `CURSO:NIVEL` (solo niveles reales, sin "TODOS"). **Reemplazar suelta el anterior**
+    tabla curso × nivel × tipo con Subir/Reemplazar/Ver/Quitar; los dos PDF llevan una
+    casilla por unidad. `application/material.ts` los guarda en `files` con entidad
+    `catalog_material_interactivo|imprimible|actividades` y clave
+    `CURSO:NIVEL` para el libro y **`CURSO:NIVEL:PARADA`** para cada PDF (solo niveles
+    reales, sin "TODOS"). **Quién lleva unidad lo decide `exigirParada`**: el
+    interactivo NUNCA (por unidad aparecería cinco veces), el imprimible SIEMPRE (sin
+    unidad quedaría fuera del alcance del guía y nadie podría abrirlo) y el de
+    actividades las DOS cosas — sin unidad es el del nivel completo, que se le habilita
+    al niño con las cuatro unidades abiertas (decisión del negocio). Los PDF para
+    imprimir de nivel entero cargados ANTES siguen en su sitio, ya no se sirven al niño
+    y la pantalla los muestra aparte, en ámbar, solo para poder quitarlos.
+    **Reemplazar suelta el anterior**
     DESPUÉS de subir el nuevo: un fallo a medias deja el viejo, no el nivel vacío. El
     tipo lo decide el CONTENIDO (`esHtml`/`esPdf` en `domain/libro-interactivo.ts`), no
     la extensión ni el MIME del navegador — en Windows un .html puede llegar sin tipo.
@@ -565,26 +579,49 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
     que es donde guarda el progreso. `inyectarPuente` mete como PRIMER script del
     `<head>` un sustituto en memoria que manda cada cambio al panel por `postMessage`;
     el panel lo guarda en SU `localStorage` con clave `lgs-material:<personaId>:<nivel>`
-    (dos hermanos en la misma tableta no se pisan) y al reabrir se lo devuelve por el
-    `name` del iframe — `window.name` es lo único que un documento aislado lee de forma
-    síncrona antes de que corra su script. Formato `lgs-material:{v:2, datos, videos}`
-    (`videos` = base con token de sus videos; el formato viejo, solo `datos`, se sigue
-    entendiendo). El panel acepta solo mensajes de ESE iframe (compara la ventana: el
-    origen es "null") y solo pares texto→texto. El progreso vive en el dispositivo, igual
-    que en el HTML original; llevarlo al servidor es otra decisión.
-  - **Un solo visor**: `src/ui/VisorLibro.tsx` (iframe, puente, progreso). Lo usan
-    `/mi-panel` y la vista previa del equipo `/panel/mantenimiento-cursos/material/ver/[id]`
-    (el botón "Ver" del libro en Material), para que el equipo vea EXACTAMENTE lo que ve
-    el niño, videos incluidos. El progreso del equipo va aparte (`lgs-material:equipo:<id>`).
-  - **Verificado en Chrome real** (CDP, con el libro real): origen `null`,
-    `document.cookie` → SecurityError, `fetch` a la API bloqueado por la CSP, y el
-    progreso sobrevive a cerrar y reabrir. **Trampa para quien lo pruebe**: Chrome corre
-    el iframe con sandbox en OTRO proceso; no aparece en `Page.getFrameTree` del padre y
-    hay que adjuntarse con `Target.setAutoAttach` (llega con URL vacía).
+    (dos hermanos en la misma tableta no se pisan) y al abrirlo se lo devuelve por el
+    `name` de la pestaña — `window.name` es lo único que un documento aislado lee de
+    forma síncrona antes de que corra su script. Formato `lgs-material:{v:2, datos,
+videos}` (`videos` = base con token de sus videos; el formato viejo, solo `datos`, se
+    sigue entendiendo). El panel acepta solo mensajes de una ventana que él abrió
+    (compara la VENTANA: el origen es "null") y solo pares texto→texto. El progreso vive
+    en el dispositivo, igual que en el HTML original; llevarlo al servidor es otra decisión.
+  - **En SU PROPIA PESTAÑA (2026-09-22)**: "Libro interactivo" hace `window.open`; antes
+    se abría dentro del panel, en un iframe a pantalla completa. Un solo módulo,
+    `src/ui/libro-pestana.ts` (`abrirLibroEnPestana`), lo usan el niño y el "Ver" del
+    equipo, para que el equipo vea EXACTAMENTE lo que ve el niño; el progreso del equipo
+    va aparte (`lgs-material:equipo:<id>`). Lo que cambia con la pestaña:
+    - el puente ya no tiene `parent`: le habla a **`window.opener`**, así que el panel
+      tiene que seguir abierto para que se guarde. Si se cerró, el libro no se cae y su
+      progreso sigue en su `window.name`, que sobrevive a recargar ESA pestaña;
+    - el `name` lleva el progreso, que es texto libre (el diario del niño): **los
+      espacios van escapados** como ` `, porque el nombre de una ventana no debe
+      llevar espacios;
+    - reabrir el mismo libro REUTILIZA su pestaña (mismo `name`), no acumula copias;
+    - el `window.open` tiene que ocurrir EN EL CLIC. Por eso la lista del equipo
+      (`GET /api/catalog/material`) ya trae la caja y la base de videos de cada libro:
+      pedirlas antes de abrir convertía la pestaña en ventana emergente y el navegador
+      la bloqueaba. Por lo mismo se retiraron `/api/catalog/material/[id]/visor` y la
+      página `…/material/ver/[id]`, que existían solo para el visor en iframe.
+  - **Verificado en Chrome real** (CDP, con el libro real, en pestaña): `self.origin`
+    `null`, `document.cookie` → SecurityError, `fetch` a la API bloqueado por la CSP,
+    `<base>` de videos puesta, y el progreso del libro aparece en el `localStorage` del
+    panel. **Dos trampas para quien lo pruebe**: `location.origin` devuelve la URL
+    (`http://localhost:3000`) aunque el documento esté en origen opaco — el que vale es
+    `self.origin`; y con el visor en iframe, Chrome lo corría en OTRO proceso, fuera de
+    `Page.getFrameTree` (hacía falta `Target.setAutoAttach`), mientras que la pestaña sí
+    aparece como un target normal.
   - **Quién ve qué**: el niño por `/api/student/material` (lista) y
     `/api/student/material/[id]` (sirve), que exigen que el archivo SEA material
     (`archivoDeMaterial`) y que sea de SU curso y de un nivel ALCANZADO (`alcance.ts`, la
-    misma regla de nivel que el dashboard); si no, 404. El equipo, por
+    misma regla de nivel que el dashboard); si no, 404. **Los PDF suman una tercera
+    condición**: que su guía haya abierto esa unidad O una POSTERIOR (`caminoAbierto`:
+    quien va en la 3 conserva la 1 y la 2; el Welcome va siempre, como en el libro) y,
+    para el de actividades del nivel completo, haber llegado a la CUARTA
+    (`todasLasUnidades`). La lista manda SIEMPRE las cinco casillas de cada PDF —abierta
+    con enlace, cerrada con candado y sin enlace, y "todavía sin cargar"— para que el
+    niño vea el camino entero; la ruta que los sirve lo vuelve a comprobar, así que
+    revocar una unidad vuelve a cerrar lo que ya se listó. El equipo, por
     `/api/catalog/material/[id]` con `catalogo.ver`. Caché inmutable: los bytes de un id
     no cambian, así que los 30 MB se bajan una vez por dispositivo.
   - Las pruebas de integración usan `setPrefijoMaterialParaPruebas`: la clave
@@ -592,6 +629,47 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
     prueba lo borraría.
   - **Contenido a revisar con diseño**: el libro de Rookie trae dentro un desplegable
     "Respuestas y pistas para el docente" que el niño también puede abrir.
+- **La misión la abre el GUÍA (2026-09-23)**: migración `20260923000000_mision_autorizada`.
+  El libro abría sus unidades solo con SUS reglas (la 1 siempre; la siguiente al
+  completar la anterior). Ahora manda la clase: el guía abre en el modal de la sesión
+  la unidad que están trabajando —evaluación, juego y souvenir— y el libro la abre.
+  - **Contrato con diseño** (`CLAVE_AUTORIZACIONES_LIBRO` en `domain/libro-interactivo.ts`):
+    el libro lee de su almacenamiento `lgs-autorizaciones` = `{"v":1,"unidades":[0,1]}`
+    (mismos números del mapa: 0 = Welcome). Si la clave NO está, se comporta como antes
+    —así el archivo sigue sirviendo suelto, fuera de la plataforma—; si está, el Puerto
+    queda abierto y las demás solo si figuran en la lista. Lista vacía = todo cerrado
+    salvo el Puerto, que es el estado de partida de cualquier niño.
+  - **El permiso viaja por el puente**, en el mismo paquete que el progreso y los
+    videos: el servidor manda el valor YA armado (`autorizacionParaLibro`) y el panel
+    lo mete tal cual, pisando lo que hubiera guardado de la vez anterior.
+  - **`catalog_mision_autorizada`**: una fila por (niño, curso, nivel, parada), con quién
+    la abrió y desde qué sesión. Es un PERMISO, no progresión (regla 4): no lo deriva
+    nadie y no mueve medallas. Abrir dos veces no duplica; se puede cerrar lo abierto
+    por error (`revocarMision`).
+  - **Lo abierto es un RECORRIDO, no casillas sueltas** (2026-09-24): `caminoAbierto`
+    (dominio) devuelve el Welcome más TODAS las unidades hasta la más alta autorizada,
+    y `misionesAutorizadas` ya entrega eso — la tabla guarda lo que el guía abrió
+    explícitamente, pero quien pregunte "¿puede ver esto?" recibe el recorrido. El
+    curso no vuelve atrás: el niño que va en la Unidad 3 conserva el libro y el
+    cuaderno de la 1 y la 2 sin que haya que abrírselos de a uno. Revocar la 3 lo
+    devuelve al punto de partida (se cierran también 1 y 2), porque el tope baja.
+  - **EL NIVEL IMPORTA, y por eso se elige**: el libro es uno por nivel. La primera
+    versión abría la unidad en el nivel que el niño tenía EN CURSO, y la prueba lo
+    destapó: un alumno con Champion en curso abre el libro de Rookie (su nivel
+    alcanzado) y la autorización caía en un libro que no estaba mirando. El guía elige
+    el nivel de la CLASE (se sugiere el más repetido del grupo, `?conNiveles=1`) y la
+    pantalla avisa "⚠ va en …" de quien esté en otro.
+  - Endpoints: `GET|POST|DELETE /api/scheduling/sessions/[id]/misiones`, con
+    `asistencia.gestionar` + `verificarAccesoGuia` (el mismo alcance que pasar lista) y
+    validando que los niños sean de ESA sesión. Auditoría:
+    `catalog.misiones_autorizadas` y `catalog.mision_revocada`.
+  - El panel del niño muestra por nivel "🔓 Abiertas: …" o "🔒 Tu guía abrirá las
+    misiones en clase"; la vista previa del EQUIPO abre todas las unidades, porque es
+    una revisión y no una clase.
+  - Probado en Chrome con el libro real: sin permiso la Unidad 1 está cerrada, tras
+    autorizarla queda abierta y la 2 sigue cerrada. **Trampa al probarlo**: la pestaña
+    anterior del libro sigue viva con el permiso que tenía; hay que cerrarla antes de
+    reabrir, o se lee un estado viejo.
 - **Videos del libro (2026-09-21)**: los videos incrustados en base64 llevaban el libro
   de Rookie a 105 MB y el niño bajaba 11 minutos de canciones antes de ver la página 1.
   Sin ellos, el mismo libro (CON_PASSPORT) pesa **22,6 MB** y cada video se baja al darle
@@ -1113,6 +1191,19 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   Faltan los otros 4 niveles de Junior y los 5 de Youngster; se suben por Material del
   alumno y Videos del libro, sin tocar código. Los originales están en
   `Libros/<Curso>/<Nivel>/` (ignorado por git).
+- **El libro cargado el 2026-09-23 trae los videos DENTRO otra vez**: pesa **71,4 MB**
+  (`LGS_Kids_JUNIOR_Rookie_CON_PASSPORT.html`) contra los 22,6 MB de la versión con
+  videos aparte. Trae bien el permiso del guía, pero deshace lo de "Videos del libro":
+  el niño vuelve a bajar los 12 videos antes de la página 1 y los que ya se subieron
+  comprimidos quedan sin usar. Hay que pedirle a diseño que exporte con
+  `videos/<página>-<n>.mp4` (guía en `docs/operacion/libro-interactivo-videos.md`) y
+  volver a cargarlo.
+- **Lo que el niño logra en el LIBRO no se guarda en el servidor**: el puente ya trae
+  su progreso al panel (intentos, juegos, souvenirs), pero hoy solo queda en el
+  `localStorage` del dispositivo. Falta el endpoint que lo reciba y lo guarde por niño
+  como REGISTRO —no como progresión, decisión del negocio (2026-09-23): la medalla del
+  nivel sigue saliendo del cuestionario que registra el guía—. Sin eso, un cambio de
+  tableta se lleva el souvenir y la plataforma no sabe quién lo consiguió.
 - **Derechos de las canciones**: los videos de los libros son descargas de YouTube de
   terceros (Planet Pop, LARVA KIDS, ABCmouse, Lingokids, CoComelon, The Singing Walrus…).
   Subirlos a la plataforma es redistribuirlos: confirmar permiso o sustituirlos.
