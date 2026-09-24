@@ -1,0 +1,24 @@
+# Lo que NO entra en la imagen. Con esto el contexto de build son unos MB.
+node_modules
+.next
+.git
+.github
+.storage
+.env
+.env.*
+*.log
+
+# Arte y material de ORIGEN: pesan cientos de MB y no los sirve la app
+# (ver "Arte de ORIGEN fuera del repositorio" en CLAUDE.md).
+/arte
+/imagenes
+/Audios
+/Libros
+/Videos
+
+# La landing vive en Hostinger, no en este contenedor.
+/landing-estatica
+
+# Documentación y pruebas: no se ejecutan en producción.
+/docs
+**/*.test.ts

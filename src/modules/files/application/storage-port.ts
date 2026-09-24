@@ -2,8 +2,8 @@
  * StoragePort (ADR-0006): nada se guarda en el disco del contenedor en
  * producción. Adaptadores:
  * - LocalStorage (desarrollo/CI): carpeta STORAGE_DIR, fuera de Git.
- * - Spaces (producción, Fase 11): S3-compatible con credenciales; la
- *   interfaz ya está fijada.
+ * - SpacesStorage (producción): DigitalOcean Spaces (S3). Se elige solo, por
+ *   las credenciales del entorno (`getStorage`).
  * TODO archivo es PRIVADO: no existen URLs públicas; toda descarga pasa por
  * un endpoint autenticado.
  */

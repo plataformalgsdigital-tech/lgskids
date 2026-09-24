@@ -13,10 +13,33 @@ import { logger } from "../logging/logger";
 
 let pool: Pool | null = null;
 
+/**
+ * Quita `sslmode` de la URL cuando hay certificado.
+ *
+ * `pg` da PRIORIDAD al `sslmode` de la cadena de conexión sobre el objeto
+ * `ssl`, y desde 8.22 lo interpreta como `verify-full` contra el almacén del
+ * sistema: con la CA en la mano, la conexión fallaba igual con "self-signed
+ * certificate in certificate chain". Quitándolo manda la verificación contra
+ * la CA, que es la que firma esa base. Sin certificado no se toca nada.
+ */
+export function conCertificado(url: string, ca: string | undefined): string {
+  if (ca === undefined) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("sslmode");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function getPool(): Pool {
   if (pool === null) {
+    // Con la CA de la base administrada se verifica la cadena completa.
+    const ca = env().DATABASE_CA_CERT;
     pool = new Pool({
-      connectionString: requireDatabaseUrl(),
+      connectionString: conCertificado(requireDatabaseUrl(), ca),
+      ...(ca === undefined ? {} : { ssl: { ca, rejectUnauthorized: true } }),
       max: env().DB_POOL_MAX,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,

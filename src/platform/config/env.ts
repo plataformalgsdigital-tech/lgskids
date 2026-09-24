@@ -22,6 +22,18 @@ const envSchema = z.object({
   /** Conexión directa (sin pool) SOLO para migraciones. */
   DIRECT_DATABASE_URL: z.string().min(1).optional(),
 
+  /**
+   * Certificado (PEM) de la CA de la base administrada.
+   *
+   * La base de DigitalOcean obliga a TLS y la firma su PROPIA autoridad, que
+   * no está en el almacén del sistema. Desde pg 8.22, `sslmode=require` en la
+   * URL se verifica como `verify-full`, así que sin este certificado la
+   * conexión falla con "self-signed certificate in certificate chain".
+   * Con él se verifica de verdad, que es mejor que apagar la comprobación.
+   * Ausente (desarrollo, CI): conexión sin TLS al Postgres local.
+   */
+  DATABASE_CA_CERT: z.string().min(40).optional(),
+
   /** Máximo de conexiones del pool. Presupuesto documentado: 8–10. */
   DB_POOL_MAX: z.coerce.number().int().min(1).max(10).default(8),
 
@@ -66,6 +78,23 @@ const envSchema = z.object({
 
   /** Carpeta del adaptador local de archivos (desarrollo). */
   STORAGE_DIR: z.string().default(".storage"),
+
+  /**
+   * DigitalOcean Spaces (S3): el almacenamiento de PRODUCCIÓN.
+   *
+   * El contenedor de App Platform tiene disco EFÍMERO: lo que se sube al disco
+   * local desaparece en el siguiente despliegue, y ahí viven los libros, los
+   * videos, el arte y las fotos. Con las cuatro variables puestas,
+   * `getStorage()` usa Spaces; sin ellas, la carpeta local (desarrollo y CI).
+   * Van las cuatro o ninguna: media configuración guardaría en el sitio
+   * equivocado sin avisar.
+   */
+  SPACES_KEY: z.string().min(8).optional(),
+  SPACES_SECRET: z.string().min(8).optional(),
+  SPACES_BUCKET: z.string().min(3).optional(),
+  SPACES_REGION: z.string().min(3).optional(),
+  /** Por defecto `https://<region>.digitaloceanspaces.com`. */
+  SPACES_ENDPOINT: z.url().optional(),
 
   /** Solo para el seed: credenciales del admin inicial. */
   SEED_ADMIN_USERNAME: z.string().min(3).default("admin"),
@@ -114,6 +143,50 @@ export function requireAuthSecret(): string {
     );
   }
   return secret;
+}
+
+export interface ConfigSpaces {
+  key: string;
+  secret: string;
+  bucket: string;
+  region: string;
+  endpoint: string;
+}
+
+/**
+ * Arma la configuración de Spaces: TODO o NADA.
+ *
+ * Con alguna de las cuatro puesta y otra faltando, lanza. Un despliegue con la
+ * llave pero sin bucket arrancaría guardando en el disco efímero del
+ * contenedor, y eso solo se descubre cuando los archivos ya se perdieron.
+ * Pura, para poder probarla sin tocar el entorno.
+ */
+export function armarConfigSpaces(partes: {
+  SPACES_KEY?: string | undefined;
+  SPACES_SECRET?: string | undefined;
+  SPACES_BUCKET?: string | undefined;
+  SPACES_REGION?: string | undefined;
+  SPACES_ENDPOINT?: string | undefined;
+}): ConfigSpaces | null {
+  const obligatorias = ["SPACES_KEY", "SPACES_SECRET", "SPACES_BUCKET", "SPACES_REGION"] as const;
+  const faltan = obligatorias.filter((k) => partes[k] === undefined);
+  if (faltan.length === obligatorias.length) return null;
+  if (faltan.length > 0) {
+    throw new Error(`Spaces a medio configurar: falta ${faltan.join(", ")}.`);
+  }
+  const region = partes.SPACES_REGION ?? "";
+  return {
+    key: partes.SPACES_KEY ?? "",
+    secret: partes.SPACES_SECRET ?? "",
+    bucket: partes.SPACES_BUCKET ?? "",
+    region,
+    endpoint: partes.SPACES_ENDPOINT ?? `https://${region}.digitaloceanspaces.com`,
+  };
+}
+
+/** Credenciales de Spaces del entorno, o null si no está configurado. */
+export function configuracionSpaces(): ConfigSpaces | null {
+  return armarConfigSpaces(env());
 }
 
 /** Llave de la bóveda de claves, o null si no está configurada (función apagada). */

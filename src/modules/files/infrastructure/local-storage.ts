@@ -3,8 +3,9 @@ import { dirname, join, normalize } from "node:path";
 import { env } from "@/platform/config/env";
 import { NotFoundError, ValidationError } from "@/platform/errors";
 import type { StoragePort } from "../application/storage-port";
+import { spacesSiEstaConfigurado } from "./spaces-storage";
 
-/** Adaptador LOCAL (desarrollo/CI). En producción se usa Spaces (Fase 11). */
+/** Adaptador LOCAL (desarrollo/CI). En producción se usa Spaces. */
 export class LocalStorage implements StoragePort {
   private ruta(storageKey: string): string {
     // Sin traversal: la clave es interna (uuid/uuid.ext), pero se valida igual.
@@ -35,11 +36,15 @@ export class LocalStorage implements StoragePort {
 
 let storage: StoragePort | null = null;
 
+/**
+ * El almacenamiento vigente: **Spaces si hay credenciales**, si no el disco.
+ *
+ * Lo decide el entorno y no un `NODE_ENV`: así el mismo binario sirve para
+ * desarrollo (carpeta local), CI (carpeta local) y producción (Spaces), y
+ * probar contra Spaces desde una máquina es poner las cuatro variables.
+ */
 export function getStorage(): StoragePort {
-  if (storage === null) {
-    // Fase 11: si hay credenciales de Spaces, se instancia el adaptador S3.
-    storage = new LocalStorage();
-  }
+  storage ??= spacesSiEstaConfigurado() ?? new LocalStorage();
   return storage;
 }
 
