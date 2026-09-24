@@ -21,10 +21,9 @@ bootstrapIdentity();
  * 1. que el archivo SEA material (si no, esta ruta serviría cualquier archivo
  *    de `files` —fotos de menores incluidas— a quien tuviera el id);
  * 2. que sea de SU curso y de un nivel que ya alcanzó;
- * 3. si es un PDF, que su guía haya abierto esa unidad. El Welcome va siempre,
- *    como en el libro; el de actividades del nivel entero pide las CUATRO
- *    unidades; y el PDF del nivel entero (los cargados antes de que fuera por
- *    unidad) ya no se sirve: nadie puede abrirlo.
+ * 3. si es un PDF, que su guía haya abierto esa unidad —o una posterior, ver
+ *    `caminoAbierto`—. El Welcome va siempre, como en el libro, y los dos PDF
+ *    del NIVEL ENTERO piden las CUATRO unidades.
  * Cualquiera que falle responde 404, no 403: no se confirma que el id exista.
  */
 export const GET = handlerWithAuth(async (request, auth, context) => {
@@ -47,9 +46,9 @@ export const GET = handlerWithAuth(async (request, auth, context) => {
     const abiertas = await misionesAutorizadas(alcance.personaId, material.curso, material.nivel);
     const abierta =
       material.parada === null
-        ? // Sin unidad: el de ACTIVIDADES del nivel entero, que pide las cuatro
-          // abiertas. El PDF del nivel entero (los antiguos) ya no se sirve.
-          material.tipo === "actividades" && todasLasUnidades(abiertas)
+        ? // Sin unidad: el del NIVEL ENTERO (cualquiera de los dos PDF), que
+          // pide las cuatro unidades abiertas.
+          todasLasUnidades(abiertas)
         : material.parada === PARADA_WELCOME || abiertas.includes(material.parada);
     if (!abierta) throw new NotFoundError("Tu guía todavía no abrió eso.");
   }

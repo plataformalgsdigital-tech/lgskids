@@ -111,7 +111,7 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("el PDF va POR UNIDAD: sin unidad, o con una que no existe, se rechaza", async () => {
+  it("el PDF para descargar admite las dos formas: por unidad y el del nivel completo", async () => {
     const base = {
       actorUserId: ACTOR,
       tipo: "imprimible" as const,
@@ -120,9 +120,20 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
       nombreOriginal: "u.pdf",
       bytes: PDF,
     };
-    // Sin unidad no hay quien lo abra: el guía abre unidades, no niveles.
-    await expect(subirMaterial(base)).rejects.toBeInstanceOf(ValidationError);
+    // Una unidad que no existe en el mapa sigue siendo un error.
     await expect(subirMaterial({ ...base, parada: 9 })).rejects.toBeInstanceOf(ValidationError);
+
+    // Sin unidad NO falla: es el del nivel entero, que el niño abre al terminarlo.
+    const completo = await subirMaterial(base);
+    expect((await materialVigente("imprimible", "JUNIOR", "CHAMPION"))?.id).toBe(completo.id);
+    // Y no llena ninguna casilla de unidad.
+    expect(await materialVigente("imprimible", "JUNIOR", "CHAMPION", 1)).toBeNull();
+    expect(await archivoDeMaterial(completo.id)).toMatchObject({
+      tipo: "imprimible",
+      parada: null,
+    });
+    const nivel = (await estadoMaterial())["JUNIOR"]?.find((n) => n.nivel === "CHAMPION");
+    expect(nivel?.imprimibleCompleto?.id).toBe(completo.id);
   });
 
   it("un archivo que NO es material no se sirve como material", async () => {

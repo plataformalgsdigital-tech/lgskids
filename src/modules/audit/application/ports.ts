@@ -24,4 +24,6 @@ export interface AuditRepositoryPort {
     limit: number;
     offset: number;
   }): Promise<AuditRecord[]>;
+  /** Cuántas veces ocurrió una acción desde una IP en los últimos N minutos. */
+  contarPorIp(params: { accion: string; ip: string; minutos: number }): Promise<number>;
 }

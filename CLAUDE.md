@@ -568,12 +568,12 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
     `catalog_material_interactivo|imprimible|actividades` y clave
     `CURSO:NIVEL` para el libro y **`CURSO:NIVEL:PARADA`** para cada PDF (solo niveles
     reales, sin "TODOS"). **Quién lleva unidad lo decide `exigirParada`**: el
-    interactivo NUNCA (por unidad aparecería cinco veces), el imprimible SIEMPRE (sin
-    unidad quedaría fuera del alcance del guía y nadie podría abrirlo) y el de
-    actividades las DOS cosas — sin unidad es el del nivel completo, que se le habilita
-    al niño con las cuatro unidades abiertas (decisión del negocio). Los PDF para
-    imprimir de nivel entero cargados ANTES siguen en su sitio, ya no se sirven al niño
-    y la pantalla los muestra aparte, en ámbar, solo para poder quitarlos.
+    interactivo NUNCA (por unidad aparecería cinco veces) y **los dos PDF las DOS
+    cosas** — por unidad y, sin unidad, el del NIVEL COMPLETO, que se le habilita al
+    niño con las cuatro unidades abiertas. El de actividades lo admite desde
+    2026-09-23 y el de descargar desde **2026-09-24**: antes este último exigía
+    unidad, y los de nivel entero cargados de antes se mostraban en ámbar como
+    "ya no se entrega"; ahora esa casilla es normal y sí se sirve.
     **Reemplazar suelta el anterior**
     DESPUÉS de subir el nuevo: un fallo a medias deja el viejo, no el nivel vacío. El
     tipo lo decide el CONTENIDO (`esHtml`/`esPdf` en `domain/libro-interactivo.ts`), no
@@ -635,8 +635,7 @@ videos}` (`videos` = base con token de sus videos; el formato viejo, solo `datos
     misma regla de nivel que el dashboard); si no, 404. **Los PDF suman una tercera
     condición**: que su guía haya abierto esa unidad O una POSTERIOR (`caminoAbierto`:
     quien va en la 3 conserva la 1 y la 2; el Welcome va siempre, como en el libro) y,
-    para el de actividades del nivel completo, haber llegado a la CUARTA
-    (`todasLasUnidades`). La lista manda SIEMPRE las cinco casillas de cada PDF —abierta
+    para los dos del nivel completo, haber llegado a la CUARTA (`todasLasUnidades`). La lista manda SIEMPRE las cinco casillas de cada PDF —abierta
     con enlace, cerrada con candado y sin enlace, y "todavía sin cargar"— para que el
     niño vea el camino entero; la ruta que los sirve lo vuelve a comprobar, así que
     revocar una unidad vuelve a cerrar lo que ya se listó. El equipo, por
@@ -994,6 +993,45 @@ idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salone
   (entidad `scheduling_guia_foto`) y llena `scheduling_guia.foto_file_id`.
 - `GET /api/scheduling/guias` devuelve además `enlaces` (estado del último por guía)
   y `diasVigencia`, para que la UI no copie la constante del dominio.
+
+## Registro ABIERTO de guías (2026-09-24)
+
+Lo pidió el negocio sabiendo el costo: **una sola URL fija** (`/nuevo-guia`, sin
+`?t=`) que se reparte y con la que **cada guía crea su propia cuenta**, como en
+MOSAICO. Hasta ahora la cuenta la creaba administración y el enlace por persona
+solo servía para completar la ficha.
+
+- **Quien tenga esa URL entra al panel con permisos de guía** (ve salones y
+  niños). Por eso no va sola; `scheduling/application/registro-abierto.ts` le pone
+  tres frenos, y ninguno vive en la ruta:
+  1. **interruptor**: nace apagado (`platform_config.guia_registro_abierto`) y se
+     prende solo mientras se recluta;
+  2. **clave compartida** (`…_codigo`, mínimo 6): se guarda EN CLARO a propósito —su
+     valor es poder dictarla por otro canal, como la clave de una reunión—; dejarla
+     vacía abre el enlace sin clave;
+  3. **tope por IP** (`MAX_REGISTROS_POR_IP_HORA` = 3), para que una URL filtrada no
+     fabrique cuentas en serie.
+- El tope se cuenta sobre la AUDITORÍA, que ya guarda la IP de cada alta: `audit`
+  ganó `contarPorIp(accion, ip, minutos)` en vez de inventar otra tabla. Sin IP
+  (proxy que no la reenvía) devuelve 0: no se puede limitar lo que no se distingue,
+  y bloquear a todos por eso sería peor.
+- El alta pasa por `crearGuia`, EL MISMO núcleo del panel: cuenta + rol `guia`
+  global + ficha en una transacción, con foto y documento obligatorios. El actor de
+  auditoría es el usuario de sistema (el guía aún no existe cuando se registra).
+  La clave generada se muestra UNA vez en la pantalla (`Cache-Control: no-store`) y
+  la cuenta nace con "cambiar clave al entrar".
+- Endpoints: `GET|PUT /api/scheduling/guias/registro-abierto` (`usuarios.gestionar`,
+  sin caché: devuelve la clave en claro) y la puerta pública
+  `GET|POST /api/public/guia-registro`. El GET público dice solo `activo` y
+  `exigeCodigo` — la clave NO viaja, si no el freno no frenaría nada.
+  Auditoría: `scheduling.guia_registro_abierto` (y `…_prendido|_apagado`).
+- UI: tarjeta "🔗 Enlace abierto de registro" en **Usuarios y roles › Guía**, con el
+  interruptor, la clave y el enlace para copiar. `/nuevo-guia` sin `?t=` ya no dice
+  "enlace incompleto": pregunta al servidor y, si está abierto, muestra el MISMO
+  wizard de 3 pasos más el campo de clave, y al terminar entrega usuario y clave.
+- Pruebas: `scheduling/tests/registro-abierto-integration.test.ts` (apagado no deja
+  entrar, clave equivocada, alta completa con rol y ficha, tope por IP). Deja el
+  interruptor como estaba: es configuración REAL de la instancia.
 
 ## Menú por secciones y Tablero (2026-08-26)
 

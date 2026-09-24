@@ -37,13 +37,26 @@ export const GET = handlerWithAuth(async (_request, auth) => {
   const niveles = await Promise.all(
     alcanzados.map(async (nivel) => {
       const abiertas = await misionesAutorizadas(personaId, curso, nivel);
-      const [interactivo, actividadesCompleto, ...pdfs] = await Promise.all([
+      const [interactivo, imprimibleCompleto, actividadesCompleto, ...pdfs] = await Promise.all([
         materialVigente("interactivo", curso, nivel),
+        materialVigente("imprimible", curso, nivel),
         materialVigente("actividades", curso, nivel),
         ...PARADAS.map((parada) => materialVigente("imprimible", curso, nivel, parada)),
         ...PARADAS.map((parada) => materialVigente("actividades", curso, nivel, parada)),
       ]);
       const url = (id: string) => `/api/student/material/${id}`;
+
+      /**
+       * El PDF del NIVEL ENTERO (los dos libros lo admiten): se habilita con
+       * las cuatro unidades abiertas — el nivel entero se gana al terminarlo.
+       */
+      const completo = (m: { id: string } | null) =>
+        m === null
+          ? null
+          : {
+              abierta: todasLasUnidades(abiertas),
+              url: todasLasUnidades(abiertas) ? `${url(m.id)}?descargar=1` : null,
+            };
 
       /**
        * Las CINCO unidades, siempre a la vista: el niño ve el camino completo
@@ -76,20 +89,12 @@ export const GET = handlerWithAuth(async (_request, auth) => {
         // para pedir `videos/7-1.mp4` sin cookie. Se emite aquí porque aquí ya
         // se comprobó que el niño alcanzó este nivel.
         videosBase: interactivo !== null ? baseVideosLibro(interactivo.id) : null,
-        // Libro para descargar y libro de actividades, los dos por unidad.
+        // Libro para descargar y libro de actividades, los dos por unidad…
         imprimibles: casillas(0),
         actividades: casillas(PARADAS.length),
-        // El de actividades del nivel ENTERO: se habilita cuando su guía le
-        // abrió las cuatro unidades (decisión del negocio, 2026-09-23).
-        actividadesCompleto:
-          actividadesCompleto === null
-            ? null
-            : {
-                abierta: todasLasUnidades(abiertas),
-                url: todasLasUnidades(abiertas)
-                  ? `${url(actividadesCompleto.id)}?descargar=1`
-                  : null,
-              },
+        // …y los dos con su nivel entero (decisión del negocio, 2026-09-23/24).
+        imprimibleCompleto: completo(imprimibleCompleto),
+        actividadesCompleto: completo(actividadesCompleto),
       };
     }),
   );

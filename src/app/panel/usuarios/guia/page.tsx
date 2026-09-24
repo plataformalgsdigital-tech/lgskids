@@ -38,6 +38,13 @@ interface Creado {
   enlaceExpira: string | null;
 }
 
+/** El enlace ABIERTO: una URL fija con la que cada guía crea su cuenta. */
+interface RegistroAbierto {
+  activo: boolean;
+  codigo: string;
+  enlace: string;
+}
+
 export default function AltaGuiaPage() {
   const [datos, setDatos] = useState(VACIO);
   const [foto, setFoto] = useState<File | null>(null);
@@ -49,6 +56,39 @@ export default function AltaGuiaPage() {
   const [ocupado, setOcupado] = useState(false);
   const [creado, setCreado] = useState<Creado | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [abierto, setAbierto] = useState<RegistroAbierto | null>(null);
+  const [guardandoAbierto, setGuardandoAbierto] = useState(false);
+  const [copiadoAbierto, setCopiadoAbierto] = useState(false);
+
+  useEffect(() => {
+    async function cargar() {
+      const res = await apiFetch("/api/scheduling/guias/registro-abierto");
+      if (res.ok) setAbierto((await res.json()) as RegistroAbierto);
+    }
+    void cargar();
+  }, []);
+
+  /** Prende/apaga el enlace abierto o cambia su clave. */
+  async function guardarAbierto(cambios: Partial<RegistroAbierto>) {
+    if (abierto === null) return;
+    const siguiente = { ...abierto, ...cambios };
+    setGuardandoAbierto(true);
+    setError(null);
+    try {
+      const res = await apiFetch("/api/scheduling/guias/registro-abierto", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activo: siguiente.activo, codigo: siguiente.codigo }),
+      });
+      if (!res.ok) {
+        setError(await mensajeDeError(res, "No se pudo guardar el enlace abierto."));
+        return;
+      }
+      setAbierto((await res.json()) as RegistroAbierto);
+    } finally {
+      setGuardandoAbierto(false);
+    }
+  }
 
   // La URL del previo es del navegador: se suelta al cambiar de foto o salir.
   useEffect(() => {
@@ -155,6 +195,85 @@ export default function AltaGuiaPage() {
             )}
           </CajaCredenciales>
         </div>
+      )}
+
+      {abierto !== null && (
+        <section style={{ ...tarjeta, marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1rem", fontWeight: 800, marginBottom: "0.2rem" }}>
+            🔗 Enlace abierto de registro
+          </h2>
+          <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", marginBottom: "0.8rem" }}>
+            Una sola URL para repartir: quien la abra crea su propia cuenta de guía. Déjala prendida
+            solo mientras estés reclutando, y dicta la clave por otro medio (WhatsApp, teléfono), no
+            junto al enlace.
+          </p>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              fontWeight: 700,
+              fontSize: "0.9rem",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={abierto.activo}
+              disabled={guardandoAbierto}
+              onChange={(e) => void guardarAbierto({ activo: e.target.checked })}
+            />
+            {abierto.activo ? "Abierto: cualquiera con el enlace puede registrarse" : "Cerrado"}
+          </label>
+
+          <div style={{ marginTop: "0.8rem", display: "grid", gap: "0.5rem" }}>
+            <label style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+              Clave compartida (déjala vacía para no pedir ninguna)
+            </label>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <input
+                value={abierto.codigo}
+                onChange={(e) => setAbierto({ ...abierto, codigo: e.target.value })}
+                placeholder="mínimo 6 caracteres"
+                style={{ ...input, maxWidth: "16rem" }}
+              />
+              <button
+                type="button"
+                style={boton}
+                disabled={guardandoAbierto}
+                onClick={() => void guardarAbierto({})}
+              >
+                Guardar clave
+              </button>
+            </div>
+          </div>
+
+          {abierto.activo && (
+            <div
+              style={{
+                marginTop: "0.8rem",
+                display: "flex",
+                gap: "0.5rem",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <code style={{ fontSize: "0.82rem", wordBreak: "break-all" }}>{abierto.enlace}</code>
+              <button
+                type="button"
+                style={boton}
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(abierto.enlace)
+                    .then(() => setCopiadoAbierto(true))
+                    .catch(() => setCopiadoAbierto(false));
+                }}
+              >
+                {copiadoAbierto ? "✓ Copiado" : "Copiar enlace"}
+              </button>
+            </div>
+          )}
+        </section>
       )}
 
       <form onSubmit={crear} style={tarjeta}>

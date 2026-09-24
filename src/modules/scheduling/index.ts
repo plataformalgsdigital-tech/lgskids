@@ -83,6 +83,15 @@ export {
 export { crearGuia, MIMES_FOTO_GUIA } from "./application/alta-guia";
 export type { DatosAltaGuia } from "./application/alta-guia";
 export {
+  getRegistroAbierto,
+  setRegistroAbierto,
+  estadoPublicoRegistro,
+  registrarGuiaAbierto,
+  enlaceRegistroAbierto,
+  MAX_REGISTROS_POR_IP_HORA,
+} from "./application/registro-abierto";
+export type { RegistroAbierto } from "./application/registro-abierto";
+export {
   crearEventoAdmin,
   eventosAdmin,
   audienciaEventoAdmin,

@@ -23,6 +23,22 @@ const PAISES = [
 
 const PASOS = ["Datos básicos", "Contacto", "Zoom y foto"];
 
+/** Modo abierto: no hay ficha previa que traer, se empieza en blanco. */
+const FICHA_NUEVA: Ficha = {
+  username: "",
+  nombres: null,
+  apellidos: null,
+  docNumero: null,
+  email: null,
+  telefono: null,
+  pais: null,
+  domicilio: null,
+  fechaNacimiento: null,
+  zoomUrl: null,
+  tieneFoto: false,
+  expiraEn: "",
+};
+
 interface Ficha {
   username: string;
   nombres: string | null;
@@ -111,14 +127,24 @@ function Wizard() {
   // sabe si el enlace venía completo y no hace falta un segundo render.
   const token = useSearchParams().get("t")?.trim() ?? "";
   const [ficha, setFicha] = useState<Ficha | null>(null);
-  const [cargaError, setCargaError] = useState<string | null>(
-    token === ""
-      ? "Este enlace está incompleto. Pídele a tu coordinación el enlace de registro."
-      : null,
+  const [cargaError, setCargaError] = useState<string | null>(null);
+  /**
+   * Sin `?t=` la página no se rinde: puede ser el REGISTRO ABIERTO, la URL
+   * fija que reparte coordinación y con la que el guía crea su propia cuenta.
+   * Lo decide el servidor (interruptor + clave), nunca el cliente.
+   */
+  const [abierto, setAbierto] = useState(false);
+  const [exigeCodigo, setExigeCodigo] = useState(false);
+  const [codigo, setCodigo] = useState("");
+  /** En modo abierto la cuenta nace aquí: su clave se muestra UNA vez. */
+  const [credenciales, setCredenciales] = useState<{ username: string; password: string } | null>(
+    null,
   );
   const [paso, setPaso] = useState(1);
   const [form, setForm] = useState<Campos>(VACIOS);
-  const [errores, setErrores] = useState<Partial<Record<keyof Campos | "foto", string>>>({});
+  const [errores, setErrores] = useState<Partial<Record<keyof Campos | "foto" | "codigo", string>>>(
+    {},
+  );
   const [enviando, setEnviando] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
@@ -128,7 +154,26 @@ function Wizard() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (token === "") return;
+    if (token === "") {
+      // Sin enlace personal: ¿está abierto el registro general?
+      fetch("/api/public/guia-registro")
+        .then(async (r) => {
+          const data: { activo?: boolean; exigeCodigo?: boolean } = await r.json();
+          if (!r.ok || data.activo !== true) {
+            setCargaError(
+              "El registro de guías está cerrado. Pídele a tu coordinación el enlace de registro.",
+            );
+            return;
+          }
+          setAbierto(true);
+          setExigeCodigo(data.exigeCodigo === true);
+          setFicha(FICHA_NUEVA);
+        })
+        .catch(() => {
+          setCargaError("No se pudo abrir el registro. Revisa tu conexión e inténtalo de nuevo.");
+        });
+      return;
+    }
     fetch(`/api/public/guia-invitacion?t=${encodeURIComponent(token)}`)
       .then(async (r) => {
         const data: Ficha & { error?: { message?: string } } = await r.json();
@@ -190,8 +235,11 @@ function Wizard() {
   }
 
   function validar(n: number): boolean {
-    const e: Partial<Record<keyof Campos | "foto", string>> = {};
+    const e: Partial<Record<keyof Campos | "foto" | "codigo", string>> = {};
     if (n === 1) {
+      // La clave compartida se pide de entrada: si no la tiene, mejor que se
+      // entere antes de llenar tres pasos.
+      if (abierto && exigeCodigo && codigo.trim() === "") e.codigo = "Requerido";
       if (form.nombres.trim() === "") e.nombres = "Requerido";
       if (form.apellidos.trim() === "") e.apellidos = "Requerido";
       if (form.docNumero.trim() === "") e.docNumero = "Requerido";
@@ -220,19 +268,26 @@ function Wizard() {
   }
 
   async function enviar() {
-    if (!validar(3) || token === "") return;
+    if (!validar(3) || (token === "" && !abierto)) return;
     setEnviando(true);
     setApiError(null);
     try {
       const fd = new FormData();
-      fd.set("t", token);
       for (const [k, v] of Object.entries(form)) fd.set(k, v.trim());
       if (foto !== null) fd.set("foto", foto);
-      const res = await fetch("/api/public/guia-invitacion", { method: "POST", body: fd });
-      const data: { error?: { message?: string } } = await res.json();
+      if (abierto) fd.set("codigo", codigo.trim());
+      else fd.set("t", token);
+      const ruta = abierto ? "/api/public/guia-registro" : "/api/public/guia-invitacion";
+      const res = await fetch(ruta, { method: "POST", body: fd });
+      const data: { username?: string; password?: string; error?: { message?: string } } =
+        await res.json();
       if (!res.ok) {
         setApiError(data.error?.message ?? "No se pudo guardar el registro.");
         return;
+      }
+      // En modo abierto la cuenta acaba de nacer: su clave se muestra una vez.
+      if (abierto && data.username !== undefined && data.password !== undefined) {
+        setCredenciales({ username: data.username, password: data.password });
       }
       setListo(true);
     } catch {
@@ -276,13 +331,55 @@ function Wizard() {
         <div style={{ ...tarjeta, padding: "2rem", textAlign: "center" }}>
           <div style={{ fontSize: "2.6rem", marginBottom: "0.5rem" }}>✅</div>
           <h1 style={{ fontSize: "1.3rem", marginBottom: "0.4rem" }}>Registro completo</h1>
-          <p style={{ color: "var(--texto-suave)", marginBottom: "0.4rem" }}>
-            Tus datos quedaron guardados. Ya puedes cerrar esta página.
-          </p>
-          <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
-            Entra a la plataforma con tu usuario <strong>{ficha?.username}</strong> y la clave que
-            te dio tu coordinación.
-          </p>
+          {credenciales === null ? (
+            <>
+              <p style={{ color: "var(--texto-suave)", marginBottom: "0.4rem" }}>
+                Tus datos quedaron guardados. Ya puedes cerrar esta página.
+              </p>
+              <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+                Entra a la plataforma con tu usuario <strong>{ficha?.username}</strong> y la clave
+                que te dio tu coordinación.
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ color: "var(--texto-suave)", marginBottom: "0.8rem" }}>
+                Esta es tu cuenta. <strong>Anótala ahora</strong>: la clave no se vuelve a mostrar.
+              </p>
+              <div
+                style={{
+                  background: "#f6f8ff",
+                  border: "1.5px solid #dbe3ff",
+                  borderRadius: "0.8rem",
+                  padding: "0.9rem 1rem",
+                  textAlign: "left",
+                  fontSize: "0.95rem",
+                }}
+              >
+                <div style={{ marginBottom: "0.4rem" }}>
+                  Usuario:{" "}
+                  <strong style={{ fontFamily: "ui-monospace, monospace" }}>
+                    {credenciales.username}
+                  </strong>
+                </div>
+                <div>
+                  Clave:{" "}
+                  <strong style={{ fontFamily: "ui-monospace, monospace" }}>
+                    {credenciales.password}
+                  </strong>
+                </div>
+              </div>
+              <p
+                style={{
+                  color: "var(--texto-suave)",
+                  fontSize: "0.82rem",
+                  marginTop: "0.7rem",
+                }}
+              >
+                Al entrar por primera vez te pedimos cambiarla por una tuya.
+              </p>
+            </>
+          )}
           <a href="/login" style={{ display: "inline-block", marginTop: "1rem", fontWeight: 700 }}>
             Ir a iniciar sesión
           </a>
@@ -315,7 +412,13 @@ function Wizard() {
         >
           <h1 style={{ fontSize: "1.2rem", fontWeight: 800 }}>Registro de Guía</h1>
           <p style={{ fontSize: "0.85rem", opacity: 0.9 }}>
-            LGS Kids · usuario <strong>{ficha.username}</strong>
+            {abierto ? (
+              <>LGS Kids · crea tu usuario</>
+            ) : (
+              <>
+                LGS Kids · usuario <strong>{ficha.username}</strong>
+              </>
+            )}
           </p>
         </header>
 
@@ -397,6 +500,34 @@ function Wizard() {
 
           {paso === 1 && (
             <>
+              {abierto && exigeCodigo && (
+                <div>
+                  <label style={rotulo} htmlFor="cod">
+                    Clave de registro *
+                  </label>
+                  <input
+                    id="cod"
+                    value={codigo}
+                    onChange={(e) => {
+                      setCodigo(e.target.value);
+                      setErrores((p) => {
+                        const c = { ...p };
+                        delete c.codigo;
+                        return c;
+                      });
+                    }}
+                    style={errores.codigo !== undefined ? malo : campo}
+                    autoComplete="off"
+                  />
+                  {errores.codigo !== undefined ? (
+                    <p style={aviso}>{errores.codigo}</p>
+                  ) : (
+                    <p style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+                      Te la da tu coordinación, aparte de este enlace.
+                    </p>
+                  )}
+                </div>
+              )}
               <div
                 style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}
                 className="ng-dos"

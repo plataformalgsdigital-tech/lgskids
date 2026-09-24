@@ -223,6 +223,12 @@ interface CasillaDescarga {
   url: string | null;
 }
 
+/** El PDF del NIVEL ENTERO: se abre con las cuatro unidades. */
+interface CasillaCompleta {
+  abierta: boolean;
+  url: string | null;
+}
+
 /** Lo que devuelve `/api/student/material`. */
 interface MaterialAlumno {
   /** Id del niño: separa el progreso de dos hermanos en la misma tableta. */
@@ -241,8 +247,9 @@ interface MaterialAlumno {
     imprimibles: CasillaDescarga[];
     /** Libro de actividades, también por unidad. */
     actividades: CasillaDescarga[];
-    /** El de actividades del nivel entero: se abre con las cuatro unidades. */
-    actividadesCompleto: { abierta: boolean; url: string | null } | null;
+    /** Los dos del nivel entero: se abren con las cuatro unidades. */
+    imprimibleCompleto: CasillaCompleta | null;
+    actividadesCompleto: CasillaCompleta | null;
   }[];
   /** La caja del libro: permisos de su pestaña y cómo habla el puente. */
   libro: CajaLibro;
@@ -256,6 +263,7 @@ interface MaterialAlumno {
 function tieneMaterial(n: MaterialAlumno["niveles"][number]): boolean {
   return (
     n.interactivoUrl !== null ||
+    n.imprimibleCompleto !== null ||
     n.actividadesCompleto !== null ||
     n.imprimibles.some((p) => p.cargado) ||
     n.actividades.some((p) => p.cargado)
@@ -2683,41 +2691,47 @@ export default function MiPanelPage() {
                           </>
                         ) : null;
 
-                      const completo = n.actividadesCompleto;
+                      /** El del NIVEL ENTERO, que los dos libros pueden tener. */
+                      const nivelCompleto = (c: CasillaCompleta | null) =>
+                        c === null ? undefined : c.url !== null ? (
+                          <a
+                            href={c.url}
+                            download
+                            style={{
+                              ...chip,
+                              border: "1.5px solid var(--lgs-verde)",
+                              background: "white",
+                              color: "inherit",
+                            }}
+                          >
+                            ⬇️ Nivel completo
+                          </a>
+                        ) : (
+                          <span
+                            title="Se abre cuando tu guía te abra las cuatro unidades"
+                            style={{
+                              ...chip,
+                              border: "1.5px dashed #d8dce6",
+                              background: "#fafbfe",
+                              color: "var(--texto-suave)",
+                              cursor: "default",
+                              fontWeight: 600,
+                            }}
+                          >
+                            🔒 Nivel completo
+                          </span>
+                        );
                       return (
                         <>
-                          {fila("⬇️ Para imprimir, por unidad", n.imprimibles)}
+                          {fila(
+                            "⬇️ Para imprimir, por unidad",
+                            n.imprimibles,
+                            nivelCompleto(n.imprimibleCompleto),
+                          )}
                           {fila(
                             "✏️ Libro de actividades",
                             n.actividades,
-                            completo === null ? undefined : completo.url !== null ? (
-                              <a
-                                href={completo.url}
-                                download
-                                style={{
-                                  ...chip,
-                                  border: "1.5px solid var(--lgs-verde)",
-                                  background: "white",
-                                  color: "inherit",
-                                }}
-                              >
-                                ⬇️ Nivel completo
-                              </a>
-                            ) : (
-                              <span
-                                title="Se abre cuando tu guía te abra las cuatro unidades"
-                                style={{
-                                  ...chip,
-                                  border: "1.5px dashed #d8dce6",
-                                  background: "#fafbfe",
-                                  color: "var(--texto-suave)",
-                                  cursor: "default",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                🔒 Nivel completo
-                              </span>
-                            ),
+                            nivelCompleto(n.actividadesCompleto),
                           )}
                         </>
                       );

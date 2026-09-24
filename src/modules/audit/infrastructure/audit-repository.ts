@@ -1,4 +1,4 @@
-import { execute, queryRows } from "@/platform/db/query";
+import { execute, queryOne, queryRows } from "@/platform/db/query";
 import type { AuditEntry, AuditRecord, AuditRepositoryPort } from "../application/ports";
 
 interface AuditRow {
@@ -28,6 +28,19 @@ export class PgAuditRepository implements AuditRepositoryPort {
         entry.ip ?? null,
       ],
     );
+  }
+
+  async contarPorIp(params: { accion: string; ip: string; minutos: number }): Promise<number> {
+    // El intervalo se arma con `make_interval`, no interpolando minutos en el
+    // SQL: aquí todo va parametrizado, también lo que parece inofensivo.
+    const fila = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n
+         FROM audit_log
+        WHERE accion = $1 AND ip = $2
+          AND created_at > now() - make_interval(mins => $3)`,
+      [params.accion, params.ip, params.minutos],
+    );
+    return fila?.n ?? 0;
   }
 
   async list(params: {

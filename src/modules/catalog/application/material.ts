@@ -20,10 +20,13 @@ import { PARADAS, etiquetaParada, paradaValida } from "../domain/unidad-mapa";
  *  - imprimible:  el libro en PDF, **por UNIDAD** desde 2026-09-23 (clave
  *    `CURSO:NIVEL:PARADA`). El nivel se abre de a poco —el guía va abriendo
  *    cada misión—, así que el PDF sigue el mismo ritmo: el niño descarga la
- *    unidad que está trabajando, no el libro entero.
- *  - actividades: el libro de actividades, también en PDF. Va por unidad Y,
- *    además, admite el del NIVEL COMPLETO (clave `CURSO:NIVEL`, sin unidad),
- *    que se le habilita al niño cuando su guía ya le abrió las cuatro.
+ *    unidad que está trabajando, no el libro entero. Desde 2026-09-24 admite
+ *    ADEMÁS el del nivel completo (clave `CURSO:NIVEL`, sin unidad).
+ *  - actividades: el libro de actividades, también en PDF, con las mismas dos
+ *    formas: por unidad y del nivel completo.
+ *
+ * Los dos "completos" se le habilitan al niño cuando su guía ya le abrió las
+ * CUATRO unidades: son el nivel entero, y el nivel entero se gana al terminarlo.
  *
  * Vive en `files` como el arte, pero con reglas PROPIAS: son archivos de
  * decenas de MB y uno es HTML, dos cosas que la lista general de `files` no
@@ -95,18 +98,13 @@ export function claveMaterial(curso: string, nivel: string, parada?: number | nu
 /**
  * Quién lleva unidad y quién no:
  *  - interactivo: NUNCA (es uno por nivel; con unidad aparecería cinco veces);
- *  - imprimible:  SIEMPRE (sin unidad nadie podría abrirlo: el guía abre
- *    unidades, no niveles);
- *  - actividades: las dos cosas — una por unidad y, sin unidad, el del nivel
- *    completo, que se habilita cuando están abiertas las cuatro.
+ *  - los dos PDF: las DOS cosas — uno por unidad, que se abre al llegar a ella,
+ *    y uno del NIVEL COMPLETO (sin unidad), que se habilita cuando el niño ya
+ *    tiene abiertas las cuatro. Al de descargar se le sumó el completo el
+ *    2026-09-24, para que quien termina el nivel pueda bajarlo de una vez.
  */
 function exigirParada(tipo: MaterialTipo, parada?: number | null): number | null {
-  if (tipo === "imprimible") {
-    if (parada == null) throw new ValidationError("Elige la unidad del libro para descargar.");
-    return parada;
-  }
-  if (tipo === "actividades") return parada ?? null;
-  return null;
+  return tipo === "interactivo" ? null : (parada ?? null);
 }
 
 /**
@@ -203,14 +201,11 @@ export interface MaterialNivel {
   interactivo: MaterialResumen | null;
   /** Un PDF por unidad: el niño ve los de las unidades que le abrieron. */
   imprimibles: CasillaUnidad[];
-  /**
-   * PDF del NIVEL ENTERO cargado antes de 2026-09-23, cuando no iba por unidad.
-   * Ya no se sirve al niño; se muestra en mantenimiento solo para poder quitarlo.
-   */
+  /** Y el del nivel entero: se habilita con las cuatro unidades abiertas. */
   imprimibleCompleto: MaterialResumen | null;
   /** Libro de ACTIVIDADES, por unidad. */
   actividades: CasillaUnidad[];
-  /** Y el del nivel entero: se habilita con las cuatro unidades abiertas. */
+  /** Y el del nivel entero, con la misma regla. */
   actividadesCompleto: MaterialResumen | null;
 }
 

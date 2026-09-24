@@ -28,6 +28,27 @@ export async function registrarAuditoria(entry: AuditEntry): Promise<void> {
   }
 }
 
+/**
+ * Cuántas veces se registró una acción desde una IP en los últimos minutos.
+ *
+ * Es el contador de las PUERTAS PÚBLICAS: la auditoría ya guarda la IP de cada
+ * operación, así que sirve de límite sin inventar otra tabla. Sin IP (detrás de
+ * un proxy que no la reenvía) devuelve 0: no se puede limitar lo que no se
+ * distingue, y bloquear a todos por eso sería peor.
+ */
+export async function contarPorIp(params: {
+  accion: string;
+  ip: string | null;
+  minutos: number;
+}): Promise<number> {
+  if (params.ip === null || params.ip.trim() === "") return 0;
+  return repository.contarPorIp({
+    accion: params.accion,
+    ip: params.ip,
+    minutos: params.minutos,
+  });
+}
+
 /** Consulta paginada de auditoría (la autorización la hace la ruta). */
 export async function listarAuditoria(params: {
   entidad?: string;

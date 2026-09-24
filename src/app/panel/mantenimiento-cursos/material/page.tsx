@@ -27,7 +27,7 @@ interface FilaNivel {
   interactivo: Resumen | null;
   /** El PDF va por UNIDAD: el nivel se abre de a poco y el PDF lo sigue. */
   imprimibles: Casilla[];
-  /** PDF del nivel entero cargado antes; solo se muestra para poder quitarlo. */
+  /** Y el del nivel entero: el niño lo abre con las cuatro unidades abiertas. */
   imprimibleCompleto: Resumen | null;
   /** Libro de actividades, por unidad. */
   actividades: Casilla[];
@@ -55,7 +55,7 @@ const COLUMNAS: { tipo: Tipo; titulo: string; ayuda: string; accept: string }[] 
   {
     tipo: "imprimible",
     titulo: "⬇️ Libro para descargar",
-    ayuda: "PDF por unidad",
+    ayuda: "PDF por unidad y del nivel completo",
     accept: ".pdf,application/pdf",
   },
   {
@@ -395,21 +395,20 @@ export default function MaterialAlumnoPage() {
                     {fila.imprimibles.map((p) =>
                       celda("imprimible", p.parada, p.archivo, p.etiqueta),
                     )}
-                    {fila.imprimibleCompleto !== null && (
-                      <div
-                        style={{
-                          marginTop: "0.5rem",
-                          paddingTop: "0.5rem",
-                          borderTop: "1px dashed #e3e7f0",
-                        }}
-                      >
-                        <div style={{ fontSize: "0.75rem", color: "#b26a00", fontWeight: 700 }}>
-                          PDF del nivel completo (cargado antes de que fuera por unidad). Ya no se
-                          entrega al niño: quítalo cuando subas las unidades.
-                        </div>
-                        {celda("imprimible", null, fila.imprimibleCompleto)}
-                      </div>
-                    )}
+                    <div
+                      style={{
+                        marginTop: "0.5rem",
+                        paddingTop: "0.5rem",
+                        borderTop: "1px dashed #e3e7f0",
+                      }}
+                    >
+                      {celda(
+                        "imprimible",
+                        null,
+                        fila.imprimibleCompleto,
+                        "Nivel completo (se abre con las 4 unidades)",
+                      )}
+                    </div>
                   </td>
                   <td style={{ padding: "0.8rem 0.6rem", verticalAlign: "top" }}>
                     {fila.actividades.map((p) =>
