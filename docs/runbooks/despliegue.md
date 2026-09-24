@@ -5,12 +5,12 @@
 
 ## Qué hay creado
 
-| Pieza             | Nombre                             | Notas                                                       |
-| ----------------- | ---------------------------------- | ----------------------------------------------------------- |
-| App               | `lgskids` (región `nyc`)           | 3 componentes: `web`, `tareas` (worker) y `migrar` (job)      |
-| Base de datos     | `kids2026` en el clúster `lgs-db`  | PostgreSQL 18, nyc3. Usuario propio `kids2026_app`            |
-| Archivos          | Spaces `lgs-kids` (nyc3)           | Llave `lgs-kids-app`, con permiso SOLO sobre ese bucket       |
-| Imagen            | `registry.digitalocean.com/lgskids/web` | Registro DOCR, tier basic                                |
+| Pieza         | Nombre                                  | Notas                                                    |
+| ------------- | --------------------------------------- | -------------------------------------------------------- |
+| App           | `lgskids` (región `nyc`)                | 3 componentes: `web`, `tareas` (worker) y `migrar` (job) |
+| Base de datos | `kids2026` en el clúster `lgs-db`       | PostgreSQL 18, nyc3. Usuario propio `kids2026_app`       |
+| Archivos      | Spaces `lgs-kids` (nyc3)                | Llave `lgs-kids-app`, con permiso SOLO sobre ese bucket  |
+| Imagen        | `registry.digitalocean.com/lgskids/web` | Registro DOCR, tier basic                                |
 
 La base vive DENTRO de un clúster que ya existía: una base nueva no cuesta
 aparte, pero **comparte las ~22 conexiones del clúster** con `defaultdb` e
