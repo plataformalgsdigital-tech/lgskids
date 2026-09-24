@@ -15,6 +15,8 @@ import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 interface Me {
   user: { id: string; username: string; debeCambiarPassword?: boolean } | null;
   permisos: { code: string }[];
+  /** El ROL importa por sí mismo para lo que no cuelga de un permiso. */
+  roles?: { roleCode: string }[];
 }
 
 // El orden y el permiso PADRE de cada sección los define el módulo access
@@ -39,6 +41,12 @@ const MENU: {
   color: string;
   href?: string;
   pronto?: boolean;
+  /**
+   * Solo para el ROL superadmin, no para un permiso. Lo usa la base de datos,
+   * que abre TODAS las tablas: si colgara de una casilla marcable, cualquiera
+   * con `roles.asignar` podría dársela a sí mismo.
+   */
+  soloSuperadmin?: boolean;
 }[] = [
   // ── Tablero: pantalla de entrada, encima de todo ──────────
   {
@@ -140,6 +148,15 @@ const MENU: {
     color: "var(--lgs-amarillo)",
     href: "/panel/aviso-login",
     permisoMenu: "menu.aviso_login",
+  },
+  {
+    seccion: "Administración",
+    // `permiso` queda como red: quien la ve es superadmin, que los tiene todos.
+    permiso: "auditoria.ver",
+    etiqueta: "Base de datos",
+    color: "var(--lgs-rosa)",
+    href: "/panel/base-datos",
+    soloSuperadmin: true,
   },
   // ── Guía (restringido a sus salones/sesiones/niños) ────────
   {
@@ -272,10 +289,14 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const permisos = new Set(me.permisos.map((p) => p.code));
   // Dos condiciones: el permiso FUNCIONAL (si no, la pantalla daría 403) y el
   // de VISIBILIDAD del menú. Así se puede ocultar un ítem sin quitar acceso.
+  const esSuperadmin = (me.roles ?? []).some((r) => r.roleCode === "superadmin");
   const opciones = MENU.filter(
     (item) =>
       permisos.has(item.permiso) &&
-      (item.permisoMenu === undefined || permisos.has(item.permisoMenu)),
+      (item.permisoMenu === undefined || permisos.has(item.permisoMenu)) &&
+      // Lo de superadmin no se enseña a nadie más: el servidor lo rechazaría
+      // igual, y un ítem que siempre da 403 solo confunde.
+      (item.soloSuperadmin !== true || esSuperadmin),
   );
 
   return (

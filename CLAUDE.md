@@ -1167,6 +1167,47 @@ solo servía para completar la ficha.
   (al alumno le abre "Enviar solicitud de contacto" en vez de la clase). Índice único:
   dos guías no pueden compartir sala.
 
+## Explorador de la base de datos (2026-09-24)
+
+Módulo `dbadmin` + `/panel/base-datos`. Equivale al `/dbmosaico` de MOSAICO
+—mirar y escribir cualquier tabla desde el panel— con cuatro diferencias que
+aquí no son opcionales, porque la base guarda datos de menores y credenciales:
+
+- **Acceso por ROL superadmin**, no por permiso (como la bóveda de claves):
+  esto abre la base entera y no puede colgar de una casilla marcable, o
+  cualquiera con `roles.asignar` se la daría a sí mismo. El ítem del menú
+  también se oculta por rol (`soloSuperadmin` en el layout del panel).
+- **Las credenciales no se leen**: `identity_user.password_hash` y
+  `password_cifrada`, y los `token_hash` de refresh e invitaciones, ni siquiera
+  entran en el `SELECT` — llegan como `•••` y no se pueden editar. Hay además
+  una red por nombre (`/password|token|_hash$|cifrad/`) para la columna que
+  alguien agregue mañana sin actualizar la lista.
+- **Auditoría de cada escritura** (`dbadmin.celda_actualizada|fila_insertada|
+filas_borradas`), y la de celda guarda el **antes y el después**. MOSAICO no
+  audita nada de esto.
+- **Las tablas que alimentan invariantes piden confirmación explícita**
+  (`TABLAS_SENSIBLES`): progresión y premios se re-derivan (regla 4), asistencia
+  e intentos son los disparadores de esa derivación, la matrícula nace tomando
+  cupo (regla 5), y `audit_log`/`_prisma_migrations` no son datos que se
+  "corrijan". No están bloqueadas —el negocio pidió poder escribir— pero la
+  pantalla explica QUÉ se rompe y exige marcar la casilla.
+
+Lo demás: los **identificadores** se validan con regex Y se cotejan contra
+`pg_class`/`information_schema` antes de ir entre comillas (no pueden ir
+parametrizados); los **valores** siempre parametrizados; columnas de filtro u
+orden desconocidas se descartan. La **clave primaria no se edita** (lo que
+apunte a la fila quedaría colgando: se borra y se inserta) y una tabla sin PK
+de una sola columna es de solo lectura, porque un `WHERE` de una columna
+tocaría varias filas. Topes: 200 filas por página, 20.000 en el CSV, 100 por
+borrado (en una transacción). El conteo del listado es la estimación de
+`reltuples`, no un `count(*)` por tabla.
+
+Endpoints: `GET /api/dbadmin/tablas` y
+`GET|PATCH|POST|DELETE /api/dbadmin/tablas/[tabla]` (el GET con `?formato=csv`
+exporta lo filtrado). Pruebas: `dbadmin/tests/tablas.test.ts` (identificadores e
+inyección) y `explorador-integration.test.ts` (el hash no sale ni en el CSV, la
+tabla inventada no llega al SQL, escribir queda auditado con el antes).
+
 ## Aviso de la pantalla de login (2026-08-26)
 
 - Imagen que administración CAMBIA y PRENDE/APAGA sin despliegue (`/panel/aviso-login`,
