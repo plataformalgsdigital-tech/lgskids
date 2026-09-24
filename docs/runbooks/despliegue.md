@@ -105,8 +105,18 @@ Viven cifrados en el spec de la app (`type: SECRET`). Están:
 el registro se agrega con su CLI:
 
 ```bash
-hostinger dns records list lgskidsplataforma.com
-hostinger dns records update lgskidsplataforma.com --zone '<json>' --overwrite false
+hostinger dns records list lgskidsplataforma.com --format json
+hostinger dns records validate lgskidsplataforma.com --zone "$ZONA" --overwrite=false
+hostinger dns records update   lgskidsplataforma.com --zone "$ZONA" --overwrite=false
 ```
 
-El certificado lo emite DigitalOcean (Let's Encrypt) cuando el CNAME resuelve.
+Con `$ZONA` =
+`[{"name":"app","records":[{"content":"<ingress>.","is_disabled":false}],"ttl":300,"type":"CNAME"}]`.
+Dos detalles que cuestan un rato: la bandera es `--overwrite=false` (con `=`, o
+el `false` se toma como argumento suelto) y **`--overwrite=false` es lo correcto
+aquí**, porque `true` borra los registros que coincidan en nombre y tipo. Desde
+PowerShell hay que escapar las comillas del JSON (`$zona -replace '"','\"'`), o
+llega partido y responde "invalid JSON".
+
+El certificado lo emite DigitalOcean (Let's Encrypt) cuando el CNAME resuelve;
+tardó unos minutos. Antes de eso el dominio responde con error de TLS, no 404.
