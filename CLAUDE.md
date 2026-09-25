@@ -183,7 +183,10 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   fuera a propósito: los del cuadernillo llegan a 47 MB y eso es trabajo de un
   CDN, no de una ruta autenticada de Node), 10 MB máx (quien llama puede pasar su
   propia `PoliticaArchivo`: el material del alumno admite HTML y 80 MB),
-  claves impredecibles; adaptador Spaces se enchufa en Fase 11. Reporting:
+  claves impredecibles. **El adaptador de Spaces ya está** (2026-09-24,
+  `infrastructure/spaces-storage.ts`): `getStorage()` lo elige cuando hay
+  credenciales, así que producción guarda ahí y desarrollo/CI siguen en disco.
+  Reporting:
   asistencia por salón/mes con `AT TIME ZONE cl.timezone` EN SQL,
   ocupación de salones, contratos por país (con alcance). UI:
   /panel/reportes. Permisos: reportes.ver, archivos.gestionar/ver.
@@ -778,10 +781,14 @@ cerrado`. Iconos en `src/ui/ZoomAccessButton.tsx`: cámara azul + check verde
   Contenido tomado de letsgospeak.cl/lgs-kids (6–13 años, en vivo, grupos
   1–9, niveles Rookie→Legendary, medallas, guías, LetsGoSpeak). La app vive
   en `/login` y `/panel`; el footer enlaza a `/login`.
+  **Se queda en la raíz de `app.lgskidsplataforma.com`** (decisión del negocio,
+  2026-09-24): se probó redirigir `/` al login y se descartó. Está anotado en
+  `next.config.ts` para que nadie lo "arregle" de nuevo.
 - **Versión estática** en `landing-estatica/index.html`: el MISMO diseño en
   un HTML autocontenido para subir a **Hostinger** (hosting compartido) en
-  lgskidsplataforma.com. La plataforma completa (Node + Postgres) irá a
-  DigitalOcean, previsiblemente en `app.lgskidsplataforma.com`.
+  lgskidsplataforma.com, donde corre la landing pública. La plataforma
+  (Node + Postgres) YA corre en DigitalOcean, en `app.lgskidsplataforma.com`
+  (ver "Fase 11" y `docs/runbooks/despliegue.md`).
 - **Tema WordPress (2026-08-25/26)**: lo que corre HOY en lgskidsplataforma.com es
   `landing-estatica/wp-theme/lgs-kids-landing/` — el mismo diseño como tema, para
   que la landing siga siendo mantenible desde WordPress (textos por el Customizer)
@@ -853,7 +860,8 @@ se toca lo que miden:
 
 ## Estructura
 
-- `src/modules/<m>/` — 14 módulos de negocio; anatomía
+- `src/modules/<m>/` — 16 módulos: 15 de negocio + `dbadmin`, que es
+  herramienta de administración (ver "Explorador de la base de datos"); anatomía
   domain/application/infrastructure/api/ui + `index.ts` (API pública, lo
   ÚNICO importable desde fuera; lo verifica `.dependency-cruiser.cjs`).
 - `src/platform/` — técnico transversal SIN reglas de negocio: config (env
@@ -862,7 +870,9 @@ se toca lo que miden:
   correlation ID).
 - `src/app/` — rutas Next.js delgadas. Health: `/api/health/live` (sin BD) y
   `/api/health/ready` (con BD).
-- `worker/` — tareas programadas (esqueleto).
+- `worker/` — tareas programadas, corriendo en producción como el componente
+  `tareas` de la app: vencimientos de contrato (6 h), recálculo global de
+  progresión (12 h), premios pendientes (15 min) y despacho del outbox (5 min).
 - `docs/adr/` — 9 ADRs vigentes. Léelos antes de decidir arquitectura.
 
 ## Reglas que NO se negocian (resumen; detalle en docs/architecture/overview.md)
