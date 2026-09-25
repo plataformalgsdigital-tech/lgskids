@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eliminarArchivo, listarArchivos } from "@/modules/files";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
@@ -51,7 +52,15 @@ describe.runIf(RUN)("registro abierto de guías (integración)", () => {
   });
 
   afterAll(async () => {
-    for (const id of creados) await execute(`DELETE FROM identity_user WHERE id = $1`, [id]);
+    for (const id of creados) {
+      // La foto PRIMERO: no cuelga de la cuenta por clave foránea, así que
+      // borrar el usuario antes la dejaría huérfana — y eso es justo lo que
+      // vigila `alta-guia-integration`, que corre en paralelo.
+      for (const a of await listarArchivos({ entidad: "scheduling_guia_foto", entidadId: id })) {
+        await eliminarArchivo(a.id);
+      }
+      await execute(`DELETE FROM identity_user WHERE id = $1`, [id]);
+    }
     await execute(`DELETE FROM audit_log WHERE ip = $1`, [IP]);
     // Se deja el interruptor como estaba: es configuración REAL de la instancia.
     await setRegistroAbierto({ actorUserId: ACTOR, ...previo });

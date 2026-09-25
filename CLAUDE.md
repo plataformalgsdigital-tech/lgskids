@@ -837,6 +837,14 @@ pnpm test:arch    # solo límites de módulos (dependency-cruiser)
 docker compose -f infra/docker/docker-compose.yml up -d   # Postgres local
 ```
 
+**Las pruebas de integración corren EN PARALELO** (vitest, un archivo por
+worker) contra la MISMA base. Por eso una prueba no puede afirmar nada sobre un
+total de la tabla —"había N filas, sigue habiendo N"—: otro archivo está
+creando y borrando al mismo tiempo. Costó un CI en rojo intermitente
+(2026-09-24): `alta-guia-integration` contaba todas las fotos de guía y empezó a
+fallar cuando el registro abierto de guías empezó a crear las suyas. La forma
+estable es mirar SOLO lo propio (un nombre o un id único de esa prueba).
+
 **Lo que `verify` NO cubre de CI** (2026-09-16, costó un push en rojo). Hasta esa
 fecha `verify` tampoco corría `format:check` ni `audit`; se sumaron. Quedan fuera
 dos pasos que no caben en un script local, y hay que comprobarlos a mano cuando

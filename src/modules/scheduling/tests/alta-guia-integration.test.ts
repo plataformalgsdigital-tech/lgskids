@@ -24,9 +24,21 @@ const PNG = Buffer.from(
 const foto = () => ({ nombreOriginal: "foto.png", mime: "image/png", bytes: PNG });
 const sala = () => `https://zoom.us/j/9${String(randomInt(100_000_000, 999_999_999))}`;
 
-async function fotosDeGuia(): Promise<number> {
+/**
+ * ¿Quedó en `files` una foto con ESTE nombre?
+ *
+ * Antes se contaban todas las fotos de guía de la tabla y se comparaba el
+ * total antes/después. Eso se volvió inestable en cuanto otros archivos de
+ * pruebas empezaron a crear y borrar guías con foto en paralelo —vitest corre
+ * los archivos a la vez—: el total cambiaba por razones ajenas y CI falló con
+ * "expected 2 to be 1". Mirar el nombre ÚNICO de la foto de esta prueba mide
+ * el mismo invariante ("el alta fallida soltó su foto") sin depender de lo que
+ * hagan los demás.
+ */
+async function fotosConNombre(nombre: string): Promise<number> {
   const fila = await queryOne<{ n: number }>(
-    `SELECT count(*)::int AS n FROM files_object WHERE entidad = 'scheduling_guia_foto'`,
+    `SELECT count(*)::int AS n FROM files_object WHERE nombre_original = $1`,
+    [nombre],
   );
   return fila?.n ?? 0;
 }
@@ -98,13 +110,14 @@ describe.runIf(RUN)("alta del guía (integración)", () => {
   });
 
   it("si la ficha falla (sala de Zoom ajena) no queda cuenta ni foto sueltas", async () => {
-    const antes = await fotosDeGuia();
     const email = `otro-${marca}@prueba.lgs`;
+    // Nombre único: así se puede comprobar que se soltó ESTA foto y no otra.
+    const nombreFoto = `fallida-${marca}.png`;
     await expect(
       crearGuia({
         actorUserId: ACTOR,
         datos: { nombres: "Otro", apellidos: "Guía", email, docNumero: "9", zoomUrl: zoom },
-        foto: foto(),
+        foto: { ...foto(), nombreOriginal: nombreFoto },
       }),
     ).rejects.toBeInstanceOf(ConflictError);
     const cuenta = await queryOne<{ n: number }>(
@@ -112,7 +125,7 @@ describe.runIf(RUN)("alta del guía (integración)", () => {
       [email],
     );
     expect(cuenta?.n).toBe(0);
-    expect(await fotosDeGuia()).toBe(antes);
+    expect(await fotosConNombre(nombreFoto)).toBe(0);
   });
 
   it("COMPLETO exige foto y documento; CON ENLACE basta nombre, apellido y correo", async () => {
