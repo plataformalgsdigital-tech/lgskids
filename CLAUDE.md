@@ -1250,7 +1250,8 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
   **Ramas (2026-09-21)**: se trabaja en `main`. `feature/bootstrap-platform` está
   sincronizada con su remota y TODO su contenido ya está en `main`: se puede borrar.
   **PRs de Dependabot abiertos, SIN mezclar a propósito** — cada uno pide revisión:
-  - #10 "dependencias-menores": CI verde, pero sube Next 16.3.5, React 19.3, Zod 4.6,
+  - **#11** "dependencias-menores" (era el #10; Dependabot lo rehízo al empujar a
+    `main`, así que el número cambia): sube Next 16.3.5, React 19.3, Zod 4.6,
     Prisma 7.10 y más. Probar con `verify` completo antes de mezclar.
   - #5 TypeScript 5.9.3 → 6.0.3: CI verde, pero ver la advertencia de Versiones (TS 7
     rompe Next/ESLint/depcruise); confirmar a mano antes de subir de versión mayor.
