@@ -952,7 +952,38 @@ Entrada desde LGS/MOSAICO: un beneficiario niño se registra en KIDS contra una
 campaña abierta + curso (por edad) + salón con cupo, reteniendo el cupo como
 matrícula `RESERVADA` hasta aprobar (el alta única activa RESERVADA→ACTIVA).
 `contracts_contract.external_ref` (N° LGS, idempotente) + `firmado`. Núcleo
-único `crearReservaBeneficiario`. Dos puertas al mismo núcleo: el **wizard**
+único `crearReservaBeneficiario`.
+
+**Verificado contra producción el 2026-09-26, y aparecieron dos fallas que
+nadie habría visto hasta tener niños reales inscribiéndose:**
+
+- **El N° de LGS trae el DOCUMENTO del niño al final** (`02-16016-26#1012345678`).
+  KIDS exigía `PP-NNNNN-YY` exacto y rechazaba TODA reserva con 400. El sufijo
+  es necesario: un contrato de LGS puede llevar varios hermanos y en KIDS cada
+  niño es su propio contrato. Ahora `parseExternalRef` devuelve `base` y
+  `sufijo` (acotado a 30, alfanumérico con `. _ -`), y el país se sigue
+  comprobando sobre el prefijo. El buscador usa `ILIKE`, así que buscar
+  `02-16016-26` encuentra a los dos hermanos.
+- **La idempotencia no existía**: reenviar la misma reserva daba 409, aunque el
+  código y este archivo la prometían. La llamada de LGS es best-effort dentro
+  de un `try/catch`, así que ante el conflicto guarda `errorKids`, NO marca
+  `enviadoAKids` y su paso de aprobación —que solo mira los enviados— nunca
+  corre: el niño se queda RESERVADO, con el cupo tomado y sin cuenta. Pasa cada
+  vez que la respuesta se pierde después de que KIDS ya creó la reserva. Ahora
+  el reenvío devuelve la reserva existente (`reservaYaHecha`); con OTRO niño en
+  la misma referencia sigue siendo 409, y si la matrícula fue cancelada también
+  (hay que mirarlo en el panel antes de reenviar). Probado en
+  `contracts/tests/reserva-lgs-integration.test.ts`.
+
+**Estado de la conexión (2026-09-26)**: la app de LGS en producción
+(`lgs-plataforma.com`) YA tiene `KIDS_API_URL` y `KIDS_INTAKE_API_KEY` (esta
+como secreto). Su cliente es `src/lib/kids-intake.ts` y dispara en dos puntos:
+al CREAR el contrato (una reserva por beneficiario marcado como kids, con el
+salón elegido) y al APROBAR al beneficiario (ahí pide `approve` y guarda
+usuario y clave del niño en `KIDS_INSCRIPCIONES`). Falta lo operativo: cargar
+en KIDS la campaña real con sus salones y encender el interruptor
+`kids_feature_activo` de LGS (hoy en `false`; encenderlo antes de tener
+campañas le mostraría a los comerciales un selector vacío). Dos puertas al mismo núcleo: el **wizard**
 `/panel/reservas` (JWT) y la **puerta de servicio** módulo `intake`
 (API-key `x-api-key` / `LGS_INTAKE_API_KEY`, `handlerWithServiceAuth`):
 `GET /api/kids-intake/availability`, `POST /api/kids-intake/reservations`,
@@ -1244,11 +1275,13 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
-- **Entregar a LGS la clave del intake**: KIDS ya es público
-  (`https://app.lgskidsplataforma.com`) y tiene su `LGS_INTAKE_API_KEY` puesta,
-  pero del otro lado hay que provisionar la MISMA clave para que
-  `/api/kids-intake/*` deje de responder 401. La clave está en el spec de la app
-  (cifrada): si se perdió, se rota y se cambia en los dos sistemas.
+- **Encender la integración con LGS cuando haya campaña**: la conexión ya está
+  hecha por los dos lados (2026-09-26) y el flujo completo se probó contra
+  producción —disponibilidad, reserva, aprobar y el niño entrando a su panel—.
+  Faltan dos cosas OPERATIVAS, en este orden: cargar en KIDS el catálogo de
+  horarios y la campaña real con sus salones, y solo entonces poner
+  `kids_feature_activo = true` en LGS. Al revés, el comercial ve la opción Kids
+  con un selector vacío.
 - Procedimiento operativo para cuando el desfase CL–CO sea de 2 h (verano
   austral): el negocio lo definirá más adelante.
 - Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. **CI activo**
