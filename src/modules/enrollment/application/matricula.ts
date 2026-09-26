@@ -190,5 +190,5 @@ export async function matriculaDeNino(childPersonId: string): Promise<MatriculaA
   return matriculaActualDeNino(childPersonId);
 }
 
-export { findActivaByContract };
+export { findActivaByContract, findMatriculaVivaByContract };
 export type { MatriculaActual };

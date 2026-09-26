@@ -3,6 +3,7 @@ import { registrarAuditoria } from "@/modules/audit";
 import {
   activarReservaDeContratoTx,
   cancelarMatriculaDeContratoTx,
+  findMatriculaVivaByContract,
   matricularTx,
 } from "@/modules/enrollment";
 import {
@@ -116,6 +117,44 @@ async function exigirDocLibre(p: PersonInput): Promise<void> {
 }
 
 /**
+ * La reserva YA existía: se devuelve tal cual en vez de fallar.
+ *
+ * Esto es lo que hace la puerta IDEMPOTENTE, y no es un adorno: LGS manda la
+ * reserva al crear el contrato y, si la respuesta se pierde (un corte, un
+ * tiempo de espera), reintenta. Con un 409 ahí, LGS guardaba `errorKids`, no
+ * anotaba `enviadoAKids` y su paso de aprobación —que solo mira los enviados—
+ * nunca corría: el niño quedaba RESERVADO en KIDS, ocupando cupo, y sin cuenta
+ * jamás. Devolviéndole los ids, el reintento se arregla solo.
+ *
+ * Se comprueba que sea EL MISMO niño: la misma referencia con otro documento
+ * no es un reintento, es un error de quien llama, y ahí sí conviene el 409.
+ */
+async function reservaYaHecha(
+  contrato: { id: string; beneficiarioId: string },
+  externalRef: string,
+  nino: PersonInput,
+): Promise<{ contractId: string; externalRef: string; enrollmentId: string }> {
+  const existente = await findPersonByDoc(
+    nino.countryCode,
+    nino.docTipo.trim().toUpperCase(),
+    nino.docNumero.trim(),
+  );
+  if (existente === null || existente.id !== contrato.beneficiarioId) {
+    throw new ConflictError(
+      `El contrato LGS ${externalRef} ya está reservado para otro niño. Revisa el número: cada niño lleva el suyo (contrato#documento).`,
+    );
+  }
+  const matricula = await findMatriculaVivaByContract(contrato.id);
+  if (matricula === null) {
+    throw new ConflictError(
+      `El contrato LGS ${externalRef} ya existe pero su matrícula fue cancelada: revísalo en el panel antes de volver a enviarlo.`,
+    );
+  }
+  logger.info("Reserva LGS repetida: se devuelve la existente", { externalRef });
+  return { contractId: contrato.id, externalRef, enrollmentId: matricula.id };
+}
+
+/**
  * RESERVA DE BENEFICIARIO DESDE LGS (ADR-0010): crea, en UNA transacción,
  * titular + apoderado + niño (con guardianship) + contrato PENDIENTE (firmado,
  * con external_ref del contrato LGS) + matrícula RESERVADA en el salón elegido
@@ -150,7 +189,7 @@ export async function crearReservaBeneficiario(input: {
 
   const yaExiste = await findContractByExternalRef(input.externalRef);
   if (yaExiste !== null) {
-    throw new ConflictError(`Ya existe una reserva para el contrato LGS ${input.externalRef}.`);
+    return reservaYaHecha(yaExiste, input.externalRef, input.nino);
   }
   await exigirDocLibre(input.titular);
   if (input.apoderadoNuevo !== undefined) await exigirDocLibre(input.apoderadoNuevo);

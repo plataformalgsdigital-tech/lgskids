@@ -17,6 +17,7 @@ export {
   historialDeNino,
   matriculaDeNino,
   findActivaByContract,
+  findMatriculaVivaByContract,
 } from "./application/matricula";
 export type { MatriculaActual } from "./application/matricula";
 export { matricularHandler, rosterHandler, cambioAcademicoHandler } from "./api/handlers";
