@@ -4,9 +4,11 @@ import { closePool } from "@/platform/db/pool";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
 import {
+  agenda,
   cambiarGuia,
   cambiarGuiaDeSesion,
   crearSalon,
+  listarSalones,
   obtenerDetalleSesion,
 } from "../application/gestion-salones";
 
@@ -115,6 +117,19 @@ describe.runIf(RUN)("cambio de guía (integración)", () => {
     const detalle = await obtenerDetalleSesion(primera?.id ?? "");
     expect(detalle.guia?.nombre).toBe("Ana Titular");
     expect(detalle.guia?.soloEstaSesion).toBe(false);
+  });
+
+  it("el calendario y la lista de salones también, con su campaña", async () => {
+    // Mismas tres consultas, mismo defecto: se leía el nombre de `people_person`.
+    const dia = await agenda({ desde: "2026-08-03", hasta: "2026-11-30", campaignId });
+    expect(dia.length).toBeGreaterThan(0);
+    for (const s of dia) {
+      expect(s.guia).toBe("Ana Titular");
+      expect(s.campania).toContain("IT Guia");
+    }
+
+    const salones = (await listarSalones(courseId)).filter((s) => s.id === classroomId);
+    expect(salones[0]?.guia).toBe("Ana Titular");
   });
 
   it("cambiar el guía en la SESIÓN no toca el salón ni las demás sesiones", async () => {

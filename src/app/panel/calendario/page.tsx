@@ -504,6 +504,20 @@ function CalendarioSalones() {
                       }}
                     >
                       <span>
+                        {/* La CAMPAÑA primero: el mismo "Salón 01" existe en
+                            todas, así que sin ella la fila no dice a cuál va. */}
+                        <span
+                          style={{
+                            background: "#eef2ff",
+                            color: "#3730a3",
+                            padding: "0.1rem 0.45rem",
+                            borderRadius: "0.5rem",
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {s.campania}
+                        </span>{" "}
                         <strong>{s.horaLocal}</strong>{" "}
                         <span
                           style={{

@@ -4,6 +4,36 @@ import { newId } from "@/platform/ids";
 
 type Queryable = Pick<PoolClient, "query">;
 
+/**
+ * Nombre COMPLETO del guía. `identity_user` solo guarda el acceso: la ficha del
+ * guía vive en `scheduling_guia`, la del staff en `identity_perfil` y la del
+ * alumno en `people_person`. Esto miraba SOLO `people_person` —vacía para un
+ * guía—, así que el calendario mostraba el usuario (`vespinosa7913`).
+ * Requiere los alias `gu` (cuenta), `gg`, `gpf` y `gp` de `JOIN_NOMBRE_GUIA`.
+ */
+const NOMBRE_GUIA = `COALESCE(
+        NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+        NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
+        NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
+        gu.username)`;
+
+/** Joins de las tres fichas donde puede estar el nombre de `gu`. */
+const JOIN_NOMBRE_GUIA = `LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
+       LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
+       LEFT JOIN people_person gp ON gp.user_id = gu.id`;
+
+/** Columnas de las fichas, para el GROUP BY de una consulta agregada. */
+const GROUP_NOMBRE_GUIA = `gu.username, gg.nombres, gg.apellidos,
+               gpf.nombres, gpf.apellidos, gp.nombres, gp.apellidos`;
+
+/**
+ * Guía EFECTIVO de una sesión: el suyo propio si lo tiene, si no el del salón.
+ * `scheduling_session.guia_user_id` es a la vez el histórico (lo fija cerrar la
+ * sesión) y el reemplazo de un día, y en las dos lecturas manda sobre el del
+ * salón. Mismo COALESCE que usa la estadística mensual del guía.
+ */
+const GUIA_EFECTIVO = `COALESCE(s.guia_user_id, cl.guia_user_id)`;
+
 // ============================================================
 // Catálogo de horarios (mantenimiento centralizado por tipo de curso)
 // ============================================================
@@ -432,7 +462,7 @@ export async function listClassrooms(
             cl.timezone, cl.holiday_country AS "holidayCountry", cl.activo,
             cu.tipo::text AS curso, ca.nombre AS campania,
             ca.inicio::text AS "campaniaInicio",
-            COALESCE(NULLIF(TRIM(gp.nombres || ' ' || gp.apellidos), ''), gu.username) AS guia,
+            ${NOMBRE_GUIA} AS guia,
             (SELECT json_agg(json_build_object(
                        'tipo', sl.tipo, 'diaSemana', sl.dia_semana,
                        'horaLocal', sl.hora_local, 'duracionMin', sl.duracion_min)
@@ -447,10 +477,10 @@ export async function listClassrooms(
        JOIN catalog_course cu ON cu.id = cl.course_id
        JOIN catalog_campaign ca ON ca.id = cu.campaign_id
        LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
-       LEFT JOIN people_person gp ON gp.user_id = gu.id
+       ${JOIN_NOMBRE_GUIA}
        LEFT JOIN scheduling_session s ON s.classroom_id = cl.id
       ${where}
-      GROUP BY cl.id, cu.tipo, ca.nombre, ca.inicio, gu.username, gp.nombres, gp.apellidos
+      GROUP BY cl.id, cu.tipo, ca.nombre, ca.inicio, ${GROUP_NOMBRE_GUIA}
       -- Campaña más RECIENTE primero: por fecha de inicio, no por nombre
       -- (alfabéticamente "AGOSTO" iría antes que "SEPTIEMBRE" sin significar nada).
       ORDER BY ca.inicio DESC, ca.nombre, cu.tipo, cl.nombre`,
@@ -499,15 +529,16 @@ export async function agendaSesiones(
             s.tipo::text AS tipo, s.numero,
             cl.id AS "classroomId", cl.nombre AS salon, cl.cupo,
             cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
-            COALESCE(NULLIF(TRIM(gp.nombres || ' ' || gp.apellidos), ''), gu.username) AS guia,
+            ${NOMBRE_GUIA} AS guia,
             (SELECT count(*) FROM enrollment_enrollment e
               WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA'))::int AS ocupados
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course cu ON cu.id = cl.course_id
        JOIN catalog_campaign ca ON ca.id = cu.campaign_id
-       LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
-       LEFT JOIN people_person gp ON gp.user_id = gu.id
+       -- El EFECTIVO: si ese día lo cubre un reemplazo, es el que va en la agenda.
+       LEFT JOIN identity_user gu ON gu.id = ${GUIA_EFECTIVO}
+       ${JOIN_NOMBRE_GUIA}
       WHERE s.fecha BETWEEN $1::date AND $2::date ${extra}
       ORDER BY s.starts_at, cl.nombre`,
     values,
@@ -564,32 +595,6 @@ export interface SesionDetalle {
   curso: { id: string; tipo: string; campania: string };
   guia: { userId: string; nombre: string; pais: string; soloEstaSesion: boolean } | null;
 }
-
-/**
- * Nombre COMPLETO del guía. `identity_user` solo guarda el acceso: la ficha del
- * guía vive en `scheduling_guia`, la del staff en `identity_perfil` y la del
- * alumno en `people_person`. Esto miraba SOLO `people_person` —vacía para un
- * guía—, así que el panel de la sesión mostraba el usuario (`vespinosa7913`).
- * Requiere los alias `gu` (cuenta), `gg`, `gpf` y `gp` de `JOIN_NOMBRE_GUIA`.
- */
-const NOMBRE_GUIA = `COALESCE(
-        NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
-        NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
-        NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
-        gu.username)`;
-
-/** Joins de las tres fichas donde puede estar el nombre de `gu`. */
-const JOIN_NOMBRE_GUIA = `LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
-       LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
-       LEFT JOIN people_person gp ON gp.user_id = gu.id`;
-
-/**
- * Guía EFECTIVO de una sesión: el suyo propio si lo tiene, si no el del salón.
- * `scheduling_session.guia_user_id` es a la vez el histórico (lo fija cerrar la
- * sesión) y el cambio puntual de un día, y en las dos lecturas manda sobre el
- * del salón. Mismo COALESCE que usa la estadística mensual del guía.
- */
-const GUIA_EFECTIVO = `COALESCE(s.guia_user_id, cl.guia_user_id)`;
 
 /** Detalle de una sesión con su salón, curso y guía (para el resumen del evento). */
 export async function detalleSesion(sessionId: string): Promise<SesionDetalle | null> {
