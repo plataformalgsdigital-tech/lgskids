@@ -49,6 +49,96 @@ const boton: CSSProperties = {
   cursor: "pointer",
 };
 
+const plural = (n: number, una: string, varias: string) => `${String(n)} ${n === 1 ? una : varias}`;
+
+const nombreDeGuia = (guias: Guia[], id: string | null): string => {
+  if (id === null) return "sin guía";
+  const g = guias.find((x) => x.id === id);
+  return g === undefined ? "otro guía" : (g.nombre ?? g.username);
+};
+
+/**
+ * Cambiar el guía del salón no es guardar un campo: reasigna todas las clases
+ * que faltan. Se dice qué pasa con las dictadas ANTES de aceptar, porque desde
+ * la pantalla no se ve y no hay forma de deshacerlo con un botón.
+ */
+function ConfirmarCambioDeGuia(props: {
+  salon: string;
+  guiaAnterior: string;
+  guiaNuevo: string;
+  futuras: number;
+  dictadas: number;
+  ocupado: boolean;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-cambio-guia"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1rem",
+        zIndex: 50,
+      }}
+      onClick={props.onCancelar}
+    >
+      <div
+        style={{
+          background: "white",
+          borderRadius: "0.9rem",
+          padding: "1.25rem 1.4rem",
+          maxWidth: "31rem",
+          width: "100%",
+          boxShadow: "0 18px 45px rgba(15, 23, 42, 0.25)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="titulo-cambio-guia" style={{ fontSize: "1.1rem", margin: 0 }}>
+          ⚠ Cambiar el guía de {props.salon}
+        </h2>
+        <p style={{ fontSize: "0.9rem", marginTop: "0.6rem" }}>
+          <strong>{props.guiaAnterior}</strong> → <strong>{props.guiaNuevo}</strong>
+        </p>
+        <ul style={{ fontSize: "0.88rem", paddingLeft: "1.1rem", lineHeight: 1.55 }}>
+          <li>
+            Pasan al guía nuevo <strong>{plural(props.futuras, "sesión", "sesiones")}</strong>, de
+            hoy en adelante — incluidas las que tuvieran un reemplazo puesto para ese día.
+          </li>
+          <li>
+            <strong>{plural(props.dictadas, "sesión ya dictada", "sesiones ya dictadas")}</strong>{" "}
+            no se toca: el histórico conserva a {props.guiaAnterior}.
+          </li>
+          <li>El enlace de Zoom de las clases es el del guía asignado.</li>
+        </ul>
+        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+          <button style={boton} onClick={props.onCancelar} disabled={props.ocupado}>
+            Cancelar
+          </button>
+          <button
+            style={{
+              ...boton,
+              borderColor: "var(--lgs-verde)",
+              background: "var(--lgs-verde)",
+              color: "#1b2a10",
+            }}
+            onClick={props.onConfirmar}
+            disabled={props.ocupado}
+          >
+            Sí, cambiar el guía
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface RosterItem {
   enrollmentId: string;
   childPersonId: string;
@@ -69,6 +159,17 @@ export default function DetalleSalonPage() {
   // Edición del salón
   const [cupoEdit, setCupoEdit] = useState("");
   const [guiaEdit, setGuiaEdit] = useState("");
+  /**
+   * Cambio de guía pendiente de confirmar (null = no hay nada que confirmar).
+   * Lleva el conteo de sesiones tal como estaba AL PULSAR: contarlas durante el
+   * render obligaría a mirar el reloj, que no es puro.
+   */
+  const [confirmarGuia, setConfirmarGuia] = useState<{
+    cupo: number;
+    guiaUserId: string | null;
+    futuras: number;
+    dictadas: number;
+  } | null>(null);
   // Edición de fechas de campaña (afectan a todos sus salones)
   const [finEdit, setFinEdit] = useState("");
   const [cierreEdit, setCierreEdit] = useState("");
@@ -120,12 +221,22 @@ export default function DetalleSalonPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      const data: { error?: { message: string } } = await res.json();
+      const data: {
+        pasadasCongeladas?: number;
+        futurasAsignadas?: number;
+        error?: { message: string };
+      } = await res.json();
       if (!res.ok) {
         setError(data.error?.message ?? "No se pudo guardar el salón.");
         return;
       }
-      setAviso("Salón actualizado.");
+      const futuras = data.futurasAsignadas ?? 0;
+      const pasadas = data.pasadasCongeladas ?? 0;
+      setAviso(
+        patch.guiaUserId !== undefined && (futuras > 0 || pasadas > 0)
+          ? `Salón actualizado. El guía nuevo toma ${plural(futuras, "sesión", "sesiones")} desde hoy; ${plural(pasadas, "sesión ya dictada conserva", "sesiones ya dictadas conservan")} su guía.`
+          : "Salón actualizado.",
+      );
       await cargar();
     } catch {
       setError("Error de conexión.");
@@ -325,13 +436,47 @@ export default function DetalleSalonPage() {
             color: "#1b2a10",
           }}
           disabled={ocupado}
-          onClick={() =>
-            void guardarSalon({ cupo: Number(cupoEdit), guiaUserId: guiaEdit || null })
-          }
+          onClick={() => {
+            const guiaUserId = guiaEdit === "" ? null : guiaEdit;
+            const cupo = Number(cupoEdit);
+            if (guiaUserId === detalle.salon.guiaUserId) {
+              void guardarSalon({ cupo, guiaUserId });
+              return;
+            }
+            // Cambiar el guía mueve TODAS las sesiones que faltan: se confirma.
+            // El corte es el INSTANTE, no la fecha: el salón puede estar en otra zona.
+            const ahora = Date.now();
+            const futuras = detalle.sesiones.filter(
+              (s) => new Date(s.startsAt).getTime() >= ahora,
+            ).length;
+            setConfirmarGuia({
+              cupo,
+              guiaUserId,
+              futuras,
+              dictadas: detalle.sesiones.length - futuras,
+            });
+          }}
         >
           Guardar salón
         </button>
       </section>
+
+      {confirmarGuia !== null && (
+        <ConfirmarCambioDeGuia
+          salon={detalle.salon.nombre}
+          guiaAnterior={nombreDeGuia(guias, detalle.salon.guiaUserId)}
+          guiaNuevo={nombreDeGuia(guias, confirmarGuia.guiaUserId)}
+          futuras={confirmarGuia.futuras}
+          dictadas={confirmarGuia.dictadas}
+          ocupado={ocupado}
+          onCancelar={() => setConfirmarGuia(null)}
+          onConfirmar={() => {
+            const { cupo, guiaUserId } = confirmarGuia;
+            setConfirmarGuia(null);
+            void guardarSalon({ cupo, guiaUserId });
+          }}
+        />
+      )}
 
       {/* Fechas de la campaña (compartidas por todos sus salones) */}
       {detalle.campania !== null && (

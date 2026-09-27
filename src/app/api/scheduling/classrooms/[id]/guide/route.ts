@@ -1,6 +1,7 @@
 import { bootstrapIdentity } from "@/modules/identity";
-import { cambiarGuiaHandler } from "@/modules/scheduling";
+import { alcanceCambioGuiaHandler, cambiarGuiaHandler } from "@/modules/scheduling";
 
 bootstrapIdentity();
 
+export const GET = alcanceCambioGuiaHandler;
 export const POST = cambiarGuiaHandler;

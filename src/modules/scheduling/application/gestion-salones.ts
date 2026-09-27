@@ -9,6 +9,8 @@ import {
   agendaSesiones,
   classroomExisteNombre,
   classroomTieneMatriculas,
+  congelarGuiaSesionesPasadas,
+  contarSesionesFuturas,
   coursesDeCampania,
   deleteClassroom,
   deleteSessions,
@@ -28,8 +30,10 @@ import {
   listClassrooms,
   ninosDeGuia,
   sessionExisteEnFecha,
+  soltarGuiaSesionesFuturas,
   updateClassroom,
   updateGuiaSalon,
+  updateGuiaSesion,
   upsertHolidays,
   type AgendaItem,
   type ClassroomListItem,
@@ -321,24 +325,103 @@ export async function obtenerDetalleSesion(sessionId: string): Promise<SesionDet
   return detalle;
 }
 
+/** Qué movió un cambio de guía del salón. */
+export interface CambioDeGuia {
+  /** Sesiones ya empezadas a las que se les fijó el guía saliente. */
+  pasadasCongeladas: number;
+  /** Sesiones de hoy en adelante que pasan al guía nuevo. */
+  futurasAsignadas: number;
+  /** De esas, las que tenían guía propio de un día y se soltaron. */
+  futurasSoltadas: number;
+}
+
+/**
+ * EL ÚNICO lugar donde cambia el guía de un salón, para que el wizard y el
+ * calendario no puedan divergir. El cambio mira ADELANTE:
+ *
+ *  - las sesiones YA EMPEZADAS conservan a quien las dictó: se les escribe el
+ *    guía saliente antes de tocar el salón (antes lo heredaban, así que el
+ *    cambio les reescribía el pasado);
+ *  - las FUTURAS pasan al guía nuevo, incluidas las que tuvieran un guía
+ *    puesto para ese día suelto: se sueltan para que vuelvan a heredar.
+ *
+ * Va todo en una transacción: congelar el pasado sin cambiar el salón dejaría
+ * el histórico escrito con un cambio que no ocurrió.
+ */
+async function aplicarGuiaDeSalon(
+  client: Queryable,
+  classroomId: string,
+  guiaSaliente: string | null,
+  guiaNuevo: string | null,
+): Promise<CambioDeGuia> {
+  const pasadasCongeladas =
+    guiaSaliente === null
+      ? 0
+      : await congelarGuiaSesionesPasadas(classroomId, guiaSaliente, client);
+  await updateGuiaSalon(classroomId, guiaNuevo, client);
+  const futurasSoltadas = await soltarGuiaSesionesFuturas(classroomId, client);
+  const futurasAsignadas = await contarSesionesFuturas(classroomId, client);
+  return { pasadasCongeladas, futurasAsignadas, futurasSoltadas };
+}
+
 /** Cambia el guía de un salón (null = quitar). Auditado; no toca el horario. */
 export async function cambiarGuia(input: {
   actorUserId: string;
   classroomId: string;
   guiaUserId: string | null;
   ip?: string | null;
-}): Promise<void> {
+}): Promise<CambioDeGuia> {
   const classroom = await findClassroomById(input.classroomId);
   if (classroom === null) throw new NotFoundError("El salón no existe.");
-  await updateGuiaSalon(input.classroomId, input.guiaUserId);
+  const cambio = await withTransaction((client) =>
+    aplicarGuiaDeSalon(client, input.classroomId, classroom.guiaUserId, input.guiaUserId),
+  );
   await registrarAuditoria({
     actorUserId: input.actorUserId,
     accion: "scheduling.guia_cambiado",
     entidad: "scheduling_classroom",
     entidadId: input.classroomId,
-    payload: { guiaAnterior: classroom.guiaUserId, guiaNuevo: input.guiaUserId },
+    payload: { guiaAnterior: classroom.guiaUserId, guiaNuevo: input.guiaUserId, ...cambio },
     ip: input.ip ?? null,
   });
+  return cambio;
+}
+
+/**
+ * Cambia el guía de UNA sesión (null = vuelve a heredar el del salón). Es el
+ * reemplazo de un día —el guía titular no puede— y por eso NO toca el salón ni
+ * las demás sesiones. Se guarda en `scheduling_session.guia_user_id`, la misma
+ * columna que fija el cierre, así que la estadística mensual ya lo cuenta.
+ */
+export async function cambiarGuiaDeSesion(input: {
+  actorUserId: string;
+  sessionId: string;
+  guiaUserId: string | null;
+  ip?: string | null;
+}): Promise<{ guia: SesionDetalle["guia"] }> {
+  const antes = await detalleSesion(input.sessionId);
+  if (antes === null) throw new NotFoundError("La sesión no existe.");
+  await updateGuiaSesion(input.sessionId, input.guiaUserId);
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.guia_sesion_cambiado",
+    entidad: "scheduling_session",
+    entidadId: input.sessionId,
+    payload: {
+      classroomId: antes.salon.id,
+      fecha: antes.sesion.fecha,
+      guiaAnterior: antes.guia?.userId ?? null,
+      guiaNuevo: input.guiaUserId,
+    },
+    ip: input.ip ?? null,
+  });
+  const despues = await detalleSesion(input.sessionId);
+  return { guia: despues?.guia ?? null };
+}
+
+/** Sesiones del salón que están por venir: lo que movería un cambio de guía. */
+export async function sesionesFuturasDelSalon(classroomId: string): Promise<number> {
+  return contarSesionesFuturas(classroomId);
 }
 
 export interface DetalleSalon {
@@ -379,7 +462,7 @@ export async function editarSalon(input: {
   guiaUserId?: string | null | undefined;
   activo?: boolean | undefined;
   ip?: string | null;
-}): Promise<void> {
+}): Promise<CambioDeGuia> {
   const salon = await findClassroomById(input.classroomId);
   if (salon === null) throw new NotFoundError("El salón no existe.");
 
@@ -389,17 +472,31 @@ export async function editarSalon(input: {
   }
   const guiaUserId = input.guiaUserId !== undefined ? input.guiaUserId : salon.guiaUserId;
   const activo = input.activo ?? salon.activo;
+  const cambiaGuia = guiaUserId !== salon.guiaUserId;
 
-  await updateClassroom(input.classroomId, { cupo, guiaUserId, activo });
+  // Guardar el salón y reacomodar sus sesiones es UNA operación: si lo segundo
+  // falla, el guía nuevo no puede quedar puesto con el histórico a medias.
+  const cambio = await withTransaction(async (client) => {
+    await updateClassroom(input.classroomId, { cupo, guiaUserId, activo }, client);
+    return cambiaGuia
+      ? await aplicarGuiaDeSalon(client, input.classroomId, salon.guiaUserId, guiaUserId)
+      : { pasadasCongeladas: 0, futurasAsignadas: 0, futurasSoltadas: 0 };
+  });
 
   await registrarAuditoria({
     actorUserId: input.actorUserId,
     accion: "scheduling.salon_editado",
     entidad: "scheduling_classroom",
     entidadId: input.classroomId,
-    payload: { cupo, guiaUserId, activo },
+    payload: {
+      cupo,
+      guiaUserId,
+      activo,
+      ...(cambiaGuia && { guiaAnterior: salon.guiaUserId, ...cambio }),
+    },
     ip: input.ip ?? null,
   });
+  return cambio;
 }
 
 const TZ_POR_GRUPO: Record<string, string> = {

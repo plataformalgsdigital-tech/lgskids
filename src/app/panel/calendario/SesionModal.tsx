@@ -43,7 +43,11 @@ interface Sesion {
   fecha: string;
   startsAt: string;
   numero: number;
+  /** Nombre completo del guía EFECTIVO de esta sesión (el del salón, o su reemplazo). */
   guia: string | null;
+  guiaUserId: string | null;
+  /** El guía es solo de este día, no el del salón. */
+  guiaSoloEstaSesion: boolean;
   meetingUrl: string | null;
   cerradaEn: string | null;
   campania: string | null;
@@ -143,7 +147,7 @@ export function SesionModal({
   const [ficha, setFicha] = useState({ ...FICHA_VACIA });
   const [pidiendoRepeticion, setPidiendoRepeticion] = useState(false);
   // Cambiar guía / suspender: solo coordinación llega hasta aquí.
-  const [guias, setGuias] = useState<{ id: string; username: string }[]>([]);
+  const [guias, setGuias] = useState<{ id: string; nombre: string | null; username: string }[]>([]);
   const [cambiandoGuia, setCambiandoGuia] = useState(false);
   const [nuevoGuia, setNuevoGuia] = useState("");
   // Registrar sesión: hora (sugerida = ahora), nota y confirmación.
@@ -392,20 +396,33 @@ export function SesionModal({
 
   /** Guías disponibles: se piden solo cuando se va a cambiar. */
   async function abrirCambioGuia() {
-    setCambiandoGuia((v) => !v);
+    const abriendo = !cambiandoGuia;
+    setCambiandoGuia(abriendo);
+    if (abriendo) setNuevoGuia(sesion?.guiaUserId ?? "");
     if (guias.length === 0) {
       const res = await apiFetch("/api/identity/guides");
       if (res.ok)
-        setGuias(((await res.json()) as { guias: { id: string; username: string }[] }).guias);
+        setGuias(
+          (
+            (await res.json()) as {
+              guias: { id: string; nombre: string | null; username: string }[];
+            }
+          ).guias,
+        );
     }
   }
 
+  /**
+   * Cambia el guía SOLO de esta sesión. Antes esto llamaba al endpoint del
+   * SALÓN, así que reemplazar al guía de un martes se llevaba el curso entero
+   * —pasado incluido—. El guía del curso se cambia en el detalle del salón.
+   */
   async function cambiarGuia() {
     if (sesion === null) return;
     setOcupado(true);
     setError(null);
     try {
-      const res = await apiFetch(`/api/scheduling/classrooms/${sesion.classroomId}/guide`, {
+      const res = await apiFetch(`/api/scheduling/sessions/${sesion.id}/guia`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ guiaUserId: nuevoGuia === "" ? null : nuevoGuia }),
@@ -415,7 +432,7 @@ export function SesionModal({
         setError(c.error?.message ?? "No se pudo cambiar el guía.");
         return;
       }
-      setAviso("Guía actualizado.");
+      setAviso("Guía de esta sesión actualizado. Las demás sesiones no cambian.");
       setCambiandoGuia(false);
       await cargar();
     } finally {
@@ -621,10 +638,15 @@ export function SesionModal({
 
             <section style={caja}>
               <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>Guía</h3>
-              {/* El NOMBRE siempre se ve; cambiarlo es de coordinación. */}
+              {/* El NOMBRE COMPLETO siempre se ve; cambiarlo es de coordinación. */}
               <p style={{ fontSize: "0.95rem", fontWeight: 700 }}>
                 {sesion?.guia ?? "Sin guía asignado"}
               </p>
+              {sesion?.guiaSoloEstaSesion === true && (
+                <p style={{ fontSize: "0.78rem", color: "#8a6d00", marginTop: "0.15rem" }}>
+                  Reemplazo solo de esta sesión.
+                </p>
+              )}
               {puedeGestionarSalones && (
                 <>
                   <button
@@ -655,10 +677,10 @@ export function SesionModal({
                           border: "1.5px solid #d8dce6",
                         }}
                       >
-                        <option value="">— Sin guía —</option>
+                        <option value="">— El guía del salón —</option>
                         {guias.map((g) => (
                           <option key={g.id} value={g.id}>
-                            {g.username}
+                            {g.nombre ?? g.username}
                           </option>
                         ))}
                       </select>
@@ -670,6 +692,18 @@ export function SesionModal({
                       >
                         Guardar
                       </button>
+                      <p
+                        style={{
+                          width: "100%",
+                          fontSize: "0.78rem",
+                          color: "var(--texto-suave)",
+                          margin: 0,
+                        }}
+                      >
+                        Cambia el guía <strong>solo de esta sesión</strong>: las anteriores y las
+                        siguientes siguen con el guía del salón. Para cambiarlo en el curso, entra
+                        al salón.
+                      </p>
                     </div>
                   )}
                 </>

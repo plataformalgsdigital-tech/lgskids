@@ -4,6 +4,7 @@ import { handlerWithAuth, json } from "@/platform/http/handler";
 import {
   agenda,
   cambiarGuia,
+  cambiarGuiaDeSesion,
   crearSalon,
   detalleSalon,
   editarSalon,
@@ -13,6 +14,7 @@ import {
   misNinosDeGuia,
   obtenerDetalleSesion,
   regenerarSesiones,
+  sesionesFuturasDelSalon,
   suspenderDia,
 } from "../application/gestion-salones";
 import {
@@ -193,19 +195,51 @@ export const misNinosHandler = handlerWithAuth(async (_request, auth) => {
 
 const cambiarGuiaSchema = z.object({ guiaUserId: z.uuid().nullable() });
 
-/** POST /api/scheduling/classrooms/[id]/guide — cambia (o quita) el guía del salón. */
+/**
+ * POST /api/scheduling/classrooms/[id]/guide — cambia (o quita) el guía del
+ * SALÓN: de aquí en adelante. Devuelve cuántas sesiones movió, para que la
+ * pantalla lo diga en vez de dejarlo a la imaginación.
+ */
 export const cambiarGuiaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
   const id = await idFromContext(context);
   const body = cambiarGuiaSchema.parse(await request.json());
-  await cambiarGuia({
+  const cambio = await cambiarGuia({
     actorUserId: auth.userId,
     classroomId: id,
     guiaUserId: body.guiaUserId,
     ip: ip(request),
   });
-  return json({ ok: true });
+  return json({ ok: true, ...cambio });
+});
+
+/** GET /api/scheduling/classrooms/[id]/guide — qué movería el cambio (para la advertencia). */
+export const alcanceCambioGuiaHandler = handlerWithAuth(async (_request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  return json({ sesionesFuturas: await sesionesFuturasDelSalon(id) });
+});
+
+/**
+ * POST /api/scheduling/sessions/[sessionId]/guia — guía de UNA sesión.
+ * El reemplazo de un día: no toca el salón ni las demás sesiones.
+ */
+export const cambiarGuiaSesionHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const params = await context.params;
+  const sessionId = z.uuid().parse(params["sessionId"]);
+  const body = cambiarGuiaSchema.parse(await request.json());
+  return json(
+    await cambiarGuiaDeSesion({
+      actorUserId: auth.userId,
+      sessionId,
+      guiaUserId: body.guiaUserId,
+      ip: ip(request),
+    }),
+  );
 });
 
 const editarSalonSchema = z.object({
@@ -220,8 +254,13 @@ export const editarSalonHandler = handlerWithAuth(async (request, auth, context)
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
   const id = await idFromContext(context);
   const body = editarSalonSchema.parse(await request.json());
-  await editarSalon({ actorUserId: auth.userId, classroomId: id, ...body, ip: ip(request) });
-  return json({ ok: true });
+  const cambio = await editarSalon({
+    actorUserId: auth.userId,
+    classroomId: id,
+    ...body,
+    ip: ip(request),
+  });
+  return json({ ok: true, ...cambio });
 });
 
 /** DELETE /api/scheduling/classrooms/[id] — elimina el salón (si no tiene matrículas). */

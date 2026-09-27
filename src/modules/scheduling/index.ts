@@ -20,8 +20,10 @@ export {
   agenda,
   obtenerDetalleSesion,
   cambiarGuia,
+  cambiarGuiaDeSesion,
+  sesionesFuturasDelSalon,
 } from "./application/gestion-salones";
-export type { SlotInput, DetalleSalon } from "./application/gestion-salones";
+export type { SlotInput, DetalleSalon, CambioDeGuia } from "./application/gestion-salones";
 export {
   crearHorario,
   actualizarHorario,
@@ -51,6 +53,8 @@ export {
   agendaHandler,
   detalleSesionHandler,
   cambiarGuiaHandler,
+  alcanceCambioGuiaHandler,
+  cambiarGuiaSesionHandler,
   listarHorariosHandler,
   crearHorarioHandler,
   actualizarHorarioHandler,

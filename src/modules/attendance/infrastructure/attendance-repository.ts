@@ -13,10 +13,16 @@ export interface SessionInfo {
   fecha: string;
   startsAt: Date;
   numero: number;
-  /** Guía dueño del salón (para el alcance de un guía sobre SUS sesiones). */
+  /**
+   * Guía EFECTIVO de la sesión: el suyo si se lo cambiaron para ese día, si no
+   * el del salón. Es el que decide el alcance del guía sobre la sesión — con el
+   * del salón, un reemplazo de un día no podía ni pasar lista.
+   */
   guiaUserId: string | null;
-  /** Nombre del guía: SIEMPRE visible en el evento, aunque no se pueda cambiar. */
+  /** Nombre COMPLETO del guía: SIEMPRE visible, aunque no se pueda cambiar. */
   guia: string | null;
+  /** El guía es solo de ESTA sesión (reemplazo), no el del salón. */
+  guiaSoloEstaSesion: boolean;
   /** Enlace de la clase (Zoom/meeting) del salón. */
   meetingUrl: string | null;
   /** Registro de la sesión: quién la cerró y cuándo. */
@@ -31,8 +37,18 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
   return queryOne<SessionInfo>(
     `SELECT s.id, s.classroom_id AS "classroomId", cl.course_id AS "courseId",
             cl.nombre AS salon, s.tipo::text AS tipo, s.fecha::text AS fecha,
-            s.starts_at AS "startsAt", s.numero, cl.guia_user_id AS "guiaUserId",
-            g.username AS guia, cl.meeting_url AS "meetingUrl", cl.cupo,
+            s.starts_at AS "startsAt", s.numero,
+            COALESCE(s.guia_user_id, cl.guia_user_id) AS "guiaUserId",
+            -- El nombre NO está en la cuenta: el guía lo tiene en su ficha
+            -- (scheduling_guia) y el staff en identity_perfil. Sin esto el
+            -- panel mostraba el usuario generado (vespinosa7913).
+            COALESCE(
+              NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+              NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
+              g.username) AS guia,
+            (s.guia_user_id IS NOT NULL
+              AND s.guia_user_id IS DISTINCT FROM cl.guia_user_id) AS "guiaSoloEstaSesion",
+            cl.meeting_url AS "meetingUrl", cl.cupo,
             s.cerrada_por AS "cerradaPor", s.cerrada_en::text AS "cerradaEn",
             ca.nombre AS campania, co.tipo::text AS "cursoTipo"
        FROM scheduling_session s
@@ -40,6 +56,8 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
        JOIN catalog_course co ON co.id = cl.course_id
        JOIN catalog_campaign ca ON ca.id = co.campaign_id
        LEFT JOIN identity_user g ON g.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+       LEFT JOIN scheduling_guia gg ON gg.guia_user_id = g.id
+       LEFT JOIN identity_perfil gpf ON gpf.user_id = g.id
       WHERE s.id = $1`,
     [sessionId],
   );

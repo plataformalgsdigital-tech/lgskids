@@ -562,8 +562,34 @@ export interface SesionDetalle {
     meetingUrl: string | null;
   };
   curso: { id: string; tipo: string; campania: string };
-  guia: { userId: string; nombre: string; pais: string } | null;
+  guia: { userId: string; nombre: string; pais: string; soloEstaSesion: boolean } | null;
 }
+
+/**
+ * Nombre COMPLETO del guía. `identity_user` solo guarda el acceso: la ficha del
+ * guía vive en `scheduling_guia`, la del staff en `identity_perfil` y la del
+ * alumno en `people_person`. Esto miraba SOLO `people_person` —vacía para un
+ * guía—, así que el panel de la sesión mostraba el usuario (`vespinosa7913`).
+ * Requiere los alias `gu` (cuenta), `gg`, `gpf` y `gp` de `JOIN_NOMBRE_GUIA`.
+ */
+const NOMBRE_GUIA = `COALESCE(
+        NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+        NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
+        NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
+        gu.username)`;
+
+/** Joins de las tres fichas donde puede estar el nombre de `gu`. */
+const JOIN_NOMBRE_GUIA = `LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
+       LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
+       LEFT JOIN people_person gp ON gp.user_id = gu.id`;
+
+/**
+ * Guía EFECTIVO de una sesión: el suyo propio si lo tiene, si no el del salón.
+ * `scheduling_session.guia_user_id` es a la vez el histórico (lo fija cerrar la
+ * sesión) y el cambio puntual de un día, y en las dos lecturas manda sobre el
+ * del salón. Mismo COALESCE que usa la estadística mensual del guía.
+ */
+const GUIA_EFECTIVO = `COALESCE(s.guia_user_id, cl.guia_user_id)`;
 
 /** Detalle de una sesión con su salón, curso y guía (para el resumen del evento). */
 export async function detalleSesion(sessionId: string): Promise<SesionDetalle | null> {
@@ -585,6 +611,7 @@ export async function detalleSesion(sessionId: string): Promise<SesionDetalle | 
     campania: string;
     guiaUserId: string | null;
     guiaNombre: string | null;
+    guiaSoloEstaSesion: boolean;
   }
   const row = await queryOne<Row>(
     `SELECT s.id AS "sesionId", s.tipo::text AS "sesionTipo", s.fecha::text AS fecha,
@@ -593,14 +620,15 @@ export async function detalleSesion(sessionId: string): Promise<SesionDetalle | 
             cl.id AS "classroomId", cl.nombre AS salon, cl.cupo, cl.timezone,
             cl.holiday_country AS "holidayCountry", cl.meeting_url AS "meetingUrl",
             cu.id AS "courseId", cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
-            gu.id AS "guiaUserId",
-            COALESCE(NULLIF(TRIM(gp.nombres || ' ' || gp.apellidos), ''), gu.username) AS "guiaNombre"
+            gu.id AS "guiaUserId", ${NOMBRE_GUIA} AS "guiaNombre",
+            (s.guia_user_id IS NOT NULL
+              AND s.guia_user_id IS DISTINCT FROM cl.guia_user_id) AS "guiaSoloEstaSesion"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course cu ON cu.id = cl.course_id
        JOIN catalog_campaign ca ON ca.id = cu.campaign_id
-       LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
-       LEFT JOIN people_person gp ON gp.user_id = gu.id
+       LEFT JOIN identity_user gu ON gu.id = ${GUIA_EFECTIVO}
+       ${JOIN_NOMBRE_GUIA}
       WHERE s.id = $1`,
     [sessionId],
   );
@@ -629,6 +657,7 @@ export async function detalleSesion(sessionId: string): Promise<SesionDetalle | 
             userId: row.guiaUserId,
             nombre: row.guiaNombre ?? "(sin nombre)",
             pais: row.holidayCountry,
+            soloEstaSesion: row.guiaSoloEstaSesion,
           }
         : null,
   };
@@ -647,16 +676,83 @@ export async function updateGuiaSalon(
   );
 }
 
+/** Guía de UNA sesión (null = vuelve a heredar el del salón). */
+export async function updateGuiaSesion(
+  sessionId: string,
+  guiaUserId: string | null,
+  client?: Queryable,
+): Promise<void> {
+  await execute(
+    `UPDATE scheduling_session SET guia_user_id = $2 WHERE id = $1`,
+    [sessionId, guiaUserId],
+    client,
+  );
+}
+
+/**
+ * CONGELA el pasado antes de cambiar el guía del salón: escribe el guía que
+ * está saliendo en las sesiones YA EMPEZADAS que lo heredaban. Sin esto, dar
+ * de alta a otro guía reescribiría quién dictó todo el curso anterior.
+ * Devuelve cuántas quedaron fijadas.
+ */
+export async function congelarGuiaSesionesPasadas(
+  classroomId: string,
+  guiaSaliente: string,
+  client?: Queryable,
+): Promise<number> {
+  return execute(
+    `UPDATE scheduling_session
+        SET guia_user_id = $2
+      WHERE classroom_id = $1 AND guia_user_id IS NULL AND starts_at < now()`,
+    [classroomId, guiaSaliente],
+    client,
+  );
+}
+
+/**
+ * Suelta las sesiones FUTURAS que tenían un guía propio para que vuelvan a
+ * heredar el del salón: el cambio de salón manda sobre los cambios de un día.
+ * Devuelve cuántas se soltaron.
+ */
+export async function soltarGuiaSesionesFuturas(
+  classroomId: string,
+  client?: Queryable,
+): Promise<number> {
+  return execute(
+    `UPDATE scheduling_session
+        SET guia_user_id = NULL
+      WHERE classroom_id = $1 AND guia_user_id IS NOT NULL AND starts_at >= now()`,
+    [classroomId],
+    client,
+  );
+}
+
+/** Cuántas sesiones del salón están por venir (para advertir antes de cambiar). */
+export async function contarSesionesFuturas(
+  classroomId: string,
+  client?: Queryable,
+): Promise<number> {
+  const row = await queryOne<{ n: number }>(
+    `SELECT count(*)::int AS n FROM scheduling_session
+      WHERE classroom_id = $1 AND starts_at >= now()`,
+    [classroomId],
+    client,
+  );
+  return row?.n ?? 0;
+}
+
 /** Edita cupo, guía y activo del salón (no toca el horario ni las sesiones). */
 export async function updateClassroom(
   classroomId: string,
   datos: { cupo: number; guiaUserId: string | null; activo: boolean },
+  client?: Queryable,
 ): Promise<void> {
   await execute(
     `UPDATE scheduling_classroom
         SET cupo = $2, guia_user_id = $3, activo = $4, updated_at = now()
       WHERE id = $1`,
     [classroomId, datos.cupo, datos.guiaUserId, datos.activo],
+    client,
   );
 }
 

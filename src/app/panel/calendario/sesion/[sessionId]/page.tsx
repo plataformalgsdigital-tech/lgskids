@@ -23,7 +23,7 @@ interface SesionDetalle {
     meetingUrl: string | null;
   };
   curso: { id: string; tipo: string; campania: string };
-  guia: { userId: string; nombre: string; pais: string } | null;
+  guia: { userId: string; nombre: string; pais: string; soloEstaSesion: boolean } | null;
 }
 
 interface Inscrito {
@@ -170,13 +170,14 @@ export default function ResumenSesionPage() {
     }
   }
 
+  /** Solo ESTA sesión: el guía del curso se cambia en el detalle del salón. */
   async function cambiarGuia() {
     if (detalle === null) return;
     setError(null);
     setAviso(null);
     setOcupado(true);
     try {
-      const res = await apiFetch(`/api/scheduling/classrooms/${detalle.salon.id}/guide`, {
+      const res = await apiFetch(`/api/scheduling/sessions/${detalle.sesion.id}/guia`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ guiaUserId: nuevoGuia === "" ? null : nuevoGuia }),
@@ -186,7 +187,7 @@ export default function ResumenSesionPage() {
         setError(data.error?.message ?? "No se pudo cambiar el guía.");
         return;
       }
-      setAviso("Guía actualizado.");
+      setAviso("Guía de esta sesión actualizado. Las demás no cambian.");
       setMostrarCambioGuia(false);
       await cargar();
     } catch {
@@ -305,6 +306,11 @@ export default function ResumenSesionPage() {
               <p style={{ margin: "0.3rem 0", color: "var(--texto-suave)" }}>
                 País: {PAIS_NOMBRE[detalle.guia.pais] ?? detalle.guia.pais}
               </p>
+              {detalle.guia.soloEstaSesion && (
+                <p style={{ margin: "0.3rem 0", fontSize: "0.82rem", color: "#8a6d00" }}>
+                  Reemplazo solo de esta sesión.
+                </p>
+              )}
             </>
           ) : (
             <p style={{ color: "var(--texto-suave)" }}>Este salón no tiene guía asignado.</p>
@@ -323,7 +329,7 @@ export default function ResumenSesionPage() {
                 onChange={(e) => setNuevoGuia(e.target.value)}
                 style={{ ...boton, fontWeight: 400, cursor: "auto", flex: "1 1 12rem" }}
               >
-                <option value="">— Sin guía —</option>
+                <option value="">— El guía del salón —</option>
                 {guias.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.nombre ?? g.username}
@@ -338,6 +344,17 @@ export default function ResumenSesionPage() {
               >
                 Guardar
               </button>
+              <p
+                style={{
+                  width: "100%",
+                  margin: 0,
+                  fontSize: "0.8rem",
+                  color: "var(--texto-suave)",
+                }}
+              >
+                Cambia el guía <strong>solo de esta sesión</strong>. Para el curso entero, entra al
+                salón.
+              </p>
             </div>
           )}
         </section>
