@@ -5,6 +5,9 @@ export interface SalonDisponible {
   id: string;
   nombre: string;
   courseId: string;
+  /** País/grupo del salón ("CL" grupo 01, "CO" grupo 02/resto) — lo usa LGS
+   *  para mostrar solo los salones del país del contrato. Sale de holidayCountry. */
+  pais: string;
   cupo: number;
   ocupados: number;
   cupoDisponible: number;
@@ -50,6 +53,7 @@ export async function disponibilidad(): Promise<{ campanias: CampaniaDisponible[
           id: s.id,
           nombre: s.nombre,
           courseId: s.courseId,
+          pais: s.holidayCountry,
           cupo: s.cupo,
           ocupados: s.ocupados,
           cupoDisponible: s.cupo - s.ocupados,
