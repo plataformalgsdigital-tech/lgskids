@@ -980,15 +980,38 @@ nadie habría visto hasta tener niños reales inscribiéndose:**
 como secreto). Su cliente es `src/lib/kids-intake.ts` y dispara en dos puntos:
 al CREAR el contrato (una reserva por beneficiario marcado como kids, con el
 salón elegido) y al APROBAR al beneficiario (ahí pide `approve` y guarda
-usuario y clave del niño en `KIDS_INSCRIPCIONES`). Falta lo operativo: cargar
-en KIDS la campaña real con sus salones y encender el interruptor
-`kids_feature_activo` de LGS (hoy en `false`; encenderlo antes de tener
-campañas le mostraría a los comerciales un selector vacío). Dos puertas al mismo núcleo: el **wizard**
+usuario y clave del niño en `KIDS_INSCRIPCIONES`).
+
+**ENCENDIDA Y EN USO (2026-09-26, noche)**: existe la campaña **OCTUBRE2026** (en
+matrícula hasta el 2026-10-26, curso desde el 2026-10-05) con sus **12 salones**
+generados del catálogo, y LGS ya mandó su **primera reserva real** por la puerta de
+servicio (`sistema-lgs`, contrato `02-10764-26#121290`, niño de 9 años → JUNIOR
+Salón 04, el de `America/Bogota`: el comercial eligió bien el grupo). Queda
+PENDIENTE/RESERVADA hasta que LGS apruebe al beneficiario — **no aprobarla desde el
+panel de KIDS**: la clave y el usuario del niño se devuelven UNA vez, y es el paso de
+aprobación de LGS el que los guarda en `KIDS_INSCRIPCIONES`. Aprobarla por el panel
+deja a LGS sin credenciales y su `approve` posterior falla.
+Se verificó ADEMÁS el camino propio de KIDS (contrato creado en el panel, aprobado con
+salón, credenciales, el niño entrando a `/mi-panel` con su sesión del 2026-10-05):
+funciona de punta a punta. Lo que falta es OPERATIVO, no de código: **los 12 salones
+nacieron sin guía y sin sala de Zoom** ("Generar salones del catálogo" los crea así), así
+que el 5 de octubre "Entrar a clase" no tendría a dónde llevar al niño.
+Dos puertas al mismo núcleo: el **wizard**
 `/panel/reservas` (JWT) y la **puerta de servicio** módulo `intake`
 (API-key `x-api-key` / `LGS_INTAKE_API_KEY`, `handlerWithServiceAuth`):
 `GET /api/kids-intake/availability`, `POST /api/kids-intake/reservations`,
 `POST /api/kids-intake/reservations/{externalRef}/approve`. Auditoría contra el
-usuario de sistema `sistema-lgs`. **Catálogo de horarios** reutilizable por tipo
+usuario de sistema `sistema-lgs`.
+**`availability` es un CATÁLOGO, no una recomendación**: `disponibilidadHandler` no
+lee la query, así que `?pais=&edad=` no filtran nada y la respuesta trae JUNIOR **y**
+YOUNGSTER de todas las campañas EN_MATRÍCULA. Quien elige es LGS; si el comercial se
+equivoca de curso, la reserva recién falla al validar la edad contra la fecha de
+nacimiento — y como la llamada de LGS es best-effort dentro de un `try/catch`, ese
+fallo queda en `errorKids` sin que nadie lo vea. Para que LGS pueda acotar, cada
+`SalonDisponible` trae **`pais`** (2026-09-26, desde `holiday_country`: `CL` grupo 01,
+`CO` el resto) — un niño colombiano en un salón `America/Santiago` tendría la clase dos
+horas corridas.
+**Catálogo de horarios** reutilizable por tipo
 de curso, **grupo de país** (`scheduling_horario.grupo_pais`: `01`=Chile,
 `02`=Colombia/Ecuador/Perú — por el desfase horario CL vs. el resto) y **salón**
 (`salon_numero`: el horario COMPLETO es un salón — todos sus días son el mismo;
@@ -1275,13 +1298,14 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
-- **Encender la integración con LGS cuando haya campaña**: la conexión ya está
-  hecha por los dos lados (2026-09-26) y el flujo completo se probó contra
-  producción —disponibilidad, reserva, aprobar y el niño entrando a su panel—.
-  Faltan dos cosas OPERATIVAS, en este orden: cargar en KIDS el catálogo de
-  horarios y la campaña real con sus salones, y solo entonces poner
-  `kids_feature_activo = true` en LGS. Al revés, el comercial ve la opción Kids
-  con un selector vacío.
+- **Guía y sala de Zoom para los 12 salones de OCTUBRE2026**: están todos en `SIN
+GUIA` y sin `meeting_url` (así los crea "Generar salones del catálogo"). El curso
+  arranca el **2026-10-05**; sin enlace, el botón "Entrar a clase" del niño no lleva
+  a ninguna parte, y el enlace se HEREDA del guía asignado.
+- **Aprobar la reserva de LGS desde LGS, no desde KIDS** (ver "Estado de la
+  conexión"): hay una PENDIENTE (`02-10764-26#121290`). La integración con LGS ya
+  está encendida y en uso — lo que quedaba pendiente aquí (catálogo de horarios,
+  campaña real, `kids_feature_activo`) está hecho.
 - Procedimiento operativo para cuando el desfase CL–CO sea de 2 h (verano
   austral): el negocio lo definirá más adelante.
 - Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. **CI activo**
