@@ -1135,6 +1135,34 @@ solo servía para completar la ficha.
   redirecciones permanentes, incluidas las de detalle y sesión.
 - Un evento abre **MODAL** (`calendario/SesionModal.tsx`), no una página. El nombre
   del guía SIEMPRE se ve; "Cambiar guía" y "Suspender" solo con `salones.gestionar`.
+- **Cambiar el guía son DOS operaciones distintas (2026-09-27)**. Las dos pantallas
+  llamaban al MISMO endpoint (el del salón), así que reemplazar al guía de un martes
+  reescribía el curso entero, pasado incluido:
+  - **En la SESIÓN** (`POST /api/scheduling/sessions/[id]/guia`, `cambiarGuiaDeSesion`):
+    el reemplazo de UN día. Escribe `scheduling_session.guia_user_id` y no toca el
+    salón ni las demás sesiones. Es la MISMA columna que fija el cierre («quién la
+    dictó»), así que la estadística mensual del guía ya la contaba —usa
+    `COALESCE(s.guia_user_id, cl.guia_user_id)` desde antes—.
+  - **En el SALÓN** (PATCH del salón y `…/classrooms/[id]/guide`): mira ADELANTE.
+    Un solo núcleo, `aplicarGuiaDeSalon`, que comparten los dos caminos: **congela**
+    las sesiones ya empezadas escribiéndoles el guía SALIENTE (antes lo heredaban y
+    el cambio les reescribía el pasado), pone el guía nuevo en el salón y **suelta**
+    (`guia_user_id = NULL`) los reemplazos de un día que quedaran por delante, para
+    que hereden al nuevo. Todo en UNA transacción y devolviendo el conteo.
+    La pantalla del salón **pide confirmación** con ese conteo antes de aceptar: el
+    cambio mueve clases que no están a la vista y no hay botón para deshacerlo.
+  - El corte pasado/futuro es el **INSTANTE** (`starts_at < now()`), no la fecha: el
+    salón puede estar en otra zona (regla 3).
+  - **`guia_user_id` de la sesión es el guía EFECTIVO**, y por eso `getSessionInfo`
+    lo devuelve con ese COALESCE: con el del salón, un reemplazo de un día no podía
+    ni pasar lista (es ese id el que compara `verificarAccesoGuia`).
+  - **El NOMBRE del guía no está en la cuenta**: su ficha vive en `scheduling_guia`
+    (la del staff en `identity_perfil`, la del alumno en `people_person`). El panel
+    leía solo `people_person` —vacía para un guía— y mostraba el usuario generado
+    (`vespinosa7913`). Hay un COALESCE por las tres, con el usuario de respaldo.
+  - Invariantes en `scheduling/tests/cambio-guia-integration.test.ts`, con un salón
+    a caballo de hoy: sin sesiones de los dos lados la prueba no prueba nada, y eso
+    también se afirma.
 - **NO se creó una base "booking"**: `attendance_attendance` ya es el registro por
   (sesión, niño) y `scheduling_session` ya es el calendario. Una tabla paralela
   abriría un segundo camino de escritura invisible para la función central de
