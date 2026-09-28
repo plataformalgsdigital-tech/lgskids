@@ -385,6 +385,23 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
 - **Editar la ficha del guía ya no borra su foto**: `guardarFichaGuia` escribía
   `foto_file_id = NULL` cuando no se la mandaban, y el PUT de `/panel/guias` no la
   manda. Ahora "no vino" = no se toca.
+- **La foto del guía SÍ se ve (2026-09-27)**: se pedía en el alta y no se mostraba
+  en ninguna pantalla, porque no había ruta que la sirviera.
+  `GET /api/scheduling/guias/[guiaUserId]/foto` (`fotoDeGuia`) va por el id del
+  **GUÍA, no por el del archivo**: una ruta que sirviera cualquier id de `files`
+  entregaría también fotos de NIÑOS —es la trampa ya pagada con
+  `/api/catalog/imagen-curso/[id]`— y además comprueba que el archivo sea una
+  imagen. La ven el propio guía y quien administra fichas (`usuarios.gestionar`);
+  no es arte curricular, es la cara de una persona. Caché de **una hora, NO
+  inmutable**: al reemplazar la foto el guía conserva su id, así que la URL no
+  cambia. Se pinta en la lista de Guías, en el encabezado de su ficha y en la
+  barra del panel; sin foto, la inicial de siempre.
+- **El panel dice quién entró, por su NOMBRE**: mostraba el usuario generado
+  (`vespinosa7913`) porque el nombre no está en la cuenta — vive en la ficha de
+  cada tipo de usuario. `GET /api/auth/me` devuelve `nombre` y `tieneFoto`
+  (`quienEntro`, con el mismo COALESCE de las tres fichas que ya usaba
+  `listarUsuarios`), y debajo del nombre va el usuario: es el que se dicta por
+  teléfono para entrar.
 - Pruebas: `identity/tests/gestion-usuarios-integration.test.ts`,
   `scheduling/tests/alta-guia-integration.test.ts` y la renovación en contratos.
   **Trampa para quien pruebe el enlace**: `scheduling_guia_invitacion.creado_por`
