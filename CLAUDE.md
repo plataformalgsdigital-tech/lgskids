@@ -106,6 +106,27 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   solo si no hay otros contratos vivos. Worker: barrido de vencidos cada
   6 h. Permisos: personas.gestionar/ver, contratos.gestionar/ver.
   UI: /panel/personas y /panel/contratos.
+  **Contratos: lista y FICHA (2026-09-27)**. `/panel/contratos` es una TABLA
+  —campaña, N° de contrato, titular, documento, fecha y estado— con filtro de
+  **salón**; la fila entera abre la ficha. `/panel/contratos/[id]`
+  (`GET /api/contracts/[id]` → `fichaContrato`) es el resumen de matrícula al
+  estilo de LGS: el titular arriba y los **beneficiarios** en tarjetas, con sus
+  **HERMANOS** —los otros contratos de KIDS salidos del MISMO N° de LGS, que se
+  distinguen por el sufijo `#documento`—, y cada tarjeta actúa sobre SU contrato
+  (aprobar, matricular, cambiar salón, cambiar curso, pausar/reactivar,
+  inactivar).
+  **CAMBIO DE CURSO** (`POST /api/contracts/[id]/curso` → `cambiarCursoContrato`):
+  cambia `tipo_curso` del contrato **Y** mueve la matrícula en UNA transacción —de
+  quedar en cursos distintos, el siguiente cambio de salón lo rechazaría
+  `matricularTx` sin que nadie supiera por qué—. El par cerrar+matricular vive en
+  `moverMatriculaTx` (enrollment), compartido con el cambio académico.
+  **La EDAD advierte, NO bloquea**, a propósito: los rangos son disjuntos (6–9 y
+  10–13) y se miden a la fecha de INICIO, así que exigirla como en el alta haría
+  imposible TODO cambio de curso. Los casos reales son justo los que la regla del
+  alta no contempla —el niño cumplió años, o llegó con la fecha de nacimiento mal
+  y se corrigió—. El aviso viaja en la respuesta y queda en la auditoría
+  (`contracts.curso_cambiado`) junto al motivo. Probado en
+  `cambio-curso-integration.test.ts`.
   **NIÑO es un PAPEL, no una edad (2026-09-27)**: la sección Kids
   (`/panel/personas`, `listNinos`) filtraba por "tiene fecha de nacimiento" y
   listaba también a los APODERADOS —LGS manda también la del titular—, que
