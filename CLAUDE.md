@@ -106,6 +106,13 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   solo si no hay otros contratos vivos. Worker: barrido de vencidos cada
   6 h. Permisos: personas.gestionar/ver, contratos.gestionar/ver.
   UI: /panel/personas y /panel/contratos.
+  **NIÑO es un PAPEL, no una edad (2026-09-27)**: la sección Kids
+  (`/panel/personas`, `listNinos`) filtraba por "tiene fecha de nacimiento" y
+  listaba también a los APODERADOS —LGS manda también la del titular—, que
+  salían sin campaña ni curso. Ahora lista a quien es beneficiario de un contrato
+  o el menor de un `people_guardianship` (`ES_NINO`). Tiene además filtro de
+  **salón**, derivado de la matrícula VIVA (la lista del salón sale de las
+  matrículas, nunca de una tabla aparte), y cada fila muestra su salón.
 - **Fase 6 (`scheduling`) completada**: migración `20260726000000_scheduling`
   (salón, slots, sesiones, feriados, suspensiones). Salón: zona operativa Y
   calendario de feriados configurables por salón; slots SESION/CLUB.
