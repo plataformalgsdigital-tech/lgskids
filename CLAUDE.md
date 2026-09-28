@@ -930,7 +930,12 @@ se toca lo que miden:
 
 ## Reglas que NO se negocian (resumen; detalle en docs/architecture/overview.md)
 
-1. `final_curso` NUNCA se reescribe; el fin real es la última sesión.
+1. `final_curso` NUNCA se reescribe POR DERIVACIÓN; el fin real es la última
+   sesión. Lo mueve una sola cosa, y con una persona decidiendo: **Fin del
+   Programa** en la ficha de la campaña (`moverFinDePrograma`, 2026-09-28). Lo
+   que la regla prohíbe es que el SISTEMA lo derive de las sesiones generadas
+   —cada regeneración correría el fin un poco más—, no que el negocio decida
+   que el programa termina en otra fecha.
 2. Suspensiones y feriados en tabla — la regeneración de un curso es
    destructiva y los recrea desde `(inicio, final, horario)`.
 3. Instantes en UTC; zona operativa POR SALÓN; reportes con `AT TIME ZONE`
@@ -1078,6 +1083,35 @@ tiene **"Generar salones del catálogo"** (`POST /api/scheduling/campaigns/[id]/
 → `generarSalonesDesdeCatalogo`): crea un salón por cada horario activo del
 catálogo (ambos grupos, ambos tipos) con **guía pendiente** y cupo 12,
 idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salones`.
+**La campaña se edita desde SU ficha (2026-09-28)**, con el impacto a la vista, y
+al salón se entra desde ahí (su "Volver" regresa a la campaña). Las dos fechas
+hacen cosas distintas:
+
+- **Cierre de Ventas** (`final_venta`) mueve el ESTADO derivado. No toca sesiones.
+- **Fin del Programa** (`fin`) mueve las SESIONES de TODOS los salones:
+  `POST /api/scheduling/campaigns/[id]/fin-programa` → `moverFinDePrograma`
+  reescribe `final_curso` de sus cursos y regenera. El **GET** de esa misma ruta
+  es el PREVIO: simula con la MISMA función pura que genera (`generarFechasSlot`)
+  y dice cuántas sesiones quedarían por salón — si se calculara aparte, sería una
+  promesa que se desincroniza con la regla de corrimiento por feriados.
+  **SE BLOQUEA con asistencia o sesiones cerradas**: regenerar BORRA y recrea, y
+  `attendance_attendance` cuelga de la sesión con **ON DELETE CASCADE**, así que
+  mover el fin con el curso andando se llevaría el registro de lo dictado en
+  silencio. Con el curso empezado se alarga o recorta con una **sesión extra** o
+  una **suspensión**. Si está bloqueado, la pantalla guarda SOLO el cierre de
+  ventas: mandar el fin igual dejaría la campaña diciendo que termina en una fecha
+  que sus sesiones no reflejan.
+  **El `numero` de la sesión es del CURSO, no del slot (2026-09-28)**: se asignaba
+  por slot, así que un salón de dos días por semana tenía dos "Sesión 1", dos
+  "Sesión 2"… y en la pantalla parecían duplicadas. Ahora van 1..N en orden
+  cronológico. Invariantes en `scheduling/tests/regeneracion-integration.test.ts`
+  (numeración sin repetir ni saltar, regenerar deja el mismo conjunto sin instantes
+  dobles, y asignar el guía al salón lo deja en TODAS sus sesiones — las heredan,
+  con `guia_user_id` NULL, para que un cambio POSTERIOR pueda congelar lo dictado).
+  **Vocabulario en la UI (2026-09-28)**: Nombre Campaña · Inicio de campaña ·
+  **Inicio del Programa** · **Fin del Programa** · **Cierre de Ventas**. En la base
+  siguen llamándose `inicio`, `final_curso`, `fin` y `final_venta`: se renombró lo
+  que ve la gente, no las columnas.
 
 ## Alta del guía por enlace (2026-08-29)
 
