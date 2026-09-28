@@ -10,7 +10,9 @@ import {
   editarSalon,
   eliminarSalon,
   generarSalonesDesdeCatalogo,
+  impactoFinDePrograma,
   listarSalones,
+  moverFinDePrograma,
   misNinosDeGuia,
   obtenerDetalleSesion,
   regenerarSesiones,
@@ -284,6 +286,36 @@ export const generarSalonesHandler = handlerWithAuth(async (request, auth, conte
     ip: ip(request),
   });
   return json(resultado, { status: 201 });
+});
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * GET /api/scheduling/campaigns/[id]/fin-programa?fin=YYYY-MM-DD — PREVIO.
+ * Cuántas sesiones quedarían por salón y qué historia se perdería. No escribe.
+ */
+export const impactoFinProgramaHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const fin = z.string().regex(ISO_DATE).parse(request.nextUrl.searchParams.get("fin"));
+  return json(await impactoFinDePrograma(id, fin));
+});
+
+/** POST /api/scheduling/campaigns/[id]/fin-programa — mueve el fin y regenera. */
+export const moverFinProgramaHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const body = z.object({ fin: z.string().regex(ISO_DATE) }).parse(await request.json());
+  return json(
+    await moverFinDePrograma({
+      actorUserId: auth.userId,
+      campaignId: id,
+      fin: body.fin,
+      ip: ip(request),
+    }),
+  );
 });
 
 // ---- Catálogo de horarios (mantenimiento) ----

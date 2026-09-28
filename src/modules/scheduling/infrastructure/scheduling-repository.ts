@@ -800,6 +800,70 @@ export async function coursesDeCampania(
   );
 }
 
+/**
+ * Mueve el fin NOMINAL del curso. Es lo ÚNICO que reescribe `final_curso`, y
+ * solo cuando una persona cambia el fin del programa desde la campaña: la
+ * regla dura 1 prohíbe que el sistema lo derive de las sesiones generadas
+ * (cada regeneración correría el fin un poco más), no que el negocio decida
+ * que el programa termina en otra fecha.
+ */
+export async function setCourseFinalCurso(
+  courseId: string,
+  finalCurso: string,
+  client?: Queryable,
+): Promise<void> {
+  await execute(
+    `UPDATE catalog_course SET final_curso = $2::date, updated_at = now() WHERE id = $1`,
+    [courseId, finalCurso],
+    client,
+  );
+}
+
+/**
+ * HISTORIA que se perdería al regenerar: la asistencia cuelga de la sesión con
+ * ON DELETE CASCADE, y regenerar BORRA y recrea. Con el curso empezado, mover
+ * el fin del programa se llevaría las marcas por delante sin avisar.
+ */
+export async function historiaDeCampania(
+  campaignId: string,
+): Promise<{ conAsistencia: number; cerradas: number }> {
+  const row = await queryOne<{ conAsistencia: number; cerradas: number }>(
+    `SELECT count(*) FILTER (WHERE EXISTS (
+              SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id))::int
+              AS "conAsistencia",
+            count(*) FILTER (WHERE s.cerrada_en IS NOT NULL)::int AS cerradas
+       FROM scheduling_session s
+       JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+       JOIN catalog_course cu ON cu.id = cl.course_id
+      WHERE cu.campaign_id = $1 AND s.slot_id IS NOT NULL`,
+    [campaignId],
+  );
+  return { conAsistencia: row?.conAsistencia ?? 0, cerradas: row?.cerradas ?? 0 };
+}
+
+/** Salones de una campaña con lo que hace falta para simular su regeneración. */
+export async function salonesDeCampania(campaignId: string): Promise<
+  {
+    id: string;
+    nombre: string;
+    holidayCountry: string;
+    cursoInicio: string;
+    sesiones: number;
+  }[]
+> {
+  return queryRows(
+    `SELECT cl.id, cl.nombre, cl.holiday_country AS "holidayCountry",
+            cu.inicio::text AS "cursoInicio",
+            (SELECT count(*) FROM scheduling_session s
+              WHERE s.classroom_id = cl.id AND s.slot_id IS NOT NULL)::int AS sesiones
+       FROM scheduling_classroom cl
+       JOIN catalog_course cu ON cu.id = cl.course_id
+      WHERE cu.campaign_id = $1
+      ORDER BY cu.tipo, cl.nombre`,
+    [campaignId],
+  );
+}
+
 /** ¿Ya existe un salón con ese nombre en el curso? (idempotencia de la generación). */
 export async function classroomExisteNombre(courseId: string, nombre: string): Promise<boolean> {
   const row = await queryOne<{ id: string }>(

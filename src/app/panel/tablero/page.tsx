@@ -173,7 +173,7 @@ export default function TableroPage() {
                 <span style={pastilla}>Inicio · {fechaCorta(destacada.inicio)}</span>
                 {destacada.finalVenta !== null && (
                   <span style={pastilla}>
-                    Cierre matrícula · {fechaCorta(destacada.finalVenta)}
+                    Cierre de ventas · {fechaCorta(destacada.finalVenta)}
                   </span>
                 )}
                 <span style={pastilla}>Fin · {fechaCorta(destacada.fin)}</span>

@@ -71,6 +71,204 @@ const ESTADO_CAMPANIA: Record<Estado, { texto: string; color: string; fondo: str
 
 const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
+/** Lo que devuelve el PREVIO del fin del programa (no escribe nada). */
+interface Impacto {
+  finActual: string;
+  finNuevo: string;
+  salones: { nombre: string; ahora: number; despues: number }[];
+  totalAhora: number;
+  totalDespues: number;
+  conAsistencia: number;
+  cerradas: number;
+}
+
+/** Estado que tendría la campaña con esas fechas (mismo criterio que el servidor). */
+function estadoCon(finalVenta: string, fin: string): Estado {
+  const hoy = new Date().toISOString().slice(0, 10);
+  if (hoy <= finalVenta) return "EN_MATRICULA";
+  return hoy <= fin ? "ACTIVA" : "CERRADA";
+}
+
+/**
+ * Cambiar estas dos fechas no es guardar un campo: una mueve las clases de
+ * todos los salones y la otra decide si la campaña sigue vendiéndose. Se dice
+ * ANTES, con números, porque el efecto no se ve en esta pantalla.
+ */
+function ConfirmarFechas(props: {
+  campania: string;
+  finActual: string;
+  finNuevo: string;
+  ventaActual: string;
+  ventaNueva: string;
+  estadoActual: Estado;
+  estadoNuevo: Estado;
+  impacto: Impacto | null;
+  ocupado: boolean;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}) {
+  const cambiaFin = props.finActual !== props.finNuevo;
+  const cambiaVenta = props.ventaActual !== props.ventaNueva;
+  const cambiaEstado = props.estadoActual !== props.estadoNuevo;
+  const bloqueado =
+    props.impacto !== null && (props.impacto.conAsistencia > 0 || props.impacto.cerradas > 0);
+  const delta = props.impacto === null ? 0 : props.impacto.totalDespues - props.impacto.totalAhora;
+
+  const boton: React.CSSProperties = {
+    padding: "0.45rem 1rem",
+    borderRadius: "0.6rem",
+    border: "1px solid #e3e7f0",
+    background: "white",
+    fontWeight: 600,
+    fontSize: "0.85rem",
+    cursor: "pointer",
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-fechas"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1rem",
+        zIndex: 50,
+      }}
+      onClick={props.onCancelar}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: "0.9rem",
+          padding: "1.25rem 1.4rem",
+          maxWidth: "36rem",
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+          boxShadow: "0 18px 45px rgba(15, 23, 42, 0.25)",
+        }}
+      >
+        <h2 id="titulo-fechas" style={{ fontSize: "1.1rem", margin: 0 }}>
+          ⚠ Cambiar las fechas de {props.campania}
+        </h2>
+
+        {cambiaVenta && (
+          <div style={{ marginTop: "0.8rem" }}>
+            <strong style={{ fontSize: "0.9rem" }}>Cierre de ventas</strong>
+            <p style={{ margin: "0.2rem 0", fontSize: "0.88rem" }}>
+              {props.ventaActual} → <strong>{props.ventaNueva}</strong>
+            </p>
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+              {cambiaEstado ? (
+                <>
+                  La campaña pasa de <strong>{ESTADO_CAMPANIA[props.estadoActual].texto}</strong> a{" "}
+                  <strong>{ESTADO_CAMPANIA[props.estadoNuevo].texto}</strong>. En matrícula es la
+                  única que se ofrece en el wizard de contratos y en las reservas de LGS.
+                </>
+              ) : (
+                <>
+                  El estado sigue siendo <strong>{ESTADO_CAMPANIA[props.estadoNuevo].texto}</strong>
+                  . No se tocan sesiones.
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
+        {cambiaFin && props.impacto !== null && (
+          <div style={{ marginTop: "0.9rem" }}>
+            <strong style={{ fontSize: "0.9rem" }}>Fin del programa</strong>
+            <p style={{ margin: "0.2rem 0", fontSize: "0.88rem" }}>
+              {props.impacto.finActual} → <strong>{props.impacto.finNuevo}</strong>
+            </p>
+            {bloqueado ? (
+              <p
+                style={{
+                  margin: "0.4rem 0",
+                  fontSize: "0.85rem",
+                  color: "#c62828",
+                  background: "#ffebee",
+                  padding: "0.6rem 0.75rem",
+                  borderRadius: "0.6rem",
+                }}
+              >
+                <strong>No se puede mover.</strong> Ya hay {props.impacto.conAsistencia} sesión(es)
+                con asistencia y {props.impacto.cerradas} cerrada(s). Regenerar las borra —la
+                asistencia cuelga de la sesión—, así que con el curso andando se alarga o recorta
+                con una <strong>sesión extra</strong> o una <strong>suspensión</strong>, no con la
+                ventana entera. El cierre de ventas sí se puede cambiar.
+              </p>
+            ) : (
+              <>
+                <p style={{ margin: "0.2rem 0", fontSize: "0.88rem" }}>
+                  Sesiones: {props.impacto.totalAhora} →{" "}
+                  <strong>{props.impacto.totalDespues}</strong>{" "}
+                  <span style={{ color: delta >= 0 ? "#1b5e20" : "#c62828", fontWeight: 700 }}>
+                    ({delta >= 0 ? "+" : ""}
+                    {delta})
+                  </span>{" "}
+                  en {props.impacto.salones.length} salones.
+                </p>
+                <ul
+                  style={{
+                    margin: "0.3rem 0",
+                    paddingLeft: "1.1rem",
+                    fontSize: "0.82rem",
+                    color: "var(--texto-suave)",
+                    maxHeight: "9rem",
+                    overflowY: "auto",
+                  }}
+                >
+                  {props.impacto.salones.map((s) => (
+                    <li key={s.nombre}>
+                      {s.nombre}: {s.ahora} → {s.despues}
+                    </li>
+                  ))}
+                </ul>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--texto-suave)" }}>
+                  Las sesiones se BORRAN y se vuelven a crear desde el horario, respetando feriados
+                  y suspensiones. Los eventos sueltos (talleres, clases extra) no se tocan.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            justifyContent: "flex-end",
+            marginTop: "1rem",
+          }}
+        >
+          <button style={boton} onClick={props.onCancelar} disabled={props.ocupado}>
+            Cancelar
+          </button>
+          <button
+            style={{
+              ...boton,
+              borderColor: "var(--lgs-verde)",
+              background: "var(--lgs-verde)",
+              color: "#1b2a10",
+            }}
+            onClick={props.onConfirmar}
+            disabled={props.ocupado || (bloqueado && !cambiaVenta)}
+          >
+            {bloqueado && cambiaVenta ? "Guardar solo el cierre de ventas" : "Sí, guardar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** "17:00" + 60 min → "18:00" (reloj de pared, sin zona). */
 function horaFin(inicio: string, dur: number): string {
   const [h, m] = inicio.split(":").map(Number);
@@ -115,6 +313,12 @@ export default function DetalleCampaniaPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verEstructura, setVerEstructura] = useState(false);
+  // Edición de fechas: el fin del programa mueve SESIONES y el cierre de
+  // ventas mueve el ESTADO, así que ninguno se guarda sin enseñar qué pasa.
+  const [finEdit, setFinEdit] = useState("");
+  const [ventaEdit, setVentaEdit] = useState("");
+  const [impacto, setImpacto] = useState<Impacto | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
 
   const cargar = useCallback(async () => {
     const res = await apiFetch(`/api/catalog/campaigns/${params.id}`);
@@ -130,6 +334,8 @@ export default function DetalleCampaniaPage() {
     const campania = data.campania ?? null;
     setDetalle(campania);
     if (campania !== null) {
+      setFinEdit(campania.fin);
+      setVentaEdit(campania.finalVenta);
       const entradas = await Promise.all(
         campania.courses.map(async (curso) => {
           const r = await apiFetch(`/api/scheduling/classrooms?courseId=${curso.id}`);
@@ -148,6 +354,92 @@ export default function DetalleCampaniaPage() {
     }
     void inicial();
   }, [cargar]);
+
+  /** Pide el PREVIO y abre la confirmación. No escribe nada todavía. */
+  async function revisarCambio() {
+    if (detalle === null) return;
+    setError(null);
+    setAviso(null);
+    setOcupado(true);
+    try {
+      if (finEdit === detalle.fin) {
+        // Solo cambia el cierre de ventas: no se tocan sesiones.
+        setImpacto(null);
+        setConfirmando(true);
+        return;
+      }
+      const res = await apiFetch(
+        `/api/scheduling/campaigns/${params.id}/fin-programa?fin=${finEdit}`,
+      );
+      const data: Impacto & { error?: { message: string } } = await res.json();
+      if (!res.ok) {
+        setError(data.error?.message ?? "No se pudo calcular el impacto.");
+        return;
+      }
+      setImpacto(data);
+      setConfirmando(true);
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /**
+   * Guarda: primero las fechas de la campaña (estado derivado y ventana de
+   * venta) y, si cambió el fin del programa, mueve las sesiones.
+   */
+  async function guardarFechas() {
+    if (detalle === null) return;
+    setConfirmando(false);
+    setError(null);
+    setAviso(null);
+    setOcupado(true);
+    try {
+      // Con historia, el fin del programa NO se mueve: se guarda solo el cierre
+      // de ventas. Mandarlo igual dejaría la campaña diciendo que termina en
+      // una fecha que sus sesiones no reflejan.
+      const bloqueado = impacto !== null && (impacto.conAsistencia > 0 || impacto.cerradas > 0);
+      const fin = bloqueado ? detalle.fin : finEdit;
+      if (bloqueado) setFinEdit(detalle.fin);
+
+      const res = await apiFetch(`/api/catalog/campaigns/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fin, finalVenta: ventaEdit }),
+      });
+      const data: { error?: { message: string } } = await res.json();
+      if (!res.ok) {
+        setError(data.error?.message ?? "No se pudieron guardar las fechas.");
+        return;
+      }
+      let extra = "";
+      if (fin !== detalle.fin) {
+        const r2 = await apiFetch(`/api/scheduling/campaigns/${params.id}/fin-programa`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fin: finEdit }),
+        });
+        const d2: { salones?: number; sesiones?: number; error?: { message: string } } =
+          await r2.json();
+        if (!r2.ok) {
+          // Las fechas de la campaña YA cambiaron; las sesiones no. Se dice.
+          setError(
+            `${d2.error?.message ?? "No se pudieron regenerar las sesiones."} Las fechas de la campaña sí se guardaron.`,
+          );
+          await cargar();
+          return;
+        }
+        extra = ` ${String(d2.sesiones ?? 0)} sesiones regeneradas en ${String(d2.salones ?? 0)} salones.`;
+      }
+      setAviso(`Fechas actualizadas.${extra}`);
+      await cargar();
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   async function generarSalones() {
     setError(null);
@@ -263,9 +555,87 @@ export default function DetalleCampaniaPage() {
         </span>
       </div>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-        Campaña: {detalle.inicio} → {detalle.fin} (12 meses) · Cierre de matrícula:{" "}
+        Campaña: {detalle.inicio} → {detalle.fin} (12 meses) · Cierre de ventas:{" "}
         {detalle.finalVenta}
       </p>
+
+      {/* ── Editar fechas de la campaña ───────────────────────── */}
+      <section
+        style={{
+          marginTop: "1rem",
+          padding: "1rem 1.1rem",
+          border: "1px solid #e3e7f0",
+          borderRadius: "0.9rem",
+          display: "flex",
+          gap: "0.8rem",
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+        }}
+      >
+        <strong style={{ width: "100%", fontSize: "0.95rem" }}>Fechas de la campaña</strong>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Fin del Programa</span>
+          <input
+            type="date"
+            value={finEdit}
+            onChange={(e) => setFinEdit(e.target.value)}
+            style={{ padding: "0.45rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6" }}
+          />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Cierre de Ventas</span>
+          <input
+            type="date"
+            value={ventaEdit}
+            onChange={(e) => setVentaEdit(e.target.value)}
+            style={{ padding: "0.45rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6" }}
+          />
+        </label>
+        <button
+          onClick={() => void revisarCambio()}
+          disabled={ocupado || (finEdit === detalle.fin && ventaEdit === detalle.finalVenta)}
+          style={{
+            padding: "0.5rem 1.1rem",
+            borderRadius: "0.6rem",
+            border: "1px solid var(--lgs-verde)",
+            background: "var(--lgs-verde)",
+            color: "#1b2a10",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Revisar cambio →
+        </button>
+        <p
+          style={{
+            width: "100%",
+            margin: 0,
+            fontSize: "0.78rem",
+            color: "var(--texto-suave)",
+          }}
+        >
+          El <strong>fin del programa</strong> alarga o recorta las sesiones de{" "}
+          <strong>todos los salones</strong> de la campaña; el <strong>cierre de ventas</strong>{" "}
+          decide hasta cuándo la campaña se ofrece (su estado). Antes de guardar se muestra qué
+          cambia.
+        </p>
+      </section>
+
+      {confirmando && (
+        <ConfirmarFechas
+          campania={detalle.nombre}
+          finActual={detalle.fin}
+          finNuevo={finEdit}
+          ventaActual={detalle.finalVenta}
+          ventaNueva={ventaEdit}
+          estadoActual={detalle.estado}
+          estadoNuevo={estadoCon(ventaEdit, finEdit)}
+          impacto={impacto}
+          ocupado={ocupado}
+          onCancelar={() => setConfirmando(false)}
+          onConfirmar={() => void guardarFechas()}
+        />
+      )}
 
       {aviso !== null && (
         <p
@@ -358,7 +728,7 @@ export default function DetalleCampaniaPage() {
                   <th style={th}>Horario</th>
                   <th style={th}>Inicio curso</th>
                   <th style={th}>Final curso</th>
-                  <th style={th}>Cierre matríc.</th>
+                  <th style={th}>Cierre ventas</th>
                   <th style={th}>Cupos</th>
                   <th style={th}>Estado</th>
                   <th style={th}>Acciones</th>

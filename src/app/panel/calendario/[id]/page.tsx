@@ -316,9 +316,19 @@ export default function DetalleSalonPage() {
 
   return (
     <main style={{ padding: "2rem", maxWidth: "60rem", margin: "0 auto" }}>
-      <Link href="/panel/calendario" style={{ fontSize: "0.9rem" }}>
-        ← Volver a salones
-      </Link>
+      {/* Se vuelve a DONDE se venía: al salón se entra desde su campaña. */}
+      {detalle.campania !== null ? (
+        <Link
+          href={`/panel/campanias/${detalle.campania.campaignId}`}
+          style={{ fontSize: "0.9rem" }}
+        >
+          ← Volver a {detalle.campania.campaignNombre}
+        </Link>
+      ) : (
+        <Link href="/panel/calendario" style={{ fontSize: "0.9rem" }}>
+          ← Volver al calendario
+        </Link>
+      )}
       <div
         style={{
           display: "flex",
@@ -497,13 +507,16 @@ export default function DetalleSalonPage() {
               Campaña: {detalle.campania.campaignNombre}
             </strong>
             <p style={{ margin: "0.15rem 0 0", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-              Inicio campaña {detalle.campania.campaignInicio} · Inicio curso{" "}
-              {detalle.campania.cursoInicio} · Fin curso nominal {detalle.campania.finalCurso}.
-              Editar estas fechas afecta a <strong>todos los salones</strong> de la campaña.
+              Inicio campaña {detalle.campania.campaignInicio} · Inicio del programa{" "}
+              {detalle.campania.cursoInicio} · Fin del programa (nominal){" "}
+              {detalle.campania.finalCurso}. Editar estas fechas afecta a{" "}
+              <strong>todos los salones</strong> de la campaña.
             </p>
           </div>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Fin de campaña (12 meses)</span>
+            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+              Fin del Programa (12 meses)
+            </span>
             <input
               type="date"
               value={finEdit}
@@ -512,7 +525,7 @@ export default function DetalleSalonPage() {
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Cierre de matrícula</span>
+            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Cierre de Ventas</span>
             <input
               type="date"
               value={cierreEdit}

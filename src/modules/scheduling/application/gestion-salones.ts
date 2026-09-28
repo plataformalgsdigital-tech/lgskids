@@ -22,8 +22,11 @@ import {
   getSessions,
   getSlots,
   getSuspensionDates,
+  historiaDeCampania,
   insertClassroom,
   insertSessionsBatch,
+  salonesDeCampania,
+  setCourseFinalCurso,
   getSalonCampania,
   insertSlot,
   insertSuspension,
@@ -130,10 +133,18 @@ async function generarSesionesTx(
           classroom.timezone,
         ),
         duracionMin: slot.duracionMin,
+        // Se renumera abajo: aquí el índice es el del SLOT, no el del curso.
         numero: index + 1,
       });
     });
   }
+  // EL NÚMERO ES DEL CURSO, no del día de la semana. Con dos días por semana el
+  // índice por slot daba dos "Sesión 1", dos "Sesión 2"… y en la pantalla del
+  // salón parecían sesiones duplicadas. Van 1..N en orden cronológico.
+  rows.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  rows.forEach((row, i) => {
+    row.numero = i + 1;
+  });
   await insertSessionsBatch(tx, classroom.id, rows);
   return rows.length;
 }
@@ -249,6 +260,126 @@ export async function regenerarSesiones(input: {
     ip: input.ip ?? null,
   });
   return { sesiones };
+}
+
+export interface ImpactoFinPrograma {
+  /** Fin nominal que tienen hoy los cursos de la campaña. */
+  finActual: string;
+  finNuevo: string;
+  salones: { nombre: string; ahora: number; despues: number }[];
+  totalAhora: number;
+  totalDespues: number;
+  /** Lo que la regeneración BORRARÍA: por eso se bloquea si hay algo. */
+  conAsistencia: number;
+  cerradas: number;
+}
+
+/**
+ * Qué pasaría si el programa terminara en otra fecha, SIN tocar nada.
+ *
+ * Se simula con la MISMA función pura que genera (`generarFechasSlot`), no con
+ * una cuenta aparte: si mañana cambia la regla de corrimiento por feriados, el
+ * previo cambia con ella y no se vuelve una promesa falsa.
+ */
+export async function impactoFinDePrograma(
+  campaignId: string,
+  finNuevo: string,
+): Promise<ImpactoFinPrograma> {
+  const cursos = await coursesDeCampania(campaignId);
+  if (cursos.length === 0) throw new NotFoundError("La campaña no tiene cursos.");
+  const ventana = await getCourseWindow(cursos[0]?.courseId ?? "");
+  if (ventana === null) throw new NotFoundError("El curso de la campaña no existe.");
+
+  const salones = await salonesDeCampania(campaignId);
+  const filas: ImpactoFinPrograma["salones"] = [];
+  for (const salon of salones) {
+    const slots = await getSlots(salon.id);
+    const feriados = await getHolidayDates(
+      salon.holidayCountry,
+      salon.cursoInicio,
+      `${Number(finNuevo.slice(0, 4)) + 1}-12-31`,
+    );
+    const suspensiones = await getSuspensionDates(salon.id);
+    const noDictables = new Set([...feriados, ...suspensiones]);
+    const despues = slots.reduce(
+      (total, slot) =>
+        total +
+        generarFechasSlot({
+          inicioCurso: salon.cursoInicio,
+          finalCurso: finNuevo,
+          diaSemana: slot.diaSemana,
+          noDictables,
+        }).fechas.length,
+      0,
+    );
+    filas.push({ nombre: salon.nombre, ahora: salon.sesiones, despues });
+  }
+
+  const historia = await historiaDeCampania(campaignId);
+  return {
+    finActual: ventana.finalCurso,
+    finNuevo,
+    salones: filas,
+    totalAhora: filas.reduce((t, f) => t + f.ahora, 0),
+    totalDespues: filas.reduce((t, f) => t + f.despues, 0),
+    ...historia,
+  };
+}
+
+/**
+ * Mueve el FIN DEL PROGRAMA de toda la campaña: reescribe `final_curso` de sus
+ * cursos y regenera las sesiones de TODOS sus salones, en una transacción.
+ *
+ * Se BLOQUEA si alguna sesión ya tiene asistencia o está cerrada. Regenerar es
+ * destructivo y la asistencia cuelga de la sesión con ON DELETE CASCADE: mover
+ * el fin con el curso andando se llevaría el registro de lo ya dictado, en
+ * silencio. Con el curso empezado, lo que se alarga o recorta son sesiones
+ * sueltas (evento extra o suspensión), no la ventana entera.
+ */
+export async function moverFinDePrograma(input: {
+  actorUserId: string;
+  campaignId: string;
+  fin: string;
+  ip?: string | null;
+}): Promise<{ salones: number; sesiones: number }> {
+  const historia = await historiaDeCampania(input.campaignId);
+  if (historia.conAsistencia > 0 || historia.cerradas > 0) {
+    throw new ConflictError(
+      `No se puede mover el fin del programa: ya hay ${String(historia.conAsistencia)} sesión(es) con asistencia y ${String(historia.cerradas)} cerrada(s), y regenerar las borraría. Usa una suspensión o una sesión extra.`,
+    );
+  }
+  const cursos = await coursesDeCampania(input.campaignId);
+  if (cursos.length === 0) throw new NotFoundError("La campaña no tiene cursos.");
+
+  const resultado = await withTransaction(async (tx) => {
+    let sesiones = 0;
+    let salones = 0;
+    for (const curso of cursos) {
+      await setCourseFinalCurso(curso.courseId, input.fin, tx);
+      for (const salon of await listClassrooms(curso.courseId)) {
+        const classroom = await findClassroomById(salon.id, tx);
+        if (classroom === null) continue;
+        await sincronizarFeriados(
+          classroom.holidayCountry,
+          aniosDeVentana(salon.primeraSesion ?? input.fin, input.fin),
+          tx,
+        );
+        sesiones += await generarSesionesTx(tx, classroom, await getSlots(salon.id, tx));
+        salones += 1;
+      }
+    }
+    return { salones, sesiones };
+  });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.fin_programa_movido",
+    entidad: "catalog_campaign",
+    entidadId: input.campaignId,
+    payload: { fin: input.fin, ...resultado },
+    ip: input.ip ?? null,
+  });
+  return resultado;
 }
 
 /**

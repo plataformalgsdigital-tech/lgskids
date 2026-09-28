@@ -629,14 +629,14 @@ export default function CampaniasPage() {
           <label
             style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "2 1 12rem" }}
           >
-            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Nombre</span>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Nombre Campaña</span>
             <input
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               required
               minLength={3}
               maxLength={80}
-              placeholder="Campaña Agosto 2026"
+              placeholder="AGOSTO2026"
               style={inputStyle}
             />
           </label>
@@ -655,7 +655,7 @@ export default function CampaniasPage() {
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Inicio del curso</span>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Inicio del Programa</span>
             <input
               type="date"
               value={cursoInicio}
@@ -666,7 +666,7 @@ export default function CampaniasPage() {
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
             <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>
-              Fin de campaña (12 meses · editable)
+              Fin del Programa (12 meses · editable)
             </span>
             <input
               type="date"
@@ -680,12 +680,12 @@ export default function CampaniasPage() {
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Cierre de matrícula</span>
+            <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Cierre de Ventas</span>
             <input
               type="text"
-              value={cursoInicio ? `${sumarDias(cursoInicio, 21)} (curso + 3 sem.)` : "—"}
+              value={cursoInicio ? `${sumarDias(cursoInicio, 21)} (programa + 3 sem.)` : "—"}
               readOnly
-              title="Inicio del curso + 3 semanas"
+              title="Inicio del programa + 3 semanas"
               style={{ ...inputStyle, background: "#f4f6fa", color: "var(--texto-suave)" }}
             />
           </label>
@@ -693,11 +693,11 @@ export default function CampaniasPage() {
             {puedeSalones ? "Siguiente: salones Junior →" : creando ? "Creando…" : "Crear campaña"}
           </button>
           <p style={{ width: "100%", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-            La campaña dura 12 meses (fin editable). Las sesiones del curso corren desde el inicio
-            del curso hasta el fin de la campaña; el cierre de matrícula es 3 semanas después del
-            inicio del curso (hasta ahí es visible en el wizard de contratos). Se generan los cursos
-            Junior y Youngster con sus 4 niveles, 4 lecciones por nivel y su Level Up. Los salones
-            se crean después: primero Junior, luego Youngster.
+            La campaña dura 12 meses (fin editable). Las sesiones corren desde el inicio del
+            programa hasta el fin del programa; el cierre de ventas es 3 semanas después del inicio
+            del programa (hasta ahí la campaña es visible en el wizard de contratos). Se generan los
+            cursos Junior y Youngster con sus 4 niveles, 4 lecciones por nivel y su Level Up. Los
+            salones se crean después: primero Junior, luego Youngster.
           </p>
           {error !== null && (
             <p role="alert" style={{ width: "100%", color: "#c62828", fontSize: "0.9rem" }}>
