@@ -5,9 +5,9 @@ import { listarUsuarios } from "@/modules/identity";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
-import { ConflictError, ValidationError } from "@/platform/errors";
+import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { crearGuia } from "../application/alta-guia";
-import { guardarFichaGuia } from "../application/crear-evento";
+import { fotoDeGuia, guardarFichaGuia } from "../application/crear-evento";
 
 /**
  * ALTA DEL GUÍA desde Gestión de Usuarios (2026-09-22): cuenta + rol + ficha +
@@ -92,6 +92,17 @@ describe.runIf(RUN)("alta del guía (integración)", () => {
       [guia.userId],
     );
     expect(perfil?.n).toBe(0);
+  });
+
+  it("su foto se sirve por el id del GUÍA, y sin foto no hay qué servir", async () => {
+    // Va por el guía y no por el id del archivo a propósito: una ruta que
+    // sirviera cualquier id de `files` entregaría también fotos de niños.
+    const { meta, bytes } = await fotoDeGuia(guia.userId);
+    expect(meta.mime).toBe("image/png");
+    expect(bytes.length).toBeGreaterThan(0);
+
+    const sinFicha = randomUUID();
+    await expect(fotoDeGuia(sinFicha)).rejects.toThrow(NotFoundError);
   });
 
   it("editar la ficha sin mandar la foto la CONSERVA (antes la borraba)", async () => {

@@ -24,8 +24,18 @@ export {
 } from "./application/provisionar-alumno";
 export type { AlumnoProvisionado } from "./application/provisionar-alumno";
 export { baseUsername, correoSintetico } from "./domain/username";
-export { listarUsuarios, listarGuias, TIPOS_USUARIO } from "./application/listar-usuarios";
-export type { UsuarioListItem, GuiaListItem, TipoUsuario } from "./application/listar-usuarios";
+export {
+  listarUsuarios,
+  listarGuias,
+  quienEntro,
+  TIPOS_USUARIO,
+} from "./application/listar-usuarios";
+export type {
+  UsuarioListItem,
+  GuiaListItem,
+  TipoUsuario,
+  QuienEntro,
+} from "./application/listar-usuarios";
 export { crearUsuarioStaff, crearCuentaStaffTx } from "./application/crear-usuario";
 export type { DatosCuentaStaff } from "./application/crear-usuario";
 export type { CuentaCreada } from "./application/alta-cuenta";

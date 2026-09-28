@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getAccessProfile } from "@/modules/access";
 import { handler, handlerWithAuth, json } from "@/platform/http/handler";
+import { quienEntro } from "../application/listar-usuarios";
 import { bootstrapIdentity } from "../infrastructure/authenticator";
 import { sessionService, userRepository } from "../infrastructure/composition";
 import {
@@ -64,9 +65,11 @@ export const logoutHandler = handler(async (request) => {
 
 /** GET /api/auth/me — usuario + roles + permisos (alimenta el menú). */
 export const meHandler = handlerWithAuth(async (_request, auth) => {
-  const [user, profile] = await Promise.all([
+  const [user, profile, quien] = await Promise.all([
     userRepository.findById(auth.userId),
     getAccessProfile(auth.userId),
+    // El NOMBRE no está en la cuenta: vive en la ficha de cada tipo de usuario.
+    quienEntro(auth.userId),
   ]);
   return json({
     user:
@@ -77,6 +80,8 @@ export const meHandler = handlerWithAuth(async (_request, auth) => {
             username: user.username,
             email: user.email,
             debeCambiarPassword: user.debeCambiarPassword,
+            nombre: quien.nombre,
+            tieneFoto: quien.tieneFoto,
           },
     roles: profile.roles,
     permisos: profile.permissions,

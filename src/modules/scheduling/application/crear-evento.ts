@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { registrarAuditoria } from "@/modules/audit";
+import { descargarArchivo, metaArchivo } from "@/modules/files";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
@@ -95,6 +96,30 @@ export async function fichasDeGuias(): Promise<FichaGuia[]> {
                g.telefono, g.pais, g.domicilio, g.fecha_nacimiento, g.zoom_url, g.foto_file_id
       ORDER BY u.username`,
   );
+}
+
+/**
+ * Foto del guía, para pintarla junto a su nombre.
+ *
+ * Va por el id del GUÍA, no por el del archivo: `files` guarda también fotos de
+ * niños y arte, y una ruta que sirviera cualquier id de `files` con la sesión de
+ * quien abra el enlace es exactamente la trampa que ya se pagó con
+ * `/api/catalog/imagen-curso/[id]`. Aquí solo sale el archivo al que apunta ESE
+ * guía, y solo si es una imagen.
+ */
+export async function fotoDeGuia(
+  guiaUserId: string,
+): Promise<{ meta: { mime: string }; bytes: Buffer }> {
+  const row = await queryOne<{ fotoFileId: string | null }>(
+    `SELECT foto_file_id AS "fotoFileId" FROM scheduling_guia WHERE guia_user_id = $1`,
+    [guiaUserId],
+  );
+  if (row?.fotoFileId == null) throw new NotFoundError("El guía no tiene foto.");
+  const meta = await metaArchivo(row.fotoFileId);
+  if (meta === null || !meta.mime.startsWith("image/")) {
+    throw new NotFoundError("El guía no tiene foto.");
+  }
+  return descargarArchivo(row.fotoFileId);
 }
 
 /**

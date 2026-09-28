@@ -13,11 +13,23 @@ import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
  */
 
 interface Me {
-  user: { id: string; username: string; debeCambiarPassword?: boolean } | null;
+  user: {
+    id: string;
+    username: string;
+    debeCambiarPassword?: boolean;
+    /** Nombre de su ficha: la cuenta solo guarda el acceso. */
+    nombre?: string | null;
+    /** El guía tiene foto en su ficha; el resto del staff no. */
+    tieneFoto?: boolean;
+  } | null;
   permisos: { code: string }[];
   /** El ROL importa por sí mismo para lo que no cuelga de un permiso. */
   roles?: { roleCode: string }[];
 }
+
+/** Cómo se llama quien entró: su nombre y, si no lo tiene, su usuario. */
+const nombreVisible = (me: Me): string =>
+  me.user?.nombre != null && me.user.nombre !== "" ? me.user.nombre : (me.user?.username ?? "");
 
 // El orden y el permiso PADRE de cada sección los define el módulo access
 // (SECCIONES_MENU), que es la única fuente de la jerarquía.
@@ -396,23 +408,42 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-            <span
-              aria-hidden
-              style={{
-                width: "2.2rem",
-                height: "2.2rem",
-                borderRadius: "50%",
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 800,
-                fontSize: "1rem",
-                color: "white",
-                background: "linear-gradient(135deg, var(--lgs-azul) 0%, var(--lgs-magenta) 100%)",
-                flexShrink: 0,
-              }}
-            >
-              {(me.user?.username ?? "?").charAt(0).toUpperCase()}
-            </span>
+            {/* La foto solo la tiene el guía (su ficha). Sin ella, la inicial. */}
+            {me.user?.tieneFoto === true && me.user.id !== undefined ? (
+              // Ruta AUTENTICADA: `next/image` no puede optimizarla.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/scheduling/guias/${me.user.id}/foto`}
+                alt=""
+                style={{
+                  width: "2.2rem",
+                  height: "2.2rem",
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  flexShrink: 0,
+                  background: "#eef2ff",
+                }}
+              />
+            ) : (
+              <span
+                aria-hidden
+                style={{
+                  width: "2.2rem",
+                  height: "2.2rem",
+                  borderRadius: "50%",
+                  display: "grid",
+                  placeItems: "center",
+                  fontWeight: 800,
+                  fontSize: "1rem",
+                  color: "white",
+                  background:
+                    "linear-gradient(135deg, var(--lgs-azul) 0%, var(--lgs-magenta) 100%)",
+                  flexShrink: 0,
+                }}
+              >
+                {(nombreVisible(me) ?? "?").charAt(0).toUpperCase()}
+              </span>
+            )}
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
@@ -422,10 +453,25 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                 }}
+                title={me.user?.username}
               >
-                {me.user?.username}
+                {nombreVisible(me)}
               </div>
-              <div style={{ fontSize: "0.72rem", color: "var(--texto-suave)" }}>sesión activa</div>
+              <div
+                style={{
+                  fontSize: "0.72rem",
+                  color: "var(--texto-suave)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {/* Debajo del nombre va el usuario: es el que se dicta por
+                    teléfono para entrar, y "sesión activa" ya lo dice el botón. */}
+                {me.user?.nombre != null && me.user.nombre !== ""
+                  ? me.user.username
+                  : "sesión activa"}
+              </div>
             </div>
           </div>
           <button

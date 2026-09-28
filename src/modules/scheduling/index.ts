@@ -81,6 +81,7 @@ export {
   guiasConZoom,
   guardarFichaGuia,
   fichasDeGuias,
+  fotoDeGuia,
   MAX_SALONES_COMPARTIDOS,
   DURACIONES_TALLER,
 } from "./application/crear-evento";

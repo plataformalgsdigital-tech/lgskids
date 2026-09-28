@@ -1,4 +1,4 @@
-import { queryRows } from "@/platform/db/query";
+import { queryOne, queryRows } from "@/platform/db/query";
 import { SQL_MOTIVOS_NO_BORRAR } from "./gestion-cuentas";
 
 /**
@@ -121,6 +121,33 @@ export async function listarUsuarios(params: {
     values,
   );
   return rows.map((r) => ({ ...r, roles: r.roles ?? [] }));
+}
+
+/**
+ * Quién es el que entró: su NOMBRE y, si es guía, su foto. La cuenta solo
+ * guarda el acceso, así que el panel mostraba el usuario generado
+ * (`vespinosa7913`) en vez de la persona.
+ */
+export interface QuienEntro {
+  nombre: string | null;
+  /** Solo el guía tiene foto (su ficha); el resto del staff no. */
+  tieneFoto: boolean;
+}
+
+export async function quienEntro(userId: string): Promise<QuienEntro> {
+  const row = await queryOne<{ nombre: string | null; fotoFileId: string | null }>(
+    `SELECT ${NOMBRE} AS nombre, g.foto_file_id AS "fotoFileId"
+       FROM identity_user u
+       LEFT JOIN people_person p ON p.user_id = u.id
+       LEFT JOIN scheduling_guia g ON g.guia_user_id = u.id
+       LEFT JOIN identity_perfil pf ON pf.user_id = u.id
+      WHERE u.id = $1`,
+    [userId],
+  );
+  return {
+    nombre: row?.nombre !== undefined && row.nombre !== "" ? row.nombre : null,
+    tieneFoto: row?.fotoFileId != null,
+  };
 }
 
 export interface GuiaListItem {

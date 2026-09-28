@@ -24,6 +24,8 @@ interface Ficha {
   domicilio: string | null;
   fechaNacimiento: string | null;
   zoomUrl: string | null;
+  /** Foto de su ficha. La sirve `/api/scheduling/guias/[id]/foto`. */
+  fotoFileId: string | null;
 }
 
 interface Enlace {
@@ -62,6 +64,54 @@ const tarjeta: CSSProperties = {
   borderRadius: "0.9rem",
   padding: "1rem 1.1rem",
 };
+
+const nombreDeGuia = (g: Ficha): string =>
+  g.nombres !== null && g.apellidos !== null ? `${g.nombres} ${g.apellidos}` : g.username;
+
+/**
+ * Cara del guía junto a su nombre. Quien coordina reconoce antes una cara que
+ * un usuario generado, y la foto ya se pedía en el alta sin mostrarse en
+ * ninguna pantalla. Sin foto, la inicial.
+ */
+function FotoGuia({ guia }: { guia: Ficha }) {
+  const lado = "2.4rem";
+  if (guia.fotoFileId === null) {
+    return (
+      <span
+        aria-hidden
+        style={{
+          width: lado,
+          height: lado,
+          flexShrink: 0,
+          borderRadius: "50%",
+          display: "grid",
+          placeItems: "center",
+          fontWeight: 800,
+          color: "white",
+          background: "linear-gradient(135deg, var(--lgs-azul) 0%, var(--lgs-magenta) 100%)",
+        }}
+      >
+        {nombreDeGuia(guia).charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    // La sirve una ruta AUTENTICADA: `next/image` no puede optimizarla.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/api/scheduling/guias/${guia.guiaUserId}/foto`}
+      alt=""
+      style={{
+        width: lado,
+        height: lado,
+        flexShrink: 0,
+        borderRadius: "50%",
+        objectFit: "cover",
+        background: "#eef2ff",
+      }}
+    />
+  );
+}
 
 const VACIA = {
   nombres: "",
@@ -253,35 +303,39 @@ export default function GuiasPage() {
                     cursor: "pointer",
                     background: sel?.guiaUserId === g.guiaUserId ? "#eef2ff" : "transparent",
                     font: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.6rem",
                   }}
                 >
-                  <span style={{ fontWeight: 700 }}>
-                    {g.nombres !== null && g.apellidos !== null
-                      ? `${g.nombres} ${g.apellidos}`
-                      : g.username}
-                  </span>
-                  <span
-                    style={{ display: "block", fontSize: "0.74rem", color: "var(--texto-suave)" }}
-                  >
-                    {g.username}
-                    {g.zoomUrl === null || g.zoomUrl === "" ? " · sin Zoom" : ` · ${g.pais ?? "—"}`}
-                  </span>
-                  {enlaces[g.guiaUserId] !== undefined && (
+                  <FotoGuia guia={g} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ fontWeight: 700 }}>{nombreDeGuia(g)}</span>
                     <span
-                      style={{
-                        display: "inline-block",
-                        marginTop: "0.25rem",
-                        fontSize: "0.68rem",
-                        fontWeight: 700,
-                        padding: "0.1rem 0.45rem",
-                        borderRadius: "1rem",
-                        background: COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].bg,
-                        color: COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].c,
-                      }}
+                      style={{ display: "block", fontSize: "0.74rem", color: "var(--texto-suave)" }}
                     >
-                      {COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].txt}
+                      {g.username}
+                      {g.zoomUrl === null || g.zoomUrl === ""
+                        ? " · sin Zoom"
+                        : ` · ${g.pais ?? "—"}`}
                     </span>
-                  )}
+                    {enlaces[g.guiaUserId] !== undefined && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          marginTop: "0.25rem",
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          padding: "0.1rem 0.45rem",
+                          borderRadius: "1rem",
+                          background: COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].bg,
+                          color: COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].c,
+                        }}
+                      >
+                        {COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].txt}
+                      </span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>
@@ -293,7 +347,18 @@ export default function GuiasPage() {
             <p style={{ color: "var(--texto-suave)" }}>Elige un guía para ver y editar su ficha.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
-              <h2 style={{ fontSize: "1.1rem", fontWeight: 800 }}>{sel.username}</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
+                <FotoGuia guia={sel} />
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>
+                    {nombreDeGuia(sel)}
+                  </h2>
+                  <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+                    {sel.username}
+                    {sel.fotoFileId === null && " · sin foto"}
+                  </span>
+                </div>
+              </div>
 
               <div
                 style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
