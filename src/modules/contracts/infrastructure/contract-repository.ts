@@ -260,6 +260,7 @@ export async function listContracts(params: {
   pais?: string;
   tipoCurso?: string;
   campaignId?: string;
+  classroomId?: string;
   inicioDesde?: string;
   finalHasta?: string;
   limit: number;
@@ -287,6 +288,11 @@ export async function listContracts(params: {
     values.push(params.campaignId);
     where.push(`ca.id = $${values.length}`);
   }
+  if (params.classroomId !== undefined) {
+    // Por el salón de su matrícula VIVA, igual que la sección Kids.
+    values.push(params.classroomId);
+    where.push(`cl.id = $${values.length}`);
+  }
   if (params.inicioDesde !== undefined) {
     values.push(params.inicioDesde);
     where.push(`c.inicio >= $${values.length}::date`);
@@ -306,6 +312,59 @@ export async function listContracts(params: {
       ORDER BY c.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     values,
+  );
+}
+
+/** Un contrato con todo lo que muestra su ficha (mismas columnas que la lista). */
+export async function findContractItem(
+  id: string,
+  countryScope: string[] | null,
+): Promise<ContractListItem | null> {
+  const values: unknown[] = [id];
+  let extra = "";
+  if (countryScope !== null) {
+    values.push(countryScope);
+    extra = ` AND c.country_code = ANY($${values.length})`;
+  }
+  return queryOne<ContractListItem>(`${SELECT_ITEM} WHERE c.id = $1${extra}`, values);
+}
+
+/**
+ * HERMANOS: los demás contratos de KIDS que salieron del MISMO contrato de LGS.
+ *
+ * En LGS un contrato lleva varios beneficiarios; en KIDS cada niño es su propio
+ * contrato y se distinguen por el sufijo `#documento` del `external_ref`. Por
+ * eso la ficha los muestra juntos: quien abre el contrato de un niño está
+ * mirando, en realidad, la matrícula de una familia.
+ */
+export async function findContractsPorRefBase(
+  base: string,
+  countryScope: string[] | null,
+): Promise<ContractListItem[]> {
+  const values: unknown[] = [`${base}%`];
+  let extra = "";
+  if (countryScope !== null) {
+    values.push(countryScope);
+    extra = ` AND c.country_code = ANY($${values.length})`;
+  }
+  return queryRows<ContractListItem>(
+    `${SELECT_ITEM} WHERE c.external_ref LIKE $1${extra} ORDER BY c.numero`,
+    values,
+  );
+}
+
+/** Cambia el tipo de curso del contrato (cambio de curso, con su matrícula). */
+export async function setContractTipoCurso(
+  id: string,
+  tipoCurso: string,
+  client?: Queryable,
+): Promise<void> {
+  await execute(
+    `UPDATE contracts_contract
+        SET tipo_curso = $2::catalog_course_tipo, updated_at = now()
+      WHERE id = $1`,
+    [id, tipoCurso],
+    client,
   );
 }
 

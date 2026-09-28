@@ -4,8 +4,10 @@ import { handlerWithAuth, json } from "@/platform/http/handler";
 import { buscarEstudiantes } from "../application/estudiantes";
 import {
   aprobarContrato,
+  cambiarCursoContrato,
   crearContrato,
   crearReservaBeneficiario,
+  fichaContrato,
   inactivarContrato,
   listarContratos,
   ponerEnPausa,
@@ -97,6 +99,7 @@ const listarSchema = z.object({
     .optional(),
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
   campaignId: z.uuid().optional(),
+  classroomId: z.uuid().optional(),
   inicioDesde: ISO_DATE_OPT,
   finalHasta: ISO_DATE_OPT,
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -133,12 +136,50 @@ export const listarContratosHandler = handlerWithAuth(async (request, auth) => {
     ...(query.pais !== undefined && { pais: query.pais }),
     ...(query.tipoCurso !== undefined && { tipoCurso: query.tipoCurso }),
     ...(query.campaignId !== undefined && { campaignId: query.campaignId }),
+    ...(query.classroomId !== undefined && { classroomId: query.classroomId }),
     ...(query.inicioDesde !== undefined && { inicioDesde: query.inicioDesde }),
     ...(query.finalHasta !== undefined && { finalHasta: query.finalHasta }),
     limit: query.limit,
     offset: query.offset,
   });
   return json({ contratos });
+});
+
+/** GET /api/contracts/[id] — ficha del contrato: titular, niño y hermanos. */
+export const fichaContratoHandler = handlerWithAuth(async (_request, auth, context) => {
+  const contractId = await contractIdFromContext(context);
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CONTRATOS_VER);
+  const ficha = await fichaContrato(contractId, auth.countryScope);
+  return json({
+    ...ficha,
+    // Solo deciden qué botones dibuja la pantalla; el servidor lo vuelve a exigir.
+    puedeGestionar: profile.hasPermission(PERMISOS.CONTRATOS_GESTIONAR),
+  });
+});
+
+const cursoSchema = z.object({
+  tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
+  classroomId: z.uuid().nullish(),
+  motivo: z.string().min(5).max(300),
+});
+
+/** POST /api/contracts/[id]/curso — cambio de CURSO (con su salón nuevo). */
+export const cambiarCursoHandler = handlerWithAuth(async (request, auth, context) => {
+  const contractId = await contractIdFromContext(context);
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  const body = cursoSchema.parse(await request.json());
+  return json(
+    await cambiarCursoContrato({
+      actorUserId: auth.userId,
+      contractId,
+      tipoCurso: body.tipoCurso,
+      classroomId: body.classroomId ?? null,
+      motivo: body.motivo,
+      ip: ip(request),
+    }),
+  );
 });
 
 const aprobarSchema = z.object({ classroomId: z.uuid().nullish() });

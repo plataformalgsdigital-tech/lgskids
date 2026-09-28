@@ -1,7 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+
+/**
+ * Contratos: LISTA para buscar, ficha para trabajar.
+ *
+ * La pantalla era una tarjeta por contrato con todos sus datos y sus botones;
+ * con una campaña real eso es una columna de párrafos por la que no se puede
+ * pasar el ojo. Aquí quedan las cinco columnas con las que se busca —campaña,
+ * N°, titular, documento y fecha— y todo lo demás vive en la ficha, a un clic.
+ */
 
 interface Contrato {
   id: string;
@@ -38,15 +48,6 @@ interface SalonOpcion {
   id: string;
   nombre: string;
   campania: string;
-  curso: string; // tipo del curso (JUNIOR | YOUNGSTER)
-  cupo: number;
-  sesiones: number;
-}
-
-interface Credenciales {
-  username: string;
-  correo: string;
-  passwordInicial: string;
 }
 
 const ESTADO_UI: Record<Contrato["estado"], { texto: string; color: string; fondo: string }> = {
@@ -73,25 +74,37 @@ const botonAccion: CSSProperties = {
   cursor: "pointer",
 };
 
+const th: CSSProperties = {
+  textAlign: "left",
+  padding: "0.55rem 0.7rem",
+  fontSize: "0.76rem",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+  color: "var(--texto-suave)",
+  borderBottom: "1px solid #e3e7f0",
+  whiteSpace: "nowrap",
+};
+
+const td: CSSProperties = {
+  padding: "0.6rem 0.7rem",
+  fontSize: "0.88rem",
+  borderBottom: "1px solid #edf0f6",
+  verticalAlign: "middle",
+};
+
 export default function ContratosPage() {
+  const router = useRouter();
   const [contratos, setContratos] = useState<Contrato[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [credenciales, setCredenciales] = useState<Credenciales | null>(null);
-  const [ocupado, setOcupado] = useState(false);
   const [descargando, setDescargando] = useState(false);
   const [salones, setSalones] = useState<SalonOpcion[]>([]);
   const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
-  // Contrato al que se le está eligiendo salón (matrícula o cambio académico).
-  const [eligiendoSalon, setEligiendoSalon] = useState<{
-    contrato: Contrato;
-    modo: "matricular" | "mover";
-  } | null>(null);
-  const [salonElegido, setSalonElegido] = useState("");
   // Filtros
   const [fEstado, setFEstado] = useState("");
   const [fPais, setFPais] = useState("");
   const [fTipoCurso, setFTipoCurso] = useState("");
   const [fCampaniaId, setFCampaniaId] = useState("");
+  const [fSalonId, setFSalonId] = useState("");
   const [fInicioDesde, setFInicioDesde] = useState("");
   const [fFinalHasta, setFFinalHasta] = useState("");
 
@@ -101,6 +114,7 @@ export default function ContratosPage() {
     if (fPais) p.set("pais", fPais);
     if (fTipoCurso) p.set("tipoCurso", fTipoCurso);
     if (fCampaniaId) p.set("campaignId", fCampaniaId);
+    if (fSalonId) p.set("classroomId", fSalonId);
     if (fInicioDesde) p.set("inicioDesde", fInicioDesde);
     if (fFinalHasta) p.set("finalHasta", fFinalHasta);
     p.set("limit", "200");
@@ -109,7 +123,7 @@ export default function ContratosPage() {
       const data: { contratos: Contrato[] } = await res.json();
       setContratos(data.contratos);
     }
-  }, [fEstado, fPais, fTipoCurso, fCampaniaId, fInicioDesde, fFinalHasta]);
+  }, [fEstado, fPais, fTipoCurso, fCampaniaId, fSalonId, fInicioDesde, fFinalHasta]);
 
   useEffect(() => {
     async function run() {
@@ -135,6 +149,11 @@ export default function ContratosPage() {
     }
     void estaticos();
   }, []);
+
+  // Con una campaña elegida, el selector de salón muestra solo los suyos.
+  const campaniaNombre = campanias.find((c) => c.id === fCampaniaId)?.nombre;
+  const salonesVisibles =
+    campaniaNombre === undefined ? salones : salones.filter((s) => s.campania === campaniaNombre);
 
   /** Genera un CSV con los contratos actualmente listados (respeta los filtros). */
   function descargarCSV() {
@@ -211,101 +230,8 @@ export default function ContratosPage() {
     }
   }
 
-  async function accion(id: string, ruta: string, body?: object) {
-    setError(null);
-    setOcupado(true);
-    try {
-      const res = await apiFetch(`/api/contracts/${id}/${ruta}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        ...(body !== undefined && { body: JSON.stringify(body) }),
-      });
-      const data: {
-        credenciales?: Credenciales | null;
-        error?: { message: string };
-        diasExtendidos?: number;
-      } = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? "La operación falló.");
-        return;
-      }
-      if (data.credenciales != null) {
-        setCredenciales(data.credenciales);
-      }
-      await cargarContratos();
-    } catch {
-      setError("Error de conexión.");
-    } finally {
-      setOcupado(false);
-    }
-  }
-
-  function aprobar(id: string) {
-    void accion(id, "approve");
-  }
-
-  async function confirmarSalon() {
-    if (eligiendoSalon === null || salonElegido === "") return;
-    setError(null);
-    setOcupado(true);
-    try {
-      let res: Response;
-      if (eligiendoSalon.modo === "matricular") {
-        res = await apiFetch("/api/enrollment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contractId: eligiendoSalon.contrato.id,
-            classroomId: salonElegido,
-          }),
-        });
-      } else {
-        const motivo = window.prompt("Motivo del cambio académico (obligatorio):");
-        if (motivo === null) {
-          setOcupado(false);
-          return;
-        }
-        if (motivo.trim().length < 5) {
-          setError("El motivo debe tener al menos 5 caracteres.");
-          setOcupado(false);
-          return;
-        }
-        res = await apiFetch(`/api/enrollment/${eligiendoSalon.contrato.enrollmentId}/move`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nuevoClassroomId: salonElegido, motivo }),
-        });
-      }
-      const data: { error?: { message: string } } = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? "La operación falló.");
-        return;
-      }
-      setEligiendoSalon(null);
-      setSalonElegido("");
-      await cargarContratos();
-    } catch {
-      setError("Error de conexión.");
-    } finally {
-      setOcupado(false);
-    }
-  }
-  function pausar(id: string) {
-    const motivo = window.prompt("Motivo de la pausa (obligatorio):");
-    if (motivo !== null && motivo.trim().length >= 5) void accion(id, "onhold", { motivo });
-    else if (motivo !== null) setError("El motivo debe tener al menos 5 caracteres.");
-  }
-  function reactivar(id: string) {
-    void accion(id, "reactivate");
-  }
-  function inactivar(id: string) {
-    const motivo = window.prompt("Motivo de la inactivación (obligatorio):");
-    if (motivo !== null && motivo.trim().length >= 5) void accion(id, "deactivate", { motivo });
-    else if (motivo !== null) setError("El motivo debe tener al menos 5 caracteres.");
-  }
-
   return (
-    <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
+    <main style={{ padding: "2rem", maxWidth: "72rem", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: "1.6rem" }}>Contratos</h1>
         <button
@@ -365,7 +291,7 @@ export default function ContratosPage() {
           </select>
         </label>
         <label
-          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 12rem" }}
+          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 11rem" }}
         >
           <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Campaña</span>
           <select
@@ -393,6 +319,26 @@ export default function ContratosPage() {
             <option value="YOUNGSTER">Youngster (10–13)</option>
           </select>
         </label>
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 12rem" }}
+        >
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Salón</span>
+          {/* Por el salón de la matrícula viva; lleva su campaña delante porque
+              el mismo "Salón 01" existe en todas. */}
+          <select
+            value={fSalonId}
+            onChange={(e) => setFSalonId(e.target.value)}
+            style={inputStyle}
+            disabled={salones.length === 0}
+          >
+            <option value="">{salones.length === 0 ? "Sin salones" : "Todos"}</option>
+            {salonesVisibles.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.campania} · {s.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Inicio desde</span>
           <input
@@ -411,13 +357,20 @@ export default function ContratosPage() {
             style={inputStyle}
           />
         </label>
-        {(fEstado || fPais || fTipoCurso || fCampaniaId || fInicioDesde || fFinalHasta) && (
+        {(fEstado ||
+          fPais ||
+          fTipoCurso ||
+          fCampaniaId ||
+          fSalonId ||
+          fInicioDesde ||
+          fFinalHasta) && (
           <button
             onClick={() => {
               setFEstado("");
               setFPais("");
               setFTipoCurso("");
               setFCampaniaId("");
+              setFSalonId("");
               setFInicioDesde("");
               setFFinalHasta("");
             }}
@@ -428,250 +381,91 @@ export default function ContratosPage() {
         )}
       </div>
 
-      {credenciales !== null && (
-        <div
-          style={{
-            marginTop: "1rem",
-            padding: "1rem 1.25rem",
-            background: "#e8f5e9",
-            border: "2px solid var(--lgs-verde)",
-            borderRadius: "0.9rem",
-          }}
-        >
-          <strong>🎉 Alumno dado de alta. Credenciales (se muestran UNA sola vez):</strong>
-          <p style={{ marginTop: "0.4rem", fontFamily: "monospace", fontSize: "1.05rem" }}>
-            Usuario: <strong>{credenciales.username}</strong> · Contraseña inicial:{" "}
-            <strong>{credenciales.passwordInicial}</strong>
-          </p>
-          <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-            Entréguelas al apoderado. El niño deberá cambiar la contraseña en su primer ingreso.
-          </p>
-          <button
-            onClick={() => setCredenciales(null)}
-            style={{ ...botonAccion, marginTop: "0.4rem" }}
-          >
-            Entendido, cerrar
-          </button>
-        </div>
-      )}
-
-      {error !== null && (
-        <p role="alert" style={{ marginTop: "0.75rem", color: "#c62828" }}>
-          {error}
-        </p>
-      )}
-
-      <section
-        style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
-      >
+      <section style={{ marginTop: "1.25rem" }}>
         {contratos === null ? (
           <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
         ) : contratos.length === 0 ? (
           <p style={{ color: "var(--texto-suave)" }}>
-            Sin contratos. Primero crea las personas en la sección Personas.
+            Sin contratos con esos filtros. Los contratos nuevos se crean en Reservas (LGS) o desde
+            la sección Kids.
           </p>
         ) : (
-          contratos.map((c) => {
-            const estado = ESTADO_UI[c.estado];
-            return (
-              <div
-                key={c.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.8rem 1rem",
-                  border: "1px solid #e3e7f0",
-                  borderRadius: "0.7rem",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ minWidth: "16rem" }}>
-                  {/* 1) Campaña · N° de contrato · Fecha · Plataforma */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: "0.5rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <strong style={{ fontSize: "1rem", color: "var(--lgs-azul-oscuro)" }}>
-                      {c.campania ?? "— sin campaña —"}
-                    </strong>
-                    <strong>· N° {c.numero}</strong>
-                    {c.externalRef !== null && (
-                      <span
-                        style={{
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                          color: "#0d47a1",
-                          background: "#e3f2fd",
-                          padding: "0.1rem 0.45rem",
-                          borderRadius: "0.5rem",
-                        }}
-                      >
-                        LGS {c.externalRef}
-                      </span>
-                    )}
-                    <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                      · {c.inicio} → {c.finalContrato} · {c.countryCode}
-                    </span>
-                  </div>
-                  {/* 2) Titular + datos */}
-                  <div
-                    style={{
-                      fontSize: "0.8rem",
-                      color: "var(--texto-suave)",
-                      marginTop: "0.25rem",
-                    }}
-                  >
-                    👤 Titular: <strong>{c.titular}</strong> · {c.titularDocTipo}{" "}
-                    {c.titularDocNumero}
-                    {c.titularTelefono !== null && ` · tel. ${c.titularTelefono}`}
-                    {c.titularEmail !== null && ` · ${c.titularEmail}`}
-                  </div>
-                  {/* 3) Beneficiario + datos + curso */}
-                  <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                    👦 Beneficiario: <strong>{c.beneficiario}</strong> · {c.beneficiarioDocTipo}{" "}
-                    {c.beneficiarioDocNumero}
-                    {c.beneficiarioFechaNac !== null && ` · nac. ${c.beneficiarioFechaNac}`}
-                    {" · "}
-                    <strong>
-                      {c.tipoCurso === "JUNIOR" ? "Junior (6–9)" : "Youngster (10–13)"}
-                    </strong>
-                    {c.username !== null && ` · usuario: ${c.username}`}
-                    {c.salon !== null && (
-                      <>
-                        {" · "}
-                        <strong style={{ color: "var(--lgs-azul-oscuro)" }}>🎓 {c.salon}</strong>
-                      </>
-                    )}
-                  </div>
-                  {/* 4) Apoderado(s) */}
-                  {c.apoderados.length > 0 && (
-                    <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                      🧑‍🤝‍🧑 Apoderado{c.apoderados.length > 1 ? "s" : ""}:{" "}
-                      {c.apoderados
-                        .map(
-                          (a) =>
-                            `${a.nombre}${a.parentesco !== null ? ` (${a.parentesco})` : ""} · ${a.docTipo} ${a.docNumero}${a.telefono !== null ? ` · tel. ${a.telefono}` : ""}`,
-                        )
-                        .join("   |   ")}
-                    </div>
-                  )}
-                  {eligiendoSalon?.contrato.id === c.id && (
-                    <div
-                      style={{
-                        marginTop: "0.4rem",
-                        display: "flex",
-                        gap: "0.4rem",
-                        alignItems: "center",
-                        flexWrap: "wrap",
+          <div style={{ overflowX: "auto", border: "1px solid #e3e7f0", borderRadius: "0.8rem" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", background: "white" }}>
+              <thead>
+                <tr>
+                  <th style={th}>Campaña</th>
+                  <th style={th}>N° contrato</th>
+                  <th style={th}>Titular</th>
+                  <th style={th}>ID</th>
+                  <th style={th}>Fecha</th>
+                  <th style={th}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contratos.map((c) => {
+                  const estado = ESTADO_UI[c.estado];
+                  const abrir = () => router.push(`/panel/contratos/${c.id}`);
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={abrir}
+                      // Clic en la fila y Enter con el teclado: la fila ES el enlace.
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") abrir();
                       }}
+                      style={{ cursor: "pointer" }}
+                      title="Ver la ficha del contrato"
                     >
-                      <select
-                        value={salonElegido}
-                        onChange={(e) => setSalonElegido(e.target.value)}
-                        style={{
-                          padding: "0.4rem",
-                          borderRadius: "0.5rem",
-                          border: "1.5px solid #d8dce6",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        <option value="">— Elegir salón {c.tipoCurso} —</option>
-                        {salones
-                          .filter((s) => s.curso === c.tipoCurso)
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.campania} · {s.nombre} (cupo {s.cupo})
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        style={{ ...botonAccion, borderColor: "var(--lgs-verde)" }}
-                        disabled={ocupado || salonElegido === ""}
-                        onClick={() => void confirmarSalon()}
-                      >
-                        Confirmar
-                      </button>
-                      <button style={botonAccion} onClick={() => setEligiendoSalon(null)}>
-                        Cancelar
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                  <span
-                    style={{
-                      fontSize: "0.78rem",
-                      fontWeight: 700,
-                      padding: "0.22rem 0.6rem",
-                      borderRadius: "1rem",
-                      color: estado.color,
-                      background: estado.fondo,
-                    }}
-                  >
-                    {estado.texto}
-                  </span>
-                  {c.estado === "PENDIENTE" && (
-                    <button
-                      style={{ ...botonAccion, borderColor: "var(--lgs-verde)" }}
-                      onClick={() => aprobar(c.id)}
-                      disabled={ocupado}
-                    >
-                      ✔ Aprobar
-                    </button>
-                  )}
-                  {c.estado === "APROBADO" && c.enrollmentId === null && (
-                    <button
-                      style={{ ...botonAccion, borderColor: "var(--lgs-azul)" }}
-                      disabled={ocupado}
-                      onClick={() => {
-                        setEligiendoSalon({ contrato: c, modo: "matricular" });
-                        setSalonElegido("");
-                      }}
-                    >
-                      🎓 Matricular
-                    </button>
-                  )}
-                  {c.estado === "APROBADO" && c.enrollmentId !== null && (
-                    <button
-                      style={botonAccion}
-                      disabled={ocupado}
-                      onClick={() => {
-                        setEligiendoSalon({ contrato: c, modo: "mover" });
-                        setSalonElegido("");
-                      }}
-                    >
-                      🔀 Cambiar salón
-                    </button>
-                  )}
-                  {c.estado === "APROBADO" && (
-                    <button style={botonAccion} onClick={() => pausar(c.id)} disabled={ocupado}>
-                      ⏸ Pausar
-                    </button>
-                  )}
-                  {c.estado === "ONHOLD" && (
-                    <button style={botonAccion} onClick={() => reactivar(c.id)} disabled={ocupado}>
-                      ▶ Reactivar
-                    </button>
-                  )}
-                  {c.estado !== "INACTIVO" && (
-                    <button
-                      style={{ ...botonAccion, color: "#c62828" }}
-                      onClick={() => inactivar(c.id)}
-                      disabled={ocupado}
-                    >
-                      ✖ Inactivar
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })
+                      <td style={{ ...td, fontWeight: 700, color: "var(--lgs-azul-oscuro)" }}>
+                        {c.campania ?? "— sin campaña —"}
+                      </td>
+                      <td style={td}>
+                        <strong>N° {c.numero}</strong>
+                        {c.externalRef !== null && (
+                          <span
+                            style={{
+                              marginLeft: "0.4rem",
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              color: "#0d47a1",
+                              background: "#e3f2fd",
+                              padding: "0.1rem 0.4rem",
+                              borderRadius: "0.5rem",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            LGS {c.externalRef}
+                          </span>
+                        )}
+                      </td>
+                      <td style={td}>{c.titular}</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>
+                        {c.titularDocTipo} {c.titularDocNumero}
+                      </td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{c.inicio}</td>
+                      <td style={td}>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            padding: "0.2rem 0.55rem",
+                            borderRadius: "1rem",
+                            color: estado.color,
+                            background: estado.fondo,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {estado.texto}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </main>

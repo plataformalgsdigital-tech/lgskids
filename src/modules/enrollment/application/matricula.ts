@@ -112,6 +112,36 @@ export async function matricular(input: {
 }
 
 /**
+ * MOVER una matrícula, dentro de una transacción ajena: cierra la de origen
+ * (el historial conserva el motivo) y crea la nueva por `matricularTx`, que es
+ * quien valida cupo y tipo de curso.
+ *
+ * Está suelto porque lo usan DOS caminos —el cambio académico y el cambio de
+ * CURSO del contrato, que además reescribe `tipo_curso`—, y tener el par
+ * cerrar+matricular copiado en los dos es pedir que uno se olvide del cierre y
+ * el niño quede en dos salones.
+ */
+export async function moverMatriculaTx(
+  tx: Queryable,
+  input: {
+    enrollmentId: string;
+    contractId: string;
+    childPersonId: string;
+    nuevoClassroomId: string;
+    tipoCursoContrato: string;
+    motivo: string;
+  },
+): Promise<string> {
+  await cerrarEnrollment(tx, input.enrollmentId, "FINALIZADA", `cambio académico: ${input.motivo}`);
+  return matricularTx(tx, {
+    contractId: input.contractId,
+    childPersonId: input.childPersonId,
+    classroomId: input.nuevoClassroomId,
+    tipoCursoContrato: input.tipoCursoContrato,
+  });
+}
+
+/**
  * CAMBIO ACADÉMICO (sección 2.7): mueve al niño a otro salón (de cualquier
  * campaña, mismo tipo de curso) en UNA transacción: cierra la matrícula
  * origen (historial conservado con motivo) y crea la nueva validando cupo
@@ -140,15 +170,16 @@ export async function cambioAcademico(input: {
     throw new ConflictError("El contrato de la matrícula no está APROBADO.");
   }
 
-  const nuevoId = await withTransaction(async (tx) => {
-    await cerrarEnrollment(tx, actual.id, "FINALIZADA", `cambio académico: ${input.motivo.trim()}`);
-    return matricularTx(tx, {
+  const nuevoId = await withTransaction((tx) =>
+    moverMatriculaTx(tx, {
+      enrollmentId: actual.id,
       contractId: actual.contractId,
       childPersonId: actual.childPersonId,
-      classroomId: input.nuevoClassroomId,
+      nuevoClassroomId: input.nuevoClassroomId,
       tipoCursoContrato: contrato.tipoCurso,
-    });
-  });
+      motivo: input.motivo.trim(),
+    }),
+  );
 
   await registrarAuditoria({
     actorUserId: input.actorUserId,

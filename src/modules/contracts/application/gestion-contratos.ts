@@ -5,6 +5,7 @@ import {
   cancelarMatriculaDeContratoTx,
   findMatriculaVivaByContract,
   matricularTx,
+  moverMatriculaTx,
 } from "@/modules/enrollment";
 import {
   inactivarUsuarioTx,
@@ -25,7 +26,7 @@ import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { logger } from "@/platform/logging/logger";
 import { validarEdadParaTipo } from "../domain/edad";
-import { validarExternalRef } from "../domain/external-ref";
+import { parseExternalRef, validarExternalRef } from "../domain/external-ref";
 import { contratoVencido, fechaUtcHoy, finalDeContrato } from "../domain/vigencia";
 import {
   beneficiarioTieneOtrosContratosVivos,
@@ -33,6 +34,8 @@ import {
   extenderFinalContrato,
   findContractById,
   findContractByExternalRef,
+  findContractItem,
+  findContractsPorRefBase,
   findContratosVencidos,
   findOnholdAbierto,
   insertContract,
@@ -40,6 +43,7 @@ import {
   listContracts,
   searchContracts,
   setContractEstado,
+  setContractTipoCurso,
   type ContractListItem,
   type ContractRecord,
 } from "../infrastructure/contract-repository";
@@ -538,6 +542,7 @@ export async function listarContratos(params: {
   pais?: string;
   tipoCurso?: string;
   campaignId?: string;
+  classroomId?: string;
   inicioDesde?: string;
   finalHasta?: string;
   limit?: number;
@@ -549,6 +554,7 @@ export async function listarContratos(params: {
     ...(params.pais !== undefined && { pais: params.pais }),
     ...(params.tipoCurso !== undefined && { tipoCurso: params.tipoCurso }),
     ...(params.campaignId !== undefined && { campaignId: params.campaignId }),
+    ...(params.classroomId !== undefined && { classroomId: params.classroomId }),
     ...(params.inicioDesde !== undefined && { inicioDesde: params.inicioDesde }),
     ...(params.finalHasta !== undefined && { finalHasta: params.finalHasta }),
     limit: Math.min(Math.max(params.limit ?? 50, 1), 200),
@@ -560,4 +566,117 @@ export async function obtenerContrato(id: string): Promise<ContractRecord> {
   const contrato = await findContractById(id);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
   return contrato;
+}
+
+export interface FichaContrato {
+  contrato: ContractListItem;
+  /**
+   * Los OTROS niños del mismo contrato de LGS. En KIDS cada niño es su propio
+   * contrato, así que la ficha de uno enseña a sus hermanos y cada tarjeta
+   * actúa sobre SU contrato.
+   */
+  hermanos: ContractListItem[];
+}
+
+/** Ficha del contrato: su titular, su beneficiario y los hermanos. */
+export async function fichaContrato(
+  id: string,
+  countryScope: string[] | null,
+): Promise<FichaContrato> {
+  const contrato = await findContractItem(id, countryScope);
+  if (contrato === null) throw new NotFoundError("El contrato no existe.");
+  // Sin N° de LGS (contrato hecho en KIDS) no hay con qué agrupar hermanos.
+  const partes = contrato.externalRef === null ? null : parseExternalRef(contrato.externalRef);
+  const hermanos =
+    partes === null
+      ? []
+      : (await findContractsPorRefBase(partes.base, countryScope)).filter(
+          (c) => c.id !== contrato.id,
+        );
+  return { contrato, hermanos };
+}
+
+/**
+ * CAMBIO DE CURSO: el niño pasa de Junior a Youngster (o al revés).
+ *
+ * Es más que mover de salón: cambia el `tipo_curso` del CONTRATO, y por eso
+ * vive aquí y no en enrollment. Va todo en una transacción — el contrato y su
+ * matrícula tienen que quedar del mismo curso, o `matricularTx` rechazaría el
+ * siguiente movimiento.
+ *
+ * La EDAD **advierte, no bloquea**, y es a propósito: los rangos de los dos
+ * cursos son disjuntos (6–9 y 10–13) y la edad se mide a la fecha de INICIO,
+ * así que exigirla como en el alta haría imposible TODO cambio de curso. Los
+ * casos reales son justamente los que la regla de alta no contempla: el niño
+ * cumplió años, o llegó con la fecha de nacimiento equivocada y se corrigió.
+ * La advertencia viaja en la respuesta y queda en la auditoría con el motivo.
+ */
+export async function cambiarCursoContrato(input: {
+  actorUserId: string;
+  contractId: string;
+  tipoCurso: "JUNIOR" | "YOUNGSTER";
+  /** Salón del curso nuevo. Obligatorio si el niño está matriculado. */
+  classroomId?: string | null;
+  motivo: string;
+  ip?: string | null;
+}): Promise<{ enrollmentId: string | null; advertencia: string | null }> {
+  if (input.motivo.trim().length < 5) {
+    throw new ValidationError("El motivo del cambio es obligatorio (mínimo 5 caracteres).");
+  }
+  const contrato = await findContractById(input.contractId);
+  if (contrato === null) throw new NotFoundError("El contrato no existe.");
+  if (contrato.tipoCurso === input.tipoCurso) {
+    throw new ValidationError("El contrato ya está en ese curso.");
+  }
+  if (contrato.estado === "INACTIVO") {
+    throw new ConflictError("El contrato está inactivo.");
+  }
+
+  const nino = await findPersonById(contrato.beneficiarioId);
+  let advertencia: string | null = null;
+  if (nino?.fechaNacimiento != null) {
+    try {
+      validarEdadParaTipo(nino.fechaNacimiento, contrato.inicio, input.tipoCurso);
+    } catch (e) {
+      // La MISMA regla del alta, en modo aviso: quien lo hace ve exactamente
+      // qué se está saltando, y queda escrito junto a su motivo.
+      advertencia = e instanceof ValidationError ? e.message : "La edad no cuadra con el curso.";
+    }
+  }
+
+  const viva = await findMatriculaVivaByContract(input.contractId);
+  if (viva !== null && (input.classroomId == null || input.classroomId === "")) {
+    throw new ValidationError(
+      "Elige el salón del curso nuevo: el niño está matriculado y tiene que quedar en uno.",
+    );
+  }
+
+  const enrollmentId = await withTransaction(async (tx) => {
+    await setContractTipoCurso(input.contractId, input.tipoCurso, tx);
+    if (viva === null || input.classroomId == null) return null;
+    return moverMatriculaTx(tx, {
+      enrollmentId: viva.id,
+      contractId: input.contractId,
+      childPersonId: contrato.beneficiarioId,
+      nuevoClassroomId: input.classroomId,
+      tipoCursoContrato: input.tipoCurso,
+      motivo: `cambio de curso: ${input.motivo.trim()}`,
+    });
+  });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.curso_cambiado",
+    entidad: "contracts_contract",
+    entidadId: input.contractId,
+    payload: {
+      desde: contrato.tipoCurso,
+      hacia: input.tipoCurso,
+      motivo: input.motivo.trim(),
+      classroomId: input.classroomId ?? null,
+      advertencia,
+    },
+    ip: input.ip ?? null,
+  });
+  return { enrollmentId, advertencia };
 }

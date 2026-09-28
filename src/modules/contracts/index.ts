@@ -19,7 +19,10 @@ export {
   listarContratos,
   buscarContratos,
   obtenerContrato,
+  fichaContrato,
+  cambiarCursoContrato,
 } from "./application/gestion-contratos";
+export type { FichaContrato } from "./application/gestion-contratos";
 export {
   contratoVencido,
   fechaUtcHoy,
@@ -36,6 +39,8 @@ export {
   crearContratoHandler,
   crearReservaHandler,
   listarContratosHandler,
+  fichaContratoHandler,
+  cambiarCursoHandler,
   aprobarContratoHandler,
   onholdHandler,
   reactivarHandler,
