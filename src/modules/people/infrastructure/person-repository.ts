@@ -75,11 +75,24 @@ export interface NinoListItem {
   contratoEstado: string | null;
   campania: string | null;
   curso: string | null;
+  salon: string | null;
 }
 
 /**
- * Lista de NIÑOS (personas con fecha de nacimiento) enriquecida con su usuario,
- * su contrato más reciente y — si tiene matrícula viva — su campaña y curso.
+ * NIÑO = quien juega el papel de niño: el beneficiario de un contrato o el
+ * menor de una relación apoderado–niño.
+ *
+ * Antes bastaba con tener fecha de nacimiento, y por ahí se colaban los
+ * APODERADOS: LGS manda también la del titular, así que la sección Kids listaba
+ * a la mamá junto a su hijo, sin campaña ni curso. La edad no dice quién es
+ * niño; el papel en el contrato sí.
+ */
+const ES_NINO = `(EXISTS (SELECT 1 FROM people_guardianship g WHERE g.nino_id = p.id)
+       OR EXISTS (SELECT 1 FROM contracts_contract cc WHERE cc.beneficiario_id = p.id))`;
+
+/**
+ * Lista de NIÑOS enriquecida con su usuario, su contrato más reciente y — si
+ * tiene matrícula viva — su campaña, curso y salón.
  * Alcance por país (ADR-0009) + filtros de la sección Kids.
  */
 export async function listNinos(params: {
@@ -88,12 +101,13 @@ export async function listNinos(params: {
   estado?: string;
   tipoCurso?: string;
   campaignId?: string;
+  classroomId?: string;
   inicioDesde?: string;
   finalHasta?: string;
   limit: number;
   offset: number;
 }): Promise<NinoListItem[]> {
-  const where: string[] = ["p.fecha_nacimiento IS NOT NULL"];
+  const where: string[] = [ES_NINO];
   const values: unknown[] = [];
   if (params.countryScope !== null) {
     values.push(params.countryScope);
@@ -115,6 +129,12 @@ export async function listNinos(params: {
     values.push(params.campaignId);
     where.push(`ca.id = $${values.length}`);
   }
+  if (params.classroomId !== undefined) {
+    // Por el salón de su matrícula VIVA: la lista del salón se deriva de las
+    // matrículas, nunca de una tabla aparte (Fase 7).
+    values.push(params.classroomId);
+    where.push(`cl.id = $${values.length}`);
+  }
   if (params.inicioDesde !== undefined) {
     values.push(params.inicioDesde);
     where.push(`c.inicio >= $${values.length}::date`);
@@ -135,7 +155,7 @@ export async function listNinos(params: {
             c.numero AS "contratoNumero", c.external_ref AS "externalRef",
             c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
             c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
-            ca.nombre AS campania,
+            ca.nombre AS campania, cl.nombre AS salon,
             COALESCE(cu.tipo::text, c.tipo_curso::text) AS curso
        FROM people_person p
        LEFT JOIN identity_user u ON u.id = p.user_id

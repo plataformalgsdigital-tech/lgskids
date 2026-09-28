@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { crearCampania } from "@/modules/catalog";
+import { listarNinos } from "@/modules/people";
 import { crearSalon } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
@@ -126,6 +127,34 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
       [externalRef],
     );
     expect(cuantos?.n).toBe(1);
+  });
+
+  it("la sección Kids lista al NIÑO, no a su apoderado, y filtra por salón", async () => {
+    // El apoderado también trae fecha de nacimiento cuando LGS la manda, así
+    // que "tiene fecha de nacimiento" no sirve para decidir quién es niño: la
+    // mamá aparecía en Kids junto a su hijo, sin campaña ni curso.
+    await execute(
+      `UPDATE people_person SET fecha_nacimiento = '1988-05-04'
+        WHERE apellidos = $1 AND doc_numero = $2`,
+      [`Prueba${marca}`, `T-${marca}`],
+    );
+
+    const lista = await listarNinos({ countryScope: null, id: marca, limit: 50 });
+    const docs = lista.map((n) => n.docNumero);
+    expect(docs).toContain(`N-${marca}`);
+    expect(docs).not.toContain(`T-${marca}`);
+    expect(lista.find((n) => n.docNumero === `N-${marca}`)?.salon).toBe(`Salón prueba ${marca}`);
+
+    // El filtro de salón sale de la matrícula viva.
+    const delSalon = await listarNinos({ countryScope: null, id: marca, classroomId, limit: 50 });
+    expect(delSalon.map((n) => n.docNumero)).toEqual([`N-${marca}`]);
+    const deOtro = await listarNinos({
+      countryScope: null,
+      id: marca,
+      classroomId: randomUUID(),
+      limit: 50,
+    });
+    expect(deOtro).toEqual([]);
   });
 
   it("la misma referencia con OTRO niño sí es conflicto", async () => {

@@ -23,6 +23,14 @@ interface Nino {
   contratoEstado: string | null;
   campania: string | null;
   curso: string | null;
+  /** Salón de su matrícula viva; null si todavía no está matriculado. */
+  salon: string | null;
+}
+
+interface Salon {
+  id: string;
+  nombre: string;
+  campania: string;
 }
 
 const inputStyle: CSSProperties = {
@@ -52,6 +60,7 @@ export default function PersonasPage() {
   const [ninos, setNinos] = useState<Nino[] | null>(null);
   const [descargando, setDescargando] = useState(false);
   const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
+  const [salones, setSalones] = useState<Salon[]>([]);
   // Filtros (el buscador global puede llegar con ?buscar=<documento>).
   const [fId, setFId] = useState(() =>
     typeof window !== "undefined"
@@ -60,6 +69,7 @@ export default function PersonasPage() {
   );
   const [fCampaniaId, setFCampaniaId] = useState("");
   const [fCurso, setFCurso] = useState("");
+  const [fSalonId, setFSalonId] = useState("");
   const [fEstado, setFEstado] = useState("");
   const [fInicioDesde, setFInicioDesde] = useState("");
   const [fFinalHasta, setFFinalHasta] = useState("");
@@ -69,6 +79,7 @@ export default function PersonasPage() {
     if (fId) p.set("id", fId);
     if (fCampaniaId) p.set("campaignId", fCampaniaId);
     if (fCurso) p.set("tipoCurso", fCurso);
+    if (fSalonId) p.set("classroomId", fSalonId);
     if (fEstado) p.set("estado", fEstado);
     if (fInicioDesde) p.set("inicioDesde", fInicioDesde);
     if (fFinalHasta) p.set("finalHasta", fFinalHasta);
@@ -77,7 +88,7 @@ export default function PersonasPage() {
       const data: { ninos: Nino[] } = await res.json();
       setNinos(data.ninos);
     }
-  }, [fId, fCampaniaId, fCurso, fEstado, fInicioDesde, fFinalHasta]);
+  }, [fId, fCampaniaId, fCurso, fSalonId, fEstado, fInicioDesde, fFinalHasta]);
 
   useEffect(() => {
     async function run() {
@@ -87,15 +98,29 @@ export default function PersonasPage() {
   }, [cargar]);
 
   useEffect(() => {
-    async function cargarCampanias() {
-      const res = await apiFetch("/api/catalog/campaigns");
-      if (res.ok) {
-        const data: { campanias: { id: string; nombre: string }[] } = await res.json();
+    async function cargarFiltros() {
+      const [rc, rs] = await Promise.all([
+        apiFetch("/api/catalog/campaigns"),
+        // Quien solo tiene `personas.ver` no ve salones: el selector queda
+        // vacío y deshabilitado en vez de romper la pantalla.
+        apiFetch("/api/scheduling/classrooms"),
+      ]);
+      if (rc.ok) {
+        const data: { campanias: { id: string; nombre: string }[] } = await rc.json();
         setCampanias(data.campanias);
       }
+      if (rs.ok) {
+        const data: { salones: Salon[] } = await rs.json();
+        setSalones(data.salones);
+      }
     }
-    void cargarCampanias();
+    void cargarFiltros();
   }, []);
+
+  // Con una campaña elegida, el selector de salón muestra solo los suyos.
+  const campaniaNombre = campanias.find((c) => c.id === fCampaniaId)?.nombre;
+  const salonesVisibles =
+    campaniaNombre === undefined ? salones : salones.filter((s) => s.campania === campaniaNombre);
 
   /** Exporta a CSV los niños actualmente listados (respeta los filtros). */
   function descargarCSV() {
@@ -109,6 +134,7 @@ export default function PersonasPage() {
         "Usuario",
         "Campana",
         "Curso",
+        "Salon",
         "Estado",
         "Contrato",
         "N LGS",
@@ -127,6 +153,7 @@ export default function PersonasPage() {
           n.username ?? "",
           n.campania ?? "",
           n.curso ?? "",
+          n.salon ?? "",
           n.estado,
           n.contratoNumero ?? "",
           n.externalRef ?? "",
@@ -219,6 +246,23 @@ export default function PersonasPage() {
             <option value="YOUNGSTER">Youngster (10–13)</option>
           </select>
         </Campo>
+        <Campo etiqueta="Salón" ancho="1 1 13rem">
+          <select
+            value={fSalonId}
+            onChange={(e) => setFSalonId(e.target.value)}
+            style={inputStyle}
+            disabled={salones.length === 0}
+          >
+            <option value="">{salones.length === 0 ? "Sin salones" : "Todos"}</option>
+            {/* Filtra por la matrícula VIVA del niño; el salón lleva su campaña
+                delante porque el mismo "Salón 01" existe en todas. */}
+            {salonesVisibles.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.campania} · {s.nombre}
+              </option>
+            ))}
+          </select>
+        </Campo>
         <Campo etiqueta="Estado" ancho="0 0 8rem">
           <select value={fEstado} onChange={(e) => setFEstado(e.target.value)} style={inputStyle}>
             <option value="">Todos</option>
@@ -242,12 +286,13 @@ export default function PersonasPage() {
             style={inputStyle}
           />
         </Campo>
-        {(fId || fCampaniaId || fCurso || fEstado || fInicioDesde || fFinalHasta) && (
+        {(fId || fCampaniaId || fCurso || fSalonId || fEstado || fInicioDesde || fFinalHasta) && (
           <button
             onClick={() => {
               setFId("");
               setFCampaniaId("");
               setFCurso("");
+              setFSalonId("");
               setFEstado("");
               setFInicioDesde("");
               setFFinalHasta("");
@@ -315,6 +360,9 @@ export default function PersonasPage() {
                   </strong>
                   {n.contratoNumero !== null && ` · contrato N° ${n.contratoNumero}`}
                   {n.externalRef !== null && ` · LGS ${n.externalRef}`}
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
+                  🏫 {n.salon ?? "— sin salón —"}
                 </div>
               </div>
               <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>

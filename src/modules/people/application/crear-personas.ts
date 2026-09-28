@@ -111,6 +111,7 @@ export async function listarNinos(params: {
   estado?: string;
   tipoCurso?: string;
   campaignId?: string;
+  classroomId?: string;
   inicioDesde?: string;
   finalHasta?: string;
   limit?: number;
@@ -122,6 +123,7 @@ export async function listarNinos(params: {
     ...(params.estado !== undefined && { estado: params.estado }),
     ...(params.tipoCurso !== undefined && { tipoCurso: params.tipoCurso }),
     ...(params.campaignId !== undefined && { campaignId: params.campaignId }),
+    ...(params.classroomId !== undefined && { classroomId: params.classroomId }),
     ...(params.inicioDesde !== undefined && { inicioDesde: params.inicioDesde }),
     ...(params.finalHasta !== undefined && { finalHasta: params.finalHasta }),
     limit: Math.min(Math.max(params.limit ?? 100, 1), 500),
