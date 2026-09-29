@@ -1083,8 +1083,32 @@ tiene **"Generar salones del catálogo"** (`POST /api/scheduling/campaigns/[id]/
 → `generarSalonesDesdeCatalogo`): crea un salón por cada horario activo del
 catálogo (ambos grupos, ambos tipos) con **guía pendiente** y cupo 12,
 idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salones`.
+**El desfase CL–CO NO ES FIJO** (`scheduling/domain/husos.ts`, 2026-09-28).
+Chile cambia la hora y Colombia no, así que el mismo horario —17:00 del grupo 01—
+lo viven los demás a las **15:00 en verano austral y a las 16:00 en invierno**. La
+sesión siempre sale bien porque se guarda como INSTANTE (regla 3); lo que se
+rompe es la agenda del guía que está en otro país. `/panel/horarios` muestra por
+horario la equivalencia (`17:00 Chile = 15:00 Col/Ecu/Perú`, con "(día anterior)"
+cuando cruza la fecha) y arriba el desfase de HOY más **cuándo cambia**
+(`proximoCambioDeDesfase` busca día a día contra la base IANA del runtime, hasta
+400 días: hardcodear "el primer domingo de abril" es justo la regla que se mueve
+por decreto y nadie actualiza). Se calcula al cargar el módulo, no en el render
+—mirar el reloj mientras se pinta no es puro— y `toISOString` es UTC en servidor
+y navegador, así que no hay desajuste al hidratar. Pruebas: `tests/husos.test.ts`.
 **La campaña se edita desde SU ficha (2026-09-28)**, con el impacto a la vista, y
-al salón se entra desde ahí (su "Volver" regresa a la campaña). Las dos fechas
+al salón se entra desde ahí (su "Volver" regresa a la campaña). Se editan
+**nombre, inicio de campaña, Inicio del Programa, Fin del Programa y Cierre de
+Ventas**; el nombre es único. Y se puede **ELIMINAR**
+(`DELETE /api/catalog/campaigns/[id]` → `eliminarCampania`): arrastra cursos,
+niveles, lecciones y cuestionarios por cascada, y **sus SALONES** con sus
+sesiones — `scheduling_classroom` NO tiene clave foránea contra `catalog_course`,
+así que borrar la campaña sola los dejaría apuntando a un curso inexistente y su
+pantalla fallando sin decir por qué; por eso `catalog` llama a
+`eliminarSalonesDeCampaniaTx` DENTRO de su transacción. **Se bloquea con
+matrículas** (vivas o históricas): detrás hay niños con contrato y progreso, y
+para cerrar una campaña basta dejar pasar su fin, que el estado se deriva de la
+fecha. La pantalla exige escribir el nombre. Probado en
+`catalog/tests/campania-editar-integration.test.ts`. Las dos fechas del programa
 hacen cosas distintas:
 
 - **Cierre de Ventas** (`final_venta`) mueve el ESTADO derivado. No toca sesiones.

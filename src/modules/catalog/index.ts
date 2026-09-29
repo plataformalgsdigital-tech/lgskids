@@ -12,6 +12,7 @@ export {
   listarCampaniasHandler,
   detalleCampaniaHandler,
   actualizarCampaniaHandler,
+  eliminarCampaniaHandler,
   referenciaNivelGetHandler,
   referenciaNivelPutHandler,
   referenciaQuizGetHandler,

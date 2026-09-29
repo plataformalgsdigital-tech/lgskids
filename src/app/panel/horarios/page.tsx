@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { desfaseHoras, horaEnElOtroGrupo, proximoCambioDeDesfase } from "@/ui/husos";
 
 type TipoCurso = "JUNIOR" | "YOUNGSTER";
 type GrupoPais = "01" | "02";
@@ -40,12 +41,41 @@ const NOMBRE_GRUPO: Record<GrupoPais, string> = {
 // Números de salón disponibles para el horario (el horario completo es un salón).
 const SALONES = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
 
+/**
+ * El día, el desfase de hoy y el próximo salto se calculan UNA vez, al cargar
+ * el módulo, y no en el render: mirar el reloj mientras se pinta no es puro y
+ * la respuesta no cambia mientras la pantalla está abierta. `toISOString` es
+ * UTC en el servidor y en el navegador, así que no hay desajuste al hidratar.
+ */
+const HOY = new Date().toISOString().slice(0, 10);
+const DESFASE_HOY = desfaseHoras(HOY);
+const CAMBIO_HUSO = proximoCambioDeDesfase(HOY);
+
 const inputStyle: CSSProperties = {
   padding: "0.5rem 0.65rem",
   borderRadius: "0.5rem",
   border: "1.5px solid #d8dce6",
   fontSize: "0.9rem",
 };
+
+/**
+ * El MISMO horario visto desde el otro grupo: "17:00 Chile = 15:00 Colombia".
+ *
+ * Hace falta porque el desfase NO es fijo —Chile cambia la hora y Colombia
+ * no—, y porque una guía en Colombia puede tener asignado un salón de Chile: la
+ * etiqueta "Lun-Mier 5:00PM" no dice de quién es esa tarde.
+ */
+function equivalencia(slots: HorarioSlot[], grupo: GrupoPais, fecha: string): string {
+  const horas = [...new Set(slots.map((s) => s.horaLocal))].sort();
+  const aqui = grupo === "01" ? "Chile" : "Col/Ecu/Perú";
+  const alla = grupo === "01" ? "Col/Ecu/Perú" : "Chile";
+  const partes = horas.map((h) => {
+    const otra = horaEnElOtroGrupo(h, grupo, fecha);
+    const dia = otra.dias === -1 ? " (día anterior)" : otra.dias === 1 ? " (día siguiente)" : "";
+    return `${h} ${aqui} = ${otra.hora}${dia} ${alla}`;
+  });
+  return partes.join(" · ");
+}
 
 /** Resume slots agrupando por hora: "LUN-MIÉ 16:00 · SÁB 10:00 (Club)". */
 function resumen(slots: HorarioSlot[]): string {
@@ -88,7 +118,6 @@ export default function HorariosPage() {
   const [slots, setSlots] = useState<HorarioSlot[]>([nuevoSlot()]);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-
   const cargar = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/horarios");
     if (res.status === 401) {
@@ -206,7 +235,8 @@ export default function HorariosPage() {
         <div>
           <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Horarios</h1>
           <p style={{ color: "var(--texto-suave)", margin: "0.25rem 0 0", fontSize: "0.9rem" }}>
-            Catálogo reutilizable por tipo de curso. Se elige al crear un salón o reservar.
+            Catálogo reutilizable por tipo de curso. Se elige al crear un salón o reservar. La hora
+            de cada horario es la de <strong>su grupo</strong>.
           </p>
         </div>
         {puedeGestionar && (
@@ -394,6 +424,32 @@ export default function HorariosPage() {
         </form>
       )}
 
+      {/* EL DESFASE NO ES FIJO: Chile cambia la hora y Colombia no. El mismo
+          horario se vive una hora distinta media parte del año, y eso le mueve
+          la agenda al guía que está en otro país. */}
+      {
+        <p
+          style={{
+            marginTop: "1rem",
+            padding: "0.6rem 0.9rem",
+            borderRadius: "0.6rem",
+            background: "#e3f2fd",
+            color: "#0d47a1",
+            fontSize: "0.85rem",
+          }}
+        >
+          🕑 Hoy <strong>Chile va {DESFASE_HOY} h por delante</strong> de Colombia, Ecuador y Perú.
+          {CAMBIO_HUSO !== null && (
+            <>
+              {" "}
+              El <strong>{CAMBIO_HUSO.fecha}</strong> Chile cambia la hora y pasará a{" "}
+              <strong>{CAMBIO_HUSO.desfase} h</strong>: la sesión no se mueve —está guardada como
+              instante— pero a quien esté en el otro país le cambia la hora en su reloj.
+            </>
+          )}
+        </p>
+      }
+
       {horarios === null ? (
         <p style={{ marginTop: "1.5rem", color: "var(--texto-suave)" }}>Cargando horarios…</p>
       ) : (
@@ -441,6 +497,11 @@ export default function HorariosPage() {
                           <span style={{ color: "var(--texto-suave)" }}> · {h.etiqueta}</span>
                           <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
                             {resumen(h.slots)}
+                          </div>
+                          {/* La hora de pared es la del GRUPO; aquí se dice qué
+                              hora es en el otro país ese mismo día. */}
+                          <div style={{ fontSize: "0.78rem", color: "#0d47a1" }}>
+                            🕑 {equivalencia(h.slots, g.codigo, HOY)}
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>

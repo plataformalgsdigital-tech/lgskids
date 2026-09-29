@@ -36,7 +36,7 @@ import {
   setAvisoLoginActivo,
 } from "../application/aviso-login";
 import { crearCampania } from "../application/crear-campania";
-import { actualizarFechasCampania } from "../application/editar-campania";
+import { actualizarFechasCampania, eliminarCampania } from "../application/editar-campania";
 import { detalleCampania, listarCampanias } from "../application/consultas";
 import {
   actualizarReferenciaNivel,
@@ -63,6 +63,8 @@ const crearSchema = z.object({
 });
 
 const actualizarSchema = z.object({
+  nombre: z.string().min(3).max(80).optional(),
+  inicio: FECHA.optional(),
   fin: FECHA.optional(),
   finalVenta: FECHA.optional(),
 });
@@ -97,7 +99,22 @@ export const detalleCampaniaHandler = handlerWithAuth(async (_request, auth, con
   return json({ campania: await detalleCampania(id) });
 });
 
-/** PATCH /api/catalog/campaigns/[id] — edita fin (vigencia) y/o cierre de matrícula. */
+/** DELETE /api/catalog/campaigns/[id] — elimina la campaña con sus salones. */
+export const eliminarCampaniaHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const params = await context.params;
+  const id = z.uuid().parse(params["id"]);
+  return json(
+    await eliminarCampania({
+      actorUserId: auth.userId,
+      campaignId: id,
+      ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    }),
+  );
+});
+
+/** PATCH /api/catalog/campaigns/[id] — edita nombre, inicio, fin y cierre de ventas. */
 export const actualizarCampaniaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);

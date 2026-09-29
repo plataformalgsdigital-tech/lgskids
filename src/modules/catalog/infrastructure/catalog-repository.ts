@@ -2,6 +2,8 @@ import type { PoolClient } from "pg";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import type { CampaignGraph } from "../application/ports";
 
+type Queryable = Pick<PoolClient, "query">;
+
 /**
  * Acceso a datos de catalog. Solo esta capa escribe las tablas catalog_*
  * (regla 3.4.2). Las columnas DATE se leen SIEMPRE con ::text para que
@@ -112,19 +114,44 @@ export async function getCampaignHeader(id: string): Promise<CampaignHeaderRow |
   );
 }
 
-/** Edita SOLO la vigencia (fin) y el cierre de matrícula (final_venta) de la
- * campaña. NO toca `catalog_course.final_curso` (regla dura 1: nunca se
- * reescribe; las sesiones ya generadas no se ven afectadas). */
-export async function updateCampaignFechas(
+/**
+ * Edita la FILA de la campaña: nombre, inicio comercial, vigencia (fin) y
+ * cierre de ventas. NO toca la ventana del programa (`catalog_course.inicio` y
+ * `final_curso`), que es la que genera sesiones: eso lo mueve
+ * `moverFinDePrograma` de `scheduling`, con su previo y su bloqueo.
+ */
+export async function updateCampaign(
   id: string,
-  fechas: { fin: string; finalVenta: string },
+  datos: { nombre: string; inicio: string; fin: string; finalVenta: string },
+  client?: Queryable,
 ): Promise<void> {
   await execute(
     `UPDATE catalog_campaign
-        SET fin = $2::date, final_venta = $3::date, updated_at = now()
+        SET nombre = $2, inicio = $3::date, fin = $4::date, final_venta = $5::date,
+            updated_at = now()
       WHERE id = $1`,
-    [id, fechas.fin, fechas.finalVenta],
+    [id, datos.nombre, datos.inicio, datos.fin, datos.finalVenta],
+    client,
   );
+}
+
+/** ¿Hay otra campaña con ese nombre? (el nombre es cómo la llama la gente). */
+export async function campaignExisteNombre(nombre: string, exceptoId: string): Promise<boolean> {
+  const row = await queryOne<{ id: string }>(
+    `SELECT id FROM catalog_campaign WHERE lower(nombre) = lower($1) AND id <> $2`,
+    [nombre.trim(), exceptoId],
+  );
+  return row !== null;
+}
+
+/**
+ * Borra la campaña. Arrastra POR CASCADA sus cursos, niveles, lecciones y
+ * cuestionarios. Los SALONES no: `scheduling_classroom` no tiene clave foránea
+ * contra `catalog_course`, así que hay que borrarlos antes (lo hace
+ * `eliminarCampania` llamando a `scheduling` dentro de la misma transacción).
+ */
+export async function deleteCampaign(id: string, client?: Queryable): Promise<void> {
+  await execute(`DELETE FROM catalog_campaign WHERE id = $1`, [id], client);
 }
 
 // ============================================================

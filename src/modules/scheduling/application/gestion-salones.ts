@@ -7,8 +7,10 @@ import { feriadosDelPais } from "../domain/feriados";
 import { generarFechasSlot } from "../domain/generacion";
 import {
   agendaSesiones,
+  campaniaTieneMatriculas,
   classroomExisteNombre,
   classroomTieneMatriculas,
+  deleteClassroomsDeCampania,
   congelarGuiaSesionesPasadas,
   contarSesionesFuturas,
   coursesDeCampania,
@@ -26,7 +28,7 @@ import {
   insertClassroom,
   insertSessionsBatch,
   salonesDeCampania,
-  setCourseFinalCurso,
+  setCourseVentana,
   getSalonCampania,
   insertSlot,
   insertSuspension,
@@ -275,7 +277,7 @@ export interface ImpactoFinPrograma {
 }
 
 /**
- * Qué pasaría si el programa terminara en otra fecha, SIN tocar nada.
+ * Qué pasaría si el programa corriera en otra ventana, SIN tocar nada.
  *
  * Se simula con la MISMA función pura que genera (`generarFechasSlot`), no con
  * una cuenta aparte: si mañana cambia la regla de corrimiento por feriados, el
@@ -284,6 +286,7 @@ export interface ImpactoFinPrograma {
 export async function impactoFinDePrograma(
   campaignId: string,
   finNuevo: string,
+  inicioNuevo?: string,
 ): Promise<ImpactoFinPrograma> {
   const cursos = await coursesDeCampania(campaignId);
   if (cursos.length === 0) throw new NotFoundError("La campaña no tiene cursos.");
@@ -293,10 +296,11 @@ export async function impactoFinDePrograma(
   const salones = await salonesDeCampania(campaignId);
   const filas: ImpactoFinPrograma["salones"] = [];
   for (const salon of salones) {
+    const inicio = inicioNuevo ?? salon.cursoInicio;
     const slots = await getSlots(salon.id);
     const feriados = await getHolidayDates(
       salon.holidayCountry,
-      salon.cursoInicio,
+      inicio,
       `${Number(finNuevo.slice(0, 4)) + 1}-12-31`,
     );
     const suspensiones = await getSuspensionDates(salon.id);
@@ -305,7 +309,7 @@ export async function impactoFinDePrograma(
       (total, slot) =>
         total +
         generarFechasSlot({
-          inicioCurso: salon.cursoInicio,
+          inicioCurso: inicio,
           finalCurso: finNuevo,
           diaSemana: slot.diaSemana,
           noDictables,
@@ -327,12 +331,13 @@ export async function impactoFinDePrograma(
 }
 
 /**
- * Mueve el FIN DEL PROGRAMA de toda la campaña: reescribe `final_curso` de sus
- * cursos y regenera las sesiones de TODOS sus salones, en una transacción.
+ * Mueve la VENTANA DEL PROGRAMA de toda la campaña (inicio y/o fin): reescribe
+ * `inicio`/`final_curso` de sus cursos y regenera las sesiones de TODOS sus
+ * salones, en una transacción.
  *
  * Se BLOQUEA si alguna sesión ya tiene asistencia o está cerrada. Regenerar es
  * destructivo y la asistencia cuelga de la sesión con ON DELETE CASCADE: mover
- * el fin con el curso andando se llevaría el registro de lo ya dictado, en
+ * la ventana con el curso andando se llevaría el registro de lo ya dictado, en
  * silencio. Con el curso empezado, lo que se alarga o recorta son sesiones
  * sueltas (evento extra o suspensión), no la ventana entera.
  */
@@ -340,28 +345,33 @@ export async function moverFinDePrograma(input: {
   actorUserId: string;
   campaignId: string;
   fin: string;
+  /** Inicio nuevo del programa; si no viene, cada curso conserva el suyo. */
+  inicio?: string | undefined;
   ip?: string | null;
 }): Promise<{ salones: number; sesiones: number }> {
   const historia = await historiaDeCampania(input.campaignId);
   if (historia.conAsistencia > 0 || historia.cerradas > 0) {
     throw new ConflictError(
-      `No se puede mover el fin del programa: ya hay ${String(historia.conAsistencia)} sesión(es) con asistencia y ${String(historia.cerradas)} cerrada(s), y regenerar las borraría. Usa una suspensión o una sesión extra.`,
+      `No se puede mover la ventana del programa: ya hay ${String(historia.conAsistencia)} sesión(es) con asistencia y ${String(historia.cerradas)} cerrada(s), y regenerar las borraría. Usa una suspensión o una sesión extra.`,
     );
   }
   const cursos = await coursesDeCampania(input.campaignId);
   if (cursos.length === 0) throw new NotFoundError("La campaña no tiene cursos.");
+  if (input.inicio !== undefined && input.inicio >= input.fin) {
+    throw new ValidationError("El inicio del programa debe ser anterior a su fin.");
+  }
 
   const resultado = await withTransaction(async (tx) => {
     let sesiones = 0;
     let salones = 0;
     for (const curso of cursos) {
-      await setCourseFinalCurso(curso.courseId, input.fin, tx);
+      await setCourseVentana(curso.courseId, { inicio: input.inicio, finalCurso: input.fin }, tx);
       for (const salon of await listClassrooms(curso.courseId)) {
         const classroom = await findClassroomById(salon.id, tx);
         if (classroom === null) continue;
         await sincronizarFeriados(
           classroom.holidayCountry,
-          aniosDeVentana(salon.primeraSesion ?? input.fin, input.fin),
+          aniosDeVentana(input.inicio ?? salon.primeraSesion ?? input.fin, input.fin),
           tx,
         );
         sesiones += await generarSesionesTx(tx, classroom, await getSlots(salon.id, tx));
@@ -376,10 +386,27 @@ export async function moverFinDePrograma(input: {
     accion: "scheduling.fin_programa_movido",
     entidad: "catalog_campaign",
     entidadId: input.campaignId,
-    payload: { fin: input.fin, ...resultado },
+    payload: { fin: input.fin, inicio: input.inicio ?? null, ...resultado },
     ip: input.ip ?? null,
   });
   return resultado;
+}
+
+/** Matrículas (vivas o históricas) de toda la campaña: lo que impide borrarla. */
+export async function matriculasDeCampania(campaignId: string): Promise<number> {
+  return campaniaTieneMatriculas(campaignId);
+}
+
+/**
+ * Borra los salones de una campaña DENTRO de la transacción de quien la
+ * elimina (`catalog`). Va aquí porque las tablas son de este módulo, y se pasa
+ * el `tx` para que campaña y salones caigan juntos o no caiga ninguno.
+ */
+export async function eliminarSalonesDeCampaniaTx(
+  tx: Queryable,
+  campaignId: string,
+): Promise<number> {
+  return deleteClassroomsDeCampania(campaignId, tx);
 }
 
 /**

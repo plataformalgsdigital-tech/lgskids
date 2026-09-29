@@ -298,21 +298,33 @@ export const impactoFinProgramaHandler = handlerWithAuth(async (request, auth, c
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
   const id = await idFromContext(context);
-  const fin = z.string().regex(ISO_DATE).parse(request.nextUrl.searchParams.get("fin"));
-  return json(await impactoFinDePrograma(id, fin));
+  const q = request.nextUrl.searchParams;
+  const fin = z.string().regex(ISO_DATE).parse(q.get("fin"));
+  const inicio = z
+    .string()
+    .regex(ISO_DATE)
+    .optional()
+    .parse(q.get("inicio") ?? undefined);
+  return json(await impactoFinDePrograma(id, fin, inicio));
 });
 
-/** POST /api/scheduling/campaigns/[id]/fin-programa — mueve el fin y regenera. */
+/** POST /api/scheduling/campaigns/[id]/fin-programa — mueve la ventana y regenera. */
 export const moverFinProgramaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
   const id = await idFromContext(context);
-  const body = z.object({ fin: z.string().regex(ISO_DATE) }).parse(await request.json());
+  const body = z
+    .object({
+      fin: z.string().regex(ISO_DATE),
+      inicio: z.string().regex(ISO_DATE).optional(),
+    })
+    .parse(await request.json());
   return json(
     await moverFinDePrograma({
       actorUserId: auth.userId,
       campaignId: id,
       fin: body.fin,
+      inicio: body.inicio,
       ip: ip(request),
     }),
   );

@@ -807,16 +807,52 @@ export async function coursesDeCampania(
  * (cada regeneración correría el fin un poco más), no que el negocio decida
  * que el programa termina en otra fecha.
  */
-export async function setCourseFinalCurso(
+export async function setCourseVentana(
   courseId: string,
-  finalCurso: string,
+  ventana: { inicio?: string | undefined; finalCurso: string },
   client?: Queryable,
 ): Promise<void> {
   await execute(
-    `UPDATE catalog_course SET final_curso = $2::date, updated_at = now() WHERE id = $1`,
-    [courseId, finalCurso],
+    `UPDATE catalog_course
+        SET inicio = COALESCE($3::date, inicio), final_curso = $2::date, updated_at = now()
+      WHERE id = $1`,
+    [courseId, ventana.finalCurso, ventana.inicio ?? null],
     client,
   );
+}
+
+/**
+ * Borra los salones de una campaña (y con ellos slots, sesiones y suspensiones,
+ * por cascada). Lo llama `catalog` al eliminar la campaña: `scheduling_classroom`
+ * NO tiene clave foránea contra `catalog_course`, así que borrar la campaña sin
+ * esto dejaría salones apuntando a un curso que ya no existe — y su pantalla
+ * fallando sin decir por qué. La matrícula sí la protege la base
+ * (`ON DELETE RESTRICT`), pero el aviso se da antes.
+ */
+export async function deleteClassroomsDeCampania(
+  campaignId: string,
+  client?: Queryable,
+): Promise<number> {
+  return execute(
+    `DELETE FROM scheduling_classroom cl
+      USING catalog_course cu
+      WHERE cu.id = cl.course_id AND cu.campaign_id = $1`,
+    [campaignId],
+    client,
+  );
+}
+
+/** ¿Algún salón de la campaña tiene matrículas (vivas o históricas)? */
+export async function campaniaTieneMatriculas(campaignId: string): Promise<number> {
+  const row = await queryOne<{ n: number }>(
+    `SELECT count(*)::int AS n
+       FROM enrollment_enrollment e
+       JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+       JOIN catalog_course cu ON cu.id = cl.course_id
+      WHERE cu.campaign_id = $1`,
+    [campaignId],
+  );
+  return row?.n ?? 0;
 }
 
 /**

@@ -24,6 +24,8 @@ export {
   sesionesFuturasDelSalon,
   impactoFinDePrograma,
   moverFinDePrograma,
+  matriculasDeCampania,
+  eliminarSalonesDeCampaniaTx,
 } from "./application/gestion-salones";
 export type {
   SlotInput,
