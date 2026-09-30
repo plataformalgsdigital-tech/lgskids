@@ -26,9 +26,25 @@ export type MotivoInactivo =
   | "SIN_MATRICULA"
   | "RESERVA_SIN_APROBAR";
 
+/**
+ * Las TRES situaciones que LGS muestra en la ficha de su beneficiario
+ * ("KIDS: Cursando / Suspendido / No cursando"), pedidas por el negocio
+ * (2026-09-30).
+ *
+ * Se entregan YA clasificadas para que LGS no tenga que interpretar los
+ * motivos: si cada sistema mapeara `motivo` a su manera, un día LGS diría
+ * "Suspendido" de un contrato vencido. La regla vive aquí, una vez.
+ *
+ * SUSPENDIDO es solo la PAUSA: es lo único que vuelve solo al reactivarse. Todo
+ * lo demás —vencido, inactivo, sin salón, sin aprobar— es NO_CURSANDO, y el
+ * `motivo` dice cuál.
+ */
+export type SituacionAcademica = "CURSANDO" | "SUSPENDIDO" | "NO_CURSANDO";
+
 export interface EstadoAcademico {
   activo: boolean;
   estado: "ACTIVO" | "INACTIVO";
+  situacion: SituacionAcademica;
   motivo: MotivoInactivo | null;
   /** Frase lista para mostrar o para que LGS la repita tal cual. */
   detalle: string;
@@ -47,6 +63,7 @@ const DETALLE: Record<MotivoInactivo, string> = {
 const inactivo = (motivo: MotivoInactivo): EstadoAcademico => ({
   activo: false,
   estado: "INACTIVO",
+  situacion: motivo === "CONTRATO_EN_PAUSA" ? "SUSPENDIDO" : "NO_CURSANDO",
   motivo,
   detalle: DETALLE[motivo],
 });
@@ -79,5 +96,11 @@ export function estadoAcademico(datos: {
   // APROBADO: vencer manda sobre todo lo demás.
   if (datos.vencido) return inactivo("CONTRATO_VENCIDO");
   if (datos.matriculaEstado !== "ACTIVA") return inactivo("SIN_MATRICULA");
-  return { activo: true, estado: "ACTIVO", motivo: null, detalle: "Cursando el programa." };
+  return {
+    activo: true,
+    estado: "ACTIVO",
+    situacion: "CURSANDO",
+    motivo: null,
+    detalle: "Cursando el programa.",
+  };
 }

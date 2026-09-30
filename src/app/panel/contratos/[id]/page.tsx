@@ -64,9 +64,20 @@ interface SalonOpcion {
 interface Academico {
   activo: boolean;
   estado: "ACTIVO" | "INACTIVO";
+  situacion: "CURSANDO" | "SUSPENDIDO" | "NO_CURSANDO";
   motivo: string | null;
   detalle: string;
 }
+
+/** Las mismas tres palabras que muestra LGS, para que los dos lados coincidan. */
+const SITUACION_UI: Record<
+  Academico["situacion"],
+  { texto: string; fondo: string; color: string }
+> = {
+  CURSANDO: { texto: "🟢 Cursando", fondo: "#e8f5e9", color: "#1b5e20" },
+  SUSPENDIDO: { texto: "⏸ Suspendido", fondo: "#e3f2fd", color: "#0d47a1" },
+  NO_CURSANDO: { texto: "⚪ No cursando", fondo: "#fff8e1", color: "#8a6d00" },
+};
 
 interface Credenciales {
   username: string;
@@ -502,17 +513,13 @@ export default function FichaContratoPage() {
                 <div
                   style={{
                     padding: "0.5rem 1rem",
-                    background: academico[c.id]?.activo === true ? "#e8f5e9" : "#fff8e1",
-                    color: academico[c.id]?.activo === true ? "#1b5e20" : "#8a6d00",
+                    background: SITUACION_UI[academico[c.id]!.situacion].fondo,
+                    color: SITUACION_UI[academico[c.id]!.situacion].color,
                     fontSize: "0.85rem",
                     borderBottom: "1px solid #edf0f6",
                   }}
                 >
-                  <strong>
-                    {academico[c.id]?.activo === true
-                      ? "🟢 Cursando el programa"
-                      : "⚪ No está cursando"}
-                  </strong>
+                  <strong>{SITUACION_UI[academico[c.id]!.situacion].texto}</strong>
                   {academico[c.id]?.activo !== true && ` · ${academico[c.id]?.detalle ?? ""}`}
                 </div>
               )}

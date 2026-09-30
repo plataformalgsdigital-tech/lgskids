@@ -170,6 +170,7 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
     expect(reservado).toMatchObject({
       activo: false,
       estado: "INACTIVO",
+      situacion: "NO_CURSANDO",
       motivo: "RESERVA_SIN_APROBAR",
       externalRef,
     });
@@ -184,7 +185,12 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
     await aprobarContrato({ actorUserId: ACTOR, contractId: contrato?.id ?? "" });
 
     const cursando = await fichaAcademicaPorRef(externalRef);
-    expect(cursando).toMatchObject({ activo: true, estado: "ACTIVO", motivo: null });
+    expect(cursando).toMatchObject({
+      activo: true,
+      estado: "ACTIVO",
+      situacion: "CURSANDO",
+      motivo: null,
+    });
     expect(cursando.nino.username).toBeTruthy();
     expect(cursando.programa?.matricula).toBe("ACTIVA");
 
@@ -196,6 +202,7 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
     });
     expect(await fichaAcademicaPorRef(externalRef)).toMatchObject({
       activo: false,
+      situacion: "SUSPENDIDO",
       motivo: "CONTRATO_EN_PAUSA",
     });
   });

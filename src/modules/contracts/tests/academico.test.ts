@@ -56,6 +56,37 @@ describe("estado académico", () => {
     ).toMatchObject({ motivo: "CONTRATO_INACTIVO" });
   });
 
+  it("clasifica en las TRES situaciones que muestra LGS", () => {
+    // Cursando: el único camino.
+    expect(
+      estadoAcademico({ contratoEstado: "APROBADO", vencido: false, matriculaEstado: "ACTIVA" })
+        .situacion,
+    ).toBe("CURSANDO");
+    // Suspendido: SOLO la pausa, que es lo único que vuelve solo al reactivar.
+    expect(
+      estadoAcademico({ contratoEstado: "ONHOLD", vencido: false, matriculaEstado: "ACTIVA" })
+        .situacion,
+    ).toBe("SUSPENDIDO");
+    // Todo lo demás es No cursando, aunque el motivo diga cuál.
+    for (const caso of [
+      { contratoEstado: "APROBADO", vencido: true, matriculaEstado: "ACTIVA" },
+      { contratoEstado: "INACTIVO", vencido: false, matriculaEstado: null },
+      { contratoEstado: "APROBADO", vencido: false, matriculaEstado: null },
+      { contratoEstado: "PENDIENTE", vencido: false, matriculaEstado: "RESERVADA" },
+      { contratoEstado: null, vencido: false, matriculaEstado: null },
+    ] as const) {
+      expect(estadoAcademico(caso).situacion).toBe("NO_CURSANDO");
+    }
+  });
+
+  it("un VENCIDO no pasa por Suspendido", () => {
+    // Si LGS mapeara el motivo por su cuenta podría confundirlos; por eso la
+    // situación viene ya clasificada.
+    expect(
+      estadoAcademico({ contratoEstado: "APROBADO", vencido: true, matriculaEstado: "ACTIVA" }),
+    ).toMatchObject({ situacion: "NO_CURSANDO", motivo: "CONTRATO_VENCIDO" });
+  });
+
   it("siempre trae una frase lista para mostrar", () => {
     for (const caso of [
       { contratoEstado: "APROBADO", vencido: false, matriculaEstado: "ACTIVA" },

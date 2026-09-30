@@ -1055,6 +1055,12 @@ reactivar o matricular. **Vencer manda sobre tener matrícula**: la matrícula
 sigue ACTIVA hasta que pase el barrido, así que mirarla sola diría que un niño
 con contrato vencido está cursando. Un niño matriculado en un curso que aún no
 empieza cuenta como ACTIVO: ya está tomando el programa para quien lo vendió.
+**`situacion`: las TRES palabras que muestra LGS** ("KIDS: Cursando / Suspendido
+/ No cursando", pedidas por el negocio): `CURSANDO` = activo; `SUSPENDIDO` = SOLO
+`CONTRATO_EN_PAUSA`, lo único que vuelve solo al reactivar; `NO_CURSANDO` = todo
+lo demás. Viaja YA clasificada para que LGS no mapee `motivo` por su cuenta: si
+cada sistema lo interpretara a su manera, un día LGS diría "Suspendido" de un
+contrato vencido.
 **No se puede leer desde `people`** (la sección Kids): `contracts` importa
 `people`, así que `people → contracts` sería un ciclo y `depcruise` lo rechaza.
 Por eso el estado se ve en la ficha del contrato, no en la lista de Kids.
