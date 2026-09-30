@@ -31,7 +31,18 @@ WORKDIR /app
 # Capa propia: mientras el lockfile no cambie, no se reinstala nada.
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+# Plazos de red generosos, y POCAS peticiones a la vez.
+#
+# Con la red lenta, las 16 descargas en paralelo que pnpm hace por defecto se
+# estorban entre sí: cada una tardaba 40–65 s y `@prisma/get-platform` pasó de
+# los 60 s del plazo por omisión, tumbando el build entero (2026-09-30). Bajar
+# la concurrencia hace que cada petición vaya más rápido, no más lento, y el
+# plazo alto es la red de seguridad. En una conexión buena no cambia nada: la
+# capa se resuelve igual desde la caché.
+RUN pnpm install --frozen-lockfile \
+  --fetch-timeout=600000 \
+  --fetch-retries=5 \
+  --network-concurrency=6
 
 # ---- build ----------------------------------------------------------------
 FROM base AS build
