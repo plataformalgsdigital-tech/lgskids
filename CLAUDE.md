@@ -1467,10 +1467,10 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
 GUIA` y sin `meeting_url` (así los crea "Generar salones del catálogo"). El curso
   arranca el **2026-10-05**; sin enlace, el botón "Entrar a clase" del niño no lleva
   a ninguna parte, y el enlace se HEREDA del guía asignado.
-- **Aprobar la reserva de LGS desde LGS, no desde KIDS** (ver "Estado de la
-  conexión"): hay una PENDIENTE (`02-10764-26#121290`). La integración con LGS ya
-  está encendida y en uso — lo que quedaba pendiente aquí (catálogo de horarios,
-  campaña real, `kids_feature_activo`) está hecho.
+- **Las reservas de LGS se aprueban desde LGS, no desde KIDS** (ver "Estado de
+  la conexión"). La primera (`02-10764-26#121290`) ya hizo el ciclo completo
+  (2026-09-30): LGS la aprobó, el niño tiene usuario y la puerta académica lo
+  devuelve ACTIVO. La integración está encendida y en uso.
 - Procedimiento operativo para cuando el desfase CL–CO sea de 2 h (verano
   austral): el negocio lo definirá más adelante.
 - Remoto GitHub `origin` = plataformalgsdigital-tech/lgskids. **CI activo**
