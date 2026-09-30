@@ -21,6 +21,7 @@ export {
   obtenerContrato,
   fichaContrato,
   cambiarCursoContrato,
+  academicoDeContrato,
 } from "./application/gestion-contratos";
 export type { FichaContrato } from "./application/gestion-contratos";
 export {
@@ -34,6 +35,10 @@ export {
 export { edadEnFecha, validarEdadParaTipo } from "./domain/edad";
 export { buscarEstudiantes } from "./application/estudiantes";
 export type { EstudianteEncontrado } from "./application/estudiantes";
+export { fichaAcademicaPorRef } from "./application/estado-academico";
+export type { FichaAcademica } from "./application/estado-academico";
+export { estadoAcademico } from "./domain/academico";
+export type { EstadoAcademico, MotivoInactivo } from "./domain/academico";
 export {
   buscarEstudiantesHandler,
   crearContratoHandler,

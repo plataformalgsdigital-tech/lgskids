@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { aprobarReservaPorExternalRef, crearReservaBeneficiario } from "@/modules/contracts";
+import {
+  aprobarReservaPorExternalRef,
+  crearReservaBeneficiario,
+  fichaAcademicaPorRef,
+} from "@/modules/contracts";
 import { handlerWithServiceAuth, json } from "@/platform/http/handler";
 import { disponibilidad } from "../application/disponibilidad";
 
@@ -56,6 +60,20 @@ export const reservarIntakeHandler = handlerWithServiceAuth(async (request) => {
     ip: ip(request),
   });
   return json(resultado, { status: 201 });
+});
+
+/**
+ * GET /api/kids-intake/reservations/[externalRef] — ¿está tomando el programa?
+ *
+ * La respuesta es DERIVADA (contrato + vigencia + matrícula), nunca una
+ * columna guardada: una bandera escrita a mano seguiría diciendo ACTIVO con el
+ * contrato ya vencido. Trae el motivo y el programa porque un "inactivo" a
+ * secas obliga a LGS a abrir el panel para saber qué hacer.
+ */
+export const estadoAcademicoIntakeHandler = handlerWithServiceAuth(async (_request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  return json(await fichaAcademicaPorRef(externalRef));
 });
 
 /** POST /api/kids-intake/reservations/[externalRef]/approve — activa la reserva. */

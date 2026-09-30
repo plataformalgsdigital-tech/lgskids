@@ -25,6 +25,7 @@ import {
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { logger } from "@/platform/logging/logger";
+import { estadoAcademico, type EstadoAcademico } from "../domain/academico";
 import { validarEdadParaTipo } from "../domain/edad";
 import { parseExternalRef, validarExternalRef } from "../domain/external-ref";
 import { contratoVencido, fechaUtcHoy, finalDeContrato } from "../domain/vigencia";
@@ -566,6 +567,19 @@ export async function obtenerContrato(id: string): Promise<ContractRecord> {
   const contrato = await findContractById(id);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
   return contrato;
+}
+
+/**
+ * "¿Está cursando?" para una fila de contrato. UNA regla
+ * (`domain/academico.ts`), la misma que responde la puerta de LGS: si cada
+ * pantalla la rearmara, tarde o temprano dirían cosas distintas del mismo niño.
+ */
+export function academicoDeContrato(c: ContractListItem): EstadoAcademico {
+  return estadoAcademico({
+    contratoEstado: c.estado as "PENDIENTE" | "APROBADO" | "ONHOLD" | "INACTIVO",
+    vencido: c.vencido,
+    matriculaEstado: c.matriculaEstado as "ACTIVA" | "RESERVADA" | null,
+  });
 }
 
 export interface FichaContrato {

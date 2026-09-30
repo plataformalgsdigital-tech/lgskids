@@ -3,6 +3,7 @@ import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 import { buscarEstudiantes } from "../application/estudiantes";
 import {
+  academicoDeContrato,
   aprobarContrato,
   cambiarCursoContrato,
   crearContrato,
@@ -153,6 +154,11 @@ export const fichaContratoHandler = handlerWithAuth(async (_request, auth, conte
   const ficha = await fichaContrato(contractId, auth.countryScope);
   return json({
     ...ficha,
+    // El estado académico de CADA beneficiario, por la misma regla que
+    // responde la puerta de LGS.
+    academico: Object.fromEntries(
+      [ficha.contrato, ...ficha.hermanos].map((c) => [c.id, academicoDeContrato(c)]),
+    ),
     // Solo deciden qué botones dibuja la pantalla; el servidor lo vuelve a exigir.
     puedeGestionar: profile.hasPermission(PERMISOS.CONTRATOS_GESTIONAR),
   });

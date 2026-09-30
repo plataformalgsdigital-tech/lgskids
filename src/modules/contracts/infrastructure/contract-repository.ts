@@ -185,6 +185,61 @@ export async function findContratosVencidos(limit: number): Promise<ContractReco
   );
 }
 
+/** Lo que hace falta para decidir si el niño está cursando (regla en domain/academico). */
+export interface FilaAcademica {
+  contractId: string;
+  numero: number;
+  externalRef: string | null;
+  contratoEstado: string;
+  vencido: boolean;
+  inicio: string;
+  finalContrato: string;
+  tipoCurso: string;
+  countryCode: string;
+  matriculaEstado: string | null;
+  salon: string | null;
+  campania: string | null;
+  cursoInicio: string | null;
+  ninoId: string;
+  nombres: string;
+  apellidos: string;
+  docTipo: string;
+  docNumero: string;
+  username: string | null;
+}
+
+/**
+ * Datos del contrato para el estado académico. Se busca por N° de LGS
+ * (`external_ref`) porque es el identificador que LGS tiene en la mano: el
+ * mismo con el que reserva y aprueba.
+ *
+ * `vencido` sale del gemelo SQL de `contratoVencido` — la MISMA regla de +2
+ * días de gracia que usa el barrido, no una copia.
+ */
+export async function findFilaAcademicaPorRef(externalRef: string): Promise<FilaAcademica | null> {
+  return queryOne<FilaAcademica>(
+    `SELECT c.id AS "contractId", c.numero, c.external_ref AS "externalRef",
+            c.estado::text AS "contratoEstado",
+            (${SQL_CONTRATO_VENCIDO}) AS vencido,
+            c.inicio::text AS inicio, c.final_contrato::text AS "finalContrato",
+            c.tipo_curso::text AS "tipoCurso", c.country_code AS "countryCode",
+            e.estado::text AS "matriculaEstado",
+            cl.nombre AS salon, ca.nombre AS campania, cu.inicio::text AS "cursoInicio",
+            b.id AS "ninoId", b.nombres, b.apellidos,
+            b.doc_tipo AS "docTipo", b.doc_numero AS "docNumero", u.username
+       FROM contracts_contract c
+       JOIN people_person b ON b.id = c.beneficiario_id
+       LEFT JOIN identity_user u ON u.id = b.user_id
+       LEFT JOIN enrollment_enrollment e
+         ON e.contract_id = c.id AND e.estado IN ('ACTIVA', 'RESERVADA')
+       LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+       LEFT JOIN catalog_course cu ON cu.id = cl.course_id
+       LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+      WHERE c.external_ref = $1`,
+    [externalRef],
+  );
+}
+
 export interface ContractListItem extends ContractRecord {
   beneficiario: string;
   beneficiarioDocTipo: string;
@@ -215,6 +270,10 @@ export interface ContractListItem extends ContractRecord {
   salon: string | null;
   campania: string | null;
   enrollmentId: string | null;
+  /** Estado de la matrícula viva: distingue reservar de estar cursando. */
+  matriculaEstado: string | null;
+  /** ¿Pasó su fin + los días de gracia? Misma regla que el barrido. */
+  vencido: boolean;
 }
 
 /**
@@ -243,7 +302,10 @@ const SELECT_ITEM = `
                      JOIN people_person a ON a.id = g.apoderado_id
                     WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
          cl.nombre AS salon, ca.nombre AS campania,
-         e.id AS "enrollmentId"
+         e.id AS "enrollmentId", e.estado::text AS "matriculaEstado",
+         -- Gemelo SQL de contratoVencido: la MISMA regla de +2 días que usa
+         -- el barrido, para que el estado académico no la reinvente.
+         (${SQL_CONTRATO_VENCIDO}) AS vencido
     FROM contracts_contract c
     JOIN people_person b ON b.id = c.beneficiario_id
     JOIN people_person t ON t.id = c.titular_id

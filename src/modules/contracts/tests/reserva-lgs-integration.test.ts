@@ -6,8 +6,13 @@ import { crearSalon } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
-import { ConflictError } from "@/platform/errors";
-import { crearReservaBeneficiario } from "../application/gestion-contratos";
+import { ConflictError, NotFoundError } from "@/platform/errors";
+import { fichaAcademicaPorRef } from "../application/estado-academico";
+import {
+  aprobarContrato,
+  crearReservaBeneficiario,
+  ponerEnPausa,
+} from "../application/gestion-contratos";
 
 /**
  * La puerta de LGS (ADR-0010). Lo que se fija aquí es lo que se descubrió al
@@ -155,6 +160,48 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
       limit: 50,
     });
     expect(deOtro).toEqual([]);
+  });
+
+  it("LGS puede preguntar si el niño está tomando el programa", async () => {
+    // Reservado pero SIN aprobar: tiene cupo tomado y no está cursando. Lo que
+    // falta hacer (aprobar) se dice en el motivo, si no LGS tendría que abrir
+    // el panel para saberlo.
+    const reservado = await fichaAcademicaPorRef(externalRef);
+    expect(reservado).toMatchObject({
+      activo: false,
+      estado: "INACTIVO",
+      motivo: "RESERVA_SIN_APROBAR",
+      externalRef,
+    });
+    expect(reservado.nino.docNumero).toBe(`N-${marca}`);
+    expect(reservado.programa?.salon).toBe(`Salón prueba ${marca}`);
+
+    // Tras aprobar —el alta única—, pasa a estar cursando.
+    const contrato = await queryOne<{ id: string }>(
+      `SELECT id FROM contracts_contract WHERE external_ref = $1`,
+      [externalRef],
+    );
+    await aprobarContrato({ actorUserId: ACTOR, contractId: contrato?.id ?? "" });
+
+    const cursando = await fichaAcademicaPorRef(externalRef);
+    expect(cursando).toMatchObject({ activo: true, estado: "ACTIVO", motivo: null });
+    expect(cursando.nino.username).toBeTruthy();
+    expect(cursando.programa?.matricula).toBe("ACTIVA");
+
+    // Y pausar el contrato lo saca del programa, diciendo por qué.
+    await ponerEnPausa({
+      actorUserId: ACTOR,
+      contractId: contrato?.id ?? "",
+      motivo: "viaje familiar",
+    });
+    expect(await fichaAcademicaPorRef(externalRef)).toMatchObject({
+      activo: false,
+      motivo: "CONTRATO_EN_PAUSA",
+    });
+  });
+
+  it("un N° que no existe en KIDS no inventa una respuesta", async () => {
+    await expect(fichaAcademicaPorRef("02-99999-26#nadie")).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("la misma referencia con OTRO niño sí es conflicto", async () => {

@@ -955,11 +955,19 @@ se toca lo que miden:
 
 ## Versiones (registradas 2026-07-22)
 
-Node 24.11.0 · pnpm 11.16.0 · Next 16.3.4 · React 19.2.8 · TypeScript 5.9.3
+Node 24.11.0 · pnpm 11.16.0 · Next 16.3.7 · React 19.2.8 · TypeScript 5.9.3
 (NO subir a TS 7: rompe Next/ESLint/depcruise) · ESLint 9.39.5 (NO subir a
 10: eslint-plugin-react incompatible) · Zod 4.4.3 (API nueva: `z.url()`) ·
 pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
 
+- **Next 16.3.7 (2026-09-30, subido desde 16.3.4 por seguridad)**:
+  `GHSA-vcvr-r3jv-pc5j`, **CRÍTICO** — ejecución remota de código en
+  `next/og` (`ImageResponse`), afecta a >=16.2.0 <16.3.6. **KIDS no usa
+  `next/og`** (no hay un solo import), así que la exposición real era nula, pero
+  `pnpm audit --prod` es un paso de `verify` y de CI: con un crítico en el grafo
+  de PRODUCCIÓN el pipeline queda en rojo, y "no lo usamos" no es algo que se
+  pueda dejar escrito solo en la cabeza de quien lo miró. `eslint-config-next`
+  va a la par, como siempre.
 - **Next 16.3.4 (2026-09-10, subido desde 16.2.11 por seguridad)**: dos avisos
   CRÍTICOS publicados el 8-sep afectaban a >=16.0.0 <16.3.3 —
   `GHSA-p293-qw3h-jr36` (CVE-2026-75604): ejecución remota de código SIN
@@ -1024,6 +1032,32 @@ nadie habría visto hasta tener niños reales inscribiéndose:**
   la misma referencia sigue siendo 409, y si la matrícula fue cancelada también
   (hay que mirarlo en el panel antes de reenviar). Probado en
   `contracts/tests/reserva-lgs-integration.test.ts`.
+
+**¿ESTÁ TOMANDO EL PROGRAMA? (2026-09-30)** — `GET /api/kids-intake/reservations/[externalRef]`
+(`fichaAcademicaPorRef`). LGS pregunta por el N° de contrato que ya tiene en la
+mano —el mismo con el que reserva y aprueba— y recibe `activo` (sí/no), el
+`motivo` y el programa (campaña, salón, inicio).
+**Se DERIVA, no se guarda** (lo decidió el negocio): ACTIVO = contrato APROBADO
+y no vencido + matrícula ACTIVA. Una columna `activo` escrita a mano diría
+ACTIVO con el contrato ya vencido en cuanto alguien se olvidara de apagarla, que
+es la desincronización que el resto de la plataforma evita —el estado de campaña
+y la lista del salón tampoco se almacenan—. La regla vive UNA vez en
+`contracts/domain/academico.ts` (pura, con pruebas) y la comparten la puerta de
+LGS y la ficha del contrato; `ContractListItem` ganó `matriculaEstado` y
+`vencido` (este último por el gemelo SQL de `contratoVencido`) para poder
+derivarla sin otra consulta.
+El MOTIVO importa tanto como el sí/no: `SIN_CONTRATO`, `CONTRATO_PENDIENTE`,
+`RESERVA_SIN_APROBAR` (reservó cupo por LGS y falta aprobar — distinto de un
+contrato del panel sin aprobar, porque lo que falta hacer es otro),
+`CONTRATO_EN_PAUSA`, `CONTRATO_INACTIVO`, `CONTRATO_VENCIDO`, `SIN_MATRICULA`.
+Un "inactivo" a secas obligaría a abrir el panel para saber si hay que renovar,
+reactivar o matricular. **Vencer manda sobre tener matrícula**: la matrícula
+sigue ACTIVA hasta que pase el barrido, así que mirarla sola diría que un niño
+con contrato vencido está cursando. Un niño matriculado en un curso que aún no
+empieza cuenta como ACTIVO: ya está tomando el programa para quien lo vendió.
+**No se puede leer desde `people`** (la sección Kids): `contracts` importa
+`people`, así que `people → contracts` sería un ciclo y `depcruise` lo rechaza.
+Por eso el estado se ve en la ficha del contrato, no en la lista de Kids.
 
 **Estado de la conexión (2026-09-26)**: la app de LGS en producción
 (`lgs-plataforma.com`) YA tiene `KIDS_API_URL` y `KIDS_INTAKE_API_KEY` (esta

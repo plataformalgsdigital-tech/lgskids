@@ -57,6 +57,17 @@ interface SalonOpcion {
   ocupados: number;
 }
 
+/**
+ * Estado ACADÉMICO: si el niño está tomando el programa. Lo deriva el servidor
+ * de contrato + vigencia + matrícula, y es la MISMA respuesta que recibe LGS.
+ */
+interface Academico {
+  activo: boolean;
+  estado: "ACTIVO" | "INACTIVO";
+  motivo: string | null;
+  detalle: string;
+}
+
 interface Credenciales {
   username: string;
   correo: string;
@@ -129,6 +140,8 @@ export default function FichaContratoPage() {
   const params = useParams<{ id: string }>();
   const [contrato, setContrato] = useState<Contrato | null>(null);
   const [hermanos, setHermanos] = useState<Contrato[]>([]);
+  /** ¿Está cursando? Por contrato, derivado en el servidor. */
+  const [academico, setAcademico] = useState<Record<string, Academico>>({});
   const [puedeGestionar, setPuedeGestionar] = useState(false);
   const [salones, setSalones] = useState<SalonOpcion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -150,10 +163,15 @@ export default function FichaContratoPage() {
       setError("No se pudo cargar el contrato.");
       return;
     }
-    const data: { contrato: Contrato; hermanos: Contrato[]; puedeGestionar: boolean } =
-      await res.json();
+    const data: {
+      contrato: Contrato;
+      hermanos: Contrato[];
+      puedeGestionar: boolean;
+      academico?: Record<string, Academico>;
+    } = await res.json();
     setContrato(data.contrato);
     setHermanos(data.hermanos);
+    setAcademico(data.academico ?? {});
     setPuedeGestionar(data.puedeGestionar);
   }, [params.id]);
 
@@ -478,6 +496,26 @@ export default function FichaContratoPage() {
                   {c.beneficiarioDocTipo} {c.beneficiarioDocNumero} · contrato N° {c.numero}
                 </div>
               </div>
+              {/* ¿Está tomando el programa? Es la MISMA respuesta que recibe
+                  LGS, y por eso va arriba de todo en su tarjeta. */}
+              {academico[c.id] !== undefined && (
+                <div
+                  style={{
+                    padding: "0.5rem 1rem",
+                    background: academico[c.id]?.activo === true ? "#e8f5e9" : "#fff8e1",
+                    color: academico[c.id]?.activo === true ? "#1b5e20" : "#8a6d00",
+                    fontSize: "0.85rem",
+                    borderBottom: "1px solid #edf0f6",
+                  }}
+                >
+                  <strong>
+                    {academico[c.id]?.activo === true
+                      ? "🟢 Cursando el programa"
+                      : "⚪ No está cursando"}
+                  </strong>
+                  {academico[c.id]?.activo !== true && ` · ${academico[c.id]?.detalle ?? ""}`}
+                </div>
+              )}
               <div style={{ ...rejilla, padding: "0.9rem 1rem" }}>
                 <Dato rotulo="Fecha de nacimiento">{c.beneficiarioFechaNac ?? "—"}</Dato>
                 <Dato rotulo="Curso">{CURSO_NOMBRE[c.tipoCurso] ?? c.tipoCurso}</Dato>
