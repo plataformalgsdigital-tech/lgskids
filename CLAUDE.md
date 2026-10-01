@@ -1080,6 +1080,12 @@ empieza cuenta como ACTIVO: ya está tomando el programa para quien lo vendió.
 lo demás. Viaja YA clasificada para que LGS no mapee `motivo` por su cuenta: si
 cada sistema lo interpretara a su manera, un día LGS diría "Suspendido" de un
 contrato vencido.
+**LGS YA LO MUESTRA (2026-09-30)** en la ficha de su beneficiario Kids
+("KIDS: Cursando / Suspendido / No cursando"): lo consulta en el servidor con
+`KIDS_INSCRIPCIONES.kidsExternalRef`, sin guardarlo. Si se cambia la forma de
+esta respuesta, LGS se rompe: `situacion` es un CONTRATO entre los dos sistemas.
+El N° viaja con `encodeURIComponent` — sin eso, el `#` del sufijo se toma como
+ancla y KIDS recibe solo la base y contesta 404.
 **No se puede leer desde `people`** (la sección Kids): `contracts` importa
 `people`, así que `people → contracts` sería un ciclo y `depcruise` lo rechaza.
 Por eso el estado se ve en la ficha del contrato, no en la lista de Kids.
@@ -1502,20 +1508,10 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
   la misma regla —lo que no viene, no se toca; las zonas se conservan por
   enlace—, probablemente reutilizando `planificarFila`. El editor de Referencia
   manda la fila completa y solo pierde las zonas.
-- **Mostrar en LGS si el niño está cursando**: KIDS ya responde `situacion`
-  (CURSANDO/SUSPENDIDO/NO_CURSANDO) en `GET /api/kids-intake/reservations/[ref]`.
-  Falta el lado de LGS (repositorio aparte): `academicStatus(externalRef)` en
-  `src/lib/kids-intake.ts` —con `encodeURIComponent`, porque el `#` del N° se
-  tomaría como ancla y KIDS respondería 404—, consultarlo en el servidor desde
-  `api/postgres/people/[id]` con `KIDS_INSCRIPCIONES.kidsExternalRef` y pintar el
-  distintivo en el bloque "Programa Kids" de `PersonGeneral.tsx`. No guardarlo
-  en LGS: se deriva.
-- **Campañas de prueba**: el 2026-09-30 se pidió dejar solo OCTUBRE2026 y el
-  negocio las borró desde el panel ("Eliminar campaña"). No se verificó en la
-  base: la IP de desarrollo ya no está en las fuentes confiables de `lgs-db`, un
-  clúster COMPARTIDO con LGS. Agregarla (`doctl databases firewalls append`)
-  requiere autorización, y hay que quitarla al terminar.
-
+- **Acceso a la base de producción desde desarrollo**: la IP de desarrollo ya no
+  está en las fuentes confiables de `lgs-db`, un clúster COMPARTIDO con LGS.
+  Agregarla (`doctl databases firewalls append`) requiere autorización del
+  negocio, y hay que quitarla al terminar.
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
