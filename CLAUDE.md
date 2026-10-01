@@ -1491,6 +1491,31 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
 
 ## Pendientes conocidos
 
+- **URGENTE — Guardar en Gestión de Contenido BORRA datos de la lección**
+  (detectado 2026-09-30, sin corregir). Su `PUT /api/catalog/curso/[id]` manda
+  solo temario, video, actividades y cuestionarios, y `actualizarCursoReferencia`
+  pasa por `normalizar`, que rellena con `[]` lo que no vino: se pierden
+  **material del guía, material del alumno, recursos y clubes**. Además el
+  esquema `actividadItem` (Zod, que descarta claves desconocidas) se come
+  `x`/`y`/`w`/`h`, así que también se van las **zonas de los juegos** en la
+  lámina. Es el mismo defecto que se corrigió en la carga por CSV: la solución es
+  la misma regla —lo que no viene, no se toca; las zonas se conservan por
+  enlace—, probablemente reutilizando `planificarFila`. El editor de Referencia
+  manda la fila completa y solo pierde las zonas.
+- **Mostrar en LGS si el niño está cursando**: KIDS ya responde `situacion`
+  (CURSANDO/SUSPENDIDO/NO_CURSANDO) en `GET /api/kids-intake/reservations/[ref]`.
+  Falta el lado de LGS (repositorio aparte): `academicStatus(externalRef)` en
+  `src/lib/kids-intake.ts` —con `encodeURIComponent`, porque el `#` del N° se
+  tomaría como ancla y KIDS respondería 404—, consultarlo en el servidor desde
+  `api/postgres/people/[id]` con `KIDS_INSCRIPCIONES.kidsExternalRef` y pintar el
+  distintivo en el bloque "Programa Kids" de `PersonGeneral.tsx`. No guardarlo
+  en LGS: se deriva.
+- **Campañas de prueba**: el 2026-09-30 se pidió dejar solo OCTUBRE2026 y el
+  negocio las borró desde el panel ("Eliminar campaña"). No se verificó en la
+  base: la IP de desarrollo ya no está en las fuentes confiables de `lgs-db`, un
+  clúster COMPARTIDO con LGS. Agregarla (`doctl databases firewalls append`)
+  requiere autorización, y hay que quitarla al terminar.
+
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
