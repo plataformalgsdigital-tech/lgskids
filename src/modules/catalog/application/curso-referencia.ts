@@ -1,11 +1,20 @@
+import type { PoolClient } from "pg";
 import { registrarAuditoria } from "@/modules/audit";
+import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import {
+  claveLeccion,
+  planificarFila,
+  type AccionImportacion,
+  type FilaCsvCurso,
+  type PlanFila,
+} from "../domain/importacion-curso";
+import {
   deleteCursoReferencia,
   existsCursoReferenciaKey,
-  findCursoReferenciaIdByKey,
   getCursoReferencia,
+  getCursoReferenciaPorClave,
   insertCursoReferencia,
   listCursoReferencia,
   updateCursoReferencia,
@@ -128,54 +137,164 @@ export async function actualizarCursoReferencia(
   });
 }
 
+/** Una fila tal como llega del CSV; `linea` es la del archivo (2 = primera de datos). */
+export type FilaImportacion = DatosCurso & { linea?: number | undefined };
+
+export interface FilaValidada {
+  linea: number;
+  curso: string;
+  nivel: string;
+  unidad: string | null;
+  leccion: string;
+  accion: AccionImportacion | null;
+  cambios: string[];
+  avisos: string[];
+  error: string | null;
+}
+
+export interface ValidacionImportacion {
+  filas: FilaValidada[];
+  resumen: { crear: number; actualizar: number; sinCambios: number; errores: number };
+}
+
+/** Como `normalizar`, pero lo que no vino queda `undefined`: no se toca. */
+function filaDelCsv(d: DatosCurso): FilaCsvCurso {
+  if (!CURSOS.includes(d.curso)) {
+    throw new ValidationError(`Curso inválido: ${d.curso} (JUNIOR | YOUNGSTER).`);
+  }
+  if (!NIVELES_CODIGO.includes(d.nivel)) throw new ValidationError(`Nivel inválido: ${d.nivel}.`);
+  if (d.leccion.trim() === "") throw new ValidationError("La lección es obligatoria.");
+  return {
+    curso: d.curso,
+    nivel: d.nivel,
+    unidad: d.unidad?.trim() || null,
+    leccion: d.leccion.trim(),
+    orden: d.orden,
+    contenido: d.contenido,
+    video: d.video,
+    materialGuia: d.materialGuia,
+    materialUsuario: d.materialUsuario,
+    actividades: d.actividades,
+    recursos: d.recursos,
+    clubes: d.clubes,
+  };
+}
+
 /**
- * IMPORTA (upsert) filas de referencia desde CSV: por cada fila, si ya existe
- * la clave (curso, nivel, unidad, lección) la actualiza; si no, la crea.
- * Devuelve conteos y errores por fila (base 1, incluye la cabecera del CSV).
+ * Qué pasaría con cada fila. Es el MISMO cálculo al validar y al cargar
+ * (`planificarFila`), así que lo que la pantalla promete antes de la
+ * confirmación es lo que después se escribe.
+ */
+async function planificar(
+  filas: FilaImportacion[],
+  client?: PoolClient,
+): Promise<
+  { fila: FilaValidada; datos: FilaCsvCurso | null; plan: PlanFila | null; id: string | null }[]
+> {
+  const vistas = new Set<string>();
+  const salida = [];
+  for (let i = 0; i < filas.length; i += 1) {
+    const cruda = filas[i]!;
+    const base: FilaValidada = {
+      linea: cruda.linea ?? i + 2,
+      curso: cruda.curso,
+      nivel: cruda.nivel,
+      unidad: cruda.unidad?.trim() || null,
+      leccion: cruda.leccion.trim(),
+      accion: null,
+      cambios: [],
+      avisos: [],
+      error: null,
+    };
+    try {
+      const datos = filaDelCsv(cruda);
+      const clave = claveLeccion(datos);
+      // Dos filas con la misma lección: la segunda pisaría a la primera en
+      // silencio, y el previo diría "crear" dos veces.
+      if (vistas.has(clave)) throw new ValidationError("La lección está repetida en el archivo.");
+      vistas.add(clave);
+      const actual = await getCursoReferenciaPorClave(datos, client);
+      const plan = planificarFila(datos, actual);
+      salida.push({
+        fila: { ...base, accion: plan.accion, cambios: plan.cambios, avisos: plan.avisos },
+        datos,
+        plan,
+        id: actual?.id ?? null,
+      });
+    } catch (e) {
+      const error = e instanceof Error ? e.message : "Fila inválida.";
+      salida.push({ fila: { ...base, error }, datos: null, plan: null, id: null });
+    }
+  }
+  return salida;
+}
+
+function resumir(filas: FilaValidada[]): ValidacionImportacion["resumen"] {
+  return {
+    crear: filas.filter((f) => f.accion === "CREAR").length,
+    actualizar: filas.filter((f) => f.accion === "ACTUALIZAR").length,
+    sinCambios: filas.filter((f) => f.accion === "SIN_CAMBIOS").length,
+    errores: filas.filter((f) => f.error !== null).length,
+  };
+}
+
+/** VALIDA el archivo contra la base sin escribir nada: el previo de la confirmación. */
+export async function validarImportacionCurso(
+  filas: FilaImportacion[],
+): Promise<ValidacionImportacion> {
+  const plan = await planificar(filas);
+  const validadas = plan.map((p) => p.fila);
+  return { filas: validadas, resumen: resumir(validadas) };
+}
+
+/**
+ * CARGA el archivo: TODO o NADA, en una transacción. Antes cargaba fila por
+ * fila y un error a la mitad dejaba el nivel a medio actualizar, con la
+ * pantalla diciendo "creadas 12, 1 error" y sin forma de saber qué había
+ * quedado de cada versión. Si alguna fila falla, no se escribe ninguna.
  */
 export async function importarCursoReferencia(input: {
   actorUserId: string;
-  filas: DatosCurso[];
+  filas: FilaImportacion[];
   ip?: string | null;
-}): Promise<{
-  creados: number;
-  actualizados: number;
-  errores: { fila: number; motivo: string }[];
-}> {
-  let creados = 0;
-  let actualizados = 0;
-  const errores: { fila: number; motivo: string }[] = [];
-
-  for (let i = 0; i < input.filas.length; i += 1) {
-    try {
-      const datos = normalizar(input.filas[i]!);
-      const id = await findCursoReferenciaIdByKey(
-        datos.curso,
-        datos.nivel,
-        datos.unidad,
-        datos.leccion,
+}): Promise<ValidacionImportacion["resumen"]> {
+  const resumen = await withTransaction(async (client) => {
+    const plan = await planificar(input.filas, client);
+    const conError = plan.filter((p) => p.fila.error !== null);
+    if (conError.length > 0) {
+      const primeras = conError
+        .slice(0, 3)
+        .map((p) => `línea ${String(p.fila.linea)}: ${p.fila.error ?? ""}`)
+        .join("; ");
+      throw new ValidationError(
+        `No se cargó nada: ${String(conError.length)} fila(s) con error (${primeras}).`,
       );
-      if (id !== null) {
-        await updateCursoReferencia(id, datos);
-        actualizados += 1;
-      } else {
-        await insertCursoReferencia(newId(), datos);
-        creados += 1;
-      }
-    } catch (e) {
-      errores.push({ fila: i + 2, motivo: e instanceof Error ? e.message : "Error" }); // +2: cabecera + base 1
     }
-  }
+    for (const p of plan) {
+      if (p.datos === null || p.plan === null || p.plan.accion === "SIN_CAMBIOS") continue;
+      const r = p.plan.resultado;
+      const guardar = {
+        curso: p.datos.curso,
+        nivel: p.datos.nivel,
+        unidad: p.datos.unidad,
+        leccion: p.datos.leccion,
+        ...r,
+      };
+      if (p.id === null) await insertCursoReferencia(newId(), guardar, client);
+      else await updateCursoReferencia(p.id, guardar, client);
+    }
+    return resumir(plan.map((p) => p.fila));
+  });
 
   await registrarAuditoria({
     actorUserId: input.actorUserId,
     accion: "catalog.curso_referencia_importada",
     entidad: "catalog_curso",
     entidadId: null,
-    payload: { creados, actualizados, errores: errores.length },
+    payload: resumen,
     ip: input.ip ?? null,
   });
-  return { creados, actualizados, errores };
+  return resumen;
 }
 
 export async function eliminarCursoReferencia(input: {

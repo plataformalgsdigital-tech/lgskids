@@ -42,6 +42,8 @@ export const PERMISOS = {
   MENU_REPORTES: "menu.reportes",
   MENU_AUDITORIA: "menu.auditoria",
   MENU_AVISO_LOGIN: "menu.aviso_login",
+  /** Administración › Mantenimiento: cargas masivas (hoy, el catálogo Curso por CSV). */
+  MENU_MANTENIMIENTO_ADMIN: "menu.mantenimiento_admin",
   MENU_GUIAS: "menu.guias",
   MENU_MIS_CLASES: "menu.mis_clases",
   MENU_MIS_SALONES: "menu.mis_salones",
@@ -150,6 +152,7 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.MENU_REPORTES,
     PERMISOS.MENU_AUDITORIA,
     PERMISOS.MENU_AVISO_LOGIN,
+    PERMISOS.MENU_MANTENIMIENTO_ADMIN,
     PERMISOS.MENU_GUIAS,
   ],
   guia: [
@@ -227,6 +230,7 @@ export const SECCIONES_MENU: {
       { etiqueta: "Auditoría", permiso: PERMISOS.MENU_AUDITORIA },
       { etiqueta: "Guías", permiso: PERMISOS.MENU_GUIAS },
       { etiqueta: "Aviso de login", permiso: PERMISOS.MENU_AVISO_LOGIN },
+      { etiqueta: "Mantenimiento", permiso: PERMISOS.MENU_MANTENIMIENTO_ADMIN },
     ],
   },
   {

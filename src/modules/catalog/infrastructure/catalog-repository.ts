@@ -236,20 +236,23 @@ export async function existsCursoReferenciaKey(
   return row !== null;
 }
 
-/** id de una fila por su clave natural (curso, nivel, unidad, leccion) — para upsert del importador. */
-export async function findCursoReferenciaIdByKey(
-  curso: string,
-  nivel: string,
-  unidad: string | null,
-  leccion: string,
-): Promise<string | null> {
-  const row = await queryOne<{ id: string }>(
-    `SELECT id FROM catalog_curso
+/**
+ * La lección completa por su clave natural, dentro de la transacción de la
+ * importación. `FOR UPDATE` para que dos cargas del mismo archivo a la vez no
+ * decidan las dos "crear" y choquen contra el índice único.
+ */
+export async function getCursoReferenciaPorClave(
+  clave: { curso: string; nivel: string; unidad: string | null; leccion: string },
+  client?: Queryable,
+): Promise<CursoReferenciaRow | null> {
+  return queryOne<CursoReferenciaRow>(
+    `${SELECT_CURSO}
       WHERE curso = $1::catalog_course_tipo AND nivel = $2
-        AND COALESCE(unidad, '') = $3 AND lower(leccion) = lower($4)`,
-    [curso, nivel, unidad ?? "", leccion.trim()],
+        AND COALESCE(unidad, '') = $3 AND lower(leccion) = lower($4)
+      FOR UPDATE`,
+    [clave.curso, clave.nivel, clave.unidad ?? "", clave.leccion.trim()],
+    client,
   );
-  return row?.id ?? null;
 }
 
 function cursoParams(input: CursoReferenciaInput): unknown[] {
@@ -273,6 +276,7 @@ function cursoParams(input: CursoReferenciaInput): unknown[] {
 export async function insertCursoReferencia(
   id: string,
   input: CursoReferenciaInput,
+  client?: Queryable,
 ): Promise<void> {
   await execute(
     `INSERT INTO catalog_curso
@@ -281,12 +285,14 @@ export async function insertCursoReferencia(
      VALUES ($1, $2::catalog_course_tipo, $3, $4, $5::jsonb, $6, $7, $8, $9,
              $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, now())`,
     [id, ...cursoParams(input)],
+    client,
   );
 }
 
 export async function updateCursoReferencia(
   id: string,
   input: CursoReferenciaInput,
+  client?: Queryable,
 ): Promise<void> {
   await execute(
     `UPDATE catalog_curso
@@ -296,6 +302,7 @@ export async function updateCursoReferencia(
             actividades = $13::jsonb, recursos = $14::jsonb, updated_at = now()
       WHERE id = $1`,
     [id, ...cursoParams(input)],
+    client,
   );
 }
 

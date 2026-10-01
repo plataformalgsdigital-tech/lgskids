@@ -20,6 +20,7 @@ export {
   cursoReferenciaListHandler,
   cursoReferenciaCrearHandler,
   cursoReferenciaBulkHandler,
+  cursoReferenciaValidarHandler,
   cursoReferenciaGetHandler,
   cursoReferenciaPutHandler,
   cursoReferenciaDeleteHandler,
@@ -122,8 +123,13 @@ export {
   actualizarCursoReferencia,
   eliminarCursoReferencia,
   importarCursoReferencia,
+  validarImportacionCurso,
 } from "./application/curso-referencia";
-export type { CursoReferenciaRow } from "./application/curso-referencia";
+export type {
+  CursoReferenciaRow,
+  FilaValidada,
+  ValidacionImportacion,
+} from "./application/curso-referencia";
 export { crearCampania } from "./application/crear-campania";
 export { derivarEstadoCampania, ETIQUETA_ESTADO } from "./domain/campania";
 export type { EstadoCampania } from "./domain/campania";

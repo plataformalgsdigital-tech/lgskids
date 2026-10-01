@@ -49,6 +49,7 @@ import {
   crearCursoReferencia,
   eliminarCursoReferencia,
   importarCursoReferencia,
+  validarImportacionCurso,
   listarCursoReferencia,
   obtenerCursoReferencia,
 } from "../application/curso-referencia";
@@ -216,11 +217,32 @@ export const cursoReferenciaCrearHandler = handlerWithAuth(async (request, auth)
   return json(r, { status: 201 });
 });
 
+// El CSV nunca trae cuestionarios: `quiz` queda fuera a propósito, para que
+// una carga no pueda pisar lo que se arma en Gestión de Contenido.
 const cursoBulkSchema = z.object({
-  filas: z.array(z.object(cursoBaseSchema)).min(1).max(1000),
+  filas: z
+    .array(
+      z
+        .object(cursoBaseSchema)
+        .omit({ quiz: true })
+        .extend({ linea: z.number().int().min(1).optional() }),
+    )
+    .min(1)
+    .max(1000),
 });
 
-/** POST /api/catalog/curso/bulk — importa (upsert) muchas filas desde CSV. */
+/**
+ * POST /api/catalog/curso/bulk/validar — el PREVIO: dice qué fila se crea, cuál
+ * se actualiza (y qué le cambia) y cuál tiene error, SIN escribir nada.
+ */
+export const cursoReferenciaValidarHandler = handlerWithAuth(async (request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  const body = cursoBulkSchema.parse(await request.json());
+  return json(await validarImportacionCurso(body.filas));
+});
+
+/** POST /api/catalog/curso/bulk — carga el archivo, todo o nada. */
 export const cursoReferenciaBulkHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);

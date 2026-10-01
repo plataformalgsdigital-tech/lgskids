@@ -163,6 +163,14 @@ const MENU: {
   },
   {
     seccion: "Administración",
+    permiso: "catalogo.gestionar",
+    etiqueta: "Mantenimiento",
+    color: "var(--lgs-azul)",
+    href: "/panel/mantenimiento",
+    permisoMenu: "menu.mantenimiento_admin",
+  },
+  {
+    seccion: "Administración",
     // `permiso` queda como red: quien la ve es superadmin, que los tiene todos.
     permiso: "auditoria.ver",
     etiqueta: "Base de datos",

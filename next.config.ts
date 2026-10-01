@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
     return [
       { source: "/panel/salones", destination: "/panel/calendario", permanent: true },
       { source: "/panel/salones/:path*", destination: "/panel/calendario/:path*", permanent: true },
+      // La carga del catálogo Curso por CSV se mudó a Administración ›
+      // Mantenimiento, ahora con validación contra la base y confirmación.
+      {
+        source: "/panel/mantenimiento-cursos/subir-curso",
+        destination: "/panel/mantenimiento/catalogo-curso",
+        permanent: true,
+      },
       // NO redirigir "/" al login: la raíz de `app.lgskidsplataforma.com`
       // muestra la landing a propósito (decisión del negocio, 2026-09-24) y a
       // la plataforma se entra por `/login`. Se probó el atajo contrario y se

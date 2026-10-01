@@ -58,13 +58,31 @@ del salón, nunca de una acción del estudiante.
   actividades de seguimiento (consumo aún pendiente). CRUD:
   `GET|POST /api/catalog/curso` + `GET|PUT|DELETE /api/catalog/curso/[id]`
   (`curso-referencia.ts`; único por curso·nivel·unidad·lección; ver=catalogo.ver,
-  escribir=catalogo.gestionar). **Import CSV** (`POST /api/catalog/curso/bulk` →
-  `importarCursoReferencia`, UPSERT por clave natural): UI `/panel/mantenimiento-cursos/subir-curso`
-  parsea el CSV en el navegador, muestra un PREVIO validado (✔/✘ por fila) y solo
-  al confirmar sube las válidas. **Separador autodetectado** (`detectarSeparador`
+  escribir=catalogo.gestionar). **Import CSV (2026-09-30: Administración ›
+  Mantenimiento › "Carga catálogo Curso")**, `/panel/mantenimiento/catalogo-curso`
+  (la ruta vieja `…/mantenimiento-cursos/subir-curso` redirige). Tres pasos: el
+  navegador revisa el FORMATO; `POST /api/catalog/curso/bulk/validar`
+  (`validarImportacionCurso`) VALIDA contra la base sin escribir y dice por fila
+  Nueva / Actualiza (y QUÉ cambia) / Sin cambios / Error, con avisos; y
+  `POST /api/catalog/curso/bulk` carga solo tras CONFIRMAR en un modal. Las dos
+  usan la MISMA regla pura, `planificarFila` (`domain/importacion-curso.ts`), para
+  que el previo no prometa algo distinto de lo que se escribe. **La carga es TODO
+  O NADA** (`withTransaction`): antes iba fila por fila y un error a la mitad
+  dejaba el nivel entre dos versiones del archivo. **Lo que el CSV no trae, no se
+  toca**: los CUESTIONARIOS (`quiz` — la versión anterior escribía `quiz = NULL` en
+  cada lección existente y se llevaba las evaluaciones de Gestión de Contenido; el
+  esquema del bulk ni siquiera acepta `quiz`), las columnas AUSENTES del encabezado
+  y las ZONAS de los juegos sobre la lámina, que se conservan en las actividades
+  que siguen con el MISMO ENLACE (el nombre se corrige a menudo; el enlace no). Una
+  columna que viene VACÍA sí borra: es lo que dice el archivo. Pruebas:
+  `importacion-curso.test.ts` e `importacion-curso-integration.test.ts`.
+  **Separador autodetectado** (`detectarSeparador`
   cuenta `,` vs `;` SOLO en el encabezado: el Excel en español exporta con `;`) y
   `ULTIMATE STAGE` se acepta como `ULTIMATE`. Columnas obligatorias: **curso,
   nivel, unidad, leccion, orden**. Listas en CSV: ítems `Nombre|enlace` separados por `;`.
+  La plantilla que descarga la pantalla va con `;` y BOM: el BOM se arma con
+  `String.fromCharCode(0xfeff)` porque las herramientas de edición convierten el
+  escape `\uFEFF` en el carácter invisible.
   **Gestión de Contenido** (`/panel/mantenimiento-cursos/gestion-contenido`, estilo
   MOSAICO): editor guiado por Curso→Nivel que edita el temario y la **evaluación de
   cada lección con VARIOS cuestionarios** (`quiz = { cuestionarios: [{titulo, minutos,
@@ -599,8 +617,9 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
     en una lección de "Unidad 0" y no verlos parecía un fallo — el editor solo podía
     decir "esta unidad no tiene juegos", que es cierto y no ayuda. Ahora los nombra y
     dice dónde cambiarlos.
-  - **Trampa**: reimportar por CSV esa lección SOBRESCRIBE `actividades` y se lleva las
-    posiciones; hay que volver a colocarlas.
+  - Reimportar por CSV esa lección ya NO se lleva las posiciones (2026-09-30): la
+    carga conserva la zona de cada juego que sigue con el mismo enlace, y el previo
+    AVISA cuántas se pierden por juegos que desaparecen del archivo.
   - El dashboard expone `unidades` y `juegosUnidad` por nivel.
 - **Material del alumno (2026-09-19)**: el botón **Material** de `/mi-panel` abre un
   modal con, por cada nivel ALCANZADO (el actual primero, más los completados), TRES
@@ -1253,7 +1272,8 @@ solo servía para completar la ficha.
 - El menú lateral se declara UNA vez en `SECCIONES_MENU` (`access/domain/permisos.ts`)
   como árbol padre→hijos: **Tablero** (suelto, primero) · **Académica** (Calendario,
   Mantenimiento Académico) · **Operación** (Kids, Contratos, Reservas LGS) ·
-  **Administración** (Usuarios y roles, Reportes, Auditoría, Guías, Aviso de login) ·
+  **Administración** (Usuarios y roles, Reportes, Auditoría, Guías, Aviso de login,
+  **Mantenimiento** — cargas masivas, hoy el catálogo Curso por CSV) ·
   **Guía** (Mis clases, Mis salones, Mis niños).
 - **Cada ítem exige DOS permisos**: el funcional (lo que la pantalla hace) y el de
   menú (`menu.*`); el grupo se prende con `seccion.*`. Esto no es redundancia: antes
@@ -1263,6 +1283,11 @@ solo servía para completar la ficha.
 - El seed AÑADE permisos, nunca quita (respeta lo editado en el panel);
   `menu.mantenimiento` se siembra desde `catalogo.gestionar` para que el guía no lo
   herede. `superadmin` sigue teniendo todo por la fuerza.
+- **Un permiso de menú nuevo necesita MIGRACIÓN, no solo seed**: producción no
+  corre el seed en el despliegue. `menu.mantenimiento_admin` (Administración ›
+  Mantenimiento, 2026-09-30) lo crea y lo concede la migración
+  `20260930000000_menu_mantenimiento_admin` con la misma regla del seed (a quien
+  tenga `catalogo.gestionar`), que corre sola en el trabajo `migrar`.
 - Al entrar al panel se aterriza en **/panel/tablero**.
 - Consultas del tablero en `reporting/application/tablero.ts`: `resumenTablero`,
   `salonesSinGuia`, `clasesDeHoy`, `sesionesSinMarcar`. "Hoy" se resuelve con

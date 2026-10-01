@@ -75,6 +75,7 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.MENU_REPORTES]: "Reportes",
   [PERMISOS.MENU_AUDITORIA]: "Auditoría",
   [PERMISOS.MENU_AVISO_LOGIN]: "Aviso de login",
+  [PERMISOS.MENU_MANTENIMIENTO_ADMIN]: "Mantenimiento (Administración)",
   [PERMISOS.MENU_GUIAS]: "Guías",
   [PERMISOS.MENU_MIS_CLASES]: "Mis clases",
   [PERMISOS.MENU_MIS_SALONES]: "Mis salones",
@@ -178,6 +179,8 @@ async function main(): Promise<void> {
       ["menu.reportes", ["reportes.ver"]],
       ["menu.auditoria", ["auditoria.ver"]],
       ["menu.aviso_login", ["catalogo.gestionar"]],
+      // También lo concede la migración 20260930000000: producción no corre el seed.
+      ["menu.mantenimiento_admin", ["catalogo.gestionar"]],
       ["menu.mis_clases", ["panel.guia"]],
       ["menu.mis_salones", ["panel.guia"]],
       ["menu.mis_ninos", ["panel.guia"]],
