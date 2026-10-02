@@ -53,6 +53,37 @@ interface Sesion {
   campania: string | null;
   cursoTipo: string | null;
   cupo: number;
+  /** Lección DERIVADA del catálogo Curso (la sesión N es la N-ésima lección). */
+  leccion: string | null;
+  leccionNivel: string | null;
+}
+
+const NIVEL_UI: Record<string, string> = {
+  ROOKIE: "Rookie",
+  CHAMPION: "Champion",
+  ELITE: "Elite",
+  LEGENDARY: "Legendary",
+  ULTIMATE: "Ultimate Stage",
+};
+
+/** "OCTUBRE2026 · JUNIOR · Salón 04": el salón ya se llama "JUNIOR Salón 04". */
+function tituloSalon(s: Sesion): string {
+  const curso = s.cursoTipo ?? "";
+  const salon =
+    curso !== "" && s.salon.toUpperCase().startsWith(`${curso} `)
+      ? s.salon.slice(curso.length + 1)
+      : s.salon;
+  return [s.campania, curso, salon].filter((p) => p !== null && p !== "").join(" · ");
+}
+
+/** "Sesión 3 · Lección 3": el catálogo escribe "Leccion 3", sin tilde. */
+function tituloSesion(s: Sesion): string {
+  if (s.tipo === "CLUB") return "Club";
+  if (s.numero === 0) return "Sesión extra";
+  const n = s.leccion?.match(/\d+/)?.[0];
+  const leccion =
+    s.leccion === null ? "Lección por asignar" : n !== undefined ? `Lección ${n}` : s.leccion;
+  return `Sesión ${String(s.numero)} · ${leccion}`;
 }
 interface Enlace {
   nombre?: string;
@@ -545,14 +576,30 @@ export function SesionModal({
           }}
         >
           <h2 style={{ fontSize: "1.2rem", fontWeight: 800 }}>
-            🗓️{" "}
-            {sesion === null
-              ? "Cargando…"
-              : `${sesion.tipo === "CLUB" ? "Club" : `Sesión ${String(sesion.numero)}`} · ${sesion.salon}`}
+            🗓️ {sesion === null ? "Cargando…" : tituloSalon(sesion)}
+          </h2>
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.6rem",
+              textAlign: "right",
+            }}
+          >
+            {sesion !== null && (
+              <div>
+                <div style={{ fontSize: "1.05rem", fontWeight: 800 }}>{tituloSesion(sesion)}</div>
+                {sesion.leccionNivel !== null && (
+                  <div style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+                    Nivel {NIVEL_UI[sesion.leccionNivel] ?? sesion.leccionNivel}
+                  </div>
+                )}
+              </div>
+            )}
             {cerrada && (
               <span
                 style={{
-                  marginLeft: "0.6rem",
                   fontSize: "0.7rem",
                   fontWeight: 800,
                   color: "#1b5e20",
@@ -564,15 +611,22 @@ export function SesionModal({
                 REGISTRADA
               </span>
             )}
-          </h2>
-          <button
-            type="button"
-            onClick={onCerrar}
-            aria-label="Cerrar"
-            style={{ ...boton, borderRadius: "50%", width: "2.2rem", height: "2.2rem", padding: 0 }}
-          >
-            ✕
-          </button>
+            <button
+              type="button"
+              onClick={onCerrar}
+              aria-label="Cerrar"
+              style={{
+                ...boton,
+                borderRadius: "50%",
+                width: "2.2rem",
+                height: "2.2rem",
+                padding: 0,
+                flex: "none",
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div
@@ -590,126 +644,123 @@ export function SesionModal({
           )}
           {aviso !== null && <p style={{ color: "#1b5e20", fontWeight: 600 }}>{aviso}</p>}
 
-          {/* ── Información del evento + guía ───────────────────── */}
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "0.9rem" }}
-            className="ses-dos"
-          >
-            <section style={caja}>
-              <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>
-                Información del evento
-              </h3>
-              {sesion !== null && (
-                <div
-                  style={{
-                    fontSize: "0.88rem",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.2rem",
-                  }}
+          {/* ── Información del evento (con el guía) ────────────── */}
+          <section style={caja}>
+            <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>
+              Información del evento
+            </h3>
+            {sesion !== null && (
+              <div
+                style={{
+                  fontSize: "0.88rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.25rem",
+                }}
+              >
+                <span>
+                  📅 <strong>Fecha:</strong>{" "}
+                  {new Date(`${sesion.fecha}T12:00:00`).toLocaleDateString("es", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+                <span>
+                  🕐 <strong>Hora:</strong>{" "}
+                  {new Date(sesion.startsAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span>
+                  👥 <strong>Cupo:</strong> {sesion.cupo} · <strong>Inscritos:</strong>{" "}
+                  {lista.length}
+                </span>
+                {/* El NOMBRE COMPLETO siempre se ve; cambiarlo es de coordinación. */}
+                <span
+                  style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}
                 >
                   <span>
-                    📅{" "}
-                    {new Date(`${sesion.fecha}T12:00:00`).toLocaleDateString("es", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
+                    🧑‍🏫 <strong>Guía:</strong> {sesion.guia ?? "Sin guía asignado"}
+                    {sesion.guiaSoloEstaSesion && (
+                      <span style={{ fontSize: "0.78rem", color: "#8a6d00" }}>
+                        {" "}
+                        (reemplazo solo de esta sesión)
+                      </span>
+                    )}
                   </span>
-                  <span>
-                    🕐{" "}
-                    {new Date(sesion.startsAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span>
-                    👥 Cupo {sesion.cupo} · {sesion.cursoTipo} · Campaña {sesion.campania}
-                  </span>
-                  {/* La LECCIÓN entra aquí cuando exista el módulo de Niveles. */}
-                  <span style={{ color: "var(--texto-suave)" }}>
-                    📘 Lección: se asignará desde Niveles
-                  </span>
-                  <span>🔗 {sesion.meetingUrl ?? "Sin enlace configurado"}</span>
-                </div>
-              )}
-            </section>
-
-            <section style={caja}>
-              <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>Guía</h3>
-              {/* El NOMBRE COMPLETO siempre se ve; cambiarlo es de coordinación. */}
-              <p style={{ fontSize: "0.95rem", fontWeight: 700 }}>
-                {sesion?.guia ?? "Sin guía asignado"}
-              </p>
-              {sesion?.guiaSoloEstaSesion === true && (
-                <p style={{ fontSize: "0.78rem", color: "#8a6d00", marginTop: "0.15rem" }}>
-                  Reemplazo solo de esta sesión.
-                </p>
-              )}
-              {puedeGestionarSalones && (
-                <>
-                  <button
-                    type="button"
-                    style={{ ...boton, marginTop: "0.6rem" }}
-                    disabled={ocupado}
-                    onClick={() => void abrirCambioGuia()}
+                  {puedeGestionarSalones && (
+                    <button
+                      type="button"
+                      style={{ ...boton, padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
+                      disabled={ocupado}
+                      onClick={() => void abrirCambioGuia()}
+                    >
+                      🔀 Cambiar guía
+                    </button>
+                  )}
+                </span>
+                <span style={{ overflowWrap: "anywhere" }}>
+                  🔗 <strong>Enlace:</strong> {sesion.meetingUrl ?? "Sin enlace configurado"}
+                </span>
+              </div>
+            )}
+            {puedeGestionarSalones && (
+              <>
+                {cambiandoGuia && (
+                  <div
+                    style={{
+                      marginTop: "0.6rem",
+                      display: "flex",
+                      gap: "0.4rem",
+                      flexWrap: "wrap",
+                    }}
                   >
-                    🔀 Cambiar guía
-                  </button>
-                  {cambiandoGuia && (
-                    <div
+                    <select
+                      value={nuevoGuia}
+                      onChange={(e) => setNuevoGuia(e.target.value)}
                       style={{
-                        marginTop: "0.6rem",
-                        display: "flex",
-                        gap: "0.4rem",
-                        flexWrap: "wrap",
+                        flex: 1,
+                        minWidth: "9rem",
+                        padding: "0.45rem",
+                        borderRadius: "0.5rem",
+                        border: "1.5px solid #d8dce6",
                       }}
                     >
-                      <select
-                        value={nuevoGuia}
-                        onChange={(e) => setNuevoGuia(e.target.value)}
-                        style={{
-                          flex: 1,
-                          minWidth: "9rem",
-                          padding: "0.45rem",
-                          borderRadius: "0.5rem",
-                          border: "1.5px solid #d8dce6",
-                        }}
-                      >
-                        <option value="">— El guía del salón —</option>
-                        {guias.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.nombre ?? g.username}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        style={botonPrimario}
-                        disabled={ocupado}
-                        onClick={() => void cambiarGuia()}
-                      >
-                        Guardar
-                      </button>
-                      <p
-                        style={{
-                          width: "100%",
-                          fontSize: "0.78rem",
-                          color: "var(--texto-suave)",
-                          margin: 0,
-                        }}
-                      >
-                        Cambia el guía <strong>solo de esta sesión</strong>: las anteriores y las
-                        siguientes siguen con el guía del salón. Para cambiarlo en el curso, entra
-                        al salón.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-          </div>
+                      <option value="">— El guía del salón —</option>
+                      {guias.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.nombre ?? g.username}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      style={botonPrimario}
+                      disabled={ocupado}
+                      onClick={() => void cambiarGuia()}
+                    >
+                      Guardar
+                    </button>
+                    <p
+                      style={{
+                        width: "100%",
+                        fontSize: "0.78rem",
+                        color: "var(--texto-suave)",
+                        margin: 0,
+                      }}
+                    >
+                      Cambia el guía <strong>solo de esta sesión</strong>: las anteriores y las
+                      siguientes siguen con el guía del salón. Para cambiarlo en el curso, entra al
+                      salón.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
 
           {/* ── Acciones ────────────────────────────────────────── */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>

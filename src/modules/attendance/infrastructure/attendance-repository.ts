@@ -31,7 +31,20 @@ export interface SessionInfo {
   campania: string | null;
   cursoTipo: string | null;
   cupo: number;
+  /**
+   * La lección que toca en esta sesión, DERIVADA: la sesión N del curso es la
+   * N-ésima lección del catálogo Curso de ese tipo, en el orden de los niveles
+   * (Rookie → Ultimate) y luego por `orden`. Nada se guarda en la sesión: si
+   * el catálogo se corrige o se regenera el salón, la cuenta sigue cuadrando.
+   * Null para lo que no es parte de la secuencia (refuerzos, eventos con
+   * `numero = 0`) o cuando el catálogo todavía no tiene tantas lecciones.
+   */
+  leccion: string | null;
+  leccionNivel: string | null;
 }
+
+/** Orden de los niveles para recorrer el catálogo Curso como una sola secuencia. */
+const ORDEN_NIVELES = `ARRAY['ROOKIE','CHAMPION','ELITE','LEGENDARY','ULTIMATE']::text[]`;
 
 export async function getSessionInfo(sessionId: string): Promise<SessionInfo | null> {
   return queryOne<SessionInfo>(
@@ -50,11 +63,22 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
               AND s.guia_user_id IS DISTINCT FROM cl.guia_user_id) AS "guiaSoloEstaSesion",
             cl.meeting_url AS "meetingUrl", cl.cupo,
             s.cerrada_por AS "cerradaPor", s.cerrada_en::text AS "cerradaEn",
-            ca.nombre AS campania, co.tipo::text AS "cursoTipo"
+            ca.nombre AS campania, co.tipo::text AS "cursoTipo",
+            lec.leccion, lec.nivel AS "leccionNivel"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course co ON co.id = cl.course_id
        JOIN catalog_campaign ca ON ca.id = co.campaign_id
+       LEFT JOIN LATERAL (
+         SELECT sec.leccion, sec.nivel
+           FROM (SELECT cc.leccion, cc.nivel,
+                        ROW_NUMBER() OVER (
+                          ORDER BY array_position(${ORDEN_NIVELES}, cc.nivel), cc.orden, cc.leccion
+                        ) AS n
+                   FROM catalog_curso cc
+                  WHERE cc.curso = co.tipo) sec
+          WHERE sec.n = s.numero
+       ) lec ON s.numero > 0
        LEFT JOIN identity_user g ON g.id = COALESCE(s.guia_user_id, cl.guia_user_id)
        LEFT JOIN scheduling_guia gg ON gg.guia_user_id = g.id
        LEFT JOIN identity_perfil gpf ON gpf.user_id = g.id

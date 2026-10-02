@@ -1309,6 +1309,18 @@ solo servía para completar la ficha.
   redirecciones permanentes, incluidas las de detalle y sesión.
 - Un evento abre **MODAL** (`calendario/SesionModal.tsx`), no una página. El nombre
   del guía SIEMPRE se ve; "Cambiar guía" y "Suspender" solo con `salones.gestionar`.
+  **Encabezado (2026-10-02)**: a la izquierda `CAMPAÑA · CURSO · Salón NN`, a la
+  derecha `Sesión N · Lección N` con el nivel debajo. "Información del evento" lleva
+  fecha, hora, cupo e inscritos, guía (con "Cambiar guía") y enlace; la caja
+  aparte del guía se retiró.
+  **La LECCIÓN de la sesión se DERIVA, no se guarda** (`getSessionInfo`): la sesión
+  N del curso es la N-ésima lección del catálogo Curso de ese tipo, recorrido en el
+  orden de los niveles (Rookie → Ultimate) y luego por `orden`. Supone UNA lección
+  por sesión. Sin columna nueva: regenerar el salón o corregir el catálogo no deja
+  nada desincronizado. Refuerzos y eventos (`numero = 0`) no llevan lección, y si
+  el catálogo tiene menos lecciones que sesiones el modal dice "Lección por
+  asignar". La sesión 1 de Rookie cae en la "Leccion 0" (el Welcome): es como está
+  numerado el catálogo.
 - **Cambiar el guía son DOS operaciones distintas (2026-09-27)**. Las dos pantallas
   llamaban al MISMO endpoint (el del salón), así que reemplazar al guía de un martes
   reescribía el curso entero, pasado incluido:
