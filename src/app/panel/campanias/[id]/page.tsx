@@ -48,7 +48,16 @@ interface Salon {
   cupo: number;
   ocupados: number;
   activo: boolean;
+  /** País del salón: su calendario de feriados (el mismo que viaja a LGS). */
+  holidayCountry: string;
 }
+
+const PAIS_NOMBRE: Record<string, string> = {
+  CL: "Chile",
+  CO: "Colombia",
+  EC: "Ecuador",
+  PE: "Perú",
+};
 
 const COLOR_NIVEL: Record<string, string> = {
   ROOKIE: "var(--lgs-verde)",
@@ -934,6 +943,7 @@ export default function DetalleCampaniaPage() {
                 <tr style={{ borderBottom: "1.5px solid #e3e7f0" }}>
                   <th style={th}>Tipo</th>
                   <th style={th}>Salón</th>
+                  <th style={th}>País</th>
                   <th style={th}>Guía</th>
                   <th style={th}>Horario</th>
                   <th style={th}>Inicio curso</th>
@@ -960,6 +970,9 @@ export default function DetalleCampaniaPage() {
                       </td>
                       <td style={{ ...td, fontWeight: 600 }}>
                         {etiquetaSalon(salon.nombre, curso.tipo)}
+                      </td>
+                      <td style={td}>
+                        {PAIS_NOMBRE[salon.holidayCountry] ?? salon.holidayCountry}
                       </td>
                       <td style={{ ...td, whiteSpace: "normal" }}>
                         {salon.guia ?? (

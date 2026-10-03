@@ -98,6 +98,8 @@ const ES_NINO = `(EXISTS (SELECT 1 FROM people_guardianship g WHERE g.nino_id = 
 export async function listNinos(params: {
   countryScope: string[] | null;
   id?: string;
+  /** Texto libre: nombre, apellido, documento, usuario o N° de contrato. */
+  buscar?: string;
   estado?: string;
   tipoCurso?: string;
   campaignId?: string;
@@ -116,6 +118,19 @@ export async function listNinos(params: {
   if (params.id !== undefined && params.id !== "") {
     values.push(`%${params.id}%`);
     where.push(`p.doc_numero ILIKE $${values.length}`);
+  }
+  if (params.buscar !== undefined && params.buscar !== "") {
+    // El buscador global: lo mismo que se busca de una persona, más su N° de
+    // contrato (interno o de LGS) para encontrar al niño por cualquiera.
+    values.push(`%${params.buscar}%`);
+    const i = values.length;
+    values.push(params.buscar.trim());
+    const exacto = values.length;
+    where.push(
+      `(p.nombres ILIKE $${String(i)} OR p.apellidos ILIKE $${String(i)}
+        OR p.doc_numero ILIKE $${String(i)} OR u.username ILIKE $${String(i)}
+        OR c.external_ref ILIKE $${String(i)} OR c.numero::text = $${String(exacto)})`,
+    );
   }
   if (params.estado !== undefined) {
     values.push(params.estado);

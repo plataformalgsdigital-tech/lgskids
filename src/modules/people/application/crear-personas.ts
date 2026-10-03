@@ -108,6 +108,7 @@ export async function listarPersonas(params: {
 export async function listarNinos(params: {
   countryScope: string[] | null;
   id?: string;
+  buscar?: string;
   estado?: string;
   tipoCurso?: string;
   campaignId?: string;
@@ -120,6 +121,7 @@ export async function listarNinos(params: {
   return listNinos({
     countryScope: params.countryScope,
     ...(params.id !== undefined && { id: params.id }),
+    ...(params.buscar !== undefined && { buscar: params.buscar }),
     ...(params.estado !== undefined && { estado: params.estado }),
     ...(params.tipoCurso !== undefined && { tipoCurso: params.tipoCurso }),
     ...(params.campaignId !== undefined && { campaignId: params.campaignId }),

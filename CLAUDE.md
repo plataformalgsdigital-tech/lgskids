@@ -209,6 +209,11 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   completa). **Buscador global** en el panel (`/api/search` + /panel/buscar):
   N° de contrato, documento, nombre, apellido o username, respetando
   alcance por país. Permisos: matriculas.gestionar/ver (guía ve).
+  **Desde 2026-10-03 los NIÑOS salen primero y con su programa** —la misma línea
+  del encabezado de su ficha: ID, contrato, programa (campaña y curso) y estado—,
+  vía `listarNinos({ buscar })`, que busca también por N° de contrato (interno o de
+  LGS). Las demás personas (apoderados, titulares) y los contratos van debajo SIN
+  repetir a esos niños.
 - **Fase 8 (`attendance` + `assessment`) completada**: migración
   `20260728000000_attendance_assessment`. Asistencia: UNA marca por
   (sesión, niño) con UPSERT — individual y masiva pasan por el MISMO
@@ -1195,7 +1200,9 @@ de contratos y del intake (ambos filtran `activo`). `DELETE` → `eliminarSalon`
 matrículas — desactivar en su lugar). Su detalle muestra las fechas de la campaña
 (editar fin/cierre desde ahí afecta a TODA la campaña). El **detalle de campaña**
 (`/panel/campanias/[id]`) lista todos los salones en una tabla (Tipo, Salón,
-Guía, Horario, Inicio/Final curso, Cierre matríc., Cupos, Estado, Acciones) y
+**País** —el de su calendario de feriados, el mismo `pais` que viaja a LGS en
+`availability`—, Guía, Horario, Inicio/Final curso, Cierre matríc., Cupos, Estado,
+Acciones) y
 tiene **"Generar salones del catálogo"** (`POST /api/scheduling/campaigns/[id]/generate`
 → `generarSalonesDesdeCatalogo`): crea un salón por cada horario activo del
 catálogo (ambos grupos, ambos tipos) con **guía pendiente** y cupo 12,
