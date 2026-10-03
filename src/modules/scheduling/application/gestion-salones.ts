@@ -143,10 +143,16 @@ async function generarSesionesTx(
   // EL NÚMERO ES DEL CURSO, no del día de la semana. Con dos días por semana el
   // índice por slot daba dos "Sesión 1", dos "Sesión 2"… y en la pantalla del
   // salón parecían sesiones duplicadas. Van 1..N en orden cronológico.
+  // Y POR TIPO (2026-10-03): las clases y los clubes llevan cada uno su
+  // cuenta. Contados juntos, cada club corría un puesto a las clases que venían
+  // después, y la lección de cada sesión sale de ese puesto.
   rows.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
-  rows.forEach((row, i) => {
-    row.numero = i + 1;
-  });
+  const porTipo = new Map<string, number>();
+  for (const row of rows) {
+    const n = (porTipo.get(row.tipo) ?? 0) + 1;
+    porTipo.set(row.tipo, n);
+    row.numero = n;
+  }
   await insertSessionsBatch(tx, classroom.id, rows);
   return rows.length;
 }

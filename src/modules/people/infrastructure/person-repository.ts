@@ -189,6 +189,8 @@ export interface NinoDetalle {
   estado: string;
   /** Cuenta del niño: la usa "Ver clave" (solo superadmin). */
   userId: string | null;
+  /** Contrato más reciente: lo usa Academic Change. */
+  contractId: string | null;
   username: string | null;
   correo: string | null;
   contratoNumero: number | null;
@@ -225,7 +227,7 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
             p.country_code AS "countryCode", p.fecha_nacimiento::text AS "fechaNacimiento",
             p.email AS "personaEmail", p.telefono, p.estado,
             u.id AS "userId", u.username, u.email AS correo,
-            c.numero AS "contratoNumero", c.external_ref AS "externalRef",
+            c.id AS "contractId", c.numero AS "contratoNumero", c.external_ref AS "externalRef",
             c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
             c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
             c.firmado,

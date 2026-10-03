@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 
 const RAIZ = join(__dirname, "..", "..", "..", "..");
 
-const CAMINOS: { camino: string; archivo: string; invoca: string }[] = [
+const CAMINOS: { camino: string; archivo: string; invoca: string; mismoModulo?: boolean }[] = [
   {
     camino: "1. Marcar asistencia (individual y masiva — mismo camino)",
     archivo: "src/modules/attendance/application/asistencia.ts",
@@ -35,13 +35,30 @@ const CAMINOS: { camino: string; archivo: string; invoca: string }[] = [
     archivo: "worker/index.ts",
     invoca: "recalculoGlobal",
   },
+  {
+    // La ubicación es una ENTRADA de la derivación: cambiarla sin recalcular
+    // dejaría el avance viejo hasta la próxima pasada del worker.
+    camino: "4. Ubicación académica (Academic Change › Ajuste)",
+    archivo: "src/modules/progression/application/ubicacion.ts",
+    invoca: "recalcularProgresion",
+    mismoModulo: true,
+  },
+  {
+    camino: "5. Cambio de curso (Academic Change › promover / degradar)",
+    archivo: "src/modules/contracts/application/gestion-contratos.ts",
+    invoca: "recalcularProgresion",
+  },
 ];
 
 describe("REGLA DURA 4: la función central se dispara desde TODOS los caminos", () => {
-  it.each(CAMINOS)("$camino", ({ archivo, invoca }) => {
+  it.each(CAMINOS)("$camino", ({ archivo, invoca, mismoModulo }) => {
     const codigo = readFileSync(join(RAIZ, archivo), "utf8");
-    // Importa desde el módulo progression…
-    expect(codigo).toMatch(/from "(@\/|\.\.\/src\/)modules\/progression"/);
+    // Importa desde el módulo progression (o, dentro de él, desde su archivo)…
+    expect(codigo).toMatch(
+      mismoModulo === true
+        ? /from "\.\/recalcular"/
+        : /from "(@\/|\.\.\/src\/)modules\/progression"/,
+    );
     // …y la INVOCA (no basta con importarla).
     expect(codigo).toMatch(new RegExp(`(await|void) ${invoca}\\(`));
   });

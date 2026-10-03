@@ -6,6 +6,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { numeroContrato } from "@/ui/numero-contrato";
 import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
+import { AcademicInfo } from "./AcademicInfo";
 
 interface Nino {
   id: string;
@@ -19,6 +20,7 @@ interface Nino {
   telefono: string | null;
   estado: "ACTIVA" | "INACTIVA";
   userId: string | null;
+  contractId: string | null;
   username: string | null;
   correo: string | null;
   contratoNumero: number | null;
@@ -111,6 +113,9 @@ export default function DetalleNinoPage() {
   const [nino, setNino] = useState<Nino | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [puedeVerClaves, setPuedeVerClaves] = useState(false);
+  const [pestana, setPestana] = useState<"general" | "academic">("general");
+  /** Sube cuando Academic Change mueve al niño: la ficha se vuelve a leer. */
+  const [recarga, setRecarga] = useState(0);
   const [clave, setClave] = useState<ConsultaClave | null>(null);
   const [errorClave, setErrorClave] = useState<string | null>(null);
 
@@ -145,7 +150,7 @@ export default function DetalleNinoPage() {
       setPuedeVerClaves(data.puedeVerClaves === true);
     }
     void cargar();
-  }, [params.id, router]);
+  }, [params.id, router, recarga]);
 
   if (error !== null) {
     return (
@@ -213,174 +218,232 @@ export default function DetalleNinoPage() {
         </div>
       </section>
 
-      {/* Datos personales */}
-      <section style={{ ...card, marginTop: "1rem" }}>
-        <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Datos personales</h2>
-        {/* Tres líneas fijas: identidad · contacto (el correo ocupa dos columnas,
+      {/* Pestañas */}
+      <div
+        role="tablist"
+        style={{
+          display: "flex",
+          gap: "0.4rem",
+          marginTop: "1rem",
+          borderBottom: "2px solid #e3e7f0",
+        }}
+      >
+        {(
+          [
+            ["general", "General Info"],
+            ["academic", "Academic Info"],
+          ] as const
+        ).map(([clave, texto]) => (
+          <button
+            key={clave}
+            type="button"
+            role="tab"
+            aria-selected={pestana === clave}
+            onClick={() => setPestana(clave)}
+            style={{
+              padding: "0.6rem 1.2rem",
+              border: "none",
+              borderBottom: `3px solid ${pestana === clave ? "var(--lgs-azul)" : "transparent"}`,
+              marginBottom: "-2px",
+              background: "transparent",
+              fontWeight: 800,
+              fontSize: "0.95rem",
+              color: pestana === clave ? "var(--lgs-azul)" : "var(--texto-suave)",
+              cursor: "pointer",
+            }}
+          >
+            {texto}
+          </button>
+        ))}
+      </div>
+
+      {pestana === "academic" && (
+        <AcademicInfo
+          childPersonId={nino.id}
+          contractId={nino.contractId}
+          nombre={`${nino.nombres} ${nino.apellidos}`}
+          salon={nino.salon}
+          onCambio={() => setRecarga((n) => n + 1)}
+        />
+      )}
+
+      {pestana === "general" && (
+        <>
+          {/* Datos personales */}
+          <section style={{ ...card, marginTop: "1rem" }}>
+            <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Datos personales</h2>
+            {/* Tres líneas fijas: identidad · contacto (el correo ocupa dos columnas,
             porque el sintético es largo) · acceso. */}
-        <style>{`
+            <style>{`
           .ficha-datos{display:grid;gap:0.9rem;margin-top:0.9rem;grid-template-columns:repeat(4,minmax(0,1fr))}
           .ficha-correo{grid-column:1 / span 2}
           .ficha-clave{grid-column:span 2}
           .ficha-nueva-linea{grid-column-start:1}
           @media (max-width:48rem){.ficha-datos{grid-template-columns:repeat(2,minmax(0,1fr))}}
         `}</style>
-        <div className="ficha-datos">
-          <Dato etiqueta="Nombres">{nino.nombres}</Dato>
-          <Dato etiqueta="Apellidos">{nino.apellidos}</Dato>
-          <Dato etiqueta="Documento">
-            {nino.docTipo} {nino.docNumero}
-          </Dato>
-          <Dato etiqueta="Fecha de nacimiento">{nino.fechaNacimiento ?? "—"}</Dato>
+            <div className="ficha-datos">
+              <Dato etiqueta="Nombres">{nino.nombres}</Dato>
+              <Dato etiqueta="Apellidos">{nino.apellidos}</Dato>
+              <Dato etiqueta="Documento">
+                {nino.docTipo} {nino.docNumero}
+              </Dato>
+              <Dato etiqueta="Fecha de nacimiento">{nino.fechaNacimiento ?? "—"}</Dato>
 
-          <div className="ficha-correo">
-            <Dato etiqueta="Correo">{nino.correo ?? nino.personaEmail ?? "—"}</Dato>
-          </div>
-          <Dato etiqueta="Teléfono">{nino.telefono ?? "—"}</Dato>
-          <Dato etiqueta="Plataforma">{PAIS_NOMBRE[nino.countryCode] ?? nino.countryCode}</Dato>
+              <div className="ficha-correo">
+                <Dato etiqueta="Correo">{nino.correo ?? nino.personaEmail ?? "—"}</Dato>
+              </div>
+              <Dato etiqueta="Teléfono">{nino.telefono ?? "—"}</Dato>
+              <Dato etiqueta="Plataforma">{PAIS_NOMBRE[nino.countryCode] ?? nino.countryCode}</Dato>
 
-          <div className="ficha-nueva-linea">
-            <Dato etiqueta="Usuario">{nino.username ?? "— sin login —"}</Dato>
-          </div>
-          <div className="ficha-clave">
-            <Dato etiqueta="Clave">
-              {nino.userId === null ? (
-                "— sin login —"
-              ) : !puedeVerClaves ? (
-                <span style={{ color: "var(--texto-suave)", fontWeight: 400 }}>
-                  •••••• (solo superadmin)
-                </span>
-              ) : (
-                <span
-                  style={{
-                    display: "inline-flex",
-                    gap: "0.5rem",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  {clave === null ? "••••••" : <ClaveConsultada consulta={clave} />}
-                  <button
-                    type="button"
-                    onClick={() => nino.userId !== null && void verClave(nino.userId)}
-                    style={{
-                      padding: "0.2rem 0.6rem",
-                      borderRadius: "0.5rem",
-                      border: "1px solid #e3e7f0",
-                      background: "white",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {clave === null ? "👁 Ver clave" : "🙈 Ocultar"}
-                  </button>
-                  {errorClave !== null && (
-                    <span style={{ color: "#c62828", fontSize: "0.8rem" }}>{errorClave}</span>
+              <div className="ficha-nueva-linea">
+                <Dato etiqueta="Usuario">{nino.username ?? "— sin login —"}</Dato>
+              </div>
+              <div className="ficha-clave">
+                <Dato etiqueta="Clave">
+                  {nino.userId === null ? (
+                    "— sin login —"
+                  ) : !puedeVerClaves ? (
+                    <span style={{ color: "var(--texto-suave)", fontWeight: 400 }}>
+                      •••••• (solo superadmin)
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        gap: "0.5rem",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {clave === null ? "••••••" : <ClaveConsultada consulta={clave} />}
+                      <button
+                        type="button"
+                        onClick={() => nino.userId !== null && void verClave(nino.userId)}
+                        style={{
+                          padding: "0.2rem 0.6rem",
+                          borderRadius: "0.5rem",
+                          border: "1px solid #e3e7f0",
+                          background: "white",
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {clave === null ? "👁 Ver clave" : "🙈 Ocultar"}
+                      </button>
+                      {errorClave !== null && (
+                        <span style={{ color: "#c62828", fontSize: "0.8rem" }}>{errorClave}</span>
+                      )}
+                    </span>
                   )}
-                </span>
-              )}
-            </Dato>
-          </div>
-        </div>
-      </section>
+                </Dato>
+              </div>
+            </div>
+          </section>
 
-      {/* Información académica */}
-      <section style={{ ...card, marginTop: "1rem" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "0.5rem",
-            flexWrap: "wrap",
-          }}
-        >
-          <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Información académica</h2>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            {nino.meetingUrl !== null && (
-              <a
-                href={nino.meetingUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ fontSize: "0.85rem" }}
-              >
-                ▶ Ir a la clase
-              </a>
-            )}
-            <Link href={`/panel/progreso/${nino.id}`} style={{ fontSize: "0.85rem" }}>
-              📈 Ver progreso
-            </Link>
-          </div>
-        </div>
-        <Grid>
-          <Dato etiqueta="Campaña">{nino.campania ?? "—"}</Dato>
-          <Dato etiqueta="Curso">{cursoLabel(nino.curso)}</Dato>
-          <Dato etiqueta="Salón">{nino.salon ?? "— sin matrícula —"}</Dato>
-          <Dato etiqueta="Guía">{nino.guia ?? "—"}</Dato>
-          <Dato etiqueta="Estado matrícula">{nino.matriculaEstado ?? "—"}</Dato>
-          <Dato etiqueta="Próxima sesión">{nino.proximaSesion ?? "sin sesión futura"}</Dato>
-        </Grid>
-      </section>
+          {/* Información académica */}
+          <section style={{ ...card, marginTop: "1rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Información académica</h2>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                {nino.meetingUrl !== null && (
+                  <a
+                    href={nino.meetingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: "0.85rem" }}
+                  >
+                    ▶ Ir a la clase
+                  </a>
+                )}
+                <Link href={`/panel/progreso/${nino.id}`} style={{ fontSize: "0.85rem" }}>
+                  📈 Ver progreso
+                </Link>
+              </div>
+            </div>
+            <Grid>
+              <Dato etiqueta="Campaña">{nino.campania ?? "—"}</Dato>
+              <Dato etiqueta="Curso">{cursoLabel(nino.curso)}</Dato>
+              <Dato etiqueta="Salón">{nino.salon ?? "— sin matrícula —"}</Dato>
+              <Dato etiqueta="Guía">{nino.guia ?? "—"}</Dato>
+              <Dato etiqueta="Estado matrícula">{nino.matriculaEstado ?? "—"}</Dato>
+              <Dato etiqueta="Próxima sesión">{nino.proximaSesion ?? "sin sesión futura"}</Dato>
+            </Grid>
+          </section>
 
-      {/* Contrato */}
-      <section style={{ ...card, marginTop: "1rem" }}>
-        <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Contrato</h2>
-        <Grid>
-          {/* De LGS: su número y, aparte, el documento del niño que LGS le
+          {/* Contrato */}
+          <section style={{ ...card, marginTop: "1rem" }}>
+            <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Contrato</h2>
+            <Grid>
+              {/* De LGS: su número y, aparte, el documento del niño que LGS le
               agrega. Del panel de KIDS: el N° interno, que es el único. */}
-          {nc.origen === "LGS" ? (
-            <>
-              <Dato etiqueta="N° LGS">{nc.numero}</Dato>
-              <Dato etiqueta="Beneficiario (documento)">{nc.documento ?? "—"}</Dato>
-            </>
-          ) : (
-            <Dato etiqueta="N° de contrato">{nc.numero}</Dato>
-          )}
-          <Dato etiqueta="Curso">{cursoLabel(nino.tipoCurso)}</Dato>
-          <Dato etiqueta="Inicio">{nino.inicio ?? "—"}</Dato>
-          <Dato etiqueta="Final">{nino.finalContrato ?? "—"}</Dato>
-          <Dato etiqueta="Estado">{nino.contratoEstado ?? "—"}</Dato>
-          <Dato etiqueta="Firmado">{nino.firmado === true ? "Sí" : "No"}</Dato>
-        </Grid>
-      </section>
+              {nc.origen === "LGS" ? (
+                <>
+                  <Dato etiqueta="N° LGS">{nc.numero}</Dato>
+                  <Dato etiqueta="Beneficiario (documento)">{nc.documento ?? "—"}</Dato>
+                </>
+              ) : (
+                <Dato etiqueta="N° de contrato">{nc.numero}</Dato>
+              )}
+              <Dato etiqueta="Curso">{cursoLabel(nino.tipoCurso)}</Dato>
+              <Dato etiqueta="Inicio">{nino.inicio ?? "—"}</Dato>
+              <Dato etiqueta="Final">{nino.finalContrato ?? "—"}</Dato>
+              <Dato etiqueta="Estado">{nino.contratoEstado ?? "—"}</Dato>
+              <Dato etiqueta="Firmado">{nino.firmado === true ? "Sí" : "No"}</Dato>
+            </Grid>
+          </section>
 
-      {/* Apoderados */}
-      <section style={{ ...card, marginTop: "1rem" }}>
-        <h2 style={{ fontSize: "1.1rem", margin: 0 }}>
-          Apoderado{nino.apoderados.length !== 1 ? "s" : ""}
-        </h2>
-        {nino.apoderados.length === 0 ? (
-          <p style={{ color: "var(--texto-suave)", marginTop: "0.6rem" }}>
-            Sin apoderados registrados.
-          </p>
-        ) : (
-          <div
-            style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
-          >
-            {nino.apoderados.map((a, i) => (
+          {/* Apoderados */}
+          <section style={{ ...card, marginTop: "1rem" }}>
+            <h2 style={{ fontSize: "1.1rem", margin: 0 }}>
+              Apoderado{nino.apoderados.length !== 1 ? "s" : ""}
+            </h2>
+            {nino.apoderados.length === 0 ? (
+              <p style={{ color: "var(--texto-suave)", marginTop: "0.6rem" }}>
+                Sin apoderados registrados.
+              </p>
+            ) : (
               <div
-                key={i}
                 style={{
-                  padding: "0.6rem 0.85rem",
-                  border: "1px solid #edf0f6",
-                  borderRadius: "0.6rem",
+                  marginTop: "0.6rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.5rem",
                 }}
               >
-                <strong>{a.nombre}</strong>
-                {a.parentesco !== null && (
-                  <span style={{ color: "var(--texto-suave)" }}> ({a.parentesco})</span>
-                )}
-                <div style={{ fontSize: "0.83rem", color: "var(--texto-suave)" }}>
-                  {a.docTipo} {a.docNumero}
-                  {a.telefono !== null && ` · tel. ${a.telefono}`}
-                  {a.email !== null && ` · ${a.email}`}
-                </div>
+                {nino.apoderados.map((a, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: "0.6rem 0.85rem",
+                      border: "1px solid #edf0f6",
+                      borderRadius: "0.6rem",
+                    }}
+                  >
+                    <strong>{a.nombre}</strong>
+                    {a.parentesco !== null && (
+                      <span style={{ color: "var(--texto-suave)" }}> ({a.parentesco})</span>
+                    )}
+                    <div style={{ fontSize: "0.83rem", color: "var(--texto-suave)" }}>
+                      {a.docTipo} {a.docNumero}
+                      {a.telefono !== null && ` · tel. ${a.telefono}`}
+                      {a.email !== null && ` · ${a.email}`}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
+        </>
+      )}
     </main>
   );
 }

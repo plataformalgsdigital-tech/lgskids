@@ -1,5 +1,6 @@
 import { asignarRolTx, ROLES } from "@/modules/access";
 import { registrarAuditoria } from "@/modules/audit";
+import { recalcularProgresion, ubicarTx } from "@/modules/progression";
 import {
   activarReservaDeContratoTx,
   cancelarMatriculaDeContratoTx,
@@ -631,6 +632,12 @@ export async function cambiarCursoContrato(input: {
   tipoCurso: "JUNIOR" | "YOUNGSTER";
   /** Salón del curso nuevo. Obligatorio si el niño está matriculado. */
   classroomId?: string | null;
+  /**
+   * Punto de partida en el curso NUEVO (Academic Change › promover/degradar).
+   * El avance de cada curso es independiente: sin esto, el niño que pasa a
+   * Youngster empezaría desde el Welcome.
+   */
+  ubicacion?: { levelId: string; lecciones: number } | null;
   motivo: string;
   ip?: string | null;
 }): Promise<{ enrollmentId: string | null; advertencia: string | null }> {
@@ -665,10 +672,16 @@ export async function cambiarCursoContrato(input: {
     );
   }
 
+  if (input.ubicacion != null && viva === null) {
+    throw new ValidationError(
+      "Sin matrícula no hay curso en el que ubicarlo: matricúlalo primero en un salón.",
+    );
+  }
+
   const enrollmentId = await withTransaction(async (tx) => {
     await setContractTipoCurso(input.contractId, input.tipoCurso, tx);
     if (viva === null || input.classroomId == null) return null;
-    return moverMatriculaTx(tx, {
+    const nueva = await moverMatriculaTx(tx, {
       enrollmentId: viva.id,
       contractId: input.contractId,
       childPersonId: contrato.beneficiarioId,
@@ -676,7 +689,23 @@ export async function cambiarCursoContrato(input: {
       tipoCursoContrato: input.tipoCurso,
       motivo: `cambio de curso: ${input.motivo.trim()}`,
     });
+    // En la MISMA transacción: si el nivel no es del curso nuevo, no se mueve
+    // nada. Un cambio a medias dejaría al niño en Youngster desde el Welcome.
+    if (input.ubicacion != null) {
+      await ubicarTx(tx, {
+        childPersonId: contrato.beneficiarioId,
+        levelId: input.ubicacion.levelId,
+        lecciones: input.ubicacion.lecciones,
+        motivo: `cambio de curso: ${input.motivo.trim()}`,
+        actorUserId: input.actorUserId,
+      });
+    }
+    return nueva;
   });
+
+  // CAMINO 5 de LA FUNCIÓN CENTRAL: el curso cambió, y con él el avance que
+  // le corresponde (cada curso tiene el suyo). Se re-deriva en el momento.
+  await recalcularProgresion(contrato.beneficiarioId);
 
   await registrarAuditoria({
     actorUserId: input.actorUserId,
@@ -688,6 +717,7 @@ export async function cambiarCursoContrato(input: {
       hacia: input.tipoCurso,
       motivo: input.motivo.trim(),
       classroomId: input.classroomId ?? null,
+      ubicacion: input.ubicacion ?? null,
       advertencia,
     },
     ip: input.ip ?? null,

@@ -2,10 +2,12 @@ import { registrarAuditoria } from "@/modules/audit";
 import { withTransaction } from "@/platform/db/transaction";
 import { queryRows } from "@/platform/db/query";
 import { logger } from "@/platform/logging/logger";
+import { estadoNivel, posicionRespecto } from "../domain/nivel";
 import {
   getAprobadosDeNino,
   getCursoActivoDeNino,
   getEstructuraCurso,
+  getUbicacion,
   ninosActivos,
   otorgarAward,
   tieneAward,
@@ -51,6 +53,9 @@ export async function recalcularProgresion(childPersonId: string): Promise<{
   const estructura = await getEstructuraCurso(curso.courseId);
   if (estructura.length === 0) return null;
   const aprobados = await getAprobadosDeNino(childPersonId);
+  // La UBICACIÓN académica es una entrada más de la derivación, no una edición:
+  // si se borra, el siguiente recálculo vuelve a lo que dicen las evaluaciones.
+  const ubicacion = await getUbicacion(childPersonId, curso.courseId);
 
   let medallasNuevas = 0;
   let diplomaNuevo = false;
@@ -59,20 +64,29 @@ export async function recalcularProgresion(childPersonId: string): Promise<{
   await withTransaction(async (tx) => {
     let todosCompletos = true;
     for (const nivel of estructura) {
-      const lecciones = nivel.practicaQuizIds.filter((q) => aprobados.has(q)).length;
-      const levelUp = nivel.levelUpQuizId !== null && aprobados.has(nivel.levelUpQuizId);
-      const completado = lecciones >= nivel.practicaQuizIds.length && levelUp;
+      const estado = estadoNivel({
+        totalPracticas: nivel.practicaQuizIds.length,
+        practicasAprobadas: nivel.practicaQuizIds.filter((q) => aprobados.has(q)).length,
+        levelUpAprobado: nivel.levelUpQuizId !== null && aprobados.has(nivel.levelUpQuizId),
+        posicion: posicionRespecto(nivel.orden, ubicacion?.ordenNivel ?? null),
+        leccionesUbicadas: ubicacion?.lecciones ?? 0,
+      });
+      const completado = estado.completado;
 
       await upsertProgress(tx, {
         childPersonId,
         levelId: nivel.levelId,
-        leccionesCompletadas: lecciones,
-        levelUpAprobado: levelUp,
+        leccionesCompletadas: estado.lecciones,
+        levelUpAprobado: estado.levelUp,
         completado,
+        convalidado: estado.convalidado,
       });
 
       if (completado) {
-        const yaTiene = await tieneAward(tx, childPersonId, "MEDALLA", nivel.levelId, null);
+        // Convalidado = lo decidió coordinación, no lo ganó el niño: sin medalla.
+        const yaTiene =
+          estado.convalidado ||
+          (await tieneAward(tx, childPersonId, "MEDALLA", nivel.levelId, null));
         if (!yaTiene) {
           await otorgarAward(tx, {
             childPersonId,
@@ -148,17 +162,27 @@ export interface ProgresoNino {
     levelUpAprobado: boolean;
     estado: "EN_CURSO" | "COMPLETADO" | "PENDIENTE";
     medalla: boolean;
+    /** Completado por ubicación académica, sin haberlo ganado. */
+    convalidado: boolean;
   }[];
   diploma: boolean;
+  /** Punto de partida que fijó coordinación en ESTE curso, si lo hay. */
+  ubicacion: {
+    levelId: string;
+    lecciones: number;
+    motivo: string;
+    actualizada: string;
+  } | null;
 }
 
 /** Vista del progreso del niño (para panel de staff, apoderado y alumno). */
 export async function progresoDeNino(childPersonId: string): Promise<ProgresoNino> {
   const curso = await getCursoActivoDeNino(childPersonId);
   if (curso === null) {
-    return { curso: null, niveles: [], diploma: false };
+    return { curso: null, niveles: [], diploma: false, ubicacion: null };
   }
   const estructura = await getEstructuraCurso(curso.courseId);
+  const ubicacion = await getUbicacion(childPersonId, curso.courseId);
 
   interface Row {
     level_id: string;
@@ -166,12 +190,14 @@ export async function progresoDeNino(childPersonId: string): Promise<ProgresoNin
     level_up: boolean;
     estado: string;
     medalla: boolean;
+    convalidado: boolean;
   }
   const rows = await queryRows<Row>(
     `SELECT n.id AS level_id,
             COALESCE(p.lecciones_completadas, 0) AS lecciones,
             COALESCE(p.level_up_aprobado, false) AS level_up,
             COALESCE(p.estado::text, 'PENDIENTE') AS estado,
+            COALESCE(p.convalidado, false) AS convalidado,
             EXISTS (
               SELECT 1 FROM progression_award a
                WHERE a.child_person_id = $1 AND a.tipo = 'MEDALLA' AND a.level_id = n.id
@@ -205,8 +231,18 @@ export async function progresoDeNino(childPersonId: string): Promise<ProgresoNin
         levelUpAprobado: row?.level_up ?? false,
         estado: (row?.estado ?? "PENDIENTE") as "EN_CURSO" | "COMPLETADO" | "PENDIENTE",
         medalla: row?.medalla ?? false,
+        convalidado: row?.convalidado ?? false,
       };
     }),
     diploma: diplomaRows.length > 0,
+    ubicacion:
+      ubicacion === null
+        ? null
+        : {
+            levelId: ubicacion.levelId,
+            lecciones: ubicacion.lecciones,
+            motivo: ubicacion.motivo,
+            actualizada: ubicacion.updatedAt,
+          },
   };
 }

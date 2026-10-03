@@ -88,17 +88,19 @@ export async function upsertProgress(
     leccionesCompletadas: number;
     levelUpAprobado: boolean;
     completado: boolean;
+    convalidado: boolean;
   },
 ): Promise<void> {
   await execute(
     `INSERT INTO progression_level_progress
        (id, child_person_id, level_id, lecciones_completadas, level_up_aprobado,
-        estado, completado_en, updated_at)
+        estado, completado_en, convalidado, updated_at)
      VALUES ($1, $2, $3, $4, $5,
-             $6::progression_estado, CASE WHEN $6 = 'COMPLETADO' THEN now() END, now())
+             $6::progression_estado, CASE WHEN $6 = 'COMPLETADO' THEN now() END, $7, now())
      ON CONFLICT (child_person_id, level_id) DO UPDATE
         SET lecciones_completadas = $4,
             level_up_aprobado = $5,
+            convalidado = $7,
             estado = $6::progression_estado,
             completado_en = CASE
               WHEN $6 = 'COMPLETADO' AND progression_level_progress.completado_en IS NULL THEN now()
@@ -113,7 +115,119 @@ export async function upsertProgress(
       input.leccionesCompletadas,
       input.levelUpAprobado,
       input.completado ? "COMPLETADO" : "EN_CURSO",
+      input.convalidado,
     ],
+    tx,
+  );
+}
+
+// ── Ubicación académica ─────────────────────────────────────────────────────
+
+export interface Ubicacion {
+  levelId: string;
+  ordenNivel: number;
+  lecciones: number;
+  motivo: string;
+  ubicadoPor: string | null;
+  updatedAt: string;
+}
+
+export async function getUbicacion(
+  childPersonId: string,
+  courseId: string,
+  client?: Queryable,
+): Promise<Ubicacion | null> {
+  return queryOne<Ubicacion>(
+    `SELECT u.level_id AS "levelId", n.orden AS "ordenNivel", u.lecciones, u.motivo,
+            u.ubicado_por AS "ubicadoPor", u.updated_at::text AS "updatedAt"
+       FROM progression_ubicacion u
+       JOIN catalog_level n ON n.id = u.level_id
+      WHERE u.child_person_id = $1 AND u.course_id = $2`,
+    [childPersonId, courseId],
+    client,
+  );
+}
+
+/** Nivel con su curso, su orden y cuántas prácticas tiene. */
+export async function getNivelParaUbicar(
+  levelId: string,
+  client?: Queryable,
+): Promise<{
+  levelId: string;
+  courseId: string;
+  codigo: string;
+  nombre: string;
+  orden: number;
+  totalPracticas: number;
+  esPrimero: boolean;
+} | null> {
+  return queryOne(
+    `SELECT n.id AS "levelId", n.course_id AS "courseId", n.codigo, n.nombre, n.orden,
+            (SELECT count(*)::int FROM catalog_quiz q
+              WHERE q.level_id = n.id AND q.tipo::text <> 'LEVEL_UP') AS "totalPracticas",
+            n.orden = (SELECT min(n2.orden) FROM catalog_level n2 WHERE n2.course_id = n.course_id)
+              AS "esPrimero"
+       FROM catalog_level n WHERE n.id = $1`,
+    [levelId],
+    client,
+  );
+}
+
+/** Curso de la matrícula ACTIVA del niño, leído DENTRO de la transacción. */
+export async function getCursoActivoTx(
+  childPersonId: string,
+  client: Queryable,
+): Promise<string | null> {
+  const row = await queryOne<{ courseId: string }>(
+    `SELECT cl.course_id AS "courseId"
+       FROM enrollment_enrollment e
+       JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+      WHERE e.child_person_id = $1 AND e.estado = 'ACTIVA'
+      LIMIT 1`,
+    [childPersonId],
+    client,
+  );
+  return row?.courseId ?? null;
+}
+
+export async function upsertUbicacion(
+  tx: Queryable,
+  input: {
+    childPersonId: string;
+    courseId: string;
+    levelId: string;
+    lecciones: number;
+    motivo: string;
+    ubicadoPor: string;
+  },
+): Promise<void> {
+  await execute(
+    `INSERT INTO progression_ubicacion
+       (id, child_person_id, course_id, level_id, lecciones, motivo, ubicado_por)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (child_person_id, course_id) DO UPDATE
+        SET level_id = $4, lecciones = $5, motivo = $6, ubicado_por = $7, updated_at = now()`,
+    [
+      newId(),
+      input.childPersonId,
+      input.courseId,
+      input.levelId,
+      input.lecciones,
+      input.motivo,
+      input.ubicadoPor,
+    ],
+    tx,
+  );
+}
+
+export async function deleteUbicacion(
+  tx: Queryable,
+  childPersonId: string,
+  courseId: string,
+): Promise<void> {
+  await execute(
+    `DELETE FROM progression_ubicacion WHERE child_person_id = $1 AND course_id = $2`,
+    [childPersonId, courseId],
     tx,
   );
 }

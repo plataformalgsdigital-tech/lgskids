@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
+import { opcionesAcademicas } from "../application/academic-change";
 import { buscarEstudiantes } from "../application/estudiantes";
 import {
   academicoDeContrato,
@@ -167,7 +168,21 @@ export const fichaContratoHandler = handlerWithAuth(async (_request, auth, conte
 const cursoSchema = z.object({
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]),
   classroomId: z.uuid().nullish(),
+  // Punto de partida en el curso nuevo (Academic Change › promover/degradar).
+  ubicacion: z.object({ levelId: z.uuid(), lecciones: z.number().int().min(0).max(50) }).nullish(),
   motivo: z.string().min(5).max(300),
+});
+
+/**
+ * GET /api/contracts/[id]/academico — lo que necesita el modal Academic Change:
+ * dónde está el niño, salones a los que puede ir (con el punto en que va cada
+ * uno) y los niveles de cada curso. Solo lectura.
+ */
+export const opcionesAcademicasHandler = handlerWithAuth(async (_request, auth, context) => {
+  const contractId = await contractIdFromContext(context);
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.MATRICULAS_GESTIONAR);
+  return json(await opcionesAcademicas(contractId));
 });
 
 /** POST /api/contracts/[id]/curso — cambio de CURSO (con su salón nuevo). */
@@ -182,6 +197,7 @@ export const cambiarCursoHandler = handlerWithAuth(async (request, auth, context
       contractId,
       tipoCurso: body.tipoCurso,
       classroomId: body.classroomId ?? null,
+      ubicacion: body.ubicacion ?? null,
       motivo: body.motivo,
       ip: ip(request),
     }),

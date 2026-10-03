@@ -9,3 +9,5 @@
  */
 export { recalcularProgresion, recalculoGlobal, progresoDeNino } from "./application/recalcular";
 export type { ProgresoNino } from "./application/recalcular";
+export { ubicarNino, ubicarTx } from "./application/ubicacion";
+export type { DatosUbicacion } from "./application/ubicacion";

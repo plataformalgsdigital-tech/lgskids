@@ -6,7 +6,9 @@ import {
   getMarcasDeSesion,
   getRosterConPais,
   getSessionInfo,
+  historialDeNino,
   paisesConFeriado,
+  salonActivoDeNino,
   upsertMarca,
   type SessionInfo,
 } from "../infrastructure/attendance-repository";
@@ -56,6 +58,61 @@ export async function verificarAccesoGuia(
   if (sesion.guiaUserId !== actor.userId) {
     throw new ForbiddenError("Solo puedes gestionar las sesiones de tus propios salones.");
   }
+}
+
+export interface FilaAsistenciaNino {
+  sessionId: string;
+  salon: string;
+  tipo: string;
+  fecha: string;
+  startsAt: Date;
+  guia: string | null;
+  meetingUrl: string | null;
+  claseNumero: number | null;
+  leccion: string | null;
+  leccionNivel: string | null;
+  estado: EstadoAsistencia | null;
+  justificacion: string | null;
+  /**
+   * Se puede marcar desde la ficha: solo las sesiones de su salón ACTUAL. La
+   * marca pasa por `marcarAsistencia`, que exige que el niño esté en la lista
+   * del salón; en un salón que dejó, la rechazaría.
+   */
+  editable: boolean;
+}
+
+/**
+ * Tabla de asistencia de la ficha del niño. El guía sin `salones.gestionar`
+ * ve solo las sesiones que dictó él (regla 6: el alcance del guía se aplica
+ * en el servidor).
+ */
+export async function asistenciaDeNino(
+  childPersonId: string,
+  actor: { userId: string; puedeGestionarCualquierSalon: boolean },
+): Promise<{ filas: FilaAsistenciaNino[] }> {
+  const [filas, salonActivo] = await Promise.all([
+    historialDeNino(childPersonId),
+    salonActivoDeNino(childPersonId),
+  ]);
+  return {
+    filas: filas
+      .filter((f) => actor.puedeGestionarCualquierSalon || f.guiaUserId === actor.userId)
+      .map((f) => ({
+        sessionId: f.sessionId,
+        salon: f.salon,
+        tipo: f.tipo,
+        fecha: f.fecha,
+        startsAt: f.startsAt,
+        guia: f.guia,
+        meetingUrl: f.meetingUrl,
+        claseNumero: f.claseNumero,
+        leccion: f.leccion,
+        leccionNivel: f.leccionNivel,
+        estado: f.estado as EstadoAsistencia | null,
+        justificacion: f.justificacion,
+        editable: f.classroomId === salonActivo,
+      })),
+  };
 }
 
 /** Lista de la sesión: roster derivado + marcas existentes + aviso de feriado. */

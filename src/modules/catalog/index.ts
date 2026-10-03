@@ -131,6 +131,7 @@ export type {
   ValidacionImportacion,
 } from "./application/curso-referencia";
 export { crearCampania } from "./application/crear-campania";
+export { SQL_SECUENCIA_LECCIONES } from "./domain/secuencia-lecciones";
 export { derivarEstadoCampania, ETIQUETA_ESTADO } from "./domain/campania";
 export type { EstadoCampania } from "./domain/campania";
 export { NIVELES, LECCIONES_POR_NIVEL, TIPOS_CURSO } from "./domain/curriculo";

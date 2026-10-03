@@ -9,7 +9,11 @@
  */
 export { listaDeSesion, marcarAsistencia, verificarAccesoGuia } from "./application/asistencia";
 export type { ListaDeSesion, FilaLista, EstadoAsistencia } from "./application/asistencia";
-export { listaDeSesionHandler, marcarAsistenciaHandler } from "./api/handlers";
+export {
+  asistenciaDeNinoHandler,
+  listaDeSesionHandler,
+  marcarAsistenciaHandler,
+} from "./api/handlers";
 export {
   resumenAsistencia,
   agendaProximas,

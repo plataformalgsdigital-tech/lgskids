@@ -56,6 +56,8 @@ interface Sesion {
   /** Lección DERIVADA del catálogo Curso (la sesión N es la N-ésima lección). */
   leccion: string | null;
   leccionNivel: string | null;
+  /** Puesto entre las clases regulares del salón (sin clubes ni extras). */
+  claseNumero: number | null;
 }
 
 const NIVEL_UI: Record<string, string> = {
@@ -79,11 +81,13 @@ function tituloSalon(s: Sesion): string {
 /** "Sesión 3 · Lección 3": el catálogo escribe "Leccion 3", sin tilde. */
 function tituloSesion(s: Sesion): string {
   if (s.tipo === "CLUB") return "Club";
-  if (s.numero === 0) return "Sesión extra";
+  if (s.tipo === "TALLER") return "Taller";
+  // Fuera de las clases regulares (refuerzo, sesión suelta): no lleva lección.
+  if (s.claseNumero === null) return "Sesión extra";
   const n = s.leccion?.match(/\d+/)?.[0];
   const leccion =
     s.leccion === null ? "Lección por asignar" : n !== undefined ? `Lección ${n}` : s.leccion;
-  return `Sesión ${String(s.numero)} · ${leccion}`;
+  return `Sesión ${String(s.claseNumero)} · ${leccion}`;
 }
 interface Enlace {
   nombre?: string;

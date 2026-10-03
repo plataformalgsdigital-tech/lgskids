@@ -144,4 +144,5 @@ export {
 } from "./domain/evento-admin";
 export type { TipoEventoAdmin } from "./domain/evento-admin";
 export { DIAS_VIGENCIA_INVITACION } from "./domain/invitacion";
+export { SQL_ORDINAL_CLASE } from "./domain/ordinal-sesion";
 export type { EstadoInvitacion } from "./domain/invitacion";

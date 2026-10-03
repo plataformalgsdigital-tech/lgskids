@@ -158,6 +158,30 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   clave se ve con "Ver clave" SOLO si quien mira es superadmin (la respuesta trae
   `puedeVerClaves` y `userId`; la ruta de la bóveda lo vuelve a exigir). El guía
   sale por su NOMBRE (`scheduling_guia`), no por el usuario generado.
+  **Dos pestañas (2026-10-03): General Info** (todo lo anterior) y **Academic Info**
+  (`personas/[id]/AcademicInfo.tsx`): ubicación (curso, nivel, salón, lección) con
+  el botón **Academic Change**, el avance por nivel (completado / convalidado / en
+  curso / pendiente) y la **tabla de asistencia** (`GET /api/attendance/children/[id]`
+  → `asistenciaDeNino`): fecha, tipo, guía, nivel, lección, Zoom y asistencia, con
+  filtros y acciones Asistió / No asistió / Justificar. Marcar pasa por el MISMO
+  `POST /api/attendance/sessions/[id]` de pasar lista (regla 4). Solo se marca en el
+  salón ACTUAL (`marcarAsistencia` exige que el niño esté en la lista); las de un
+  salón anterior se ven y no se tocan. El historial respeta la VENTANA de cada
+  matrícula: quien entra tarde no "faltó" a lo de antes. El guía sin
+  `salones.gestionar` ve solo las sesiones que dictó.
+  **Academic Change** (`AcademicChangeModal.tsx`, lee `GET /api/contracts/[id]/academico`
+  → `opcionesAcademicas`): 1) **Curso**: otro salón del mismo curso
+  (`/api/enrollment/[id]/move`, el avance no cambia) o **promover / degradar**
+  (`/api/contracts/[id]/curso` con `ubicacion`); 2) **Ajuste**: otro nivel y/o
+  lección en el mismo curso y salón (`POST /api/progression/children/[id]/ubicacion`),
+  con **"Alinear con el salón"**. Siempre elegir → resumen antes/después → confirmar.
+  El modal NO escribe por su cuenta: cada opción usa el camino que ya cuida sus
+  invariantes (reglas 4 y 5). Permiso `matriculas.gestionar` (cambiar de curso,
+  además `contratos.gestionar`).
+  **"En qué punto va el salón"** (`contracts/domain/punto-salon.ts`): su última clase
+  empezada → la lección del catálogo (pos de total en su nivel) → prácticas sugeridas
+  = ⌊(pos−1)/total × 4⌋. Hay DOS medidas de "lección": el calendario dicta las del
+  catálogo Curso (18–25 por nivel) y la progresión cuenta las 4 prácticas del nivel.
 - **Fase 6 (`scheduling`) completada**: migración `20260726000000_scheduling`
   (salón, slots, sesiones, feriados, suspensiones). Salón: zona operativa Y
   calendario de feriados configurables por salón; slots SESION/CLUB.
@@ -207,7 +231,22 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   re-deriva todo). NO cuenta sesiones asistidas. **Caminos que la
   disparan** (verificados por `progression/tests/caminos-progresion.test.ts`
   — agregar un camino nuevo EXIGE sumarlo ahí): 1) marcarAsistencia, 2) registrarIntento, 3) worker recalculo_global cada 12 h (red de
-  seguridad). Awards con `notificado_en` NULL hasta que Fase 10 envíe por
+  seguridad), 4) `ubicarNino` (Academic Change › Ajuste) y 5) `cambiarCursoContrato`
+  (promover/degradar: cada curso tiene su propio avance).
+  **UBICACIÓN ACADÉMICA (2026-10-03, migración `20261003000000_ubicacion_academica`)**:
+  el punto de partida que fija coordinación —un nivel y cuántas de sus lecciones se
+  dan por cursadas— para el niño que entra tarde o cambia de curso. NO edita el
+  avance: `progression_ubicacion` (una por niño y curso) es una ENTRADA más de la
+  función central, y la regla vive pura en `progression/domain/nivel.ts`
+  (`estadoNivel`, con pruebas). Los niveles anteriores quedan COMPLETADOS por
+  convalidación (`progression_level_progress.convalidado`) **sin medalla** —la
+  medalla dice "lo lograste"—; el nivel de la ubicación arranca con esas lecciones;
+  el **Level Up no se convalida**. Es un **PISO**: nunca resta lo que el niño aprobó.
+  Ubicar en el primer nivel con 0 lecciones BORRA la ubicación (es lo que la
+  derivación hace sola), y el avance vuelve a lo ganado. `ubicarTx` lo comparte el
+  cambio de curso, en la MISMA transacción que mueve la matrícula: si el nivel no es
+  del curso nuevo, no se mueve nada. Pruebas: `nivel.test.ts` y
+  `ubicacion-integration.test.ts` (el actor es `sistema-lgs`: `ubicado_por` es FK). Awards con `notificado_en` NULL hasta que Fase 10 envíe por
   WhatsApp. UI: /panel/progreso/[childId] (enlace 📈 en el roster).
   Permiso: progresion.ver.
 - **Fase 10 (`reporting` + `notifications` + `files`) completada**:
@@ -1326,9 +1365,17 @@ solo servía para completar la ficha.
   derecha `Nivel X · Sesión N · Lección N` en una sola línea. "Información del evento" lleva
   fecha, hora, cupo e inscritos, guía (con "Cambiar guía") y enlace; la caja
   aparte del guía se retiró.
-  **La LECCIÓN de la sesión se DERIVA, no se guarda** (`getSessionInfo`): la sesión
-  N del curso es la N-ésima lección del catálogo Curso de ese tipo, recorrido en el
-  orden de los niveles (Rookie → Ultimate) y luego por `orden`. Supone UNA lección
+  **La LECCIÓN de la sesión se DERIVA, no se guarda** (`getSessionInfo`): la clase
+  N del salón es la N-ésima lección del catálogo Curso de ese tipo, recorrido en el
+  orden de los niveles (Rookie → Ultimate) y luego por `orden`. Dos fragmentos SQL
+  compartidos lo hacen igual en todas partes: `SQL_SECUENCIA_LECCIONES` (catalog) y
+  `SQL_ORDINAL_CLASE` (scheduling: el puesto entre las CLASES regulares —tipo
+  SESION con slot—, por instante). **Trampa ya pagada (2026-10-03)**: la generación
+  numeraba clases y CLUBES en una sola cuenta, así que cada club corría un puesto
+  la lección de las clases siguientes. Ahora `generarSesionesTx` numera por tipo, y
+  la lección sale del puesto derivado —no del `numero` guardado—, lo que también
+  vale para los salones ya creados sin regenerarlos. El "Sesión N" del modal es ese
+  puesto (`claseNumero`). Supone UNA lección
   por sesión. Sin columna nueva: regenerar el salón o corregir el catálogo no deja
   nada desincronizado. Refuerzos y eventos (`numero = 0`) no llevan lección, y si
   el catálogo tiene menos lecciones que sesiones el modal dice "Lección por

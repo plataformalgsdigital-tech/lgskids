@@ -1,7 +1,26 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { handlerWithAuth, json } from "@/platform/http/handler";
-import { listaDeSesion, marcarAsistencia, verificarAccesoGuia } from "../application/asistencia";
+import {
+  asistenciaDeNino,
+  listaDeSesion,
+  marcarAsistencia,
+  verificarAccesoGuia,
+} from "../application/asistencia";
+
+/** GET /api/attendance/children/[id] — tabla de asistencia de la ficha del niño. */
+export const asistenciaDeNinoHandler = handlerWithAuth(async (_request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.ASISTENCIA_VER);
+  const params = await context.params;
+  const childPersonId = z.uuid().parse(params["id"]);
+  return json(
+    await asistenciaDeNino(childPersonId, {
+      userId: auth.userId,
+      puedeGestionarCualquierSalon: profile.hasPermission(PERMISOS.SALONES_GESTIONAR),
+    }),
+  );
+});
 
 async function sessionIdFromContext(context: {
   params: Promise<Record<string, string | string[]>>;

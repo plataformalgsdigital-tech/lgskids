@@ -46,6 +46,7 @@ export {
   listarContratosHandler,
   fichaContratoHandler,
   cambiarCursoHandler,
+  opcionesAcademicasHandler,
   aprobarContratoHandler,
   onholdHandler,
   reactivarHandler,
