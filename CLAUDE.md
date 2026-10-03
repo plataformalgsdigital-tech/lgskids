@@ -1047,6 +1047,13 @@ nadie habría visto hasta tener niños reales inscribiéndose:**
   `sufijo` (acotado a 30, alfanumérico con `. _ -`), y el país se sigue
   comprobando sobre el prefijo. El buscador usa `ILIKE`, así que buscar
   `02-16016-26` encuentra a los dos hermanos.
+- **Cómo se MUESTRA el número (2026-10-03, `src/ui/numero-contrato.ts`)**: un
+  contrato de LGS se ve por su N° de LGS SIN el sufijo (`02-10764-26`) y el
+  documento aparte ("Beneficiario (documento)" / "doc. 121290"); el N° interno de
+  KIDS (`numero`, SERIAL) solo aparece en los contratos creados en el panel, donde
+  es el único número. Lo usan la ficha del niño, la lista y la ficha de Contratos,
+  Kids y el buscador. La referencia COMPLETA sigue siendo la llave con LGS y se
+  guarda y viaja entera; el CSV de Contratos exporta las dos columnas tal cual.
 - **La idempotencia no existía**: reenviar la misma reserva daba 409, aunque el
   código y este archivo la prometían. La llamada de LGS es best-effort dentro
   de un `try/catch`, así que ante el conflicto guarda `errorKids`, NO marca

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { numeroContrato } from "@/ui/numero-contrato";
 import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
 
 interface Nino {
@@ -164,6 +165,8 @@ export default function DetalleNinoPage() {
     );
   }
 
+  const nc = numeroContrato({ externalRef: nino.externalRef, numero: nino.contratoNumero });
+
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
       <Link href="/panel/personas" style={{ fontSize: "0.9rem" }}>
@@ -186,13 +189,8 @@ export default function DetalleNinoPage() {
               {nino.nombres} {nino.apellidos}
             </h1>
             <p style={{ margin: "0.4rem 0 0", color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-              ID: <strong>{nino.docNumero}</strong> · Contrato:{" "}
-              <strong>
-                {nino.externalRef ??
-                  (nino.contratoNumero !== null ? `N° ${nino.contratoNumero}` : "—")}
-              </strong>{" "}
-              · Programa: <strong>{nino.campania ?? "—"}</strong> ({cursoLabel(nino.curso)}) ·
-              Estado:{" "}
+              ID: <strong>{nino.docNumero}</strong> · Contrato: <strong>{nc.numero}</strong> ·
+              Programa: <strong>{nino.campania ?? "—"}</strong> ({cursoLabel(nino.curso)}) · Estado:{" "}
               <span
                 style={badge(
                   nino.estado === "ACTIVA" ? "#e8f5e9" : "#eceff1",
@@ -329,10 +327,16 @@ export default function DetalleNinoPage() {
       <section style={{ ...card, marginTop: "1rem" }}>
         <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Contrato</h2>
         <Grid>
-          <Dato etiqueta="N° interno">
-            {nino.contratoNumero !== null ? `N° ${nino.contratoNumero}` : "—"}
-          </Dato>
-          <Dato etiqueta="N° LGS">{nino.externalRef ?? "—"}</Dato>
+          {/* De LGS: su número y, aparte, el documento del niño que LGS le
+              agrega. Del panel de KIDS: el N° interno, que es el único. */}
+          {nc.origen === "LGS" ? (
+            <>
+              <Dato etiqueta="N° LGS">{nc.numero}</Dato>
+              <Dato etiqueta="Beneficiario (documento)">{nc.documento ?? "—"}</Dato>
+            </>
+          ) : (
+            <Dato etiqueta="N° de contrato">{nc.numero}</Dato>
+          )}
           <Dato etiqueta="Curso">{cursoLabel(nino.tipoCurso)}</Dato>
           <Dato etiqueta="Inicio">{nino.inicio ?? "—"}</Dato>
           <Dato etiqueta="Final">{nino.finalContrato ?? "—"}</Dato>

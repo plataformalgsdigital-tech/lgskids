@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { textoNumeroContrato } from "@/ui/numero-contrato";
 
 interface Resultados {
   q: string;
@@ -97,9 +98,8 @@ function ResultadosBusqueda() {
                   color: "inherit",
                 }}
               >
-                <strong>Contrato N° {c.numero}</strong> · {c.beneficiario} ({c.tipoCurso},{" "}
-                {c.countryCode}) · {c.estado}
-                {c.externalRef !== null && ` · LGS ${c.externalRef}`}
+                <strong>Contrato {textoNumeroContrato(c)}</strong> · {c.beneficiario} ({c.tipoCurso}
+                , {c.countryCode}) · {c.estado}
                 <span style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                   {" "}
                   · Titular: {c.titular}

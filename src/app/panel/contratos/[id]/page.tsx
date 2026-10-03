@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { numeroContrato } from "@/ui/numero-contrato";
 
 /**
  * Ficha del contrato: el titular arriba y sus beneficiarios en tarjetas, con
@@ -343,8 +344,11 @@ export default function FichaContratoPage() {
       </Link>
       <h1 style={{ fontSize: "1.6rem", margin: "0.5rem 0 0.2rem" }}>Resumen de matrícula</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem", margin: 0 }}>
-        {contrato.campania ?? "— sin campaña —"} · Contrato N° {contrato.numero}
-        {contrato.externalRef !== null && ` · LGS ${contrato.externalRef}`} ·{" "}
+        {/* El encabezado es del contrato de LGS completo (con todos los hermanos):
+            su número va sin el documento, que cada tarjeta ya muestra. */}
+        {contrato.campania ?? "— sin campaña —"} · Contrato{" "}
+        {numeroContrato(contrato).origen === "LGS" ? "LGS " : ""}
+        {numeroContrato(contrato).numero} ·{" "}
         {PAIS_NOMBRE[contrato.countryCode] ?? contrato.countryCode}
       </p>
 
@@ -504,7 +508,9 @@ export default function FichaContratoPage() {
               >
                 <div style={{ fontWeight: 800 }}>{c.beneficiario}</div>
                 <div style={{ fontSize: "0.78rem", opacity: 0.9 }}>
-                  {c.beneficiarioDocTipo} {c.beneficiarioDocNumero} · contrato N° {c.numero}
+                  {c.beneficiarioDocTipo} {c.beneficiarioDocNumero}
+                  {/* El N° interno solo cuando el contrato no viene de LGS. */}
+                  {numeroContrato(c).origen === "KIDS" && ` · contrato ${numeroContrato(c).numero}`}
                 </div>
               </div>
               {/* ¿Está tomando el programa? Es la MISMA respuesta que recibe

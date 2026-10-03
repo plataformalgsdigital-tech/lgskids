@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { numeroContrato } from "@/ui/numero-contrato";
 
 /**
  * Contratos: LISTA para buscar, ficha para trabajar.
@@ -405,6 +406,7 @@ export default function ContratosPage() {
               <tbody>
                 {contratos.map((c) => {
                   const estado = ESTADO_UI[c.estado];
+                  const nc = numeroContrato(c);
                   const abrir = () => router.push(`/panel/contratos/${c.id}`);
                   return (
                     <tr
@@ -422,8 +424,10 @@ export default function ContratosPage() {
                         {c.campania ?? "— sin campaña —"}
                       </td>
                       <td style={td}>
-                        <strong>N° {c.numero}</strong>
-                        {c.externalRef !== null && (
+                        {/* De LGS: su número (sin el documento del niño, que va
+                            debajo). Del panel: el N° interno, que es el único. */}
+                        <strong style={{ whiteSpace: "nowrap" }}>{nc.numero}</strong>
+                        {nc.origen === "LGS" && (
                           <span
                             style={{
                               marginLeft: "0.4rem",
@@ -436,8 +440,13 @@ export default function ContratosPage() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            LGS {c.externalRef}
+                            LGS
                           </span>
+                        )}
+                        {nc.documento !== null && (
+                          <div style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+                            doc. {nc.documento}
+                          </div>
                         )}
                       </td>
                       <td style={td}>{c.titular}</td>

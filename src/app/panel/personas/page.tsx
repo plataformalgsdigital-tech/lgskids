@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { textoNumeroContrato } from "@/ui/numero-contrato";
 
 interface Nino {
   id: string;
@@ -358,8 +359,8 @@ export default function PersonasPage() {
                         ? "Youngster (10–13)"
                         : "— sin curso —"}
                   </strong>
-                  {n.contratoNumero !== null && ` · contrato N° ${n.contratoNumero}`}
-                  {n.externalRef !== null && ` · LGS ${n.externalRef}`}
+                  {(n.externalRef !== null || n.contratoNumero !== null) &&
+                    ` · contrato ${textoNumeroContrato({ externalRef: n.externalRef, numero: n.contratoNumero })}`}
                 </div>
                 <div style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
                   🏫 {n.salon ?? "— sin salón —"}
