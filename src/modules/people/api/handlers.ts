@@ -120,5 +120,10 @@ export const detalleNinoHandler = handlerWithAuth(async (_request, auth, context
   profile.requirePermission(PERMISOS.PERSONAS_VER);
   const params = await context.params;
   const id = z.uuid().parse(params["id"]);
-  return json({ nino: await obtenerDetalleNino(id) });
+  // "Ver clave" es del ROL superadmin (bóveda), no de un permiso: la pantalla
+  // solo pinta el botón; la ruta de la clave lo vuelve a exigir.
+  return json({
+    nino: await obtenerDetalleNino(id),
+    puedeVerClaves: profile.esSuperadmin,
+  });
 });

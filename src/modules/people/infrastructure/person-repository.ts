@@ -187,6 +187,8 @@ export interface NinoDetalle {
   personaEmail: string | null;
   telefono: string | null;
   estado: string;
+  /** Cuenta del niño: la usa "Ver clave" (solo superadmin). */
+  userId: string | null;
   username: string | null;
   correo: string | null;
   contratoNumero: number | null;
@@ -222,7 +224,7 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
     `SELECT p.id, p.nombres, p.apellidos, p.doc_tipo AS "docTipo", p.doc_numero AS "docNumero",
             p.country_code AS "countryCode", p.fecha_nacimiento::text AS "fechaNacimiento",
             p.email AS "personaEmail", p.telefono, p.estado,
-            u.username, u.email AS correo,
+            u.id AS "userId", u.username, u.email AS correo,
             c.numero AS "contratoNumero", c.external_ref AS "externalRef",
             c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
             c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
@@ -230,7 +232,14 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
             e.estado::text AS "matriculaEstado", cl.nombre AS salon,
             cl.meeting_url AS "meetingUrl", ca.nombre AS campania,
             COALESCE(cu.tipo::text, c.tipo_curso::text) AS curso,
-            COALESCE(NULLIF(TRIM(gp.nombres || ' ' || gp.apellidos), ''), gu.username) AS guia,
+            -- El nombre del guía vive en SU ficha (scheduling_guia); people_person
+            -- solo lo tendría si fuera alumno. Mirar solo esa mostraba el usuario
+            -- generado (vespinosa7913).
+            COALESCE(
+              NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+              NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
+              NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
+              gu.username) AS guia,
             (SELECT min(s.fecha)::text FROM scheduling_session s
               WHERE s.classroom_id = cl.id AND s.fecha >= (now() AT TIME ZONE 'UTC')::date) AS "proximaSesion",
             COALESCE((SELECT json_agg(json_build_object(
@@ -252,6 +261,8 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
        LEFT JOIN catalog_campaign ca ON ca.id = cu.campaign_id
        LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
        LEFT JOIN people_person gp ON gp.user_id = gu.id
+       LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
+       LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
       WHERE p.id = $1`,
     [id],
   );

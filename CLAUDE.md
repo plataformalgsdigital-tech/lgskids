@@ -152,6 +152,12 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   o el menor de un `people_guardianship` (`ES_NINO`). Tiene además filtro de
   **salón**, derivado de la matrícula VIVA (la lista del salón sale de las
   matrículas, nunca de una tabla aparte), y cada fila muestra su salón.
+  **Ficha del niño** (`/panel/personas/[id]`, 2026-10-02): "Datos personales" va en
+  tres líneas fijas —identidad · correo (dos columnas, porque el sintético es largo
+  y se montaba sobre el teléfono), teléfono y plataforma · usuario y clave—. La
+  clave se ve con "Ver clave" SOLO si quien mira es superadmin (la respuesta trae
+  `puedeVerClaves` y `userId`; la ruta de la bóveda lo vuelve a exigir). El guía
+  sale por su NOMBRE (`scheduling_guia`), no por el usuario generado.
 - **Fase 6 (`scheduling`) completada**: migración `20260726000000_scheduling`
   (salón, slots, sesiones, feriados, suspensiones). Salón: zona operativa Y
   calendario de feriados configurables por salón; slots SESION/CLUB.
@@ -1310,7 +1316,7 @@ solo servía para completar la ficha.
 - Un evento abre **MODAL** (`calendario/SesionModal.tsx`), no una página. El nombre
   del guía SIEMPRE se ve; "Cambiar guía" y "Suspender" solo con `salones.gestionar`.
   **Encabezado (2026-10-02)**: a la izquierda `CAMPAÑA · CURSO · Salón NN`, a la
-  derecha `Sesión N · Lección N` con el nivel debajo. "Información del evento" lleva
+  derecha `Nivel X · Sesión N · Lección N` en una sola línea. "Información del evento" lleva
   fecha, hora, cupo e inscritos, guía (con "Cambiar guía") y enlace; la caja
   aparte del guía se retiró.
   **La LECCIÓN de la sesión se DERIVA, no se guarda** (`getSessionInfo`): la sesión

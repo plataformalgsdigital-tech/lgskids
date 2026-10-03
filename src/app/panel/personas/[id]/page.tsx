@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
 
 interface Nino {
   id: string;
@@ -16,6 +17,7 @@ interface Nino {
   personaEmail: string | null;
   telefono: string | null;
   estado: "ACTIVA" | "INACTIVA";
+  userId: string | null;
   username: string | null;
   correo: string | null;
   contratoNumero: number | null;
@@ -69,11 +71,20 @@ const badge = (bg: string, fg: string): CSSProperties => ({
   fontWeight: 700,
 });
 
-function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
+function Dato({
+  etiqueta,
+  children,
+  style,
+}: {
+  etiqueta: string;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
-    <div>
+    <div style={{ minWidth: 0, ...style }}>
       <div style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>{etiqueta}</div>
-      <div style={{ fontWeight: 600 }}>{children}</div>
+      {/* Un correo largo parte la línea en vez de montarse sobre la columna vecina. */}
+      <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{children}</div>
     </div>
   );
 }
@@ -98,6 +109,23 @@ export default function DetalleNinoPage() {
   const router = useRouter();
   const [nino, setNino] = useState<Nino | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [puedeVerClaves, setPuedeVerClaves] = useState(false);
+  const [clave, setClave] = useState<ConsultaClave | null>(null);
+  const [errorClave, setErrorClave] = useState<string | null>(null);
+
+  async function verClave(userId: string) {
+    if (clave !== null) {
+      setClave(null);
+      return;
+    }
+    setErrorClave(null);
+    const res = await apiFetch(`/api/identity/users/${userId}/clave`);
+    if (!res.ok) {
+      setErrorClave("No se pudo consultar la clave.");
+      return;
+    }
+    setClave((await res.json()) as ConsultaClave);
+  }
 
   useEffect(() => {
     async function cargar() {
@@ -106,12 +134,14 @@ export default function DetalleNinoPage() {
         router.replace("/login");
         return;
       }
-      const data: { nino?: Nino; error?: { message: string } } = await res.json();
+      const data: { nino?: Nino; puedeVerClaves?: boolean; error?: { message: string } } =
+        await res.json();
       if (!res.ok) {
         setError(data.error?.message ?? "No se pudo cargar el niño.");
         return;
       }
       setNino(data.nino ?? null);
+      setPuedeVerClaves(data.puedeVerClaves === true);
     }
     void cargar();
   }, [params.id, router]);
@@ -188,18 +218,73 @@ export default function DetalleNinoPage() {
       {/* Datos personales */}
       <section style={{ ...card, marginTop: "1rem" }}>
         <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Datos personales</h2>
-        <Grid>
+        {/* Tres líneas fijas: identidad · contacto (el correo ocupa dos columnas,
+            porque el sintético es largo) · acceso. */}
+        <style>{`
+          .ficha-datos{display:grid;gap:0.9rem;margin-top:0.9rem;grid-template-columns:repeat(4,minmax(0,1fr))}
+          .ficha-correo{grid-column:1 / span 2}
+          .ficha-clave{grid-column:span 2}
+          .ficha-nueva-linea{grid-column-start:1}
+          @media (max-width:48rem){.ficha-datos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        `}</style>
+        <div className="ficha-datos">
           <Dato etiqueta="Nombres">{nino.nombres}</Dato>
           <Dato etiqueta="Apellidos">{nino.apellidos}</Dato>
           <Dato etiqueta="Documento">
             {nino.docTipo} {nino.docNumero}
           </Dato>
           <Dato etiqueta="Fecha de nacimiento">{nino.fechaNacimiento ?? "—"}</Dato>
-          <Dato etiqueta="Correo">{nino.correo ?? nino.personaEmail ?? "—"}</Dato>
+
+          <div className="ficha-correo">
+            <Dato etiqueta="Correo">{nino.correo ?? nino.personaEmail ?? "—"}</Dato>
+          </div>
           <Dato etiqueta="Teléfono">{nino.telefono ?? "—"}</Dato>
-          <Dato etiqueta="Usuario">{nino.username ?? "— sin login —"}</Dato>
           <Dato etiqueta="Plataforma">{PAIS_NOMBRE[nino.countryCode] ?? nino.countryCode}</Dato>
-        </Grid>
+
+          <div className="ficha-nueva-linea">
+            <Dato etiqueta="Usuario">{nino.username ?? "— sin login —"}</Dato>
+          </div>
+          <div className="ficha-clave">
+            <Dato etiqueta="Clave">
+              {nino.userId === null ? (
+                "— sin login —"
+              ) : !puedeVerClaves ? (
+                <span style={{ color: "var(--texto-suave)", fontWeight: 400 }}>
+                  •••••• (solo superadmin)
+                </span>
+              ) : (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    gap: "0.5rem",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {clave === null ? "••••••" : <ClaveConsultada consulta={clave} />}
+                  <button
+                    type="button"
+                    onClick={() => nino.userId !== null && void verClave(nino.userId)}
+                    style={{
+                      padding: "0.2rem 0.6rem",
+                      borderRadius: "0.5rem",
+                      border: "1px solid #e3e7f0",
+                      background: "white",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {clave === null ? "👁 Ver clave" : "🙈 Ocultar"}
+                  </button>
+                  {errorClave !== null && (
+                    <span style={{ color: "#c62828", fontSize: "0.8rem" }}>{errorClave}</span>
+                  )}
+                </span>
+              )}
+            </Dato>
+          </div>
+        </div>
       </section>
 
       {/* Información académica */}

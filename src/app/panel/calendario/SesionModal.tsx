@@ -588,13 +588,10 @@ export function SesionModal({
             }}
           >
             {sesion !== null && (
-              <div>
-                <div style={{ fontSize: "1.05rem", fontWeight: 800 }}>{tituloSesion(sesion)}</div>
-                {sesion.leccionNivel !== null && (
-                  <div style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
-                    Nivel {NIVEL_UI[sesion.leccionNivel] ?? sesion.leccionNivel}
-                  </div>
-                )}
+              <div style={{ fontSize: "1.05rem", fontWeight: 800 }}>
+                {sesion.leccionNivel !== null &&
+                  `Nivel ${NIVEL_UI[sesion.leccionNivel] ?? sesion.leccionNivel} · `}
+                {tituloSesion(sesion)}
               </div>
             )}
             {cerrada && (
