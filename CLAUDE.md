@@ -1163,6 +1163,15 @@ PENDIENTE/RESERVADA hasta que LGS apruebe al beneficiario — **no aprobarla des
 panel de KIDS**: la clave y el usuario del niño se devuelven UNA vez, y es el paso de
 aprobación de LGS el que los guarda en `KIDS_INSCRIPCIONES`. Aprobarla por el panel
 deja a LGS sin credenciales y su `approve` posterior falla.
+**Estado al 2026-10-05**: Inicio del Programa **2026-10-19**, Cierre de Ventas
+2026-10-26 (quedó calculado sobre el inicio anterior, el 5-oct: la campaña sigue "En
+matrícula" la primera semana de clases), Fin 2027-10-19. Por pedido del negocio se
+dejaron **12 salones**: JUNIOR 01 (CL), 04, 05, 08, 11 y YOUNGSTER 01 (CL), 04, 05,
+06, 08, 11, 12 (los demás, CO). Se borraron los otros 10 —sin matrículas— y el
+histórico del único alumno (Niño Migueñ, que se movió de JUNIOR 04 a JUNIOR 01 con
+Academic Change): su matrícula FINALIZADA. Se hizo con SQL en una transacción con
+controles, tras un `pg_dump` completo —hace falta `postgres:18` para el dump: el
+`pg_dump` 16 del contenedor local no lee un servidor 18—. La auditoría NO se tocó.
 Se verificó ADEMÁS el camino propio de KIDS (contrato creado en el panel, aprobado con
 salón, credenciales, el niño entrando a `/mi-panel` con su sesión del 2026-10-05):
 funciona de punta a punta. Lo que falta es OPERATIVO, no de código: **los 12 salones
@@ -1594,10 +1603,10 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
-- **Guía y sala de Zoom para los 12 salones de OCTUBRE2026**: están todos en `SIN
-GUIA` y sin `meeting_url` (así los crea "Generar salones del catálogo"). El curso
-  arranca el **2026-10-05**; sin enlace, el botón "Entrar a clase" del niño no lleva
-  a ninguna parte, y el enlace se HEREDA del guía asignado.
+- **Guía y sala de Zoom para los salones de OCTUBRE2026**: al 2026-10-05 solo JUNIOR
+  01 y JUNIOR 11 tienen guía; los otros 10 siguen sin guía ni `meeting_url`. El
+  programa arranca el **2026-10-19**; sin enlace, el botón "Entrar a clase" del niño
+  no lleva a ninguna parte, y el enlace se HEREDA del guía asignado.
 - **Las reservas de LGS se aprueban desde LGS, no desde KIDS** (ver "Estado de
   la conexión"). La primera (`02-10764-26#121290`) ya hizo el ciclo completo
   (2026-09-30): LGS la aprobó, el niño tiene usuario y la puerta académica lo
