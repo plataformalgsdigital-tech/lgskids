@@ -909,6 +909,55 @@ export async function classroomExisteNombre(courseId: string, nombre: string): P
   return row !== null;
 }
 
+/** El salón del curso con alguno de esos nombres (sin distinguir mayúsculas). */
+export async function findClassroomPorNombres(
+  courseId: string,
+  nombres: string[],
+): Promise<ClassroomRecord | null> {
+  return queryOne<ClassroomRecord>(
+    `${SELECT_CLASSROOM}
+      WHERE course_id = $1 AND lower(nombre) = ANY(SELECT lower(n) FROM unnest($2::text[]) n)
+      ORDER BY created_at LIMIT 1`,
+    [courseId, nombres.map((n) => n.trim())],
+  );
+}
+
+/** Lo que una regeneración del salón BORRARÍA: asistencia y sesiones cerradas. */
+export async function historiaDeSalon(
+  classroomId: string,
+): Promise<{ conAsistencia: number; cerradas: number }> {
+  const row = await queryOne<{ conAsistencia: number; cerradas: number }>(
+    `SELECT count(*) FILTER (WHERE EXISTS (
+              SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id))::int
+              AS "conAsistencia",
+            count(*) FILTER (WHERE s.cerrada_en IS NOT NULL)::int AS cerradas
+       FROM scheduling_session s
+      WHERE s.classroom_id = $1 AND s.slot_id IS NOT NULL`,
+    [classroomId],
+  );
+  return { conAsistencia: row?.conAsistencia ?? 0, cerradas: row?.cerradas ?? 0 };
+}
+
+/**
+ * Deja el salón SIN horario para volver a ponerle otro: zona y país nuevos,
+ * fuera sus sesiones de horario y sus bloques. Las sesiones sueltas (eventos,
+ * refuerzos) no cuelgan de un bloque y se quedan. Transaccional.
+ */
+export async function vaciarHorarioSalon(
+  tx: Queryable,
+  classroomId: string,
+  datos: { timezone: string; holidayCountry: string },
+): Promise<void> {
+  await execute(
+    `UPDATE scheduling_classroom SET timezone = $2, holiday_country = $3, updated_at = now()
+      WHERE id = $1`,
+    [classroomId, datos.timezone, datos.holidayCountry],
+    tx,
+  );
+  await deleteSessions(tx, classroomId);
+  await execute(`DELETE FROM scheduling_slot WHERE classroom_id = $1`, [classroomId], tx);
+}
+
 /** Fechas de la campaña/curso de un salón (para mostrarlas en su detalle). */
 export async function getSalonCampania(courseId: string): Promise<SalonCampania | null> {
   return queryOne<SalonCampania>(

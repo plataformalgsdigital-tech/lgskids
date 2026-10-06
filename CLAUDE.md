@@ -1244,7 +1244,17 @@ salón ya está, 409. **Trampa ya pagada**: conviven DOS nombres para el mismo
 salón —el asistente de campaña crea "Salón 08" y el catálogo "JUNIOR Salón 08"—,
 y comparar solo el largo duplicaba salones al generar en una campaña hecha con el
 asistente; `salonDelHorarioYaExiste` mira los dos (y la pantalla compara tipo +
-"Salón NN"). Prueba: `scheduling/tests/agregar-salon-integration.test.ts`. El menú lateral llama **"Calendario"** a `/panel/salones`.
+"Salón NN"). **El NÚMERO manda (2026-10-06)**: "Salón 04" es el horario 04 del
+catálogo (01–06 Chile, 07–12 Col/Ecu/Perú, en los dos cursos). Los salones que el
+asistente creó el 27-sep usaban una numeración VIEJA del catálogo —su 04 y 05 eran
+de Colombia, Lun-Mié— y "Generar" los saltaba por nombre, así que la campaña quedó
+sin los 04–06 de Chile (Mar-Jue). Ahora "Generar" compara zona, país y bloques del
+salón existente con los de su número y, si no coinciden, lo **REALINEA**
+(`realinearSalon`: horario nuevo y sesiones regeneradas, conservando id, guía,
+cupo y sala) — solo sin matrículas ni sesiones dictadas; si las tiene, lo devuelve
+en `sinCorregir` y la pantalla lo avisa. Auditoría:
+`scheduling.salon_realineado_catalogo` con el antes y el después. Prueba:
+`scheduling/tests/agregar-salon-integration.test.ts`. El menú lateral llama **"Calendario"** a `/panel/salones`.
 **El desfase CL–CO NO ES FIJO** (`scheduling/domain/husos.ts`, 2026-09-28).
 Chile cambia la hora y Colombia no, así que el mismo horario —17:00 del grupo 01—
 lo viven los demás a las **15:00 en verano austral y a las 16:00 en invierno**. La

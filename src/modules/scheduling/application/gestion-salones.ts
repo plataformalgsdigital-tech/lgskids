@@ -18,6 +18,8 @@ import {
   deleteSessions,
   detalleSesion,
   findClassroomById,
+  findClassroomPorNombres,
+  historiaDeSalon,
   listHorariosCatalogo,
   getCourseWindow,
   getHolidayDates,
@@ -40,6 +42,7 @@ import {
   updateGuiaSalon,
   updateGuiaSesion,
   upsertHolidays,
+  vaciarHorarioSalon,
   type AgendaItem,
   type ClassroomListItem,
   type ClassroomRecord,
@@ -692,6 +695,72 @@ async function salonDelHorarioYaExiste(
 
 type HorarioCatalogo = Awaited<ReturnType<typeof listHorariosCatalogo>>[number];
 
+const zonaDeHorario = (h: HorarioCatalogo): { timezone: string; holidayCountry: string } => ({
+  timezone: TZ_POR_GRUPO[h.grupoPais] ?? "America/Santiago",
+  holidayCountry: PAIS_POR_GRUPO[h.grupoPais] ?? "CL",
+});
+
+const huellaBloques = (
+  bloques: { tipo: string; diaSemana: number; horaLocal: string; duracionMin: number }[],
+): string =>
+  bloques
+    .map(
+      (b) => `${b.tipo}|${String(b.diaSemana)}|${b.horaLocal.slice(0, 5)}|${String(b.duracionMin)}`,
+    )
+    .sort()
+    .join(",");
+
+/**
+ * ¿El salón tiene lo que dice su horario del catálogo (zona, país y bloques)?
+ * El NÚMERO manda: "Salón 04" es el horario 04 del catálogo. Hace falta porque
+ * los salones del asistente se numeraron con un catálogo anterior —el 04 era de
+ * Colombia— y al regenerar se saltaban por nombre aunque tuvieran otro horario.
+ */
+async function salonAlineado(salon: ClassroomRecord, h: HorarioCatalogo): Promise<boolean> {
+  const zona = zonaDeHorario(h);
+  return (
+    salon.timezone === zona.timezone &&
+    salon.holidayCountry === zona.holidayCountry &&
+    huellaBloques(await getSlots(salon.id)) === huellaBloques(h.slots)
+  );
+}
+
+/**
+ * Le pone al salón el horario de su número en el catálogo y regenera sus
+ * sesiones, CONSERVANDO id, nombre, guía, cupo y sala. Solo si no hay nada que
+ * perder: con matrículas hay niños que se inscribieron a OTRO horario, y con
+ * asistencia o sesiones cerradas regenerar se llevaría lo dictado.
+ */
+async function realinearSalon(
+  salon: ClassroomRecord,
+  h: HorarioCatalogo,
+): Promise<{ ok: true; sesiones: number } | { ok: false; motivo: string }> {
+  if (await classroomTieneMatriculas(salon.id)) {
+    return { ok: false, motivo: "tiene matrículas" };
+  }
+  const historia = await historiaDeSalon(salon.id);
+  if (historia.conAsistencia > 0 || historia.cerradas > 0) {
+    return { ok: false, motivo: "ya tiene sesiones dictadas" };
+  }
+  const zona = zonaDeHorario(h);
+  const sesiones = await withTransaction(async (tx) => {
+    const ventana = await getCourseWindow(salon.courseId, tx);
+    if (ventana === null) throw new NotFoundError("El curso del salón no existe.");
+    await sincronizarFeriados(
+      zona.holidayCountry,
+      aniosDeVentana(ventana.inicio, ventana.finalCurso),
+      tx,
+    );
+    await vaciarHorarioSalon(tx, salon.id, zona);
+    for (const s of h.slots) {
+      await insertSlot(tx, salon.id, s);
+    }
+    const actualizado = await findClassroomById(salon.id, tx);
+    return generarSesionesTx(tx, actualizado as ClassroomRecord, await getSlots(salon.id, tx));
+  });
+  return { ok: true, sesiones };
+}
+
 /**
  * UN salón desde un horario del catálogo: nombre, zona horaria, país de
  * feriados y bloques salen del horario, con la guía PENDIENTE. Es el núcleo que
@@ -713,8 +782,7 @@ async function crearSalonDesdeHorario(input: {
     nombre: input.nombre,
     guiaUserId: null, // guía PENDIENTE de asignar
     cupo: input.cupo,
-    timezone: TZ_POR_GRUPO[h.grupoPais] ?? "America/Santiago",
-    holidayCountry: PAIS_POR_GRUPO[h.grupoPais] ?? "CL",
+    ...zonaDeHorario(h),
     slots: h.slots.map((s) => ({
       tipo: s.tipo as "SESION" | "CLUB",
       diaSemana: s.diaSemana,
@@ -769,15 +837,23 @@ export async function agregarSalonDesdeCatalogo(input: {
 /**
  * Crea los salones de una campaña DESDE EL CATÁLOGO de horarios: un salón por
  * cada horario activo del tipo de curso (ambos grupos de país), con la GUÍA
- * PENDIENTE (null) y cupo por defecto. Idempotente: omite los salones que ya
- * existan (por nombre). Cada salón genera sus sesiones.
+ * PENDIENTE (null) y cupo por defecto. Idempotente: el salón que ya existe no
+ * se duplica, pero si su horario no es el de su número en el catálogo, se
+ * CORRIGE (`realinearSalon`) cuando no tiene matrículas ni sesiones dictadas, y
+ * si las tiene se informa en `sinCorregir`. Cada salón genera sus sesiones.
  */
 export async function generarSalonesDesdeCatalogo(input: {
   actorUserId: string;
   campaignId: string;
   cupo?: number | undefined;
   ip?: string | null;
-}): Promise<{ creados: number; omitidos: number; salones: string[] }> {
+}): Promise<{
+  creados: number;
+  omitidos: number;
+  salones: string[];
+  corregidos: string[];
+  sinCorregir: { nombre: string; motivo: string }[];
+}> {
   const courses = await coursesDeCampania(input.campaignId);
   if (courses.length === 0) {
     throw new NotFoundError("La campaña no existe o no tiene cursos.");
@@ -787,12 +863,39 @@ export async function generarSalonesDesdeCatalogo(input: {
   let creados = 0;
   let omitidos = 0;
   const salones: string[] = [];
+  const corregidos: string[] = [];
+  const sinCorregir: { nombre: string; motivo: string }[] = [];
 
   for (const course of courses) {
     for (const h of horarios.filter((x) => x.tipoCurso === course.tipo)) {
       const nombre = nombreSalonDeHorario(course.tipo, h.salonNumero);
-      if (await salonDelHorarioYaExiste(course.courseId, course.tipo, h.salonNumero)) {
+      const existente = await findClassroomPorNombres(course.courseId, [
+        nombre,
+        `Salón ${h.salonNumero}`,
+      ]);
+      if (existente !== null) {
         omitidos += 1;
+        if (await salonAlineado(existente, h)) continue;
+        const r = await realinearSalon(existente, h);
+        if (r.ok) {
+          corregidos.push(existente.nombre);
+          await registrarAuditoria({
+            actorUserId: input.actorUserId,
+            accion: "scheduling.salon_realineado_catalogo",
+            entidad: "scheduling_classroom",
+            entidadId: existente.id,
+            payload: {
+              nombre: existente.nombre,
+              antes: { timezone: existente.timezone, pais: existente.holidayCountry },
+              despues: zonaDeHorario(h),
+              horario: h.etiqueta,
+              sesiones: r.sesiones,
+            },
+            ip: input.ip ?? null,
+          });
+        } else {
+          sinCorregir.push({ nombre: existente.nombre, motivo: r.motivo });
+        }
         continue;
       }
       await crearSalonDesdeHorario({
@@ -813,10 +916,10 @@ export async function generarSalonesDesdeCatalogo(input: {
     accion: "scheduling.salones_generados_catalogo",
     entidad: "catalog_campaign",
     entidadId: input.campaignId,
-    payload: { creados, omitidos },
+    payload: { creados, omitidos, corregidos, sinCorregir },
     ip: input.ip ?? null,
   });
-  return { creados, omitidos, salones };
+  return { creados, omitidos, salones, corregidos, sinCorregir };
 }
 
 /** Elimina un salón (y sus sesiones/slots/suspensiones). Se BLOQUEA si el salón

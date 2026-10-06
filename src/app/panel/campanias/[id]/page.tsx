@@ -615,16 +615,35 @@ export default function DetalleCampaniaPage() {
       const res = await apiFetch(`/api/scheduling/campaigns/${params.id}/generate`, {
         method: "POST",
       });
-      const data: { creados?: number; omitidos?: number; error?: { message: string } } =
-        await res.json();
+      const data: {
+        creados?: number;
+        omitidos?: number;
+        corregidos?: string[];
+        sinCorregir?: { nombre: string; motivo: string }[];
+        error?: { message: string };
+      } = await res.json();
       if (!res.ok) {
         setError(data.error?.message ?? "No se pudieron generar los salones.");
         return;
       }
+      const corregidos = data.corregidos ?? [];
+      const sinCorregir = data.sinCorregir ?? [];
       setAviso(
-        `Salones generados: ${data.creados} nuevos${
-          (data.omitidos ?? 0) > 0 ? `, ${data.omitidos} ya existían` : ""
-        }. La guía queda pendiente de asignar.`,
+        [
+          `Salones generados: ${String(data.creados ?? 0)} nuevos${
+            (data.omitidos ?? 0) > 0 ? `, ${String(data.omitidos)} ya existían` : ""
+          }. La guía queda pendiente de asignar.`,
+          corregidos.length > 0
+            ? `Se corrigió el horario de ${corregidos.join(", ")}: no era el de su número en el catálogo.`
+            : "",
+          sinCorregir.length > 0
+            ? `⚠ No coinciden con el catálogo y no se tocaron: ${sinCorregir
+                .map((s) => `${s.nombre} (${s.motivo})`)
+                .join(", ")}.`
+            : "",
+        ]
+          .filter((t) => t !== "")
+          .join(" "),
       );
       await cargar();
     } catch {

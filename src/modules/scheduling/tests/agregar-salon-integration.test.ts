@@ -5,7 +5,10 @@ import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
 import { ConflictError } from "@/platform/errors";
-import { agregarSalonDesdeCatalogo } from "../application/gestion-salones";
+import {
+  agregarSalonDesdeCatalogo,
+  generarSalonesDesdeCatalogo,
+} from "../application/gestion-salones";
 import { crearHorario, eliminarHorario } from "../application/horarios-catalogo";
 
 /**
@@ -48,11 +51,16 @@ describe.runIf(RUN)("agregar un salón desde el catálogo (integración)", () =>
   });
 
   afterAll(async () => {
-    if (classroomId !== undefined) {
-      await execute(`DELETE FROM scheduling_session WHERE classroom_id = $1`, [classroomId]);
-      await execute(`DELETE FROM scheduling_slot WHERE classroom_id = $1`, [classroomId]);
-      await execute(`DELETE FROM scheduling_classroom WHERE id = $1`, [classroomId]);
-    }
+    // "Generar" crea un salón por cada horario del catálogo en ESTA campaña.
+    const DE_LA_CAMPANIA = `SELECT cl.id FROM scheduling_classroom cl
+        JOIN catalog_course co ON co.id = cl.course_id WHERE co.campaign_id = $1`;
+    await execute(`DELETE FROM scheduling_session WHERE classroom_id IN (${DE_LA_CAMPANIA})`, [
+      campaniaId,
+    ]);
+    await execute(`DELETE FROM scheduling_slot WHERE classroom_id IN (${DE_LA_CAMPANIA})`, [
+      campaniaId,
+    ]);
+    await execute(`DELETE FROM scheduling_classroom WHERE id IN (${DE_LA_CAMPANIA})`, [campaniaId]);
     await eliminarHorario({ actorUserId: ACTOR, horarioId });
     await execute(`DELETE FROM catalog_campaign WHERE id = $1`, [campaniaId]);
     await closePool();
@@ -106,5 +114,56 @@ describe.runIf(RUN)("agregar un salón desde el catálogo (integración)", () =>
     await expect(
       agregarSalonDesdeCatalogo({ actorUserId: ACTOR, campaignId: campaniaId, horarioId }),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  /** Lo deja como los salones viejos de OCTUBRE2026: el número de un horario y el
+   * horario (zona, país y día) de otro. */
+  async function desalinear(): Promise<void> {
+    await execute(
+      `UPDATE scheduling_classroom SET timezone = 'America/Santiago', holiday_country = 'CL'
+        WHERE id = $1`,
+      [classroomId],
+    );
+    await execute(`UPDATE scheduling_slot SET dia_semana = 1 WHERE classroom_id = $1`, [
+      classroomId,
+    ]);
+  }
+
+  it("generar CORRIGE el salón que tiene el número de un horario y el horario de otro", async () => {
+    await desalinear();
+    const r = await generarSalonesDesdeCatalogo({ actorUserId: ACTOR, campaignId: campaniaId });
+    expect(r.corregidos).toContain("Salón 97");
+    expect(r.salones).not.toContain("YOUNGSTER Salón 97"); // no lo duplicó
+
+    const salon = await queryOne<{ timezone: string; pais: string; cupo: number; dias: string }>(
+      `SELECT cl.timezone, cl.holiday_country AS pais, cl.cupo,
+              (SELECT string_agg(s.dia_semana::text || ' ' || s.hora_local, ',')
+                 FROM scheduling_slot s WHERE s.classroom_id = cl.id) AS dias
+         FROM scheduling_classroom cl WHERE cl.id = $1`,
+      [classroomId],
+    );
+    expect(salon).toEqual({ timezone: "America/Bogota", pais: "CO", cupo: 8, dias: "2 18:00" });
+    const lunes = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM scheduling_session
+        WHERE classroom_id = $1 AND extract(dow FROM starts_at AT TIME ZONE 'America/Bogota') = 1`,
+      [classroomId],
+    );
+    expect(lunes?.n).toBe(0); // las sesiones viejas del lunes no quedaron
+  });
+
+  it("no corrige el salón que ya dictó sesiones: lo informa", async () => {
+    await desalinear();
+    await execute(
+      `UPDATE scheduling_session SET cerrada_en = now()
+        WHERE id = (SELECT id FROM scheduling_session WHERE classroom_id = $1
+                     ORDER BY starts_at LIMIT 1)`,
+      [classroomId],
+    );
+    const r = await generarSalonesDesdeCatalogo({ actorUserId: ACTOR, campaignId: campaniaId });
+    expect(r.corregidos).not.toContain("Salón 97");
+    expect(r.sinCorregir).toContainEqual({
+      nombre: "Salón 97",
+      motivo: "ya tiene sesiones dictadas",
+    });
   });
 });
