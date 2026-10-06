@@ -118,14 +118,48 @@ export async function actualizarCursoReferencia(
 ): Promise<void> {
   const actual = await getCursoReferencia(input.id);
   if (actual === null) throw new NotFoundError("La referencia de curso no existe.");
-  const datos = normalizar(input);
+  const clave = normalizar(input);
   if (
-    await existsCursoReferenciaKey(datos.curso, datos.nivel, datos.unidad, datos.leccion, input.id)
+    await existsCursoReferenciaKey(clave.curso, clave.nivel, clave.unidad, clave.leccion, input.id)
   ) {
     throw new ConflictError(
-      `Ya existe "${datos.leccion}" para ${datos.curso} · ${datos.nivel}${datos.unidad ? ` · ${datos.unidad}` : ""}.`,
+      `Ya existe "${clave.leccion}" para ${clave.curso} · ${clave.nivel}${clave.unidad ? ` · ${clave.unidad}` : ""}.`,
     );
   }
+  // LO QUE NO VIENE, NO SE TOCA (2026-10-06). Gestión de Contenido manda solo
+  // temario, video, actividades y cuestionarios, y `normalizar` rellenaba con
+  // `[]` el resto: guardar una lección borraba su material del guía y del
+  // alumno, sus recursos y sus clubes. Y como el esquema de la API descarta las
+  // claves que no conoce, las actividades llegaban sin `x/y/w/h` y se perdía la
+  // ubicación de cada juego en la lámina. Es la MISMA regla de la carga por CSV
+  // (`planificarFila`): un campo ausente conserva lo guardado y las zonas se
+  // mantienen por enlace. La diferencia es el cuestionario: este editor SÍ lo
+  // edita, así que el que viene reemplaza al guardado (`null` lo borra).
+  const plan = planificarFila(
+    {
+      curso: clave.curso,
+      nivel: clave.nivel,
+      unidad: clave.unidad,
+      leccion: clave.leccion,
+      orden: input.orden,
+      contenido: input.contenido,
+      video: input.video,
+      materialGuia: input.materialGuia,
+      materialUsuario: input.materialUsuario,
+      actividades: input.actividades,
+      recursos: input.recursos,
+      clubes: input.clubes,
+    },
+    actual,
+  );
+  const datos: CursoReferenciaInput = {
+    curso: clave.curso,
+    nivel: clave.nivel,
+    unidad: clave.unidad,
+    leccion: clave.leccion,
+    ...plan.resultado,
+    quiz: input.quiz !== undefined ? (input.quiz ?? null) : actual.quiz,
+  };
   await updateCursoReferencia(input.id, datos);
   await registrarAuditoria({
     actorUserId: input.actorUserId,

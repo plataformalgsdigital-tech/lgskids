@@ -89,7 +89,15 @@ del salón, nunca de una acción del estudiante.
 preguntas: [{tipo: opcion_multiple|verdadero_falso|respuesta_escrita, enunciado,
 opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada editor
   define su forma (Referencia guarda un arreglo de preguntas; Gestión de Contenido, los
-  cuestionarios). La migración `20260825000000` había puesto la
+  cuestionarios). **Editar una lección (`PUT /api/catalog/curso/[id]` →
+  `actualizarCursoReferencia`) NO borra lo que el editor no manda** (corregido
+  2026-10-06): Gestión de Contenido envía solo temario, video, actividades y
+  cuestionarios, y antes guardar dejaba en `[]` el material del guía y del alumno,
+  los recursos y los clubes, y las actividades perdían su zona en la lámina (el
+  esquema de la API descarta `x/y/w/h`). Usa la MISMA regla de la carga por CSV,
+  `planificarFila`: campo ausente = se conserva, vacío = se borra, zonas por enlace.
+  Única diferencia: aquí el cuestionario que viene reemplaza al guardado (`null` lo
+  borra). Prueba: `curso-referencia-editar-integration.test.ts`. La migración `20260825000000` había puesto la
   referencia en `catalog_lesson` (por campaña) — se RETIRÓ (superada por
   `catalog_curso`); quedan como PENDIENTE (¿se necesitan?) las referencias de
   `catalog_level` (`descripcion`,`recursos`) y `catalog_quiz` (`modo`,`minutos`,
@@ -1594,17 +1602,6 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
 
 ## Pendientes conocidos
 
-- **URGENTE — Guardar en Gestión de Contenido BORRA datos de la lección**
-  (detectado 2026-09-30, sin corregir). Su `PUT /api/catalog/curso/[id]` manda
-  solo temario, video, actividades y cuestionarios, y `actualizarCursoReferencia`
-  pasa por `normalizar`, que rellena con `[]` lo que no vino: se pierden
-  **material del guía, material del alumno, recursos y clubes**. Además el
-  esquema `actividadItem` (Zod, que descarta claves desconocidas) se come
-  `x`/`y`/`w`/`h`, así que también se van las **zonas de los juegos** en la
-  lámina. Es el mismo defecto que se corrigió en la carga por CSV: la solución es
-  la misma regla —lo que no viene, no se toca; las zonas se conservan por
-  enlace—, probablemente reutilizando `planificarFila`. El editor de Referencia
-  manda la fila completa y solo pierde las zonas.
 - **Acceso a la base de producción desde desarrollo**: `lgs-db` es un clúster
   COMPARTIDO con LGS. Para operar se agrega la IP (`doctl databases firewalls
 append`), se conecta con el usuario PROPIO de KIDS (`kids2026_app`, nunca el
