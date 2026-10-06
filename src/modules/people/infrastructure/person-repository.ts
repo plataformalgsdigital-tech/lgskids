@@ -76,6 +76,8 @@ export interface NinoListItem {
   campania: string | null;
   curso: string | null;
   salon: string | null;
+  /** Matrícula viva: ACTIVA, o RESERVADA (reservó cupo y falta aprobar). */
+  matriculaEstado: string | null;
 }
 
 /**
@@ -170,7 +172,7 @@ export async function listNinos(params: {
             c.numero AS "contratoNumero", c.external_ref AS "externalRef",
             c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
             c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
-            ca.nombre AS campania, cl.nombre AS salon,
+            ca.nombre AS campania, cl.nombre AS salon, e.estado::text AS "matriculaEstado",
             COALESCE(cu.tipo::text, c.tipo_curso::text) AS curso
        FROM people_person p
        LEFT JOIN identity_user u ON u.id = p.user_id

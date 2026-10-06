@@ -1072,6 +1072,11 @@ pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
     lo que Next ya exigía. Va `^8.5.23` (resuelve 8.5.28). `sharp` se acotó igual:
     `^0.35.0`. Tras el cambio, `pnpm audit --prod` no reporta nada en ninguna
     severidad.
+  - `source-map-js: "^1.2.2"` (2026-10-05): GHSA-68fv-2mgg-jv7q (DoS, alta) llega
+    por next > postcss y ponía `verify` en rojo. Comprobada la instalación
+    congelada en worktree limpio. **Trampa**: `git worktree remove` falla en
+    Windows con "Filename too long" por el `node_modules`; borrarlo con
+    `Remove-Item -LiteralPath "\\?\<ruta>" -Recurse` y luego `git worktree prune`.
 
 ## Intake de beneficiarios desde LGS (2026-08-19, ADR-0010)
 
@@ -1211,7 +1216,11 @@ matrículas — desactivar en su lugar). Su detalle muestra las fechas de la cam
 (`/panel/campanias/[id]`) lista todos los salones en una tabla (Tipo, Salón,
 **País** —el de su calendario de feriados, el mismo `pais` que viaja a LGS en
 `availability`—, Guía, Horario, Inicio/Final curso, Cierre matríc., Cupos, Estado,
-Acciones) y
+Acciones). **El cupo es un botón** (2026-10-05): abre la lista de los niños
+inscritos (nombre con enlace a su ficha, documento, contrato, usuario y si la
+matrícula está Activa o Reservada). Sale de `GET /api/people/ninos?classroomId=`
+—la misma lista de Kids—, que cuenta ACTIVAS y RESERVADAS igual que el cupo; por
+eso `NinoListItem` ganó `matriculaEstado`. Y
 tiene **"Generar salones del catálogo"** (`POST /api/scheduling/campaigns/[id]/generate`
 → `generarSalonesDesdeCatalogo`): crea un salón por cada horario activo del
 catálogo (ambos grupos, ambos tipos) con **guía pendiente** y cupo 12,

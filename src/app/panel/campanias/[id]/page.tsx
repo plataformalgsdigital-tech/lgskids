@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/ui/api-fetch";
+import { numeroContrato } from "@/ui/numero-contrato";
 
 type Estado = "EN_MATRICULA" | "ACTIVA" | "CERRADA";
 
@@ -423,6 +424,12 @@ export default function DetalleCampaniaPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verEstructura, setVerEstructura] = useState(false);
+  /** Salón cuyo botón de cupos se tocó: abre la lista de inscritos. */
+  const [inscritosDe, setInscritosDe] = useState<{
+    id: string;
+    titulo: string;
+    cupo: number;
+  } | null>(null);
   // Edición: el nombre y el inicio comercial son la ficha; el inicio y el fin
   // del PROGRAMA mueven SESIONES y el cierre de ventas mueve el ESTADO, así que
   // ninguno de esos dos se guarda sin enseñar qué pasa.
@@ -986,17 +993,29 @@ export default function DetalleCampaniaPage() {
                       <td style={td}>{curso.finalCurso}</td>
                       <td style={td}>{detalle.finalVenta}</td>
                       <td style={td}>
-                        <span
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setInscritosDe({
+                              id: salon.id,
+                              titulo: `${curso.tipo} · ${etiquetaSalon(salon.nombre, curso.tipo)}`,
+                              cupo: salon.cupo,
+                            })
+                          }
+                          title="Ver los niños inscritos"
                           style={{
                             fontWeight: 700,
                             padding: "0.15rem 0.5rem",
                             borderRadius: "0.9rem",
+                            border: "none",
+                            cursor: "pointer",
+                            font: "inherit",
                             background: lleno ? "#fff8e1" : "#e8f5e9",
                             color: lleno ? "#8a6d00" : "#1b5e20",
                           }}
                         >
                           {salon.ocupados}/{salon.cupo}
-                        </span>
+                        </button>
                       </td>
                       <td style={td}>
                         <span
@@ -1107,6 +1126,188 @@ export default function DetalleCampaniaPage() {
             </div>
           ))}
       </section>
+
+      {inscritosDe !== null && (
+        <InscritosModal salon={inscritosDe} onCerrar={() => setInscritosDe(null)} />
+      )}
     </main>
+  );
+}
+
+interface Inscrito {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  docTipo: string;
+  docNumero: string;
+  countryCode: string;
+  username: string | null;
+  contratoNumero: number | null;
+  externalRef: string | null;
+  matriculaEstado: string | null;
+}
+
+/**
+ * Los niños de un salón: la MISMA cuenta que el cupo (matrículas ACTIVAS y
+ * RESERVADAS), porque sale de la lista de Kids filtrada por ese salón.
+ */
+function InscritosModal(props: {
+  salon: { id: string; titulo: string; cupo: number };
+  onCerrar: () => void;
+}) {
+  const [ninos, setNinos] = useState<Inscrito[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    void (async () => {
+      const res = await apiFetch(`/api/people/ninos?classroomId=${props.salon.id}&limit=500`);
+      if (!vigente) return;
+      if (!res.ok) {
+        setError(
+          res.status === 403 ? "No tienes permiso para ver los niños." : "No se pudo cargar.",
+        );
+        return;
+      }
+      setNinos(((await res.json()) as { ninos: Inscrito[] }).ninos);
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, [props.salon.id]);
+
+  const th: React.CSSProperties = {
+    padding: "0.45rem 0.55rem",
+    textAlign: "left",
+    fontSize: "0.78rem",
+    color: "var(--texto-suave)",
+    whiteSpace: "nowrap",
+  };
+  const td: React.CSSProperties = { padding: "0.5rem 0.55rem", fontSize: "0.88rem" };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-inscritos"
+      onClick={props.onCerrar}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.45)",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: "3rem 1rem",
+        zIndex: 50,
+        overflowY: "auto",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: "0.9rem",
+          padding: "1.25rem 1.4rem",
+          maxWidth: "46rem",
+          width: "100%",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 id="titulo-inscritos" style={{ fontSize: "1.15rem", margin: 0 }}>
+            Inscritos · {props.salon.titulo}
+            {ninos !== null && (
+              <span style={{ color: "var(--texto-suave)", fontWeight: 600 }}>
+                {" "}
+                ({ninos.length}/{props.salon.cupo})
+              </span>
+            )}
+          </h2>
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={props.onCerrar}
+            style={{
+              width: "2.1rem",
+              height: "2.1rem",
+              borderRadius: "50%",
+              border: "1px solid #d8dce6",
+              background: "white",
+              cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {error !== null && (
+          <p role="alert" style={{ color: "#c62828", marginTop: "0.8rem" }}>
+            {error}
+          </p>
+        )}
+        {ninos === null && error === null && (
+          <p style={{ color: "var(--texto-suave)", marginTop: "0.8rem" }}>Cargando…</p>
+        )}
+        {ninos !== null && ninos.length === 0 && (
+          <p style={{ color: "var(--texto-suave)", marginTop: "0.8rem" }}>
+            Todavía no hay niños inscritos en este salón.
+          </p>
+        )}
+        {ninos !== null && ninos.length > 0 && (
+          <div style={{ overflowX: "auto", marginTop: "0.8rem" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1.5px solid #e3e7f0" }}>
+                  <th style={th}>Niño</th>
+                  <th style={th}>Documento</th>
+                  <th style={th}>Contrato</th>
+                  <th style={th}>Usuario</th>
+                  <th style={th}>Matrícula</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ninos.map((n) => {
+                  const reservada = n.matriculaEstado === "RESERVADA";
+                  return (
+                    <tr key={n.id} style={{ borderBottom: "1px solid #edf0f6" }}>
+                      <td style={td}>
+                        <Link href={`/panel/personas/${n.id}`} style={{ fontWeight: 700 }}>
+                          {n.nombres} {n.apellidos}
+                        </Link>
+                      </td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>
+                        {n.docTipo} {n.docNumero}
+                      </td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>
+                        {
+                          numeroContrato({ externalRef: n.externalRef, numero: n.contratoNumero })
+                            .numero
+                        }
+                      </td>
+                      <td style={td}>{n.username ?? "— sin cuenta —"}</td>
+                      <td style={td}>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "0.75rem",
+                            padding: "0.15rem 0.5rem",
+                            borderRadius: "1rem",
+                            background: reservada ? "#fff8e1" : "#e8f5e9",
+                            color: reservada ? "#8a5a00" : "#1b5e20",
+                          }}
+                          title={reservada ? "Reservó cupo; falta aprobar su contrato" : undefined}
+                        >
+                          {reservada ? "Reservada" : "Activa"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
