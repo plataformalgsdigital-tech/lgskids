@@ -46,9 +46,14 @@ function ip(request: Request): string | null {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 }
 
-/** GET /api/kids-intake/availability — campañas abiertas + salones con cupo. */
-export const disponibilidadHandler = handlerWithServiceAuth(async () => {
-  return json(await disponibilidad());
+/**
+ * GET /api/kids-intake/availability — campañas abiertas + salones con cupo.
+ * `?incluirLlenos=1` agrega los salones sin cupo (`lleno: true`) — lo usa la
+ * consulta "Cursos Kids" de LGS; el modal de inscripción no lo envía.
+ */
+export const disponibilidadHandler = handlerWithServiceAuth(async (request) => {
+  const incluirLlenos = new URL(request.url).searchParams.get("incluirLlenos") === "1";
+  return json(await disponibilidad({ incluirLlenos }));
 });
 
 /** POST /api/kids-intake/reservations — crea la reserva del beneficiario. */

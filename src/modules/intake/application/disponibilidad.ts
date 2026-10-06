@@ -11,6 +11,8 @@ export interface SalonDisponible {
   cupo: number;
   ocupados: number;
   cupoDisponible: number;
+  /** true cuando ocupados >= cupo. Solo aparecen llenos con `incluirLlenos`. */
+  lleno: boolean;
   guia: string | null;
   horario: { tipo: string; diaSemana: number; horaLocal: string; duracionMin: number }[];
 }
@@ -30,14 +32,21 @@ export interface CampaniaDisponible {
  * DISPONIBILIDAD para el intake de LGS: campañas EN_MATRICULA con sus cursos
  * (Junior/Youngster) y los salones que AÚN tienen cupo (ocupados < cupo,
  * contando reservas). Compone catalog (campañas) + scheduling (salones).
+ *
+ * `incluirLlenos` (consulta "Cursos Kids" de LGS): devuelve también los salones
+ * activos SIN cupo, marcados `lleno: true`. El modal de inscripción NO lo pide,
+ * así que para inscribir solo ve salones con cupo.
  */
-export async function disponibilidad(): Promise<{ campanias: CampaniaDisponible[] }> {
+export async function disponibilidad(
+  opts: { incluirLlenos?: boolean } = {},
+): Promise<{ campanias: CampaniaDisponible[] }> {
   const abiertas = (await listarCampanias()).filter((c) => c.estado === "EN_MATRICULA");
   const salones = await listarSalones();
 
   const porCampania = new Map<string, ClassroomListItem[]>();
   for (const s of salones) {
-    if (!s.activo || s.ocupados >= s.cupo) continue;
+    if (!s.activo) continue;
+    if (!opts.incluirLlenos && s.ocupados >= s.cupo) continue;
     const arr = porCampania.get(s.campania) ?? [];
     arr.push(s);
     porCampania.set(s.campania, arr);
@@ -56,7 +65,8 @@ export async function disponibilidad(): Promise<{ campanias: CampaniaDisponible[
           pais: s.holidayCountry,
           cupo: s.cupo,
           ocupados: s.ocupados,
-          cupoDisponible: s.cupo - s.ocupados,
+          cupoDisponible: Math.max(0, s.cupo - s.ocupados),
+          lleno: s.ocupados >= s.cupo,
           guia: s.guia,
           horario: s.horario,
         });
