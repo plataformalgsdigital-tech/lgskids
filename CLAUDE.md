@@ -1605,10 +1605,14 @@ tabla inventada no llega al SQL, escribir queda auditado con el antes).
   la misma regla —lo que no viene, no se toca; las zonas se conservan por
   enlace—, probablemente reutilizando `planificarFila`. El editor de Referencia
   manda la fila completa y solo pierde las zonas.
-- **Acceso a la base de producción desde desarrollo**: la IP de desarrollo ya no
-  está en las fuentes confiables de `lgs-db`, un clúster COMPARTIDO con LGS.
-  Agregarla (`doctl databases firewalls append`) requiere autorización del
-  negocio, y hay que quitarla al terminar.
+- **Acceso a la base de producción desde desarrollo**: `lgs-db` es un clúster
+  COMPARTIDO con LGS. Para operar se agrega la IP (`doctl databases firewalls
+append`), se conecta con el usuario PROPIO de KIDS (`kids2026_app`, nunca el
+  administrador del clúster) y se quita la regla al terminar. Así se hizo el
+  2026-10-05 (regla `51bc08e0…`, quitada). **Al cierre de ese día hay OTRA regla con
+  la IP de desarrollo (`38e66e06…`) que no creó la sesión de KIDS** —probablemente
+  una de LGS desde el mismo equipo—: no se quitó para no cortarle el acceso; revisar
+  con quien la abrió.
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
