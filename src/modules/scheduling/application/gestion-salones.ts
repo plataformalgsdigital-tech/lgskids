@@ -669,6 +669,103 @@ const TZ_POR_GRUPO: Record<string, string> = {
 };
 const PAIS_POR_GRUPO: Record<string, string> = { "01": "CL", "02": "CO" };
 
+/** El salón del catálogo se llama por su horario: "JUNIOR Salón 08". */
+const nombreSalonDeHorario = (tipo: string, salonNumero: string): string =>
+  `${tipo} Salón ${salonNumero}`;
+
+/**
+ * ¿El curso ya tiene el salón de ese horario? Conviven DOS nombres para el
+ * mismo salón: el asistente de campaña lo crea como "Salón 08" y el catálogo
+ * como "JUNIOR Salón 08". Comparar solo el segundo duplicaba salones al
+ * generar o agregar en una campaña hecha con el asistente.
+ */
+async function salonDelHorarioYaExiste(
+  courseId: string,
+  tipo: string,
+  salonNumero: string,
+): Promise<boolean> {
+  return (
+    (await classroomExisteNombre(courseId, nombreSalonDeHorario(tipo, salonNumero))) ||
+    (await classroomExisteNombre(courseId, `Salón ${salonNumero}`))
+  );
+}
+
+type HorarioCatalogo = Awaited<ReturnType<typeof listHorariosCatalogo>>[number];
+
+/**
+ * UN salón desde un horario del catálogo: nombre, zona horaria, país de
+ * feriados y bloques salen del horario, con la guía PENDIENTE. Es el núcleo que
+ * comparten "Generar salones del catálogo" y "Agregar salón": así los dos crean
+ * el MISMO salón para el mismo horario.
+ */
+async function crearSalonDesdeHorario(input: {
+  actorUserId: string;
+  courseId: string;
+  nombre: string;
+  horario: HorarioCatalogo;
+  cupo: number;
+  ip: string | null;
+}): Promise<{ id: string; sesionesGeneradas: number }> {
+  const h = input.horario;
+  return crearSalon({
+    actorUserId: input.actorUserId,
+    courseId: input.courseId,
+    nombre: input.nombre,
+    guiaUserId: null, // guía PENDIENTE de asignar
+    cupo: input.cupo,
+    timezone: TZ_POR_GRUPO[h.grupoPais] ?? "America/Santiago",
+    holidayCountry: PAIS_POR_GRUPO[h.grupoPais] ?? "CL",
+    slots: h.slots.map((s) => ({
+      tipo: s.tipo as "SESION" | "CLUB",
+      diaSemana: s.diaSemana,
+      horaLocal: s.horaLocal,
+      duracionMin: s.duracionMin,
+    })),
+    ip: input.ip,
+  });
+}
+
+/**
+ * AGREGAR SALÓN a una campaña desde UN horario del catálogo (2026-10-06). El
+ * botón de la ficha de la campaña llevaba al calendario sin crear nada; ahora
+ * crea el salón ahí mismo, en el curso de la campaña que corresponde al tipo
+ * del horario. Si ese salón ya existe en la campaña, lo dice (409) en vez de
+ * duplicarlo.
+ */
+export async function agregarSalonDesdeCatalogo(input: {
+  actorUserId: string;
+  campaignId: string;
+  horarioId: string;
+  cupo?: number | undefined;
+  ip?: string | null;
+}): Promise<{ id: string; nombre: string; sesionesGeneradas: number }> {
+  const courses = await coursesDeCampania(input.campaignId);
+  if (courses.length === 0) throw new NotFoundError("La campaña no existe o no tiene cursos.");
+  const horario = (await listHorariosCatalogo({ soloActivos: true })).find(
+    (h) => h.id === input.horarioId,
+  );
+  if (horario === undefined) {
+    throw new NotFoundError("El horario no existe o está desactivado en el catálogo.");
+  }
+  const course = courses.find((c) => c.tipo === horario.tipoCurso);
+  if (course === undefined) {
+    throw new ValidationError(`La campaña no tiene curso ${horario.tipoCurso}.`);
+  }
+  const nombre = nombreSalonDeHorario(course.tipo, horario.salonNumero);
+  if (await salonDelHorarioYaExiste(course.courseId, course.tipo, horario.salonNumero)) {
+    throw new ConflictError(`${nombre} ya existe en esta campaña.`);
+  }
+  const r = await crearSalonDesdeHorario({
+    actorUserId: input.actorUserId,
+    courseId: course.courseId,
+    nombre,
+    horario,
+    cupo: input.cupo ?? 12,
+    ip: input.ip ?? null,
+  });
+  return { id: r.id, nombre, sesionesGeneradas: r.sesionesGeneradas };
+}
+
 /**
  * Crea los salones de una campaña DESDE EL CATÁLOGO de horarios: un salón por
  * cada horario activo del tipo de curso (ambos grupos de país), con la GUÍA
@@ -693,25 +790,17 @@ export async function generarSalonesDesdeCatalogo(input: {
 
   for (const course of courses) {
     for (const h of horarios.filter((x) => x.tipoCurso === course.tipo)) {
-      const nombre = `${course.tipo} Salón ${h.salonNumero}`;
-      if (await classroomExisteNombre(course.courseId, nombre)) {
+      const nombre = nombreSalonDeHorario(course.tipo, h.salonNumero);
+      if (await salonDelHorarioYaExiste(course.courseId, course.tipo, h.salonNumero)) {
         omitidos += 1;
         continue;
       }
-      await crearSalon({
+      await crearSalonDesdeHorario({
         actorUserId: input.actorUserId,
         courseId: course.courseId,
         nombre,
-        guiaUserId: null, // guía PENDIENTE de asignar
+        horario: h,
         cupo,
-        timezone: TZ_POR_GRUPO[h.grupoPais] ?? "America/Santiago",
-        holidayCountry: PAIS_POR_GRUPO[h.grupoPais] ?? "CL",
-        slots: h.slots.map((s) => ({
-          tipo: s.tipo as "SESION" | "CLUB",
-          diaSemana: s.diaSemana,
-          horaLocal: s.horaLocal,
-          duracionMin: s.duracionMin,
-        })),
         ip: input.ip ?? null,
       });
       creados += 1;

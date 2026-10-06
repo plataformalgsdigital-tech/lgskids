@@ -57,6 +57,7 @@ export {
   editarSalonHandler,
   eliminarSalonHandler,
   generarSalonesHandler,
+  agregarSalonHandler,
   impactoFinProgramaHandler,
   moverFinProgramaHandler,
   regenerarHandler,

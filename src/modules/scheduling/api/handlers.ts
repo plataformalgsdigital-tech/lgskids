@@ -10,6 +10,7 @@ import {
   editarSalon,
   eliminarSalon,
   generarSalonesDesdeCatalogo,
+  agregarSalonDesdeCatalogo,
   impactoFinDePrograma,
   listarSalones,
   moverFinDePrograma,
@@ -283,6 +284,27 @@ export const generarSalonesHandler = handlerWithAuth(async (request, auth, conte
   const resultado = await generarSalonesDesdeCatalogo({
     actorUserId: auth.userId,
     campaignId: id,
+    ip: ip(request),
+  });
+  return json(resultado, { status: 201 });
+});
+
+const agregarSalonSchema = z.object({
+  horarioId: z.uuid(),
+  cupo: z.number().int().min(1).max(50).optional(),
+});
+
+/** POST /api/scheduling/campaigns/[id]/salon — agrega UN salón desde un horario del catálogo. */
+export const agregarSalonHandler = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  const id = await idFromContext(context);
+  const body = agregarSalonSchema.parse(await request.json());
+  const resultado = await agregarSalonDesdeCatalogo({
+    actorUserId: auth.userId,
+    campaignId: id,
+    horarioId: body.horarioId,
+    cupo: body.cupo,
     ip: ip(request),
   });
   return json(resultado, { status: 201 });

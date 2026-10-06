@@ -424,6 +424,7 @@ export default function DetalleCampaniaPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verEstructura, setVerEstructura] = useState(false);
+  const [agregando, setAgregando] = useState(false);
   /** Salón cuyo botón de cupos se tocó: abre la lista de inscritos. */
   const [inscritosDe, setInscritosDe] = useState<{
     id: string;
@@ -920,19 +921,24 @@ export default function DetalleCampaniaPage() {
             >
               {ocupado ? "Generando…" : "⚙️ Generar salones del catálogo"}
             </button>
-            <Link
-              href="/panel/calendario"
+            {/* Antes era un enlace al calendario que no creaba nada: ahora agrega
+                el salón aquí, desde un horario del catálogo. */}
+            <button
+              type="button"
+              onClick={() => setAgregando(true)}
               style={{
                 padding: "0.5rem 1rem",
                 borderRadius: "0.6rem",
+                border: "none",
                 background: "var(--lgs-azul)",
                 color: "white",
                 fontWeight: 700,
                 fontSize: "0.85rem",
+                cursor: "pointer",
               }}
             >
               + Agregar salón
-            </Link>
+            </button>
           </div>
         </div>
 
@@ -1130,6 +1136,24 @@ export default function DetalleCampaniaPage() {
       {inscritosDe !== null && (
         <InscritosModal salon={inscritosDe} onCerrar={() => setInscritosDe(null)} />
       )}
+      {agregando && (
+        <AgregarSalonModal
+          campaignId={params.id}
+          existentes={detalle.courses.flatMap((curso) =>
+            (salonesPorCurso[curso.id] ?? []).map(
+              // "JUNIOR Salón 08" y "Salón 08" son el mismo salón: se compara
+              // tipo + "Salón NN", que es como el servidor decide si ya existe.
+              (s) => `${curso.tipo}|${etiquetaSalon(s.nombre, curso.tipo)}`,
+            ),
+          )}
+          onCerrar={() => setAgregando(false)}
+          onCreado={(nombre) => {
+            setAgregando(false);
+            setAviso(`✔ ${nombre} creado, con sus sesiones generadas. Falta asignarle guía.`);
+            void cargar();
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -1307,6 +1331,219 @@ function InscritosModal(props: {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface HorarioCatalogo {
+  id: string;
+  tipoCurso: string;
+  grupoPais: string;
+  salonNumero: string;
+  etiqueta: string;
+}
+
+const PAIS_DEL_GRUPO: Record<string, string> = { "01": "Chile", "02": "Col/Ecu/Perú" };
+
+/**
+ * AGREGAR SALÓN desde un horario del catálogo. El servidor arma el salón con
+ * las MISMAS reglas que "Generar salones del catálogo" (nombre, zona, país y
+ * bloques salen del horario; guía pendiente), así que aquí solo se elige cuál.
+ */
+function AgregarSalonModal(props: {
+  campaignId: string;
+  /** Salones de la campaña como "TIPO|Salón NN". */
+  existentes: string[];
+  onCerrar: () => void;
+  onCreado: (nombre: string) => void;
+}) {
+  const [horarios, setHorarios] = useState<HorarioCatalogo[] | null>(null);
+  const [tipo, setTipo] = useState<"JUNIOR" | "YOUNGSTER">("JUNIOR");
+  const [horarioId, setHorarioId] = useState("");
+  const [cupo, setCupo] = useState("12");
+  const [error, setError] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  useEffect(() => {
+    let vigente = true;
+    void (async () => {
+      const res = await apiFetch("/api/scheduling/horarios?activos=1");
+      if (!vigente) return;
+      if (!res.ok) {
+        setError("No se pudo cargar el catálogo de horarios.");
+        return;
+      }
+      setHorarios(((await res.json()) as { horarios: HorarioCatalogo[] }).horarios);
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, []);
+
+  const yaExiste = (h: HorarioCatalogo) =>
+    props.existentes.includes(`${h.tipoCurso}|Salón ${h.salonNumero}`);
+  const delTipo = (horarios ?? [])
+    .filter((h) => h.tipoCurso === tipo)
+    .sort((a, b) => a.salonNumero.localeCompare(b.salonNumero));
+  const elegido = delTipo.find((h) => h.id === horarioId) ?? null;
+
+  async function crear() {
+    if (elegido === null) return;
+    setOcupado(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/scheduling/campaigns/${props.campaignId}/salon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ horarioId: elegido.id, cupo: Number(cupo) }),
+      });
+      const data = (await res.json()) as { nombre?: string; error?: { message?: string } };
+      if (!res.ok) {
+        setError(data.error?.message ?? "No se pudo crear el salón.");
+        return;
+      }
+      props.onCreado(data.nombre ?? `${elegido.tipoCurso} Salón ${elegido.salonNumero}`);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  const campo: React.CSSProperties = {
+    width: "100%",
+    padding: "0.5rem 0.6rem",
+    borderRadius: "0.5rem",
+    border: "1.5px solid #d8dce6",
+    fontSize: "0.9rem",
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-agregar-salon"
+      onClick={() => !ocupado && props.onCerrar()}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.45)",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: "3rem 1rem",
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: "0.9rem",
+          padding: "1.25rem 1.4rem",
+          maxWidth: "34rem",
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.8rem",
+        }}
+      >
+        <h2 id="titulo-agregar-salon" style={{ fontSize: "1.15rem", margin: 0 }}>
+          Agregar salón
+        </h2>
+        <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--texto-suave)" }}>
+          Elige el horario del catálogo: el salón toma de ahí su nombre, días, horas y país, y
+          genera sus sesiones. Nace sin guía; se asigna después con el lápiz.
+        </p>
+
+        <label style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+          Curso
+          <select
+            value={tipo}
+            onChange={(e) => {
+              setTipo(e.target.value as "JUNIOR" | "YOUNGSTER");
+              setHorarioId("");
+            }}
+            style={campo}
+          >
+            <option value="JUNIOR">Junior (6–9)</option>
+            <option value="YOUNGSTER">Youngster (10–13)</option>
+          </select>
+        </label>
+
+        <label style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+          Horario del catálogo
+          <select value={horarioId} onChange={(e) => setHorarioId(e.target.value)} style={campo}>
+            <option value="">{horarios === null ? "Cargando…" : "— Elige el horario —"}</option>
+            {delTipo.map((h) => (
+              <option key={h.id} value={h.id} disabled={yaExiste(h)}>
+                Salón {h.salonNumero} · {PAIS_DEL_GRUPO[h.grupoPais] ?? h.grupoPais} · {h.etiqueta}
+                {yaExiste(h) ? " (ya está en la campaña)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        {horarios !== null && delTipo.length === 0 && (
+          <p style={{ margin: 0, fontSize: "0.82rem", color: "#8a5a00" }}>
+            No hay horarios activos de este curso en el catálogo.{" "}
+            <Link href="/panel/horarios">Gestionar horarios →</Link>
+          </p>
+        )}
+
+        <label style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+          Cupo
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={cupo}
+            onChange={(e) => setCupo(e.target.value)}
+            style={{ ...campo, width: "7rem" }}
+          />
+        </label>
+
+        {error !== null && (
+          <p role="alert" style={{ margin: 0, color: "#c62828", fontWeight: 600 }}>
+            {error}
+          </p>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
+          <button
+            type="button"
+            onClick={props.onCerrar}
+            disabled={ocupado}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "0.6rem",
+              border: "1px solid #d8dce6",
+              background: "white",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void crear()}
+            disabled={ocupado || elegido === null || !(Number(cupo) >= 1)}
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background: elegido === null ? "#b0b7c3" : "var(--lgs-azul)",
+              color: "white",
+              fontWeight: 800,
+              cursor: elegido === null ? "not-allowed" : "pointer",
+            }}
+          >
+            {ocupado
+              ? "Creando…"
+              : elegido !== null
+                ? `Crear ${elegido.tipoCurso} Salón ${elegido.salonNumero}`
+                : "Crear salón"}
+          </button>
+        </div>
       </div>
     </div>
   );

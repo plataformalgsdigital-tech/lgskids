@@ -1080,6 +1080,9 @@ pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
     lo que Next ya exigía. Va `^8.5.23` (resuelve 8.5.28). `sharp` se acotó igual:
     `^0.35.0`. Tras el cambio, `pnpm audit --prod` no reporta nada en ninguna
     severidad.
+  - `sharp` a `^0.35.5` (2026-10-06, en `package.json` Y en el override): aviso
+    ALTO de librsvg. Puso en rojo el CI de un commit de otra sesión que igual se
+    desplegó; la lección es mirar `gh run list` antes de empujar la imagen.
   - `source-map-js: "^1.2.2"` (2026-10-05): GHSA-68fv-2mgg-jv7q (DoS, alta) llega
     por next > postcss y ponía `verify` en rojo. Comprobada la instalación
     congelada en worktree limpio. **Trampa**: `git worktree remove` falla en
@@ -1232,7 +1235,16 @@ eso `NinoListItem` ganó `matriculaEstado`. Y
 tiene **"Generar salones del catálogo"** (`POST /api/scheduling/campaigns/[id]/generate`
 → `generarSalonesDesdeCatalogo`): crea un salón por cada horario activo del
 catálogo (ambos grupos, ambos tipos) con **guía pendiente** y cupo 12,
-idempotente por nombre. El menú lateral llama **"Calendario"** a `/panel/salones`.
+idempotente por nombre. **"+ Agregar salón"** (2026-10-06) era un enlace al
+calendario que no creaba nada; ahora abre un modal que crea UN salón desde un
+horario del catálogo (`POST /api/scheduling/campaigns/[id]/salon` →
+`agregarSalonDesdeCatalogo`), con el MISMO núcleo que "Generar"
+(`crearSalonDesdeHorario`: nombre, zona, país y bloques salen del horario). Si el
+salón ya está, 409. **Trampa ya pagada**: conviven DOS nombres para el mismo
+salón —el asistente de campaña crea "Salón 08" y el catálogo "JUNIOR Salón 08"—,
+y comparar solo el largo duplicaba salones al generar en una campaña hecha con el
+asistente; `salonDelHorarioYaExiste` mira los dos (y la pantalla compara tipo +
+"Salón NN"). Prueba: `scheduling/tests/agregar-salon-integration.test.ts`. El menú lateral llama **"Calendario"** a `/panel/salones`.
 **El desfase CL–CO NO ES FIJO** (`scheduling/domain/husos.ts`, 2026-09-28).
 Chile cambia la hora y Colombia no, así que el mismo horario —17:00 del grupo 01—
 lo viven los demás a las **15:00 en verano austral y a las 16:00 en invierno**. La
