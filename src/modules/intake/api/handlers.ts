@@ -3,6 +3,8 @@ import {
   aprobarReservaPorExternalRef,
   crearReservaBeneficiario,
   fichaAcademicaPorRef,
+  reactivarPorExternalRef,
+  suspenderPorExternalRef,
 } from "@/modules/contracts";
 import { handlerWithServiceAuth, json } from "@/platform/http/handler";
 import { disponibilidad } from "../application/disponibilidad";
@@ -97,4 +99,38 @@ export const aprobarIntakeHandler = handlerWithServiceAuth(async (request, conte
     ip: ip(request),
   });
   return json(resultado);
+});
+
+/**
+ * POST /api/kids-intake/reservations/[externalRef]/suspend — el beneficiario se
+ * INACTIVÓ en LGS: pausa el contrato (SUSPENDIDO) y bloquea el login del niño.
+ * Body opcional { motivo }. Idempotente (`aplicado: false` si no aplica).
+ */
+export const suspenderIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  const body = z
+    .object({ motivo: z.string().max(400).optional() })
+    .parse(await request.json().catch(() => ({})));
+  return json(
+    await suspenderPorExternalRef({
+      actorUserId: SYSTEM_ACTOR,
+      externalRef,
+      motivo: body.motivo ?? "",
+      ip: ip(request),
+    }),
+  );
+});
+
+/**
+ * POST /api/kids-intake/reservations/[externalRef]/reactivate — el beneficiario
+ * se REACTIVÓ en LGS: cierra la pausa que abrió LGS (sin extender el fin) y
+ * reactiva el login. Una pausa abierta en KIDS no se toca.
+ */
+export const reactivarIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  return json(
+    await reactivarPorExternalRef({ actorUserId: SYSTEM_ACTOR, externalRef, ip: ip(request) }),
+  );
 });

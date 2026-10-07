@@ -18,5 +18,7 @@ export {
   disponibilidadHandler,
   reservarIntakeHandler,
   aprobarIntakeHandler,
+  suspenderIntakeHandler,
+  reactivarIntakeHandler,
   estadoAcademicoIntakeHandler,
 } from "./api/handlers";

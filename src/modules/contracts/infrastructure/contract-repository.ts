@@ -124,6 +124,16 @@ export async function findOnholdAbierto(
   );
 }
 
+/** Motivo de una pausa (para saber si la abrió LGS: prefijo "LGS: "). */
+export async function motivoOnhold(onholdId: string, client?: Queryable): Promise<string | null> {
+  const row = await queryOne<{ motivo: string | null }>(
+    `SELECT motivo FROM contracts_onhold WHERE id = $1`,
+    [onholdId],
+    client,
+  );
+  return row?.motivo ?? null;
+}
+
 export async function insertOnhold(
   contractId: string,
   desde: string,

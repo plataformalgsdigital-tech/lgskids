@@ -43,6 +43,7 @@ import {
   insertContract,
   insertOnhold,
   listContracts,
+  motivoOnhold,
   searchContracts,
   setContractEstado,
   setContractTipoCurso,
@@ -403,6 +404,84 @@ export async function ponerEnPausa(input: {
   });
 }
 
+/** Prefijo del motivo de las pausas que abre LGS: solo esas las cierra LGS. */
+const PREFIJO_PAUSA_LGS = "LGS: ";
+
+/**
+ * SUSPENSIÓN ADMINISTRATIVA desde LGS (el beneficiario se inactivó allá).
+ * APROBADO → ONHOLD (situación SUSPENDIDO, conserva la matrícula y el cupo) +
+ * bloquea el login del niño si no tiene otro contrato vivo. Idempotente: un
+ * contrato ya en pausa o que no está APROBADO (reserva pendiente, inactivo)
+ * no se toca y se informa con `aplicado: false`.
+ */
+export async function suspenderPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  motivo: string;
+  ip?: string | null;
+}): Promise<{ aplicado: boolean; estado: string }> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  if (contrato.estado !== "APROBADO") return { aplicado: false, estado: contrato.estado };
+  const motivo = `${PREFIJO_PAUSA_LGS}${input.motivo.trim() || "Inactivado en LGS"}`.slice(0, 500);
+  const beneficiario = await findPersonById(contrato.beneficiarioId);
+  await withTransaction(async (tx) => {
+    await setContractEstado(contrato.id, "ONHOLD", tx);
+    await insertOnhold(contrato.id, fechaUtcHoy(), motivo, tx);
+    const tieneOtros = await beneficiarioTieneOtrosContratosVivos(contrato.beneficiarioId, contrato.id, tx);
+    if (!tieneOtros && beneficiario?.userId) await inactivarUsuarioTx(tx, beneficiario.userId);
+  });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.suspendido_lgs",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: { motivo },
+    ip: input.ip ?? null,
+  });
+  return { aplicado: true, estado: "ONHOLD" };
+}
+
+/**
+ * REACTIVACIÓN desde LGS: cierra SOLO una pausa abierta por LGS (motivo con
+ * prefijo "LGS: "), sin extender `final_contrato` — en LGS la suspensión
+ * administrativa no devuelve días (no es un OnHold) — y reactiva el login.
+ * Una pausa abierta en KIDS (OnHold propio) no se toca.
+ */
+export async function reactivarPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  ip?: string | null;
+}): Promise<{ aplicado: boolean; estado: string; motivo?: string }> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  if (contrato.estado !== "ONHOLD") return { aplicado: false, estado: contrato.estado };
+  const pausa = await findOnholdAbierto(contrato.id);
+  const motivoPausa = pausa === null ? null : await motivoOnhold(pausa.id);
+  if (pausa === null || !(motivoPausa ?? "").startsWith(PREFIJO_PAUSA_LGS)) {
+    return { aplicado: false, estado: "ONHOLD", motivo: "La pausa la abrió KIDS: se reactiva desde KIDS." };
+  }
+  const beneficiario = await findPersonById(contrato.beneficiarioId);
+  await withTransaction(async (tx) => {
+    await cerrarOnhold(pausa.id, fechaUtcHoy(), 0, tx);
+    await setContractEstado(contrato.id, "APROBADO", tx);
+    if (beneficiario?.userId) await reactivarUsuarioTx(tx, beneficiario.userId);
+  });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.reactivado_lgs",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: {},
+    ip: input.ip ?? null,
+  });
+  return { aplicado: true, estado: "APROBADO" };
+}
+
 /**
  * REACTIVA un contrato en pausa: extiende `final_contrato` por los días
  * pausados (el niño NO pierde días — sección 2.4), con registro en el
@@ -426,6 +505,7 @@ export async function reactivar(input: {
   }
   const hoy = fechaUtcHoy();
   const dias = Math.max(diasEntre(pausa.desde, hoy), 0);
+  const beneficiario = await findPersonById(contrato.beneficiarioId);
 
   await withTransaction(async (tx) => {
     await cerrarOnhold(pausa.id, hoy, dias, tx);
@@ -433,6 +513,10 @@ export async function reactivar(input: {
       await extenderFinalContrato(contrato.id, dias, tx);
     }
     await setContractEstado(contrato.id, "APROBADO", tx);
+    // Una pausa que abrió LGS apagó la cuenta del niño; si se reactiva desde
+    // KIDS, la cuenta vuelve con el contrato. En una pausa propia ya está
+    // ACTIVA y esto no cambia nada.
+    if (beneficiario?.userId) await reactivarUsuarioTx(tx, beneficiario.userId);
   });
 
   const actualizado = await findContractById(contrato.id);

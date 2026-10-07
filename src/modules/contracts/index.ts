@@ -12,6 +12,8 @@ export {
   crearReservaBeneficiario,
   aprobarContrato,
   aprobarReservaPorExternalRef,
+  suspenderPorExternalRef,
+  reactivarPorExternalRef,
   ponerEnPausa,
   reactivar,
   inactivarContrato,
