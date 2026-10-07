@@ -115,7 +115,7 @@ const MENU: {
   {
     seccion: "Operación",
     permiso: "contratos.gestionar",
-    etiqueta: "Reservas (LGS)",
+    etiqueta: "Gestión de Reservas",
     color: "var(--lgs-purpura)",
     href: "/panel/reservas",
     permisoMenu: "menu.reservas",
@@ -168,6 +168,14 @@ const MENU: {
     color: "var(--lgs-azul)",
     href: "/panel/mantenimiento",
     permisoMenu: "menu.mantenimiento_admin",
+  },
+  {
+    seccion: "Administración",
+    permiso: "mensajes.enviar",
+    etiqueta: "Mensajes",
+    color: "var(--lgs-verde)",
+    href: "/panel/mensajes",
+    permisoMenu: "menu.mensajes",
   },
   {
     seccion: "Administración",

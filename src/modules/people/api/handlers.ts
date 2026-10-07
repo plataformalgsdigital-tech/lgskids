@@ -125,5 +125,7 @@ export const detalleNinoHandler = handlerWithAuth(async (_request, auth, context
   return json({
     nino: await obtenerDetalleNino(id),
     puedeVerClaves: profile.esSuperadmin,
+    // El botón de WhatsApp: la ruta del envío lo vuelve a exigir.
+    puedeEnviarMensajes: profile.hasPermission(PERMISOS.MENSAJES_ENVIAR),
   });
 });

@@ -69,6 +69,11 @@ const envSchema = z.object({
   /** WhatsApp Cloud API (Fase 11). Sin credenciales se usa LogSender. */
   WHATSAPP_TOKEN: z.string().min(10).optional(),
   WHATSAPP_PHONE_ID: z.string().min(3).optional(),
+  /**
+   * Whapi.cloud: el MISMO servicio de WhatsApp que usa LGS (2026-10-07). Es el
+   * token de UN canal (un número). Si está, manda sobre la Cloud API de Meta.
+   */
+  WHAPI_TOKEN: z.string().min(10).optional(),
 
   /**
    * Clave de servicio para el intake desde LGS (Fase B). Si está ausente, la

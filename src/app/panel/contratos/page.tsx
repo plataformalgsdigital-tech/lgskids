@@ -387,8 +387,8 @@ export default function ContratosPage() {
           <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
         ) : contratos.length === 0 ? (
           <p style={{ color: "var(--texto-suave)" }}>
-            Sin contratos con esos filtros. Los contratos nuevos se crean en Reservas (LGS) o desde
-            la sección Kids.
+            Sin contratos con esos filtros. Los contratos nuevos se crean en Gestión de Reservas o
+            desde la sección Kids.
           </p>
         ) : (
           <div style={{ overflowX: "auto", border: "1px solid #e3e7f0", borderRadius: "0.8rem" }}>

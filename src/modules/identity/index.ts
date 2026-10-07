@@ -51,3 +51,5 @@ export {
   solicitudClaveDescartarHandler,
 } from "./api/cuentas-handlers";
 export { generarPasswordInicial } from "./domain/credenciales";
+/** Solo para el envío de credenciales por WhatsApp (notifications): audita el propósito. */
+export { consultarClave } from "./application/gestion-cuentas";

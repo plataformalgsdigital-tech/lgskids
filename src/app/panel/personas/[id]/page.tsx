@@ -7,6 +7,7 @@ import { apiFetch } from "@/ui/api-fetch";
 import { numeroContrato } from "@/ui/numero-contrato";
 import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
 import { AcademicInfo } from "./AcademicInfo";
+import { EnviarCredencialesModal } from "./EnviarCredencialesModal";
 
 interface Nino {
   id: string;
@@ -113,6 +114,8 @@ export default function DetalleNinoPage() {
   const [nino, setNino] = useState<Nino | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [puedeVerClaves, setPuedeVerClaves] = useState(false);
+  const [puedeEnviarMensajes, setPuedeEnviarMensajes] = useState(false);
+  const [enviandoCredenciales, setEnviandoCredenciales] = useState(false);
   const [pestana, setPestana] = useState<"general" | "academic">("general");
   /** Sube cuando Academic Change mueve al niño: la ficha se vuelve a leer. */
   const [recarga, setRecarga] = useState(0);
@@ -140,14 +143,19 @@ export default function DetalleNinoPage() {
         router.replace("/login");
         return;
       }
-      const data: { nino?: Nino; puedeVerClaves?: boolean; error?: { message: string } } =
-        await res.json();
+      const data: {
+        nino?: Nino;
+        puedeVerClaves?: boolean;
+        puedeEnviarMensajes?: boolean;
+        error?: { message: string };
+      } = await res.json();
       if (!res.ok) {
         setError(data.error?.message ?? "No se pudo cargar el niño.");
         return;
       }
       setNino(data.nino ?? null);
       setPuedeVerClaves(data.puedeVerClaves === true);
+      setPuedeEnviarMensajes(data.puedeEnviarMensajes === true);
     }
     void cargar();
   }, [params.id, router, recarga]);
@@ -257,6 +265,14 @@ export default function DetalleNinoPage() {
         ))}
       </div>
 
+      {enviandoCredenciales && (
+        <EnviarCredencialesModal
+          childPersonId={nino.id}
+          nombre={`${nino.nombres} ${nino.apellidos}`}
+          onCerrar={() => setEnviandoCredenciales(false)}
+        />
+      )}
+
       {pestana === "academic" && (
         <AcademicInfo
           childPersonId={nino.id}
@@ -271,7 +287,36 @@ export default function DetalleNinoPage() {
         <>
           {/* Datos personales */}
           <section style={{ ...card, marginTop: "1rem" }}>
-            <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Datos personales</h2>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Datos personales</h2>
+              {puedeEnviarMensajes && nino.userId !== null && (
+                <button
+                  type="button"
+                  onClick={() => setEnviandoCredenciales(true)}
+                  title="Envía usuario y clave al WhatsApp del apoderado"
+                  style={{
+                    padding: "0.4rem 0.9rem",
+                    borderRadius: "0.6rem",
+                    border: "none",
+                    background: "#25d366",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  📲 Enviar acceso por WhatsApp
+                </button>
+              )}
+            </div>
             {/* Tres líneas fijas: identidad · contacto (el correo ocupa dos columnas,
             porque el sintético es largo) · acceso. */}
             <style>{`

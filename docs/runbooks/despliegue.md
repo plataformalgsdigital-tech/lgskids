@@ -53,7 +53,10 @@ con las claves de las variables `SEED_*`, y esas no viven en la app.
 
 Viven cifrados en el spec de la app (`type: SECRET`). Están:
 `DATABASE_URL`, `DIRECT_DATABASE_URL`, `DATABASE_CA_CERT`, `AUTH_JWT_SECRET`,
-`PASSWORD_VAULT_KEY`, `LGS_INTAKE_API_KEY`, `SPACES_KEY` y `SPACES_SECRET`.
+`PASSWORD_VAULT_KEY`, `LGS_INTAKE_API_KEY`, `SPACES_KEY`, `SPACES_SECRET` y
+`WHAPI_TOKEN` (2026-10-07: el canal B de Whapi que comparte con LGS; va en `web`,
+que envía desde Mensajes, y en `tareas`, que despacha la cola y los premios. Sin
+él, los mensajes quedan en modo simulado).
 
 - **`PASSWORD_VAULT_KEY` no se puede perder ni rotar a la ligera**: con ella se
   descifran las copias de las claves (ver "Cuentas de usuario" en CLAUDE.md).

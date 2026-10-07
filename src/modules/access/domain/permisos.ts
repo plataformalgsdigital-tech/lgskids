@@ -27,6 +27,9 @@ export const PERMISOS = {
   ARCHIVOS_GESTIONAR: "archivos.gestionar",
   ARCHIVOS_VER: "archivos.ver",
   PANEL_TABLERO: "panel.tablero",
+  /** WhatsApp a los apoderados: Gestión y el botón de credenciales de la ficha. */
+  MENSAJES_ENVIAR: "mensajes.enviar",
+  MENSAJES_PLANTILLAS: "mensajes.plantillas",
   // ── Visibilidad del menú ────────────────────────────────────────────────
   // Separados a propósito de los permisos funcionales: apagar un ítem del
   // menú NO debe quitarle capacidades a nadie. Un guía puede necesitar
@@ -44,6 +47,7 @@ export const PERMISOS = {
   MENU_AVISO_LOGIN: "menu.aviso_login",
   /** Administración › Mantenimiento: cargas masivas (hoy, el catálogo Curso por CSV). */
   MENU_MANTENIMIENTO_ADMIN: "menu.mantenimiento_admin",
+  MENU_MENSAJES: "menu.mensajes",
   MENU_GUIAS: "menu.guias",
   MENU_MIS_CLASES: "menu.mis_clases",
   MENU_MIS_SALONES: "menu.mis_salones",
@@ -154,6 +158,9 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.MENU_AVISO_LOGIN,
     PERMISOS.MENU_MANTENIMIENTO_ADMIN,
     PERMISOS.MENU_GUIAS,
+    PERMISOS.MENSAJES_ENVIAR,
+    PERMISOS.MENSAJES_PLANTILLAS,
+    PERMISOS.MENU_MENSAJES,
   ],
   guia: [
     PERMISOS.PANEL_GUIA,
@@ -217,7 +224,7 @@ export const SECCIONES_MENU: {
     hijos: [
       { etiqueta: "Kids", permiso: PERMISOS.MENU_KIDS },
       { etiqueta: "Contratos", permiso: PERMISOS.MENU_CONTRATOS },
-      { etiqueta: "Reservas (LGS)", permiso: PERMISOS.MENU_RESERVAS },
+      { etiqueta: "Gestión de Reservas", permiso: PERMISOS.MENU_RESERVAS },
     ],
   },
   {
@@ -231,6 +238,7 @@ export const SECCIONES_MENU: {
       { etiqueta: "Guías", permiso: PERMISOS.MENU_GUIAS },
       { etiqueta: "Aviso de login", permiso: PERMISOS.MENU_AVISO_LOGIN },
       { etiqueta: "Mantenimiento", permiso: PERMISOS.MENU_MANTENIMIENTO_ADMIN },
+      { etiqueta: "Mensajes", permiso: PERMISOS.MENU_MENSAJES },
     ],
   },
   {

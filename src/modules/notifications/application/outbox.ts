@@ -10,51 +10,72 @@ import { getSender } from "../infrastructure/senders";
  * WhatsApp jamás rompe una operación de negocio.
  */
 
-const MAX_INTENTOS = 5;
+export const MAX_INTENTOS = 5;
 
 export async function encolarNotificacion(input: {
   canal: Canal;
   destinatario: string;
   mensaje: string;
   payload?: Record<string, unknown>;
+  /** Para el historial de Administración › Mensajes. */
+  plantillaSlug?: string | null;
+  childPersonId?: string | null;
+  enviadoPor?: string | null;
 }): Promise<string> {
   const id = newId();
   await execute(
-    `INSERT INTO notifications_outbox (id, canal, destinatario, mensaje, payload)
-     VALUES ($1, $2::notifications_canal, $3, $4, $5)`,
+    `INSERT INTO notifications_outbox
+       (id, canal, destinatario, mensaje, payload, plantilla_slug, child_person_id, enviado_por)
+     VALUES ($1, $2::notifications_canal, $3, $4, $5, $6, $7, $8)`,
     [
       id,
       input.canal,
       input.destinatario,
       input.mensaje,
       input.payload !== undefined ? JSON.stringify(input.payload) : null,
+      input.plantillaSlug ?? null,
+      input.childPersonId ?? null,
+      input.enviadoPor ?? null,
     ],
   );
   return id;
 }
 
-/** Worker: despacha pendientes (y fallidas con intentos < MAX). Idempotente. */
-export async function procesarOutbox(limit = 50): Promise<{ enviadas: number; fallidas: number }> {
+/**
+ * Despacha lo pendiente (y lo fallido con intentos < MAX). Cada fila se TOMA
+ * antes de mandarla (`tomada_en`, con SKIP LOCKED): el worker cada 5 minutos y
+ * el envío inmediato de Gestión pueden correr a la vez, y sin eso el apoderado
+ * recibiría el mismo mensaje dos veces. Una fila tomada hace más de 10 minutos
+ * (el proceso murió a mitad) se vuelve a ofrecer.
+ */
+export async function procesarOutbox(
+  limit = 50,
+  soloIds?: string[],
+): Promise<{ enviadas: number; fallidas: number }> {
   interface Row {
     id: string;
     canal: Canal;
     destinatario: string;
     mensaje: string;
-    intentos: number;
   }
-  const pendientes = await queryRows<Row>(
-    `SELECT id, canal::text AS canal, destinatario, mensaje, intentos
-       FROM notifications_outbox
-      WHERE estado = 'PENDIENTE' OR (estado = 'FALLIDA' AND intentos < $1)
-      ORDER BY created_at
-      LIMIT $2`,
-    [MAX_INTENTOS, limit],
+  const tomadas = await queryRows<Row>(
+    `UPDATE notifications_outbox o SET tomada_en = now()
+      WHERE o.id IN (
+        SELECT id FROM notifications_outbox
+         WHERE (estado = 'PENDIENTE' OR (estado = 'FALLIDA' AND intentos < $1))
+           AND (tomada_en IS NULL OR tomada_en < now() - interval '10 minutes')
+           AND ($3::uuid[] IS NULL OR id = ANY($3::uuid[]))
+         ORDER BY created_at
+         LIMIT $2
+         FOR UPDATE SKIP LOCKED)
+      RETURNING o.id, o.canal::text AS canal, o.destinatario, o.mensaje`,
+    [MAX_INTENTOS, limit, soloIds ?? null],
   );
 
   let enviadas = 0;
   let fallidas = 0;
   const sender = getSender();
-  for (const noti of pendientes) {
+  for (const noti of tomadas) {
     const resultado = await sender.enviar({
       canal: noti.canal,
       destinatario: noti.destinatario,
@@ -63,7 +84,8 @@ export async function procesarOutbox(limit = 50): Promise<{ enviadas: number; fa
     if (resultado.ok) {
       await execute(
         `UPDATE notifications_outbox
-            SET estado = 'ENVIADA', enviada_en = now(), intentos = intentos + 1
+            SET estado = 'ENVIADA', enviada_en = now(), intentos = intentos + 1,
+                ultimo_error = NULL, tomada_en = NULL
           WHERE id = $1`,
         [noti.id],
       );
@@ -71,7 +93,7 @@ export async function procesarOutbox(limit = 50): Promise<{ enviadas: number; fa
     } else {
       await execute(
         `UPDATE notifications_outbox
-            SET estado = 'FALLIDA', intentos = intentos + 1, ultimo_error = $2
+            SET estado = 'FALLIDA', intentos = intentos + 1, ultimo_error = $2, tomada_en = NULL
           WHERE id = $1`,
         [noti.id, resultado.error ?? "desconocido"],
       );

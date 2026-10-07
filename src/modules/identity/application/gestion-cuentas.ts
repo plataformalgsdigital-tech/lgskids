@@ -121,6 +121,12 @@ export async function consultarClave(input: {
   actorUserId: string;
   userId: string;
   ip?: string | null;
+  /**
+   * VER (el superadmin la mira en pantalla) o ENVIO_WHATSAPP (sale de la
+   * bóveda directo al mensaje para el apoderado; quien envía no la ve). La
+   * auditoría lo distingue.
+   */
+  proposito?: "VER" | "ENVIO_WHATSAPP";
 }): Promise<ConsultaClave> {
   const fila = await queryOne<{ username: string; cifrada: string | null }>(
     `SELECT username, password_cifrada AS cifrada FROM identity_user WHERE id = $1`,
@@ -147,7 +153,13 @@ export async function consultarClave(input: {
     entidadId: input.userId,
     payload: {
       username: fila.username,
-      resultado: resultado.clave === null ? resultado.motivo : "MOSTRADA",
+      proposito: input.proposito ?? "VER",
+      resultado:
+        resultado.clave === null
+          ? resultado.motivo
+          : input.proposito === "ENVIO_WHATSAPP"
+            ? "ENVIADA_POR_WHATSAPP"
+            : "MOSTRADA",
     },
     ip: input.ip ?? null,
   });

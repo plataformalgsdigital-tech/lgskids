@@ -14,3 +14,13 @@ export {
 } from "./application/outbox";
 export type { NotificationSenderPort, MensajeSaliente, Canal } from "./application/ports";
 export { setSenderForTests } from "./infrastructure/senders";
+export {
+  plantillasListarHandler,
+  plantillaCrearHandler,
+  plantillaActualizarHandler,
+  destinatariosHandler,
+  envioHandler,
+  historialHandler,
+  credencialesVistaHandler,
+  credencialesEnviarHandler,
+} from "./api/handlers";

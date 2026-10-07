@@ -1394,9 +1394,10 @@ solo servía para completar la ficha.
 
 - El menú lateral se declara UNA vez en `SECCIONES_MENU` (`access/domain/permisos.ts`)
   como árbol padre→hijos: **Tablero** (suelto, primero) · **Académica** (Calendario,
-  Mantenimiento Académico) · **Operación** (Kids, Contratos, Reservas LGS) ·
+  Mantenimiento Académico) · **Operación** (Kids, Contratos, **Gestión de
+  Reservas** —antes "Reservas (LGS)", renombrado 2026-10-07—) ·
   **Administración** (Usuarios y roles, Reportes, Auditoría, Guías, Aviso de login,
-  **Mantenimiento** — cargas masivas, hoy el catálogo Curso por CSV) ·
+  **Mantenimiento** — cargas masivas, hoy el catálogo Curso por CSV —, **Mensajes**) ·
   **Guía** (Mis clases, Mis salones, Mis niños).
 - **Cada ítem exige DOS permisos**: el funcional (lo que la pantalla hace) y el de
   menú (`menu.*`); el grupo se prende con `seccion.*`. Esto no es redundancia: antes
@@ -1618,6 +1619,60 @@ Endpoints: `GET /api/dbadmin/tablas` y
 exporta lo filtrado). Pruebas: `dbadmin/tests/tablas.test.ts` (identificadores e
 inyección) y `explorador-integration.test.ts` (el hash no sale ni en el CSV, la
 tabla inventada no llega al SQL, escribir queda auditado con el antes).
+
+## Mensajes por WhatsApp (2026-10-07)
+
+Administración › **Mensajes** (`/panel/mensajes`): réplica de Mantenimiento ›
+Mensajes de LGS —**Plantillas** y **Gestión**— sobre el MISMO servicio,
+**Whapi.cloud** (`WhapiSender`, `POST https://gate.whapi.cloud/messages/text`, texto
+libre: la plantilla se rellena aquí). El token de UN canal va en `WHAPI_TOKEN`
+(secreto); KIDS usa el canal **B "Let's Go Speak"** (+56 9 4267 9066), el que LGS
+usa para bienvenidas y envíos masivos. **En LGS los tokens están escritos en el
+código** (`src/services/whatsapp-config.service.ts`), no en el entorno: si LGS los
+rota, hay que actualizar `WHAPI_TOKEN` aquí. `getSender` prefiere Whapi, luego Meta
+(`WHATSAPP_*`) y si no hay nada, `LogSender` (**modo simulado**, que la pantalla
+avisa). Migración `20261007000000_mensajes`.
+
+- **Plantillas** (`notifications_plantilla`, `domain/plantilla.ts`): `{{marcador}}`
+  como LGS (`nombre`, `nombreCompleto`, `apoderado`, `usuario`, `clave`, `curso`,
+  `salon`, `campania`, `contrato`, `plataforma`); el slug no se edita, desactivar
+  reemplaza a borrar, máx. 1000 caracteres. `credenciales-kids` (la del botón de la
+  ficha) se edita pero no se desactiva.
+- **Gestión** (`/panel/mensajes/gestion`): plantilla → destinatarios por **salón** o
+  por **documentos/CSV** (máx. 300) → revisar (con vista previa) → enviar. El mensaje
+  va al **APODERADO** de cada niño (el primero con teléfono; si no hay, el del
+  registro del niño, y la tabla lo dice). La pantalla manda ids de niños, NUNCA
+  teléfonos: el destino se deriva en el servidor. `telefonoWhatsApp` normaliza y
+  completa el indicativo SOLO al móvil local con la forma exacta del país (CO
+  `3xxxxxxxxx`, CL/PE `9xxxxxxxx`, EC `09xxxxxxxx`); lo demás se rechaza, porque
+  adivinar mandaría el mensaje a un extraño.
+- **Diferencias con LGS**: hay **HISTORIAL** (el outbox, pestaña Historial, con
+  reintentos del worker; LGS no guarda nada) y el envío se ENCOLA y se despacha
+  con `after()` —300 envíos de a uno no caben en una petición—. Para que el worker
+  y ese despacho no manden dos veces, `procesarOutbox` TOMA cada fila
+  (`tomada_en`, `FOR UPDATE SKIP LOCKED`; lo tomado hace >10 min se reofrece).
+- **Botón "📲 Enviar acceso por WhatsApp"** en la ficha del niño (Datos personales):
+  modal con A QUIÉN y QUÉ —la clave tapada— y confirmar. La clave sale de la bóveda
+  (`consultarClave` con `proposito: "ENVIO_WHATSAPP"`, que la auditoría distingue)
+  directo al mensaje: **quien envía NO la ve** —verla sigue siendo solo del
+  superadmin—, y solo va al teléfono YA registrado. Se envía AL MOMENTO, sin cola:
+  el historial guarda el texto con `••••••` y una falla NO se reintenta sola (el
+  texto guardado no lleva la clave). Una plantilla con `{{clave}}` NO se puede
+  enviar en masa: dejaría las claves de un salón en la cola en texto plano. Sin
+  copia en la bóveda (cuentas anteriores, `SIN_COPIA`) pide restablecer primero.
+- **`LogSender` no escribe el texto en el log** (solo destinatario y largo): en modo
+  simulado escribía la clave del niño en el registro del servidor.
+- Permisos (`mensajes.enviar`, `mensajes.plantillas`, `menu.mensajes`): los concede
+  la migración a quien tiene `contratos.gestionar` (enviar) y `catalogo.gestionar`
+  (plantillas). Rutas: `/api/notifications/{plantillas,plantillas/[id],destinatarios,
+envios,credenciales/[childPersonId]}`. Auditoría: `notifications.plantilla_*`,
+  `notifications.envio_encolado`, `notifications.credenciales_enviadas|fallidas`.
+- **Al encender `WHAPI_TOKEN` también salen de verdad los avisos AUTOMÁTICOS** de
+  medalla y diploma (`notificarPremiosPendientes`, worker cada 15 min), que hasta
+  entonces iban al log.
+- Pruebas: `mensajes.test.ts` (plantillas, teléfonos) y `mensajes-integration.test.ts`
+  (destinatario = apoderado, un envío sale UNA vez aunque se despache dos veces, la
+  clave llega y no queda escrita, masivo con clave rechazado).
 
 ## Aviso de la pantalla de login (2026-08-26)
 
