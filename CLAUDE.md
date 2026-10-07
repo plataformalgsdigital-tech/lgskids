@@ -1693,10 +1693,9 @@ envios,credenciales/[childPersonId]}`. Auditoría: `notifications.plantilla_*`,
   COMPARTIDO con LGS. Para operar se agrega la IP (`doctl databases firewalls
 append`), se conecta con el usuario PROPIO de KIDS (`kids2026_app`, nunca el
   administrador del clúster) y se quita la regla al terminar. Así se hizo el
-  2026-10-05 (regla `51bc08e0…`, quitada). **Al cierre de ese día hay OTRA regla con
-  la IP de desarrollo (`38e66e06…`) que no creó la sesión de KIDS** —probablemente
-  una de LGS desde el mismo equipo—: no se quitó para no cortarle el acceso; revisar
-  con quien la abrió.
+  2026-10-05 (regla `51bc08e0…`, quitada) y el 2026-10-07 (`c2230e06…`, quitada). La
+  regla ajena `38e66e06…` con la IP de desarrollo, que no había creado KIDS, ya no
+  existe el 2026-10-07: alguien la quitó. No contar con que haya una abierta.
 - **Endurecer la auth de servicio del intake de API-key a HMAC** (integridad +
   anti-replay + el secreto no viaja): alinear con el `crm-bridge` de MOSAICO.
   No urgente sobre HTTPS con rotación de clave.
