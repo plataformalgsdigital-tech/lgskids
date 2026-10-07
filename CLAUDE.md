@@ -1159,6 +1159,24 @@ contrato vencido.
 esta respuesta, LGS se rompe: `situacion` es un CONTRATO entre los dos sistemas.
 El N° viaja con `encodeURIComponent` — sin eso, el `#` del sufijo se toma como
 ancla y KIDS recibe solo la base y contesta 404.
+**SUSPENDER / REACTIVAR desde LGS (2026-10-07)** —
+`POST /api/kids-intake/reservations/[externalRef]/suspend` (body opcional
+`{ motivo }`) y `…/reactivate` (`suspenderPorExternalRef` /
+`reactivarPorExternalRef`): cuando el beneficiario se inactiva o reactiva en LGS.
+Suspender pasa un contrato APROBADO a **ONHOLD** (situación `SUSPENDIDO`; la
+matrícula y el cupo se conservan) con motivo prefijado **`LGS: `** y APAGA la
+cuenta del niño (si no tiene otro contrato vivo) —a diferencia del OnHold de KIDS,
+que la deja encendida—. Reactivar cierra SOLO una pausa con ese prefijo, **sin
+extender `final_contrato`** (en LGS la suspensión administrativa no devuelve días)
+y enciende la cuenta. Una pausa abierta en KIDS NO la cierra LGS (`aplicado:
+false` y el porqué). Las dos son idempotentes: lo que no aplica responde
+`{ aplicado: false, estado }`, sin error, para que el reintento de LGS no falle.
+Si coordinación reactiva desde el panel una pausa de LGS, `reactivar` también
+enciende la cuenta (antes quedaba el contrato APROBADO con el niño sin poder
+entrar). Probado en `reserva-lgs-integration.test.ts`. **LGS ya las llama**
+(commit `5357b2f` de LGS): `src/lib/suspension-beneficiario.ts` las dispara al
+inactivar/reactivar un beneficiario Kids, best-effort (si KIDS falla, la
+suspensión en LGS sigue).
 **No se puede leer desde `people`** (la sección Kids): `contracts` importa
 `people`, así que `people → contracts` sería un ciclo y `depcruise` lo rechaza.
 Por eso el estado se ve en la ficha del contrato, no en la lista de Kids.

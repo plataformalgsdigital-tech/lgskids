@@ -13,6 +13,9 @@ import {
   crearReservaBeneficiario,
   listarContratos,
   ponerEnPausa,
+  reactivar,
+  reactivarPorExternalRef,
+  suspenderPorExternalRef,
 } from "../application/gestion-contratos";
 
 /**
@@ -225,6 +228,67 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
       situacion: "SUSPENDIDO",
       motivo: "CONTRATO_EN_PAUSA",
     });
+  });
+
+  it("LGS suspende y reactiva, pero no cierra una pausa que abrió KIDS", async () => {
+    const contrato = await queryOne<{ id: string; final_contrato: string }>(
+      `SELECT id, final_contrato::text FROM contracts_contract WHERE external_ref = $1`,
+      [externalRef],
+    );
+    const cuenta = async () =>
+      (
+        await queryOne<{ estado: string }>(
+          `SELECT u.estado FROM identity_user u
+             JOIN people_person p ON p.user_id = u.id
+             JOIN contracts_contract c ON c.beneficiario_id = p.id
+            WHERE c.id = $1`,
+          [contrato?.id],
+        )
+      )?.estado;
+
+    // Viene de la prueba anterior EN PAUSA desde KIDS ("viaje familiar"): esa
+    // pausa la cierra KIDS, que es quien sabe por qué se abrió.
+    expect(await reactivarPorExternalRef({ actorUserId: ACTOR, externalRef })).toMatchObject({
+      aplicado: false,
+      estado: "ONHOLD",
+    });
+    await reactivar({ actorUserId: ACTOR, contractId: contrato?.id ?? "" });
+    const final = (
+      await queryOne<{ f: string }>(
+        `SELECT final_contrato::text AS f FROM contracts_contract WHERE id = $1`,
+        [contrato?.id],
+      )
+    )?.f;
+
+    // Se inactivó en LGS: pausa con motivo de LGS y la cuenta apagada.
+    expect(
+      await suspenderPorExternalRef({ actorUserId: ACTOR, externalRef, motivo: "sin pago" }),
+    ).toEqual({ aplicado: true, estado: "ONHOLD" });
+    expect(await cuenta()).toBe("INACTIVO");
+    expect(await fichaAcademicaPorRef(externalRef)).toMatchObject({ situacion: "SUSPENDIDO" });
+    // Repetir no abre otra pausa.
+    expect(
+      await suspenderPorExternalRef({ actorUserId: ACTOR, externalRef, motivo: "sin pago" }),
+    ).toEqual({ aplicado: false, estado: "ONHOLD" });
+
+    // Se reactivó en LGS: la cuenta vuelve y el fin NO se estira (no es un OnHold).
+    expect(await reactivarPorExternalRef({ actorUserId: ACTOR, externalRef })).toEqual({
+      aplicado: true,
+      estado: "APROBADO",
+    });
+    expect(await cuenta()).toBe("ACTIVO");
+    expect(await fichaAcademicaPorRef(externalRef)).toMatchObject({ situacion: "CURSANDO" });
+    const despues = await queryOne<{ f: string }>(
+      `SELECT final_contrato::text AS f FROM contracts_contract WHERE id = $1`,
+      [contrato?.id],
+    );
+    expect(despues?.f).toBe(final);
+
+    // Y si la pausa de LGS la reactiva coordinación desde KIDS, la cuenta
+    // también vuelve: antes quedaba el contrato APROBADO con el niño sin entrar.
+    await suspenderPorExternalRef({ actorUserId: ACTOR, externalRef, motivo: "sin pago" });
+    await reactivar({ actorUserId: ACTOR, contractId: contrato?.id ?? "" });
+    expect(await cuenta()).toBe("ACTIVO");
   });
 
   it("un N° que no existe en KIDS no inventa una respuesta", async () => {

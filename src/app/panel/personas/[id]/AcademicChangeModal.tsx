@@ -236,9 +236,14 @@ export function AcademicChangeModal(props: {
         setError(await mensajeDeError(res, "No se pudo aplicar el cambio."));
         return;
       }
-      // El cambio de curso avisa si la edad no cuadra; no bloquea.
+      // El cambio de curso avisa si la edad no cuadra; no bloquea. El aviso se
+      // dice como nota del cambio HECHO: con un ⚠ delante se leía como un error.
       const data = (await res.json().catch(() => ({}))) as { advertencia?: string | null };
-      props.onHecho(data.advertencia ? `${hecho} ⚠ ${data.advertencia}` : hecho);
+      props.onHecho(
+        data.advertencia
+          ? `${hecho} Nota: ${data.advertencia} El cambio se hizo igual y quedó en la auditoría.`
+          : hecho,
+      );
     } finally {
       setOcupado(false);
     }
@@ -555,6 +560,12 @@ export function AcademicChangeModal(props: {
                 <li>
                   Cada curso tiene su propio avance: en el curso nuevo, los niveles anteriores al
                   elegido quedan <strong>convalidados</strong> (sin medalla).
+                </li>
+              )}
+              {opcion === "CURSO" && mov !== "SALON" && (
+                <li>
+                  La <strong>edad no bloquea</strong> el cambio entre Junior y Youngster: si no
+                  corresponde al curso nuevo, se hace igual y queda anotado en la auditoría.
                 </li>
               )}
               {opcion === "AJUSTE" && (

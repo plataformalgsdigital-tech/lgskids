@@ -430,7 +430,11 @@ export async function suspenderPorExternalRef(input: {
   await withTransaction(async (tx) => {
     await setContractEstado(contrato.id, "ONHOLD", tx);
     await insertOnhold(contrato.id, fechaUtcHoy(), motivo, tx);
-    const tieneOtros = await beneficiarioTieneOtrosContratosVivos(contrato.beneficiarioId, contrato.id, tx);
+    const tieneOtros = await beneficiarioTieneOtrosContratosVivos(
+      contrato.beneficiarioId,
+      contrato.id,
+      tx,
+    );
     if (!tieneOtros && beneficiario?.userId) await inactivarUsuarioTx(tx, beneficiario.userId);
   });
   await registrarAuditoria({
@@ -463,7 +467,11 @@ export async function reactivarPorExternalRef(input: {
   const pausa = await findOnholdAbierto(contrato.id);
   const motivoPausa = pausa === null ? null : await motivoOnhold(pausa.id);
   if (pausa === null || !(motivoPausa ?? "").startsWith(PREFIJO_PAUSA_LGS)) {
-    return { aplicado: false, estado: "ONHOLD", motivo: "La pausa la abrió KIDS: se reactiva desde KIDS." };
+    return {
+      aplicado: false,
+      estado: "ONHOLD",
+      motivo: "La pausa la abrió KIDS: se reactiva desde KIDS.",
+    };
   }
   const beneficiario = await findPersonById(contrato.beneficiarioId);
   await withTransaction(async (tx) => {
