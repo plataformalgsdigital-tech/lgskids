@@ -425,6 +425,7 @@ export default function DetalleCampaniaPage() {
   const [ocupado, setOcupado] = useState(false);
   const [verEstructura, setVerEstructura] = useState(false);
   const [agregando, setAgregando] = useState(false);
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("TODOS");
   /** Salón cuyo botón de cupos se tocó: abre la lista de inscritos. */
   const [inscritosDe, setInscritosDe] = useState<{
     id: string;
@@ -699,6 +700,14 @@ export default function DetalleCampaniaPage() {
   const filas = detalle.courses.flatMap((curso) =>
     (salonesPorCurso[curso.id] ?? []).map((salon) => ({ curso, salon })),
   );
+  const conteoEstado: Record<FiltroEstado, number> = {
+    TODOS: filas.length,
+    ACTIVO: filas.filter((f) => f.salon.activo).length,
+    INACTIVO: filas.filter((f) => !f.salon.activo).length,
+  };
+  const visibles = filas.filter(
+    ({ salon }) => filtroEstado === "TODOS" || salon.activo === (filtroEstado === "ACTIVO"),
+  );
   const cargandoSalones = Object.keys(salonesPorCurso).length === 0;
   const est = ESTADO_CAMPANIA[detalle.estado];
 
@@ -961,12 +970,48 @@ export default function DetalleCampaniaPage() {
           </div>
         </div>
 
+        {filas.length > 0 && (
+          <div
+            role="group"
+            aria-label="Filtrar salones por estado"
+            style={{ display: "flex", gap: "0.4rem", marginTop: "0.75rem", flexWrap: "wrap" }}
+          >
+            {(["TODOS", "ACTIVO", "INACTIVO"] as const).map((op) => {
+              const activo = filtroEstado === op;
+              return (
+                <button
+                  key={op}
+                  type="button"
+                  aria-pressed={activo}
+                  onClick={() => setFiltroEstado(op)}
+                  style={{
+                    padding: "0.3rem 0.8rem",
+                    borderRadius: "999px",
+                    border: `1.5px solid ${activo ? "var(--lgs-azul)" : "#d6dbe6"}`,
+                    background: activo ? "var(--lgs-azul)" : "white",
+                    color: activo ? "white" : "var(--texto-suave)",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  {ETIQUETA_FILTRO[op]} ({conteoEstado[op]})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {cargandoSalones ? (
           <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando salones…</p>
         ) : filas.length === 0 ? (
           <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
             Esta campaña aún no tiene salones. Agrégalos en{" "}
             <Link href="/panel/calendario">Salones</Link>.
+          </p>
+        ) : visibles.length === 0 ? (
+          <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+            No hay salones {filtroEstado === "ACTIVO" ? "activos" : "inactivos"} en esta campaña.
           </p>
         ) : (
           <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
@@ -987,7 +1032,7 @@ export default function DetalleCampaniaPage() {
                 </tr>
               </thead>
               <tbody>
-                {filas.map(({ curso, salon }) => {
+                {visibles.map(({ curso, salon }) => {
                   const lleno = salon.ocupados >= salon.cupo;
                   return (
                     <tr
@@ -1364,6 +1409,13 @@ interface HorarioCatalogo {
 }
 
 const PAIS_DEL_GRUPO: Record<string, string> = { "01": "Chile", "02": "Col/Ecu/Perú" };
+
+type FiltroEstado = "TODOS" | "ACTIVO" | "INACTIVO";
+const ETIQUETA_FILTRO: Record<FiltroEstado, string> = {
+  TODOS: "Todos",
+  ACTIVO: "Activos",
+  INACTIVO: "Inactivos",
+};
 
 /**
  * AGREGAR SALÓN desde un horario del catálogo. El servidor arma el salón con

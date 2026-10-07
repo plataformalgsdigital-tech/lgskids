@@ -1227,7 +1227,8 @@ matrículas — desactivar en su lugar). Su detalle muestra las fechas de la cam
 (`/panel/campanias/[id]`) lista todos los salones en una tabla (Tipo, Salón,
 **País** —el de su calendario de feriados, el mismo `pais` que viaja a LGS en
 `availability`—, Guía, Horario, Inicio/Final curso, Cierre matríc., Cupos, Estado,
-Acciones). **El cupo es un botón** (2026-10-05): abre la lista de los niños
+Acciones), con filtro de **estado** Todos / Activos / Inactivos (2026-10-06, en el
+cliente: la lista ya viene entera). **El cupo es un botón** (2026-10-05): abre la lista de los niños
 inscritos (nombre con enlace a su ficha, documento, contrato, usuario y si la
 matrícula está Activa o Reservada). Sale de `GET /api/people/ninos?classroomId=`
 —la misma lista de Kids—, que cuenta ACTIVAS y RESERVADAS igual que el cupo; por
