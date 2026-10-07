@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { fechaLocal, horaLocal } from "@/ui/fecha-local";
+import { numeroContrato } from "@/ui/numero-contrato";
 
 type TipoCurso = "JUNIOR" | "YOUNGSTER";
 
@@ -174,7 +176,241 @@ function CamposPersona({
   );
 }
 
+type Pestania = "pendientes" | "nueva";
+
+/**
+ * GESTIÓN DE RESERVAS (2026-10-07). Dos pestañas: las reservas que todavía
+ * esperan aprobación —el cupo ya está tomado— y el asistente para crear una.
+ */
 export default function ReservasPage() {
+  const [pestania, setPestania] = useState<Pestania>("pendientes");
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  const pestanias: { id: Pestania; etiqueta: string }[] = [
+    { id: "pendientes", etiqueta: "Reservas sin aprobar" },
+    { id: "nueva", etiqueta: "Nueva reserva" },
+  ];
+
+  return (
+    <main style={{ padding: "2rem", maxWidth: "76rem", margin: "0 auto" }}>
+      <h1 style={{ fontSize: "1.6rem" }}>Gestión de Reservas</h1>
+
+      <div
+        role="tablist"
+        aria-label="Gestión de reservas"
+        style={{
+          display: "flex",
+          gap: "0.25rem",
+          marginTop: "1rem",
+          borderBottom: "2px solid #e3e7f0",
+        }}
+      >
+        {pestanias.map((p) => {
+          const activa = pestania === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={activa}
+              onClick={() => setPestania(p.id)}
+              style={{
+                padding: "0.6rem 1.1rem",
+                border: "none",
+                borderBottom: `3px solid ${activa ? "var(--lgs-azul)" : "transparent"}`,
+                marginBottom: "-2px",
+                background: "none",
+                color: activa ? "var(--lgs-azul-oscuro)" : "var(--texto-suave)",
+                fontWeight: activa ? 700 : 600,
+                fontSize: "0.95rem",
+                cursor: "pointer",
+              }}
+            >
+              {p.etiqueta}
+            </button>
+          );
+        })}
+      </div>
+
+      {aviso !== null && (
+        <p
+          style={{
+            marginTop: "1rem",
+            color: "#1b5e20",
+            background: "#e8f5e9",
+            padding: "0.7rem 1rem",
+            borderRadius: "0.6rem",
+          }}
+        >
+          {aviso}
+        </p>
+      )}
+
+      {pestania === "pendientes" ? (
+        <ReservasSinAprobar />
+      ) : (
+        <NuevaReserva
+          onCreada={(texto) => {
+            setAviso(texto);
+            setPestania("pendientes");
+          }}
+        />
+      )}
+    </main>
+  );
+}
+
+interface Reserva {
+  id: string;
+  numero: number | null;
+  externalRef: string | null;
+  countryCode: string;
+  tipoCurso: string;
+  titular: string;
+  titularDocTipo: string;
+  titularDocNumero: string;
+  titularTelefono: string | null;
+  beneficiario: string;
+  salon: string | null;
+  campania: string | null;
+  matriculaDesde: string | null;
+}
+
+const PAIS_NOMBRE: Record<string, string> = {
+  CL: "Chile",
+  CO: "Colombia",
+  EC: "Ecuador",
+  PE: "Perú",
+};
+
+/**
+ * Los cupos RESERVADOS cuyo contrato aún no se aprueba: la matrícula RESERVADA
+ * es justo eso, y al aprobar pasa a ACTIVA y sale de aquí sola.
+ */
+function ReservasSinAprobar() {
+  const router = useRouter();
+  const [reservas, setReservas] = useState<Reserva[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function cargar() {
+      try {
+        const res = await apiFetch("/api/contracts?matriculaEstado=RESERVADA&limit=200");
+        const data: { contratos?: Reserva[]; error?: { message: string } } = await res.json();
+        if (!res.ok) {
+          setError(data.error?.message ?? "No se pudieron cargar las reservas.");
+          return;
+        }
+        setReservas(data.contratos ?? []);
+      } catch {
+        setError("Error de conexión.");
+      }
+    }
+    void cargar();
+  }, []);
+
+  const th: CSSProperties = {
+    padding: "0.55rem 0.6rem",
+    textAlign: "left",
+    fontWeight: 600,
+    color: "var(--texto-suave)",
+    whiteSpace: "nowrap",
+  };
+  const td: CSSProperties = { padding: "0.6rem", verticalAlign: "top" };
+  const suave: CSSProperties = { color: "var(--texto-suave)", fontSize: "0.78rem" };
+
+  if (error !== null) {
+    return (
+      <p role="alert" style={{ marginTop: "1rem", color: "#c62828" }}>
+        {error}
+      </p>
+    );
+  }
+  if (reservas === null) {
+    return <p style={{ marginTop: "1rem", color: "var(--texto-suave)" }}>Cargando reservas…</p>;
+  }
+
+  return (
+    <section style={{ marginTop: "1.25rem" }}>
+      <p style={{ margin: 0, color: "var(--texto-suave)", fontSize: "0.88rem" }}>
+        {reservas.length === 0
+          ? "No hay reservas pendientes de aprobación."
+          : `${String(reservas.length)} ${reservas.length === 1 ? "cupo reservado" : "cupos reservados"} esperando aprobación. Las que llegan desde LGS se aprueban en LGS: es ahí donde quedan el usuario y la clave del niño.`}
+      </p>
+      {reservas.length > 0 && (
+        <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.86rem" }}>
+            <thead>
+              <tr style={{ borderBottom: "1.5px solid #e3e7f0" }}>
+                <th style={th}>N° contrato</th>
+                <th style={th}>País</th>
+                <th style={th}>Titular</th>
+                <th style={th}>Beneficiario</th>
+                <th style={th}>Fecha reserva</th>
+                <th style={th}>Curso</th>
+                <th style={th}>Salón</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reservas.map((r) => {
+                const n = numeroContrato(r);
+                return (
+                  <tr
+                    key={r.id}
+                    onClick={() => router.push(`/panel/contratos/${r.id}`)}
+                    title="Abrir la ficha del contrato"
+                    style={{ borderBottom: "1px solid #edf0f6", cursor: "pointer" }}
+                  >
+                    <td style={td}>
+                      <Link
+                        href={`/panel/contratos/${r.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ fontWeight: 700 }}
+                      >
+                        {n.numero}
+                      </Link>
+                    </td>
+                    <td style={td}>{PAIS_NOMBRE[r.countryCode] ?? r.countryCode}</td>
+                    <td style={td}>
+                      <div style={{ fontWeight: 600 }}>{r.titular}</div>
+                      <div style={suave}>
+                        {r.titularDocTipo} {r.titularDocNumero}
+                      </div>
+                      <div style={suave}>{r.titularTelefono ?? "sin teléfono"}</div>
+                    </td>
+                    <td style={td}>
+                      <div>{r.beneficiario}</div>
+                      {n.documento !== null && <div style={suave}>doc. {n.documento}</div>}
+                    </td>
+                    <td style={{ ...td, whiteSpace: "nowrap" }}>
+                      {r.matriculaDesde !== null ? (
+                        <>
+                          {fechaLocal(r.matriculaDesde)}
+                          <div style={suave}>{horaLocal(r.matriculaDesde)}</div>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td style={{ ...td, fontWeight: 600, color: "var(--lgs-azul-oscuro)" }}>
+                      {r.tipoCurso}
+                    </td>
+                    <td style={td}>
+                      <div>{r.salon ?? "—"}</div>
+                      {r.campania !== null && <div style={suave}>{r.campania}</div>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NuevaReserva({ onCreada }: { onCreada: (aviso: string) => void }) {
   const router = useRouter();
   const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
   // Paso 1
@@ -198,7 +434,6 @@ export default function ReservasPage() {
   const [classroomId, setClassroomId] = useState("");
 
   const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
   const tipoCurso: TipoCurso | null =
@@ -253,7 +488,6 @@ export default function ReservasPage() {
 
   async function enviar() {
     setError(null);
-    setOk(null);
     if (tipoCurso === null) {
       setError(
         "La edad del niño no corresponde a Junior (6–9) ni Youngster (10–13) a la fecha de inicio.",
@@ -294,10 +528,9 @@ export default function ReservasPage() {
         setError(data.error?.message ?? "No se pudo crear la reserva.");
         return;
       }
-      setOk(
-        `Reserva creada para el contrato LGS ${data.externalRef}. Queda RESERVADA hasta aprobar.`,
+      onCreada(
+        `Reserva creada para el contrato LGS ${data.externalRef ?? ""}. Queda RESERVADA hasta aprobar.`,
       );
-      setTimeout(() => router.push("/panel/contratos"), 1800);
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -308,26 +541,12 @@ export default function ReservasPage() {
   const salonesDisponibles = salones.filter((s) => s.activo && s.ocupados < s.cupo);
 
   return (
-    <main style={{ padding: "2rem", maxWidth: "48rem", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "1.6rem" }}>Reserva de beneficiario (LGS)</h1>
-      <p style={{ color: "var(--texto-suave)", marginTop: "0.25rem" }}>
+    <section style={{ maxWidth: "48rem", marginTop: "1.25rem" }}>
+      <p style={{ color: "var(--texto-suave)", margin: 0 }}>
         Paso {paso} de 4 · el cupo queda <strong>reservado</strong> hasta que se apruebe el
         contrato.
       </p>
 
-      {ok !== null && (
-        <p
-          style={{
-            marginTop: "1rem",
-            color: "#1b5e20",
-            background: "#e8f5e9",
-            padding: "0.7rem 1rem",
-            borderRadius: "0.6rem",
-          }}
-        >
-          {ok}
-        </p>
-      )}
       {error !== null && (
         <p role="alert" style={{ marginTop: "1rem", color: "#c62828" }}>
           {error}
@@ -570,6 +789,6 @@ export default function ReservasPage() {
       <p style={{ marginTop: "1rem", fontSize: "0.85rem" }}>
         <Link href="/panel/contratos">← Ir a Contratos</Link>
       </p>
-    </main>
+    </section>
   );
 }

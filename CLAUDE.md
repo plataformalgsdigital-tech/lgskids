@@ -1193,6 +1193,15 @@ salón, credenciales, el niño entrando a `/mi-panel` con su sesión del 2026-10
 funciona de punta a punta. Lo que falta es OPERATIVO, no de código: **los 12 salones
 nacieron sin guía y sin sala de Zoom** ("Generar salones del catálogo" los crea así), así
 que el 5 de octubre "Entrar a clase" no tendría a dónde llevar al niño.
+**Gestión de Reservas** (`/panel/reservas`, 2026-10-07) tiene dos pestañas:
+**Reservas sin aprobar** —los cupos tomados con el contrato aún sin aprobar: N°
+de contrato, país, titular (nombre, documento, teléfono), beneficiario, fecha de
+la reserva, curso y salón; la fila abre la ficha del contrato— y **Nueva
+reserva** (el asistente). La lista es `GET /api/contracts?matriculaEstado=RESERVADA`:
+se mira la MATRÍCULA, no el estado del contrato, porque un contrato PENDIENTE del
+panel sin salón no tomó cupo y no es una reserva; al aprobar pasa a ACTIVA y sale
+sola. `ContractListItem` ganó `matriculaDesde` (la fecha de la reserva). No ofrece
+"Aprobar" a propósito: las que llegan de LGS se aprueban en LGS (ver abajo).
 Dos puertas al mismo núcleo: el **wizard**
 `/panel/reservas` (JWT) y la **puerta de servicio** módulo `intake`
 (API-key `x-api-key` / `LGS_INTAKE_API_KEY`, `handlerWithServiceAuth`):

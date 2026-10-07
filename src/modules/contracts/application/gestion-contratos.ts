@@ -545,6 +545,7 @@ export async function listarContratos(params: {
   tipoCurso?: string;
   campaignId?: string;
   classroomId?: string;
+  matriculaEstado?: string;
   inicioDesde?: string;
   finalHasta?: string;
   limit?: number;
@@ -552,6 +553,7 @@ export async function listarContratos(params: {
 }): Promise<ContractListItem[]> {
   return listContracts({
     countryScope: params.countryScope,
+    ...(params.matriculaEstado !== undefined && { matriculaEstado: params.matriculaEstado }),
     ...(params.estado !== undefined && { estado: params.estado }),
     ...(params.pais !== undefined && { pais: params.pais }),
     ...(params.tipoCurso !== undefined && { tipoCurso: params.tipoCurso }),

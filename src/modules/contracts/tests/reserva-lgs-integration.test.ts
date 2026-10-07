@@ -11,6 +11,7 @@ import { fichaAcademicaPorRef } from "../application/estado-academico";
 import {
   aprobarContrato,
   crearReservaBeneficiario,
+  listarContratos,
   ponerEnPausa,
 } from "../application/gestion-contratos";
 
@@ -160,6 +161,25 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
       limit: 50,
     });
     expect(deOtro).toEqual([]);
+  });
+
+  it("Gestión de Reservas lista las reservas SIN aprobar, con su fecha", async () => {
+    // Por la matrícula RESERVADA, no por el estado del contrato: un contrato
+    // PENDIENTE del panel sin salón no tiene cupo tomado y no es una reserva.
+    const contrato = await queryOne<{ id: string }>(
+      `SELECT id FROM contracts_contract WHERE external_ref = $1`,
+      [externalRef],
+    );
+    const reservadas = await listarContratos({
+      countryScope: null,
+      matriculaEstado: "RESERVADA",
+      classroomId,
+    });
+    expect(reservadas.map((c) => c.id)).toEqual([contrato?.id]);
+    expect(reservadas[0]?.matriculaDesde).toBeTruthy();
+    expect(
+      await listarContratos({ countryScope: null, matriculaEstado: "ACTIVA", classroomId }),
+    ).toEqual([]);
   });
 
   it("LGS puede preguntar si el niño está tomando el programa", async () => {

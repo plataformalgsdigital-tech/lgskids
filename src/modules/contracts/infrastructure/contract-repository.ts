@@ -272,6 +272,8 @@ export interface ContractListItem extends ContractRecord {
   enrollmentId: string | null;
   /** Estado de la matrícula viva: distingue reservar de estar cursando. */
   matriculaEstado: string | null;
+  /** Desde cuándo existe esa matrícula: en una RESERVADA, la fecha de la reserva. */
+  matriculaDesde: string | null;
   /** ¿Pasó su fin + los días de gracia? Misma regla que el barrido. */
   vencido: boolean;
 }
@@ -303,6 +305,7 @@ const SELECT_ITEM = `
                     WHERE g.nino_id = c.beneficiario_id), '[]'::json) AS apoderados,
          cl.nombre AS salon, ca.nombre AS campania,
          e.id AS "enrollmentId", e.estado::text AS "matriculaEstado",
+         e.created_at AS "matriculaDesde",
          -- Gemelo SQL de contratoVencido: la MISMA regla de +2 días que usa
          -- el barrido, para que el estado académico no la reinvente.
          (${SQL_CONTRATO_VENCIDO}) AS vencido
@@ -323,6 +326,8 @@ export async function listContracts(params: {
   tipoCurso?: string;
   campaignId?: string;
   classroomId?: string;
+  /** RESERVADA = cupo tomado y contrato sin aprobar; ACTIVA = cursando. */
+  matriculaEstado?: string;
   inicioDesde?: string;
   finalHasta?: string;
   limit: number;
@@ -330,6 +335,10 @@ export async function listContracts(params: {
 }): Promise<ContractListItem[]> {
   const where: string[] = [];
   const values: unknown[] = [];
+  if (params.matriculaEstado !== undefined) {
+    values.push(params.matriculaEstado);
+    where.push(`e.estado = $${values.length}::enrollment_estado`);
+  }
   if (params.countryScope !== null) {
     values.push(params.countryScope);
     where.push(`c.country_code = ANY($${values.length})`);
