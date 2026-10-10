@@ -1032,11 +1032,16 @@ se toca lo que miden:
 
 ## Versiones (registradas 2026-07-22)
 
-Node 24.11.0 · pnpm 11.16.0 · Next 16.3.7 · React 19.2.8 · TypeScript 5.9.3
+Node 24.11.0 · pnpm 11.16.0 · Next 16.3.8 · React 19.2.8 · TypeScript 5.9.3
 (NO subir a TS 7: rompe Next/ESLint/depcruise) · ESLint 9.39.5 (NO subir a
 10: eslint-plugin-react incompatible) · Zod 4.4.3 (API nueva: `z.url()`) ·
 pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
 
+- **Next 16.3.8 (2026-10-10, por seguridad)**: seis avisos nuevos contra
+  > =16.0.0 <16.3.8 (uno ALTO, `GHSA-cjq9-62q9-8jv4`; cuatro moderados y uno
+  > bajo) ponían en rojo el `audit` de `verify` y de CI. Se fijó el PARCHE exacto:
+  > `pnpm add next@^16.3.8` instala la 16.4.0 (menor nueva), que no hacía falta.
+  > `eslint-config-next` a la par.
 - **Next 16.3.7 (2026-09-30, subido desde 16.3.4 por seguridad)**:
   `GHSA-vcvr-r3jv-pc5j`, **CRÍTICO** — ejecución remota de código en
   `next/og` (`ImageResponse`), afecta a >=16.2.0 <16.3.6. **KIDS no usa
