@@ -1692,6 +1692,48 @@ envios,credenciales/[childPersonId]}`. Auditoría: `notifications.plantilla_*`,
   (destinatario = apoderado, un envío sale UNA vez aunque se despache dos veces, la
   clave llega y no queda escrita, masivo con clave rechazado).
 
+## Welcome (2026-10-09)
+
+La sesión de bienvenida que el niño **AGENDA al crear su perfil**, antes de que
+empiece su curso. Es la ÚNICA excepción al modelo de cohortes ("el niño no
+agenda"), decidida por el negocio: todavía no tiene clases, y el Welcome no es
+una clase de su salón sino una sesión común que dicta UN guía en UNA sala de Zoom
+para niños de varios salones, países y campañas. Migración `20261009000000_welcome`.
+
+- **Tablas propias** (`scheduling_welcome` + `scheduling_welcome_reserva`), NO
+  `scheduling_session`: no es de un salón, y su asistencia NO va a
+  `attendance_attendance` ni dispara la progresión (regla 4). Una reserva ACTIVA
+  por niño (índice único parcial); cambiar de Welcome cancela la anterior.
+- **Se crea en el calendario** como un tipo más de "Evento académico". Por defecto:
+  campaña EN MATRÍCULA (o cualquiera, o Todas), país/curso/salón **Todos**, nivel
+  **Rookie** (siempre UN nivel: solo lo ven los niños que van en él), límite que pone
+  quien lo crea (obligatorio), guía obligatorio (el Zoom sale de su ficha). Vacío =
+  todos. Se pinta en VERDE; su modal (`WelcomeModal.tsx`) lista a los agendados y
+  pasa lista. Se borra solo sin niños dentro.
+- **La hora es un INSTANTE**: se escribe en el reloj de quien lo crea (zona del
+  navegador) y cada quien la ve en la suya, como el evento administrativo.
+- **Siempre ANTES del inicio del curso**: `crearWelcome` exige al menos un salón
+  activo, con esos filtros, cuyo curso (`catalog_course.inicio` a medianoche en la
+  zona del salón) empiece después. Eso valida también que el salón elegido cuadre
+  con campaña, país y curso.
+- **Qué Welcome le sirve a un niño**: UN fragmento SQL (`sqlElegible` en
+  `application/welcome.ts`) que comparten la lista (`welcomesDisponibles`) y la
+  reserva (`reservarWelcomeTx`): futuro, de su nivel, de su campaña/país
+  (`holiday_country` del salón)/curso/salón o "todos", y antes del inicio de SU
+  curso. La reserva bloquea la fila del Welcome (`FOR UPDATE`): el último cupo no
+  se vende dos veces (LGS lo descuenta sin bloqueo y puede sobrevender).
+- Endpoints: `GET|POST /api/scheduling/welcomes` (crear = `eventos.crear`; listar =
+  `salones.ver`, el guía sin `salones.gestionar` ve solo los suyos),
+  `GET|DELETE …/welcomes/[id]` y `POST …/[id]/asistencia` (`asistencia.gestionar`).
+  Auditoría: `scheduling.welcome_creado|eliminado|asistencia`.
+- "Mis próximas clases" del niño muestra ahora el guía de la SESIÓN (reemplazo o
+  evento) y no el del salón, con su nombre de la ficha de guía.
+- Prueba: `scheduling/tests/welcome-integration.test.ts`.
+- **Pendiente (parte 2)**: el WhatsApp al apoderado al aprobar el contrato, con el
+  enlace de **creación de perfil** donde el niño ve su usuario, elige su clave
+  (8+ caracteres, letras y números), completa su perfil (foto, "sobre ti",
+  hobbies, fecha de nacimiento) y agenda su Welcome (obligatorio).
+
 ## Aviso de la pantalla de login (2026-08-26)
 
 - Imagen que administración CAMBIA y PRENDE/APAGA sin despliegue (`/panel/aviso-login`,

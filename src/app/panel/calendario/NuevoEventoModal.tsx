@@ -41,7 +41,15 @@ const TIPOS_ACADEMICO = [
   { valor: "SESION", etiqueta: "Sesión" },
   { valor: "CLUB", etiqueta: "Club" },
   { valor: "TALLER", etiqueta: "Taller" },
+  // No es de un salón: lo agenda el niño al crear su perfil, antes del curso.
+  { valor: "WELCOME", etiqueta: "Welcome" },
 ] as const;
+
+interface CampaniaOpcion {
+  id: string;
+  nombre: string;
+  estado: string;
+}
 
 interface TipoAdmin {
   valor: string;
@@ -124,6 +132,10 @@ export function NuevoEventoModal({
   const [tiposAdmin, setTiposAdmin] = useState<TipoAdmin[]>([]);
   const [horasAdmin, setHorasAdmin] = useState<number[]>([]);
   const [horasTaller, setHorasTaller] = useState<number[]>([]);
+  // El Welcome filtra por campaña con su id, y por defecto elige la que está
+  // EN MATRÍCULA: es la de los niños que están por empezar.
+  const [campaniasLista, setCampaniasLista] = useState<CampaniaOpcion[]>([]);
+  const esWelcome = !esAdmin && tipo === "WELCOME";
 
   const cargarGuias = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/eventos");
@@ -153,6 +165,40 @@ export function NuevoEventoModal({
   }, [cargarGuias]);
 
   useEffect(() => {
+    if (esAdmin) return;
+    async function cargarCampanias() {
+      const res = await apiFetch("/api/catalog/campaigns");
+      if (res.ok) {
+        setCampaniasLista(((await res.json()) as { campanias: CampaniaOpcion[] }).campanias);
+      }
+    }
+    void cargarCampanias();
+  }, [esAdmin]);
+
+  /** Al pasar a Welcome: campaña en matrícula, todos los países/cursos/salones, Rookie. */
+  function elegirTipo(nuevo: string) {
+    const veniaDeWelcome = tipo === "WELCOME";
+    setTipo(nuevo);
+    if (nuevo === "TALLER" && duracion !== 60 && duracion !== 120) setDuracion(60);
+    if (nuevo === "WELCOME") {
+      setCampania(campaniasLista.find((c) => c.estado === "EN_MATRICULA")?.nombre ?? "");
+      setPais("");
+      setCurso("");
+      setSalonPrincipal("");
+      setNivel("ROOKIE");
+      setLimite("");
+      setCompartir(false);
+      setExtras([]);
+    } else if (veniaDeWelcome) {
+      setCampania("");
+      setPais("");
+      setCurso("");
+      setSalonPrincipal("");
+      setNivel("");
+    }
+  }
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onCerrar();
     }
@@ -164,7 +210,10 @@ export function NuevoEventoModal({
   // El evento ADMINISTRATIVO no se dicta en un salón: campaña, curso, salón y
   // nivel son contexto, y dejarlos vacíos significa TODOS. En el académico la
   // cascada sí obliga, porque la clase ocurre en UN salón concreto.
-  const libre = (valor: string) => esAdmin && valor === "";
+  // En el Welcome, campaña, país, curso y salón son FILTROS de quién puede
+  // agendarlo: vacío = todos, igual que en el evento administrativo.
+  const filtrosLibres = esAdmin || esWelcome;
+  const libre = (valor: string) => filtrosLibres && valor === "";
   const campanias = [...new Set(salones.map((s) => s.campania))];
   const paises = [
     ...new Set(
@@ -200,42 +249,64 @@ export function NuevoEventoModal({
   const seleccionados = [salonPrincipal, ...(compartir ? extras : [])].filter((x) => x !== "");
   const listo = esAdmin
     ? fecha !== "" && hora !== "" && audiencia.length > 0
-    : fecha !== "" && hora !== "" && salonPrincipal !== "" && guiaUserId !== "";
+    : esWelcome
+      ? fecha !== "" && hora !== "" && guiaUserId !== "" && Number(limite) > 0
+      : fecha !== "" && hora !== "" && salonPrincipal !== "" && guiaUserId !== "";
+  const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   async function crear() {
     setOcupado(true);
     setError(null);
     try {
-      const cuerpo = esAdmin
+      const cuerpo = esWelcome
         ? {
-            tipo,
-            titulo: titulo.trim() === "" ? null : titulo,
             fecha,
             horaLocal: hora,
+            zona: zonaNavegador,
             duracionMin: duracion,
-            zona: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            guiaUserId,
+            campaignId: campaniasLista.find((c) => c.nombre === campania)?.id ?? null,
             pais: pais === "" ? null : pais,
-            campania: campania === "" ? null : campania,
             curso: curso === "" ? null : curso,
             classroomId: salonPrincipal === "" ? null : salonPrincipal,
-            nivel: nivel === "" ? null : nivel,
-            limiteUsuarios: limite === "" ? null : Number(limite),
+            nivel: nivel === "" ? "ROOKIE" : nivel,
+            limiteUsuarios: Number(limite),
             observaciones: observaciones.trim() === "" ? null : observaciones,
-            guiaUserIds: audiencia,
           }
-        : {
-            classroomIds: seleccionados,
-            tipo,
-            fecha,
-            horaLocal: hora,
-            duracionMin: duracion,
-            nivel: nivel === "" ? null : nivel,
-            limiteUsuarios: limite === "" ? null : Number(limite),
-            guiaUserId,
-            observaciones: observaciones.trim() === "" ? null : observaciones,
-          };
+        : esAdmin
+          ? {
+              tipo,
+              titulo: titulo.trim() === "" ? null : titulo,
+              fecha,
+              horaLocal: hora,
+              duracionMin: duracion,
+              zona: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              pais: pais === "" ? null : pais,
+              campania: campania === "" ? null : campania,
+              curso: curso === "" ? null : curso,
+              classroomId: salonPrincipal === "" ? null : salonPrincipal,
+              nivel: nivel === "" ? null : nivel,
+              limiteUsuarios: limite === "" ? null : Number(limite),
+              observaciones: observaciones.trim() === "" ? null : observaciones,
+              guiaUserIds: audiencia,
+            }
+          : {
+              classroomIds: seleccionados,
+              tipo,
+              fecha,
+              horaLocal: hora,
+              duracionMin: duracion,
+              nivel: nivel === "" ? null : nivel,
+              limiteUsuarios: limite === "" ? null : Number(limite),
+              guiaUserId,
+              observaciones: observaciones.trim() === "" ? null : observaciones,
+            };
       const res = await apiFetch(
-        esAdmin ? "/api/scheduling/eventos-admin" : "/api/scheduling/eventos",
+        esWelcome
+          ? "/api/scheduling/welcomes"
+          : esAdmin
+            ? "/api/scheduling/eventos-admin"
+            : "/api/scheduling/eventos",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -403,11 +474,7 @@ export function NuevoEventoModal({
               <select
                 id="ev-tipo"
                 value={tipo}
-                onChange={(e) => {
-                  const nuevo = e.target.value;
-                  setTipo(nuevo);
-                  if (nuevo === "TALLER" && duracion !== 60 && duracion !== 120) setDuracion(60);
-                }}
+                onChange={(e) => elegirTipo(e.target.value)}
                 style={campo}
               >
                 {(esAdmin ? tiposAdmin : TIPOS_ACADEMICO).map((t) => (
@@ -419,7 +486,7 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-camp">
-                Campaña {esAdmin ? "" : "*"}
+                Campaña {filtrosLibres ? "" : "*"}
               </label>
               <select
                 id="ev-camp"
@@ -433,22 +500,28 @@ export function NuevoEventoModal({
                 }}
                 style={campo}
               >
-                <option value="">{esAdmin ? "Todas las campañas" : "Seleccionar campaña"}</option>
+                <option value="">
+                  {filtrosLibres ? "Todas las campañas" : "Seleccionar campaña"}
+                </option>
                 {campanias.map((c) => (
                   <option key={c} value={c}>
                     {c}
+                    {esWelcome &&
+                    campaniasLista.find((x) => x.nombre === c)?.estado === "EN_MATRICULA"
+                      ? " (en matrícula)"
+                      : ""}
                   </option>
                 ))}
               </select>
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-pais">
-                País {esAdmin ? "" : "*"}
+                País {filtrosLibres ? "" : "*"}
               </label>
               <select
                 id="ev-pais"
                 value={pais}
-                disabled={!esAdmin && campania === ""}
+                disabled={!filtrosLibres && campania === ""}
                 onChange={(e) => {
                   setPais(e.target.value);
                   setCurso("");
@@ -457,7 +530,7 @@ export function NuevoEventoModal({
                 }}
                 style={campo}
               >
-                <option value="">{esAdmin ? "Todos los países" : "Seleccionar país"}</option>
+                <option value="">{filtrosLibres ? "Todos los países" : "Seleccionar país"}</option>
                 {paises.map((p) => (
                   <option key={p} value={p}>
                     {p}
@@ -467,19 +540,19 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-curso">
-                Curso {esAdmin ? "" : "*"}
+                Curso {filtrosLibres ? "" : "*"}
               </label>
               <select
                 id="ev-curso"
                 value={curso}
-                disabled={!esAdmin && pais === ""}
+                disabled={!filtrosLibres && pais === ""}
                 onChange={(e) => {
                   setCurso(e.target.value);
                   setSalonPrincipal("");
                 }}
                 style={campo}
               >
-                <option value="">{esAdmin ? "Todos los cursos" : "Seleccionar curso"}</option>
+                <option value="">{filtrosLibres ? "Todos los cursos" : "Seleccionar curso"}</option>
                 {cursos.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -489,16 +562,18 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-salon">
-                Salón {esAdmin ? "" : "*"}
+                Salón {filtrosLibres ? "" : "*"}
               </label>
               <select
                 id="ev-salon"
                 value={salonPrincipal}
-                disabled={!esAdmin && curso === ""}
+                disabled={!filtrosLibres && curso === ""}
                 onChange={(e) => setSalonPrincipal(e.target.value)}
                 style={campo}
               >
-                <option value="">{esAdmin ? "Todos los salones" : "Seleccionar salón"}</option>
+                <option value="">
+                  {filtrosLibres ? "Todos los salones" : "Seleccionar salón"}
+                </option>
                 {salonesFiltrados.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.nombre}
@@ -516,7 +591,10 @@ export function NuevoEventoModal({
                 onChange={(e) => setNivel(e.target.value)}
                 style={campo}
               >
-                <option value="">{esAdmin ? "Todos los niveles" : "Sin nivel"}</option>
+                {/* El Welcome siempre es de UN nivel: solo lo ven los niños que van en él. */}
+                {!esWelcome && (
+                  <option value="">{esAdmin ? "Todos los niveles" : "Sin nivel"}</option>
+                )}
                 {NIVELES.map((n) => (
                   <option key={n} value={n}>
                     {n}
@@ -526,7 +604,7 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-limite">
-                Límite de usuarios
+                Límite de usuarios {esWelcome ? "*" : ""}
               </label>
               <input
                 id="ev-limite"
@@ -537,8 +615,10 @@ export function NuevoEventoModal({
                 placeholder={
                   esAdmin
                     ? String(LIMITE_ADMIN_DEFECTO)
-                    : (salonesFiltrados.find((s) => s.id === salonPrincipal)?.cupo.toString() ??
-                      "cupo del salón")
+                    : esWelcome
+                      ? "cuántos niños caben"
+                      : (salonesFiltrados.find((s) => s.id === salonPrincipal)?.cupo.toString() ??
+                        "cupo del salón")
                 }
                 onChange={(e) => setLimite(e.target.value)}
                 style={campo}
@@ -589,8 +669,26 @@ export function NuevoEventoModal({
             </div>
           </div>
 
+          {esWelcome && (
+            <div
+              style={{
+                padding: "0.7rem 0.9rem",
+                borderRadius: "0.6rem",
+                background: "#e8f5e9",
+                border: "1px solid #a5d6a7",
+                fontSize: "0.83rem",
+                lineHeight: 1.45,
+              }}
+            >
+              <strong>👋 Welcome.</strong> La hora va en tu reloj ({zonaNavegador}); cada niño la
+              verá en su propia hora. Lo agendan los niños de nivel {nivel || "ROOKIE"} al crear su
+              perfil, solo si su curso empieza después: el Welcome se hace antes del inicio del
+              curso. Campaña, país, curso y salón vacíos = todos.
+            </div>
+          )}
+
           {/* Compartir entre cursos: solo tiene sentido en el evento académico. */}
-          {!esAdmin && (
+          {!esAdmin && !esWelcome && (
             <div
               style={{
                 padding: "0.8rem 0.9rem",

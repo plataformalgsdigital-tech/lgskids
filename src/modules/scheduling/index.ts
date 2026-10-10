@@ -144,6 +144,33 @@ export {
   etiquetaEventoAdmin,
 } from "./domain/evento-admin";
 export type { TipoEventoAdmin } from "./domain/evento-admin";
+export {
+  crearWelcome,
+  listarWelcomes,
+  detalleWelcome,
+  guiaDeWelcome,
+  eliminarWelcome,
+  marcarAsistenciaWelcome,
+  welcomesDisponibles,
+  reservarWelcomeTx,
+  welcomeDeNino,
+} from "./application/welcome";
+export type {
+  WelcomeResumen,
+  InscritoWelcome,
+  WelcomeDisponible,
+  WelcomeDeNino,
+} from "./application/welcome";
+export {
+  NIVELES_WELCOME,
+  NIVEL_WELCOME_DEFECTO,
+  PAISES_WELCOME,
+  CURSOS_WELCOME,
+  DURACION_WELCOME_MIN,
+  DURACION_WELCOME_MAX,
+  LIMITE_WELCOME_MAX,
+} from "./domain/welcome";
+export type { NivelWelcome } from "./domain/welcome";
 export { DIAS_VIGENCIA_INVITACION } from "./domain/invitacion";
 export { SQL_ORDINAL_CLASE } from "./domain/ordinal-sesion";
 export type { EstadoInvitacion } from "./domain/invitacion";

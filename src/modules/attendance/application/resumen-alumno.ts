@@ -128,10 +128,15 @@ export async function agendaProximas(classroomId: string, dias = 14): Promise<Ev
     `SELECT s.id AS "sessionId", s.tipo::text AS tipo, s.fecha::text AS fecha,
             s.starts_at AS "startsAt", s.duracion_min AS "duracionMin",
             s.observaciones, s.nivel, (s.slot_id IS NULL) AS "esEvento",
-            COALESCE(gp.nombres || ' ' || gp.apellidos, gu.username) AS guia
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+                     NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
+                     gu.username) AS guia
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
-       LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
+       -- El guía de la SESIÓN (reemplazo de un día, evento suelto) y, si no
+       -- tiene, el del salón. Su nombre vive en su ficha de guía, no en la cuenta.
+       LEFT JOIN identity_user gu ON gu.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+       LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
        LEFT JOIN people_person gp ON gp.user_id = gu.id
       WHERE s.classroom_id = $1
         AND s.starts_at >= now()

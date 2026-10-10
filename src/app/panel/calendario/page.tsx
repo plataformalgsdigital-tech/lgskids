@@ -13,6 +13,7 @@ import { apiFetch } from "@/ui/api-fetch";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
 import { SesionModal } from "./SesionModal";
 import { NuevoEventoModal } from "./NuevoEventoModal";
+import { WelcomeModal } from "./WelcomeModal";
 
 interface Salon {
   id: string;
@@ -77,6 +78,15 @@ interface EventoAdmin {
   guias: number;
 }
 
+interface WelcomeCal {
+  id: string;
+  startsAt: string;
+  guia: string;
+  inscritos: number;
+  limiteUsuarios: number;
+  nivel: string;
+}
+
 interface AgendaSesion {
   id: string;
   fecha: string;
@@ -136,6 +146,10 @@ function CalendarioSalones() {
   const [sesiones, setSesiones] = useState<AgendaSesion[] | null>(null);
   // Eventos administrativos: se pintan en NARANJA, mezclados con las sesiones.
   const [eventosAdmin, setEventosAdmin] = useState<EventoAdmin[]>([]);
+  // Welcome: se pintan en VERDE. No son de un salón, así que no los filtra la campaña.
+  const [welcomes, setWelcomes] = useState<WelcomeCal[]>([]);
+  const [welcomeAbierto, setWelcomeAbierto] = useState<string | null>(null);
+  const [recarga, setRecarga] = useState(0);
   const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
   const [campaniaId, setCampaniaId] = useState("");
   const [diaAbierto, setDiaAbierto] = useState<string | null>(null);
@@ -171,10 +185,14 @@ function CalendarioSalones() {
       const from = `${y}-${pad2(m + 1)}-01`;
       const to = `${y}-${pad2(m + 1)}-${pad2(diasMes)}`;
       const filtro = campaniaId !== "" ? `&campaignId=${campaniaId}` : "";
-      const [res, resAdmin] = await Promise.all([
+      const [res, resAdmin, resWelcome] = await Promise.all([
         apiFetch(`/api/scheduling/agenda?from=${from}&to=${to}${filtro}`),
         apiFetch(`/api/scheduling/eventos-admin?from=${from}&to=${to}`),
+        apiFetch(`/api/scheduling/welcomes?from=${from}&to=${to}`),
       ]);
+      setWelcomes(
+        resWelcome.ok ? ((await resWelcome.json()) as { welcomes: WelcomeCal[] }).welcomes : [],
+      );
       if (res.ok) {
         const data: { sesiones: AgendaSesion[] } = await res.json();
         setSesiones(data.sesiones);
@@ -187,7 +205,19 @@ function CalendarioSalones() {
       );
     }
     void cargar();
-  }, [y, m, campaniaId]);
+  }, [y, m, campaniaId, recarga]);
+
+  const welcomePorDia = useMemo(() => {
+    const mapa = new Map<string, WelcomeCal[]>();
+    for (const w of welcomes) {
+      // Como el evento administrativo: la casilla sale del reloj de quien mira.
+      const dia = fechaLocal(w.startsAt);
+      const lista = mapa.get(dia) ?? [];
+      lista.push(w);
+      mapa.set(dia, lista);
+    }
+    return mapa;
+  }, [welcomes]);
 
   const adminPorDia = useMemo(() => {
     const mapa = new Map<string, EventoAdmin[]>();
@@ -309,9 +339,13 @@ function CalendarioSalones() {
             a.horaLocal.localeCompare(b.horaLocal),
           );
           const adminDelDia = adminPorDia.get(fecha) ?? [];
-          // Los administrativos van PRIMERO y no compiten por el cupo visible:
-          // son pocos y afectan al equipo, así que no deben quedar bajo "+N más".
-          const visibles = delDia.slice(0, Math.max(0, MAX_VISIBLE - adminDelDia.length));
+          const welcomeDelDia = welcomePorDia.get(fecha) ?? [];
+          // Los administrativos y los Welcome van PRIMERO y no compiten por el
+          // cupo visible: son pocos, así que no deben quedar bajo "+N más".
+          const visibles = delDia.slice(
+            0,
+            Math.max(0, MAX_VISIBLE - adminDelDia.length - welcomeDelDia.length),
+          );
           const ocultos = delDia.length - visibles.length;
           return (
             <div
@@ -363,6 +397,32 @@ function CalendarioSalones() {
                 >
                   🏛️ {horaLocal(e.startsAt)} {e.titulo ?? "Administrativo"}
                 </div>
+              ))}
+              {welcomeDelDia.map((w) => (
+                <button
+                  type="button"
+                  key={w.id}
+                  onClick={() => setWelcomeAbierto(w.id)}
+                  title={`Welcome · ${w.guia} · ${String(w.inscritos)}/${String(w.limiteUsuarios)} niños · ${w.nivel}`}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    font: "inherit",
+                    cursor: "pointer",
+                    background: "#e8f5e9",
+                    color: "#1b5e20",
+                    border: "1px solid #a5d6a7",
+                    borderRadius: "0.35rem",
+                    padding: "0.15rem 0.35rem",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  👋 {horaLocal(w.startsAt)} Welcome {w.inscritos}/{w.limiteUsuarios}
+                </button>
               ))}
               {visibles.map((s) => {
                 const color = COLOR_CURSO[s.cursoTipo] ?? { bg: "#eceff1", fg: "#37474f" };
@@ -566,6 +626,14 @@ function CalendarioSalones() {
           onCerrar={() => setSesionAbierta(null)}
         />
       )}
+
+      {welcomeAbierto !== null && (
+        <WelcomeModal
+          welcomeId={welcomeAbierto}
+          onCerrar={() => setWelcomeAbierto(null)}
+          onCambio={() => setRecarga((n) => n + 1)}
+        />
+      )}
     </div>
   );
 }
@@ -595,6 +663,7 @@ export default function SalonesPage() {
   // Crear salones es de coordinación: el guía no debe ver el botón.
   const [puedeGestionarSalonesPagina, setPuedeGestionarSalonesPagina] = useState(false);
   const [nuevoEvento, setNuevoEvento] = useState<"academico" | "administrativo" | null>(null);
+  const [versionCalendario, setVersionCalendario] = useState(0);
 
   useEffect(() => {
     async function permisos() {
@@ -789,7 +858,8 @@ export default function SalonesPage() {
         </div>
       </div>
 
-      {vista === "calendario" && <CalendarioSalones />}
+      {/* La llave cambia al crear un evento: así el mes se vuelve a cargar. */}
+      {vista === "calendario" && <CalendarioSalones key={versionCalendario} />}
 
       {vista === "lista" && mostrarForm && (
         <form
@@ -1054,6 +1124,7 @@ export default function SalonesPage() {
           onCerrar={() => setNuevoEvento(null)}
           onCreado={() => {
             setNuevoEvento(null);
+            setVersionCalendario((n) => n + 1);
             void cargarSalones();
           }}
         />

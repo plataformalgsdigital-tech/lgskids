@@ -11,14 +11,14 @@ type Queryable = Pick<PoolClient, "query">;
  * guía—, así que el calendario mostraba el usuario (`vespinosa7913`).
  * Requiere los alias `gu` (cuenta), `gg`, `gpf` y `gp` de `JOIN_NOMBRE_GUIA`.
  */
-const NOMBRE_GUIA = `COALESCE(
+export const NOMBRE_GUIA = `COALESCE(
         NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
         NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
         NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
         gu.username)`;
 
 /** Joins de las tres fichas donde puede estar el nombre de `gu`. */
-const JOIN_NOMBRE_GUIA = `LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
+export const JOIN_NOMBRE_GUIA = `LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
        LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
        LEFT JOIN people_person gp ON gp.user_id = gu.id`;
 
