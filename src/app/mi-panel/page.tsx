@@ -35,6 +35,15 @@ interface Dashboard {
     duracionMin: number;
     guia: string | null;
   } | null;
+  /** El Welcome que agendó al crear su perfil: guía y sala son los DEL EVENTO. */
+  welcome?: {
+    welcomeId: string;
+    startsAt: string;
+    duracionMin: number;
+    guia: string;
+    zoomUrl: string | null;
+    asistio: boolean | null;
+  } | null;
   /** Talleres próximos del salón: actividad puntual, no el horario de siempre. */
   talleres?: {
     sessionId: string;
@@ -524,6 +533,22 @@ export default function MiPanelPage() {
           ahoraMs: ahora,
           duracionMin: Number(data.proxima.duracionMin) || 60,
           tieneAcceso: ingreso,
+        })
+      : null;
+
+  // El Welcome se muestra hasta que termina; su enlace sigue la MISMA ventana de
+  // ingreso que una clase (5 min antes hasta 15 después del inicio).
+  const welcome = data.welcome ?? null;
+  const finWelcome =
+    welcome !== null ? new Date(welcome.startsAt).getTime() + welcome.duracionMin * 60_000 : null;
+  const welcomeVigente = welcome !== null && finWelcome !== null && finWelcome > ahora;
+  const estadoZoomWelcome =
+    welcome !== null
+      ? estadoZoom({
+          inicioMs: new Date(welcome.startsAt).getTime(),
+          ahoraMs: ahora,
+          duracionMin: welcome.duracionMin,
+          tieneAcceso: false,
         })
       : null;
 
@@ -1435,6 +1460,43 @@ export default function MiPanelPage() {
                   </p>
                 )}
               </section>
+
+              {/* Mi Welcome: lo agendó al crear su perfil, antes de empezar el curso. */}
+              {welcomeVigente && welcome !== null && (
+                <section style={{ ...card, background: "#e8f5e9", borderColor: "#a5d6a7" }}>
+                  <h2
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 800,
+                      color: "#1b5e20",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    👋 MI WELCOME
+                  </h2>
+                  <p style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: "0.35rem" }}>
+                    {fechaLarga(welcome.startsAt)}
+                  </p>
+                  <p style={{ fontSize: "0.9rem", color: "var(--texto-suave)" }}>
+                    {hora(welcome.startsAt)} (tu hora local) · {welcome.duracionMin} min · con{" "}
+                    {welcome.guia}
+                  </p>
+                  <div style={{ marginTop: "0.7rem" }}>
+                    {welcome.zoomUrl !== null && estadoZoomWelcome !== null ? (
+                      <ZoomAccessButton
+                        meetingUrl={welcome.zoomUrl}
+                        estado={estadoZoomWelcome}
+                        tieneAcceso={false}
+                        onEntrar={() => undefined}
+                      />
+                    ) : (
+                      <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+                        El enlace lo pone tu guía antes de la sesión.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              )}
 
               {/* Sesión próxima */}
               <section style={card}>

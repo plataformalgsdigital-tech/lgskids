@@ -8,6 +8,7 @@ import { numeroContrato } from "@/ui/numero-contrato";
 import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
 import { AcademicInfo } from "./AcademicInfo";
 import { EnviarCredencialesModal } from "./EnviarCredencialesModal";
+import { PerfilWelcome } from "./PerfilWelcome";
 
 interface Nino {
   id: string;
@@ -385,6 +386,13 @@ export default function DetalleNinoPage() {
               </div>
             </div>
           </section>
+
+          {/* Perfil que creó el niño desde su enlace, y su Welcome. */}
+          <PerfilWelcome
+            childPersonId={nino.id}
+            tieneCuenta={nino.userId !== null}
+            puedeEnviar={puedeEnviarMensajes}
+          />
 
           {/* Información académica */}
           <section style={{ ...card, marginTop: "1rem" }}>

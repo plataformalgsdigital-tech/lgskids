@@ -16,7 +16,13 @@ export {
 } from "./api/handlers";
 export { bootstrapIdentity } from "./infrastructure/authenticator";
 export { sessionService } from "./infrastructure/composition";
-export { validarPassword, PASSWORD_MIN_LENGTH } from "./domain/password-policy";
+export {
+  validarPassword,
+  PASSWORD_MIN_LENGTH,
+  problemaClaveNino,
+  CLAVE_NINO_MIN,
+} from "./domain/password-policy";
+export { fijarClaveNinoTx } from "./application/clave-nino";
 export {
   provisionarUsuarioAlumno,
   inactivarUsuarioTx,

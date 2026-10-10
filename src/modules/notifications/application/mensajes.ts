@@ -5,6 +5,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors
 import { newId } from "@/platform/ids";
 import {
   LARGO_MAXIMO_CONTENIDO,
+  SLUG_CREACION_PERFIL,
   SLUG_CREDENCIALES,
   SLUG_RE,
   marcadoresDe,
@@ -147,6 +148,11 @@ export async function actualizarPlantilla(input: {
   if (input.activo === false && antes.slug === SLUG_CREDENCIALES) {
     throw new ConflictError(
       "La plantilla de credenciales la usa el botón de la ficha del niño: edítala, pero no la desactives.",
+    );
+  }
+  if (input.activo === false && antes.slug === SLUG_CREACION_PERFIL) {
+    throw new ConflictError(
+      "La plantilla de creación de perfil sale sola al aprobar cada contrato: edítala, pero no la desactives.",
     );
   }
   await execute(
@@ -401,7 +407,7 @@ export async function encolarEnvio(input: {
   if (!plantilla.activo) throw new ValidationError("La plantilla está desactivada.");
   if (plantilla.usaClave) {
     throw new ValidationError(
-      "Esta plantilla lleva {{clave}}: la clave se envía solo desde la ficha de cada niño, para que no quede escrita en el historial.",
+      "Esta plantilla lleva {{clave}} o {{enlace}}: esos datos se envían solo de a un niño, para que no queden escritos en el historial.",
     );
   }
   const ids = [...new Set(input.childPersonIds)];
@@ -577,6 +583,97 @@ export async function enviarCredenciales(input: {
   return resultado.ok
     ? { ok: true, destinatario: destinatario.whatsapp }
     : { ok: false, destinatario: destinatario.whatsapp, error: resultado.error ?? "desconocido" };
+}
+
+// —— Enlace de creación de perfil (al aprobar el contrato) ————————————————————
+
+/**
+ * Manda al APODERADO el enlace con el que el niño crea su perfil. Como las
+ * credenciales: AHORA y sin cola, porque el enlace fija la clave del niño y no
+ * puede quedar escrito en una fila que espera reintento. El historial lo guarda
+ * tapado, y una falla no se reintenta sola: se reenvía desde la ficha.
+ *
+ * `actorUserId` es quien aprobó (o reenvió). No lleva alcance por país: lo
+ * llaman el alta única y la ficha, que ya validaron el acceso.
+ */
+export async function enviarEnlacePerfil(input: {
+  actorUserId: string;
+  childPersonId: string;
+  enlace: string;
+  ip?: string | null;
+}): Promise<{ ok: boolean; destinatario: string | null; error?: string }> {
+  const f = await queryOne<FilaPlantilla>(`${SELECT_PLANTILLA} WHERE slug = $1`, [
+    SLUG_CREACION_PERFIL,
+  ]);
+  if (f === null || !f.activo) {
+    return {
+      ok: false,
+      destinatario: null,
+      error: `Falta la plantilla "${SLUG_CREACION_PERFIL}" en Administración › Mensajes.`,
+    };
+  }
+  const plantilla = aPlantilla(f);
+  const { fila, destinatario } = await destinatarioDe(input.childPersonId, null, plantilla);
+  if (destinatario.whatsapp === null) {
+    const error = `No hay a qué número enviarlo: ${destinatario.problema ?? "sin teléfono"}. Agrega el teléfono del apoderado y reenvía el enlace desde la ficha del niño.`;
+    await registrarAuditoria({
+      actorUserId: input.actorUserId,
+      accion: "notifications.enlace_perfil_fallido",
+      entidad: "people_person",
+      entidadId: input.childPersonId,
+      payload: { error },
+      ip: input.ip ?? null,
+    });
+    return { ok: false, destinatario: null, error };
+  }
+
+  const ctx = contextoDe(fila);
+  const resultado = await getSender().enviar({
+    canal: "WHATSAPP",
+    destinatario: destinatario.whatsapp,
+    mensaje: rellenarPlantilla(plantilla.contenido, { ...ctx, enlace: input.enlace }),
+  });
+  await execute(
+    `INSERT INTO notifications_outbox
+       (id, canal, destinatario, mensaje, payload, estado, intentos, ultimo_error, enviada_en,
+        plantilla_slug, child_person_id, enviado_por)
+     VALUES ($1, 'WHATSAPP', $2, $3, $4, $5::notifications_estado, $6, $7,
+             CASE WHEN $5 = 'ENVIADA' THEN now() END, $8, $9, $10)`,
+    [
+      newId(),
+      destinatario.whatsapp,
+      rellenarParaHistorial(plantilla.contenido, ctx),
+      JSON.stringify({ enlacePerfil: true }),
+      resultado.ok ? "ENVIADA" : "FALLIDA",
+      // Una falla se da por agotada: el texto guardado no lleva el enlace.
+      resultado.ok ? 1 : MAX_INTENTOS,
+      resultado.ok ? null : (resultado.error ?? "desconocido"),
+      plantilla.slug,
+      input.childPersonId,
+      input.actorUserId,
+    ],
+  );
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: resultado.ok
+      ? "notifications.enlace_perfil_enviado"
+      : "notifications.enlace_perfil_fallido",
+    entidad: "people_person",
+    entidadId: input.childPersonId,
+    payload: {
+      destinatario: destinatario.whatsapp,
+      telefonoDe: destinatario.telefonoDe,
+      ...(resultado.ok ? {} : { error: resultado.error }),
+    },
+    ip: input.ip ?? null,
+  });
+  return resultado.ok
+    ? { ok: true, destinatario: destinatario.whatsapp }
+    : {
+        ok: false,
+        destinatario: destinatario.whatsapp,
+        error: resultado.error ?? "desconocido",
+      };
 }
 
 // —— Historial ————————————————————————————————————————————————————————

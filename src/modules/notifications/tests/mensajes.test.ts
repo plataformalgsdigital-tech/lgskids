@@ -32,6 +32,14 @@ describe("plantillas", () => {
     expect(texto).toBe("sgomez1234 / ••••••");
     expect(texto).not.toContain("tanodote00");
   });
+
+  it("el enlace de perfil es tan secreto como la clave: no va en masa ni al historial", () => {
+    expect(usaClave("Crea tu perfil: {{enlace}}")).toBe(true);
+    const enlace = "https://app.lgskidsplataforma.com/crear-perfil/abc";
+    const texto = rellenarParaHistorial("Entra aquí: {{enlace}}", { enlace });
+    expect(texto).toBe("Entra aquí: (enlace personal)");
+    expect(texto).not.toContain(enlace);
+  });
 });
 
 describe("teléfono para WhatsApp", () => {

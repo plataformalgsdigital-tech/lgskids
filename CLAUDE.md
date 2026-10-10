@@ -1734,10 +1734,51 @@ para niños de varios salones, países y campañas. Migración `20261009000000_w
 - "Mis próximas clases" del niño muestra ahora el guía de la SESIÓN (reemplazo o
   evento) y no el del salón, con su nombre de la ficha de guía.
 - Prueba: `scheduling/tests/welcome-integration.test.ts`.
-- **Pendiente (parte 2)**: el WhatsApp al apoderado al aprobar el contrato, con el
-  enlace de **creación de perfil** donde el niño ve su usuario, elige su clave
-  (8+ caracteres, letras y números), completa su perfil (foto, "sobre ti",
-  hobbies, fecha de nacimiento) y agenda su Welcome (obligatorio).
+- `/mi-panel` muestra **"👋 Mi Welcome"** (hora local, guía y Zoom DEL EVENTO, con la
+  misma ventana de ingreso que una clase) hasta que termina.
+
+## Creación de perfil del niño (2026-10-10)
+
+Migración `20261010000000_perfil_nino`. Réplica del `/nuevo-usuario` de LGS, que
+**a los niños de KIDS no les manda nada** (LGS solo le muestra al administrador
+la clave inicial en una alerta y deja "el WhatsApp lo maneja KIDS2026").
+
+- **Al APROBAR el contrato** (`aprobarContrato`, por los DOS caminos: panel y
+  LGS), si el niño no tiene perfil, KIDS le manda al **APODERADO** por WhatsApp
+  (plantilla `creacion-perfil-kids`, marcador `{{enlace}}`) el enlace
+  `/crear-perfil/<token>`. Va FUERA de la transacción y **no puede tumbar el alta**
+  (`enviarCreacionPerfilSinFallar`): lo que falle viaja en `perfil` de la
+  respuesta y en la auditoría, y se reenvía desde la ficha.
+- **El enlace** (`contracts_enlace_perfil`, `domain/enlace-perfil.ts`): token de 32
+  bytes, de la base solo sale el HASH, **un solo uso**, UNO vivo por niño
+  (reenviar revoca el anterior), y **no vence** (decisión del negocio; el uso único
+  lo cierra). Diferencias con LGS, cuyo enlace es el id del registro, sin token ni
+  uso único, y que guarda la clave en texto plano.
+- **`{{enlace}}` es tan secreto como `{{clave}}`**: con él se fija la clave del niño.
+  Se envía AL MOMENTO (sin cola), el historial lo guarda como "(enlace personal)",
+  una falla no se reintenta sola y una plantilla con `{{enlace}}` no va en envío
+  masivo (`usaClave` mira los dos, `MARCADORES_SECRETOS`).
+- **La página** (`/crear-perfil/[token]`, pública; API `GET|POST /api/public/perfil`,
+  `Cache-Control: no-store`): el niño ve su **usuario**, elige su **clave** (**8+
+  caracteres, letras y números** — `problemaClaveNino`, más corta que la de la
+  plataforma, que es de 10), escribe "Cuéntanos sobre ti" y hobbies, confirma su
+  fecha de nacimiento, sube su **foto** (la MISMA `student_foto` de `/mi-panel`) y
+  **elige su Welcome, obligatorio**: sin Welcome programado no se puede terminar
+  (el negocio los programa con anticipación). Solo ve los que le sirven, con la
+  regla de `sqlElegible` y SU nivel (el del panel del alumno).
+- **Todo junto o nada** (`completarPerfilNino`): clave (`fijarClaveNinoTx`: hash +
+  copia en la bóveda + "cambiar clave al entrar" APAGADO + sesiones revocadas),
+  perfil (`people_person.sobre_ti|hobbies|perfil_completado_en`), reserva del
+  Welcome y enlace USADO, en una transacción que BLOQUEA la fila del enlace. La foto
+  se sube antes y se suelta si la transacción falla.
+- **Ficha del niño**: tarjeta "Perfil y Welcome" (`PerfilWelcome.tsx`, `GET
+/api/contracts/ninos/[childPersonId]/perfil`, `personas.ver`) y **"🔗 Reenviar
+  enlace de perfil"** (POST, `mensajes.enviar`), con alcance por país.
+- Auditoría: `notifications.enlace_perfil_enviado|fallido`,
+  `contracts.perfil_completado`. Pruebas: `perfil-nino-integration.test.ts`,
+  `enlace-perfil.test.ts` y `mensajes.test.ts`.
+- **Si después cambia su clave** desde el panel, rige la política de la plataforma
+  (10 caracteres): la regla de 8 es solo la de la creación del perfil.
 
 ## Aviso de la pantalla de login (2026-08-26)
 

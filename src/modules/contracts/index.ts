@@ -35,6 +35,18 @@ export {
   SQL_CONTRATO_VENCIDO,
 } from "./domain/vigencia";
 export { edadEnFecha, validarEdadParaTipo } from "./domain/edad";
+export {
+  fichaPorEnlacePerfil,
+  completarPerfilNino,
+  reenviarEnlacePerfil,
+  estadoPerfilNino,
+} from "./application/perfil-nino";
+export type {
+  FichaPerfil,
+  DatosPerfil,
+  EstadoPerfilNino,
+  EnvioEnlacePerfil,
+} from "./application/perfil-nino";
 export { buscarEstudiantes } from "./application/estudiantes";
 export type { EstudianteEncontrado } from "./application/estudiantes";
 export { fichaAcademicaPorRef } from "./application/estado-academico";

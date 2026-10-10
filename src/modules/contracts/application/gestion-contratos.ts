@@ -23,9 +23,11 @@ import {
   setPersonEstado,
   type PersonInput,
 } from "@/modules/people";
+import { queryOne } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { logger } from "@/platform/logging/logger";
+import { enviarCreacionPerfilSinFallar, type EnvioEnlacePerfil } from "./perfil-nino";
 import { estadoAcademico, type EstadoAcademico } from "../domain/academico";
 import { validarEdadParaTipo } from "../domain/edad";
 import { parseExternalRef, validarExternalRef } from "../domain/external-ref";
@@ -279,6 +281,8 @@ export async function aprobarContrato(input: {
   enrollmentId: string | null;
   /** Id de la cuenta existente que se reactivó (renovación). */
   reactivado: string | null;
+  /** El WhatsApp con el enlace de creación de perfil (null: ya tenía perfil). */
+  perfil: EnvioEnlacePerfil | null;
 }> {
   const contrato = await findContractById(input.contractId);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
@@ -351,7 +355,26 @@ export async function aprobarContrato(input: {
     },
     ip: input.ip ?? null,
   });
-  return resultado;
+
+  // Aprobado: el apoderado recibe por WhatsApp el enlace con el que el niño
+  // crea su perfil y agenda su Welcome. Sale de KIDS por los DOS caminos (panel
+  // y LGS). Fuera de la transacción y sin poder tumbar el alta: si WhatsApp
+  // falla, se dice en la respuesta y se reenvía desde la ficha. Quien ya creó
+  // su perfil (una renovación) no lo recibe otra vez.
+  const yaTienePerfil = await queryOne<{ completado: string | null }>(
+    `SELECT perfil_completado_en AS completado FROM people_person WHERE id = $1`,
+    [contrato.beneficiarioId],
+  );
+  const perfil =
+    yaTienePerfil?.completado == null
+      ? await enviarCreacionPerfilSinFallar({
+          actorUserId: input.actorUserId,
+          childPersonId: contrato.beneficiarioId,
+          contractId: contrato.id,
+          ip: input.ip ?? null,
+        })
+      : null;
+  return { ...resultado, perfil };
 }
 
 /** Aprueba (alta única) la reserva de un contrato identificado por su ref LGS. */
