@@ -48,20 +48,27 @@ export interface EventoCreado {
 export interface GuiaConZoom {
   id: string;
   username: string;
+  /** Nombre de su ficha de guía; el usuario generado si todavía no la llenó. */
+  nombre: string;
   zoomUrl: string | null;
 }
 
-/** Guías activos con su enlace de Zoom, para el selector del formulario. */
+/**
+ * Guías activos con su enlace de Zoom, para el selector del formulario. Por su
+ * NOMBRE: el usuario generado (`atrochez8939`) no le dice a nadie quién es.
+ */
 export async function guiasConZoom(): Promise<GuiaConZoom[]> {
   return queryRows<GuiaConZoom>(
-    `SELECT u.id, u.username, g.zoom_url AS "zoomUrl"
+    `SELECT u.id, u.username,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', g.nombres, g.apellidos)), ''), u.username) AS nombre,
+            g.zoom_url AS "zoomUrl"
        FROM identity_user u
        JOIN access_user_role ur ON ur.user_id = u.id
        JOIN access_role r ON r.id = ur.role_id
        LEFT JOIN scheduling_guia g ON g.guia_user_id = u.id
       WHERE r.code = 'guia' AND u.estado = 'ACTIVO'
-      GROUP BY u.id, u.username, g.zoom_url
-      ORDER BY u.username`,
+      GROUP BY u.id, u.username, g.nombres, g.apellidos, g.zoom_url
+      ORDER BY nombre`,
   );
 }
 

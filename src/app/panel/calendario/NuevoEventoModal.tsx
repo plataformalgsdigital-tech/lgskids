@@ -29,6 +29,7 @@ export interface SalonOpcion {
 interface Guia {
   id: string;
   username: string;
+  nombre: string;
   zoomUrl: string | null;
 }
 
@@ -637,7 +638,7 @@ export function NuevoEventoModal({
                 <option value="">Seleccionar guía</option>
                 {guias.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.username}
+                    {g.nombre}
                   </option>
                 ))}
               </select>
@@ -660,7 +661,7 @@ export function NuevoEventoModal({
               <span>{guia.zoomUrl}</span>
             ) : (
               <span style={{ color: "#b57a00" }}>
-                {guia.username} todavía no tiene sala configurada. El evento se crea igual, pero sin
+                {guia.nombre} todavía no tiene sala configurada. El evento se crea igual, pero sin
                 enlace.
               </span>
             )}
@@ -852,7 +853,7 @@ export function NuevoEventoModal({
                           );
                         }}
                       />
-                      {g.username}
+                      {g.nombre}
                       {(g.zoomUrl === null || g.zoomUrl === "") && (
                         <span style={{ fontSize: "0.72rem", color: "#b57a00" }}>· sin Zoom</span>
                       )}
