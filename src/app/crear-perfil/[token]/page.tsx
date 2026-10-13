@@ -33,6 +33,7 @@ type Ficha =
       curso: string | null;
       salon: string | null;
       inicioCurso: string | null;
+      exigeWelcome: boolean;
       welcomes: Welcome[];
     };
 
@@ -129,6 +130,8 @@ export default function CrearPerfilPage() {
     [fotoUrl],
   );
 
+  // El enlace "sin Welcome" (curso ya andando) no pide agendar sesión.
+  const exigeWelcome = ficha?.estado === "VIGENTE" ? ficha.exigeWelcome : true;
   const problemas = {
     clave: problemaClave(clave),
     confirmacion: confirmacion !== clave ? "Las dos claves no coinciden." : null,
@@ -141,7 +144,7 @@ export default function CrearPerfilPage() {
         : foto.size > TOPE_FOTO
           ? "La foto pesa más de 10 MB."
           : null,
-    welcome: welcomeId === "" ? "Elige tu sesión Welcome." : null,
+    welcome: exigeWelcome && welcomeId === "" ? "Elige tu sesión Welcome." : null,
   };
   const valido = Object.values(problemas).every((p) => p === null);
   const mostrar = (p: string | null) =>
@@ -262,8 +265,8 @@ export default function CrearPerfilPage() {
     );
   }
 
-  const sinWelcome = ficha.welcomes.length === 0;
-  const todosLlenos = !sinWelcome && ficha.welcomes.every((w) => w.libres === 0);
+  const sinWelcome = exigeWelcome && ficha.welcomes.length === 0;
+  const todosLlenos = exigeWelcome && !sinWelcome && ficha.welcomes.every((w) => w.libres === 0);
 
   return (
     <main style={marco}>
@@ -283,7 +286,9 @@ export default function CrearPerfilPage() {
               ¡{ficha.nombre}, te estábamos esperando!
             </h1>
             <p style={{ margin: "0.25rem 0 0", color: "#4b5563", fontSize: "0.9rem" }}>
-              Crea tu clave, cuéntanos de ti y elige tu sesión Welcome.
+              {exigeWelcome
+                ? "Crea tu clave, cuéntanos de ti y elige tu sesión Welcome."
+                : "Crea tu clave y cuéntanos de ti."}
             </p>
           </div>
         </div>
@@ -440,77 +445,79 @@ export default function CrearPerfilPage() {
             </div>
           </div>
 
-          <div>
-            <span style={rotulo}>Elige tu sesión Welcome *</span>
-            {sinWelcome || todosLlenos ? (
-              <div
-                style={{
-                  background: "#fff8e1",
-                  border: "1px solid #ffe082",
-                  borderRadius: "0.7rem",
-                  padding: "0.75rem 0.9rem",
-                  fontSize: "0.88rem",
-                }}
-              >
-                {sinWelcome
-                  ? "Todavía no hay sesiones Welcome programadas para ti."
-                  : "Todas las sesiones Welcome están llenas por ahora."}{" "}
-                Vuelve a abrir este enlace más tarde, o escríbenos para que te ayudemos. Tu perfil
-                se guarda cuando eliges tu Welcome.
-              </div>
-            ) : (
-              <div style={{ display: "grid", gap: "0.4rem" }}>
-                {ficha.welcomes.map((w) => {
-                  const lleno = w.libres === 0;
-                  const elegido = welcomeId === w.id;
-                  return (
-                    <label
-                      key={w.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.6rem",
-                        padding: "0.6rem 0.75rem",
-                        borderRadius: "0.7rem",
-                        border: `1.5px solid ${elegido ? "#43a047" : "#e3e7f0"}`,
-                        background: elegido ? "#e8f5e9" : lleno ? "#f5f5f5" : "white",
-                        opacity: lleno ? 0.55 : 1,
-                        cursor: lleno ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="welcome"
-                        value={w.id}
-                        disabled={lleno}
-                        checked={elegido}
-                        onChange={() => setWelcomeId(w.id)}
-                      />
-                      <span style={{ flex: 1 }}>
-                        <strong style={{ textTransform: "capitalize" }}>
-                          {cuando(w.startsAt)}
-                        </strong>
-                        <span style={{ display: "block", fontSize: "0.8rem", color: "#6b7280" }}>
-                          {String(w.duracionMin)} min · con {w.guia}
-                        </span>
-                      </span>
-                      <span
+          {exigeWelcome && (
+            <div>
+              <span style={rotulo}>Elige tu sesión Welcome *</span>
+              {sinWelcome || todosLlenos ? (
+                <div
+                  style={{
+                    background: "#fff8e1",
+                    border: "1px solid #ffe082",
+                    borderRadius: "0.7rem",
+                    padding: "0.75rem 0.9rem",
+                    fontSize: "0.88rem",
+                  }}
+                >
+                  {sinWelcome
+                    ? "Todavía no hay sesiones Welcome programadas para ti."
+                    : "Todas las sesiones Welcome están llenas por ahora."}{" "}
+                  Vuelve a abrir este enlace más tarde, o escríbenos para que te ayudemos. Tu perfil
+                  se guarda cuando eliges tu Welcome.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: "0.4rem" }}>
+                  {ficha.welcomes.map((w) => {
+                    const lleno = w.libres === 0;
+                    const elegido = welcomeId === w.id;
+                    return (
+                      <label
+                        key={w.id}
                         style={{
-                          fontSize: "0.78rem",
-                          fontWeight: 700,
-                          color: lleno ? "#c62828" : "#2e7d32",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.6rem",
+                          padding: "0.6rem 0.75rem",
+                          borderRadius: "0.7rem",
+                          border: `1.5px solid ${elegido ? "#43a047" : "#e3e7f0"}`,
+                          background: elegido ? "#e8f5e9" : lleno ? "#f5f5f5" : "white",
+                          opacity: lleno ? 0.55 : 1,
+                          cursor: lleno ? "not-allowed" : "pointer",
                         }}
                       >
-                        {lleno ? "LLENO" : `${String(w.libres)} cupos`}
-                      </span>
-                    </label>
-                  );
-                })}
-                <div style={ayuda}>La hora está en la zona horaria de este dispositivo.</div>
-              </div>
-            )}
-            {!sinWelcome && !todosLlenos && mostrar(problemas.welcome)}
-          </div>
+                        <input
+                          type="radio"
+                          name="welcome"
+                          value={w.id}
+                          disabled={lleno}
+                          checked={elegido}
+                          onChange={() => setWelcomeId(w.id)}
+                        />
+                        <span style={{ flex: 1 }}>
+                          <strong style={{ textTransform: "capitalize" }}>
+                            {cuando(w.startsAt)}
+                          </strong>
+                          <span style={{ display: "block", fontSize: "0.8rem", color: "#6b7280" }}>
+                            {String(w.duracionMin)} min · con {w.guia}
+                          </span>
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.78rem",
+                            fontWeight: 700,
+                            color: lleno ? "#c62828" : "#2e7d32",
+                          }}
+                        >
+                          {lleno ? "LLENO" : `${String(w.libres)} cupos`}
+                        </span>
+                      </label>
+                    );
+                  })}
+                  <div style={ayuda}>La hora está en la zona horaria de este dispositivo.</div>
+                </div>
+              )}
+              {!sinWelcome && !todosLlenos && mostrar(problemas.welcome)}
+            </div>
+          )}
 
           {error !== null && (
             <p role="alert" style={{ color: "#c62828", fontWeight: 600, margin: 0 }}>

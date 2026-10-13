@@ -126,6 +126,24 @@ async function exigirDocLibre(p: PersonInput): Promise<void> {
 }
 
 /**
+ * La persona por su documento (país + tipo + número, la misma llave única de la
+ * tabla) o, si no existe, la crea. Para titulares y apoderados: una misma
+ * persona firma por varios hermanos. Sus datos guardados NO se pisan.
+ */
+async function personaExistenteOInsertar(
+  p: PersonInput,
+  tx: Parameters<typeof insertPerson>[1],
+): Promise<string> {
+  const existe = await findPersonByDoc(
+    p.countryCode,
+    p.docTipo.trim().toUpperCase(),
+    p.docNumero.trim(),
+    tx,
+  );
+  return existe?.id ?? insertPerson(p, tx);
+}
+
+/**
  * La reserva YA existía: se devuelve tal cual en vez de fallar.
  *
  * Esto es lo que hace la puerta IDEMPOTENTE, y no es un adorno: LGS manda la
@@ -200,16 +218,19 @@ export async function crearReservaBeneficiario(input: {
   if (yaExiste !== null) {
     return reservaYaHecha(yaExiste, input.externalRef, input.nino);
   }
-  await exigirDocLibre(input.titular);
-  if (input.apoderadoNuevo !== undefined) await exigirDocLibre(input.apoderadoNuevo);
+  // Solo el NIÑO tiene que ser nuevo. El titular y el apoderado se REUTILIZAN si
+  // ya existen: un contrato de LGS trae varios hermanos y en KIDS cada uno es su
+  // propio contrato, todos con el MISMO titular. Antes se exigía también el
+  // documento del titular libre y el segundo hermano se rechazaba con 409, que
+  // LGS toma como "ya existía": quedaba marcado como enviado sin existir.
   await exigirDocLibre(input.nino);
 
   const resultado = await withTransaction(async (tx) => {
-    const titularId = await insertPerson(input.titular, tx);
+    const titularId = await personaExistenteOInsertar(input.titular, tx);
     const apoderadoId =
       input.titularEsApoderado === true
         ? titularId
-        : await insertPerson(input.apoderadoNuevo as PersonInput, tx);
+        : await personaExistenteOInsertar(input.apoderadoNuevo as PersonInput, tx);
     const ninoId = await insertPerson(input.nino, tx);
     await insertGuardianship(ninoId, apoderadoId, input.parentesco ?? null, tx);
     const contractId = await insertContract(
@@ -275,6 +296,11 @@ export async function aprobarContrato(input: {
   contractId: string;
   /** Si viene, el alta única incluye la MATRÍCULA en ese salón (Fase 7). */
   classroomId?: string | null;
+  /**
+   * false = aprobar SIN mandar el WhatsApp de creación de perfil (por ejemplo,
+   * una migración: el enlace se manda después desde la ficha). Por defecto sí.
+   */
+  enviarPerfil?: boolean;
   ip?: string | null;
 }): Promise<{
   credenciales: AlumnoProvisionado | null;
@@ -366,7 +392,7 @@ export async function aprobarContrato(input: {
     [contrato.beneficiarioId],
   );
   const perfil =
-    yaTienePerfil?.completado == null
+    input.enviarPerfil !== false && yaTienePerfil?.completado == null
       ? await enviarCreacionPerfilSinFallar({
           actorUserId: input.actorUserId,
           childPersonId: contrato.beneficiarioId,

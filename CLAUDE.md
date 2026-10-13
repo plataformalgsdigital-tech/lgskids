@@ -1130,6 +1130,14 @@ nadie habría visto hasta tener niños reales inscribiéndose:**
   (hay que mirarlo en el panel antes de reenviar). Probado en
   `contracts/tests/reserva-lgs-integration.test.ts`.
 
+- **Los HERMANOS comparten titular (corregido 2026-10-13)**: la reserva exigía el
+  documento del titular LIBRE, así que el segundo hermano de un contrato se
+  rechazaba con 409 — y LGS trata TODO 409 como "la reserva ya existía", así que
+  lo marcaba `enviadoAKids` sin que existiera (pasó con Salem Pizarro,
+  `01-15647-26`). Ahora `crearReservaBeneficiario` REUTILIZA titular y apoderado
+  por documento (`personaExistenteOInsertar`, sin pisar sus datos) y solo exige
+  que el NIÑO sea nuevo. Prueba: `hermanos-sin-welcome-integration.test.ts`.
+
 **¿ESTÁ TOMANDO EL PROGRAMA? (2026-09-30)** — `GET /api/kids-intake/reservations/[externalRef]`
 (`fichaAcademicaPorRef`). LGS pregunta por el N° de contrato que ya tiene en la
 mano —el mismo con el que reserva y aprueba— y recibe `activo` (sí/no), el
@@ -1779,6 +1787,14 @@ la clave inicial en una alerta y deja "el WhatsApp lo maneja KIDS2026").
   `enlace-perfil.test.ts` y `mensajes.test.ts`.
 - **Si después cambia su clave** desde el panel, rige la política de la plataforma
   (10 caracteres): la regla de 8 es solo la de la creación del perfil.
+- **Enlace SIN Welcome (2026-10-13, migración `20261013000000`)**: para quien entra
+  con el curso ya andando (no hay Welcome que agendar: es antes del inicio).
+  `contracts_enlace_perfil.exige_welcome`; la ficha tiene DOS botones, "🔗 Enviar
+  enlace de perfil" y "🔗 Enviar enlace sin Welcome", y este usa la plantilla
+  `creacion-perfil-kids-sin-welcome`, que no lo menciona. La página no muestra la
+  elección y `completarPerfilNino` no reserva nada.
+- **Aprobar SIN WhatsApp**: `aprobarContrato({ enviarPerfil: false })` (migraciones;
+  el enlace se manda después desde la ficha). Por defecto sí se envía.
 
 ## Aviso de la pantalla de login (2026-08-26)
 

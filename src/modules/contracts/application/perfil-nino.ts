@@ -51,6 +51,8 @@ interface FilaEnlace {
   childPersonId: string;
   usadoEn: string | null;
   revocadoEn: string | null;
+  /** false = enlace "sin Welcome" (curso ya andando): no se pide elegir sesión. */
+  exigeWelcome: boolean;
 }
 
 interface MatriculaNino {
@@ -94,6 +96,7 @@ async function emitirEnlace(input: {
   childPersonId: string;
   contractId: string | null;
   actorUserId: string | null;
+  exigeWelcome: boolean;
 }): Promise<string> {
   const token = nuevoTokenPerfil();
   await withTransaction(async (tx) => {
@@ -104,9 +107,17 @@ async function emitirEnlace(input: {
       tx,
     );
     await execute(
-      `INSERT INTO contracts_enlace_perfil (id, child_person_id, contract_id, token_hash, creado_por)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [newId(), input.childPersonId, input.contractId, hashTokenPerfil(token), input.actorUserId],
+      `INSERT INTO contracts_enlace_perfil
+         (id, child_person_id, contract_id, token_hash, creado_por, exige_welcome)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        newId(),
+        input.childPersonId,
+        input.contractId,
+        hashTokenPerfil(token),
+        input.actorUserId,
+        input.exigeWelcome,
+      ],
       tx,
     );
   });
@@ -121,14 +132,20 @@ export interface EnvioEnlacePerfil {
 
 /**
  * Emite el enlace y se lo manda al apoderado. Lo llama el alta única al aprobar
- * el contrato y el botón "Reenviar enlace de perfil" de la ficha.
+ * el contrato y los botones "Reenviar enlace de perfil" de la ficha.
+ *
+ * `exigeWelcome: false` (botón "sin Welcome"): para quien entra con el curso ya
+ * andando, que no tiene Welcome que agendar. La página no lo pide y el mensaje
+ * no lo menciona.
  */
 export async function enviarCreacionPerfil(input: {
   actorUserId: string;
   childPersonId: string;
   contractId: string | null;
+  exigeWelcome?: boolean;
   ip?: string | null;
 }): Promise<EnvioEnlacePerfil> {
+  const exigeWelcome = input.exigeWelcome !== false;
   const persona = await queryOne<{ userId: string | null; completado: string | null }>(
     `SELECT user_id AS "userId", perfil_completado_en AS completado
        FROM people_person WHERE id = $1`,
@@ -145,11 +162,13 @@ export async function enviarCreacionPerfil(input: {
     childPersonId: input.childPersonId,
     contractId: input.contractId,
     actorUserId: input.actorUserId,
+    exigeWelcome,
   });
   const r = await enviarEnlacePerfil({
     actorUserId: input.actorUserId,
     childPersonId: input.childPersonId,
     enlace: enlacePerfil(env().APP_URL, token),
+    exigeWelcome,
     ip: input.ip ?? null,
   });
   return r.ok
@@ -186,7 +205,7 @@ async function enlacePorToken(token: string): Promise<FilaEnlace | null> {
   if (!pareceTokenPerfil(token)) return null;
   return queryOne<FilaEnlace>(
     `SELECT id, child_person_id AS "childPersonId", usado_en AS "usadoEn",
-            revocado_en AS "revocadoEn"
+            revocado_en AS "revocadoEn", exige_welcome AS "exigeWelcome"
        FROM contracts_enlace_perfil WHERE token_hash = $1`,
     [hashTokenPerfil(token)],
   );
@@ -203,6 +222,8 @@ export type FichaPerfil =
       curso: string | null;
       salon: string | null;
       inicioCurso: string | null;
+      /** false = no se pide Welcome (curso ya andando). */
+      exigeWelcome: boolean;
       welcomes: WelcomeDisponible[];
     };
 
@@ -227,7 +248,7 @@ export async function fichaPorEnlacePerfil(token: string): Promise<FichaPerfil> 
 
   const matricula = await matriculaDeNino(enlace.childPersonId);
   const welcomes =
-    matricula === null
+    matricula === null || !enlace.exigeWelcome
       ? []
       : await welcomesDisponibles({
           classroomId: matricula.classroomId,
@@ -241,6 +262,7 @@ export async function fichaPorEnlacePerfil(token: string): Promise<FichaPerfil> 
     curso: matricula?.curso ?? null,
     salon: matricula?.salon ?? null,
     inicioCurso: matricula?.inicioCurso ?? null,
+    exigeWelcome: enlace.exigeWelcome,
     welcomes,
   };
 }
@@ -275,7 +297,6 @@ export async function completarPerfilNino(
     !Number.isNaN(Date.parse(datos.fechaNacimiento))
       ? null
       : "Falta la fecha de nacimiento.",
-    datos.welcomeId === "" ? "Elige tu sesión Welcome." : null,
     datos.foto === null ? "Falta la foto." : null,
     datos.foto !== null && !MIMES_FOTO.has(datos.foto.mime)
       ? "La foto debe ser JPG, PNG o WebP."
@@ -291,6 +312,10 @@ export async function completarPerfilNino(
     throw new ConflictError(
       "Este enlace ya se usó o fue reemplazado. Si necesitas uno nuevo, pídelo a LGS Kids.",
     );
+  }
+  // El Welcome es obligatorio salvo en el enlace "sin Welcome" (curso ya andando).
+  if (enlace.exigeWelcome && datos.welcomeId === "") {
+    throw new ValidationError("Elige tu sesión Welcome.");
   }
   const nino = await queryOne<{ userId: string | null; usuario: string | null }>(
     `SELECT p.user_id AS "userId", u.username AS usuario
@@ -341,13 +366,15 @@ export async function completarPerfilNino(
         [enlace.childPersonId, datos.sobreTi.trim(), datos.hobbies.trim(), datos.fechaNacimiento],
         tx,
       );
-      await reservarWelcomeTx(tx, {
-        welcomeId: datos.welcomeId,
-        childPersonId: enlace.childPersonId,
-        classroomId: matricula.classroomId,
-        nivel,
-        agendadoPor: null,
-      });
+      if (enlace.exigeWelcome) {
+        await reservarWelcomeTx(tx, {
+          welcomeId: datos.welcomeId,
+          childPersonId: enlace.childPersonId,
+          classroomId: matricula.classroomId,
+          nivel,
+          agendadoPor: null,
+        });
+      }
       await execute(
         `UPDATE contracts_enlace_perfil SET usado_en = now() WHERE id = $1`,
         [enlace.id],
@@ -388,6 +415,8 @@ export async function reenviarEnlacePerfil(input: {
   actorUserId: string;
   childPersonId: string;
   countryScope: string[] | null;
+  /** false = "Enviar enlace sin Welcome" (curso ya andando). */
+  exigeWelcome?: boolean;
   ip?: string | null;
 }): Promise<EnvioEnlacePerfil> {
   await exigirAlcance(input.childPersonId, input.countryScope);
@@ -395,6 +424,7 @@ export async function reenviarEnlacePerfil(input: {
     actorUserId: input.actorUserId,
     childPersonId: input.childPersonId,
     contractId: null,
+    exigeWelcome: input.exigeWelcome !== false,
     ip: input.ip ?? null,
   });
 }

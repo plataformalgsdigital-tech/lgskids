@@ -26,10 +26,12 @@ export async function findPersonByDoc(
   countryCode: string,
   docTipo: string,
   docNumero: string,
+  client?: Queryable,
 ): Promise<PersonRecord | null> {
   return queryOne<PersonRecord>(
     `${SELECT_PERSON} WHERE country_code = $1 AND doc_tipo = $2 AND doc_numero = $3`,
     [countryCode, docTipo, docNumero],
+    client,
   );
 }
 

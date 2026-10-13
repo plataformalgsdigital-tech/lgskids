@@ -6,6 +6,7 @@ import { newId } from "@/platform/ids";
 import {
   LARGO_MAXIMO_CONTENIDO,
   SLUG_CREACION_PERFIL,
+  SLUG_CREACION_PERFIL_SIN_WELCOME,
   SLUG_CREDENCIALES,
   SLUG_RE,
   marcadoresDe,
@@ -150,7 +151,10 @@ export async function actualizarPlantilla(input: {
       "La plantilla de credenciales la usa el botón de la ficha del niño: edítala, pero no la desactives.",
     );
   }
-  if (input.activo === false && antes.slug === SLUG_CREACION_PERFIL) {
+  if (
+    input.activo === false &&
+    (antes.slug === SLUG_CREACION_PERFIL || antes.slug === SLUG_CREACION_PERFIL_SIN_WELCOME)
+  ) {
     throw new ConflictError(
       "La plantilla de creación de perfil sale sola al aprobar cada contrato: edítala, pero no la desactives.",
     );
@@ -600,16 +604,18 @@ export async function enviarEnlacePerfil(input: {
   actorUserId: string;
   childPersonId: string;
   enlace: string;
+  /** false = el enlace no pide Welcome (curso ya andando): otra plantilla. */
+  exigeWelcome?: boolean;
   ip?: string | null;
 }): Promise<{ ok: boolean; destinatario: string | null; error?: string }> {
-  const f = await queryOne<FilaPlantilla>(`${SELECT_PLANTILLA} WHERE slug = $1`, [
-    SLUG_CREACION_PERFIL,
-  ]);
+  const slug =
+    input.exigeWelcome === false ? SLUG_CREACION_PERFIL_SIN_WELCOME : SLUG_CREACION_PERFIL;
+  const f = await queryOne<FilaPlantilla>(`${SELECT_PLANTILLA} WHERE slug = $1`, [slug]);
   if (f === null || !f.activo) {
     return {
       ok: false,
       destinatario: null,
-      error: `Falta la plantilla "${SLUG_CREACION_PERFIL}" en Administración › Mensajes.`,
+      error: `Falta la plantilla "${slug}" en Administración › Mensajes.`,
     };
   }
   const plantilla = aPlantilla(f);

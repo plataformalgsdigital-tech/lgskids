@@ -80,3 +80,5 @@ export const LARGO_MAXIMO_CONTENIDO = 1000;
 export const SLUG_CREDENCIALES = "credenciales-kids";
 /** La del enlace de creación de perfil: sale sola al aprobar el contrato. */
 export const SLUG_CREACION_PERFIL = "creacion-perfil-kids";
+/** La misma, para quien entra con el curso andando: no menciona el Welcome. */
+export const SLUG_CREACION_PERFIL_SIN_WELCOME = "creacion-perfil-kids-sin-welcome";

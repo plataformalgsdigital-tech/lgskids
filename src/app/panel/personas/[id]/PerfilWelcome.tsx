@@ -64,10 +64,14 @@ export function PerfilWelcome({
     void inicial();
   }, [cargar]);
 
-  async function reenviar() {
+  /**
+   * `sinWelcome`: para quien entra con el curso ya andando. El enlace no pide
+   * agendar Welcome y el mensaje no lo menciona.
+   */
+  async function reenviar(sinWelcome: boolean) {
     if (
       !window.confirm(
-        "Se enviará al WhatsApp del apoderado un enlace NUEVO para crear el perfil. El anterior deja de servir. ¿Enviar?",
+        `Se enviará al WhatsApp del apoderado un enlace NUEVO para crear el perfil${sinWelcome ? ", SIN pedir que agende un Welcome" : ", donde también agenda su Welcome"}. El anterior deja de servir. ¿Enviar?`,
       )
     ) {
       return;
@@ -77,6 +81,8 @@ export function PerfilWelcome({
     try {
       const res = await apiFetch(`/api/contracts/ninos/${childPersonId}/perfil`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sinWelcome }),
       });
       const c = (await res.json().catch(() => ({}))) as {
         enviado?: boolean;
@@ -111,24 +117,44 @@ export function PerfilWelcome({
       >
         <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Perfil y Welcome</h2>
         {puedeEnviar && tieneCuenta && !completo && (
-          <button
-            type="button"
-            disabled={ocupado}
-            onClick={() => void reenviar()}
-            title="Envía al WhatsApp del apoderado un enlace nuevo para crear el perfil"
-            style={{
-              padding: "0.4rem 0.9rem",
-              borderRadius: "0.6rem",
-              border: "none",
-              background: "#25d366",
-              color: "white",
-              fontWeight: 700,
-              fontSize: "0.85rem",
-              cursor: "pointer",
-            }}
-          >
-            {ocupado ? "Enviando…" : "🔗 Reenviar enlace de perfil"}
-          </button>
+          <span style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void reenviar(false)}
+              title="Envía al WhatsApp del apoderado un enlace nuevo para crear el perfil y agendar el Welcome"
+              style={{
+                padding: "0.4rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "none",
+                background: "#25d366",
+                color: "white",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+              }}
+            >
+              {ocupado ? "Enviando…" : "🔗 Enviar enlace de perfil"}
+            </button>
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void reenviar(true)}
+              title="Para quien entra con el curso ya andando: el enlace no pide agendar Welcome"
+              style={{
+                padding: "0.4rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1.5px solid #25d366",
+                background: "white",
+                color: "#1b5e20",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+              }}
+            >
+              🔗 Enviar enlace sin Welcome
+            </button>
+          </span>
         )}
       </div>
 

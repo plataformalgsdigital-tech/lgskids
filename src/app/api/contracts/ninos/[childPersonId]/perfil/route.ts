@@ -24,10 +24,15 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
   const childPersonId = z.uuid().parse((await context.params)["childPersonId"]);
+  // { sinWelcome: true } = el enlace no pide agendar Welcome (curso ya andando).
+  const body = z
+    .object({ sinWelcome: z.boolean().optional() })
+    .parse(await request.json().catch(() => ({})));
   const r = await reenviarEnlacePerfil({
     actorUserId: auth.userId,
     childPersonId,
     countryScope: auth.countryScope,
+    exigeWelcome: body.sinWelcome !== true,
     ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
   });
   return json(r, { status: r.enviado ? 200 : 502 });
