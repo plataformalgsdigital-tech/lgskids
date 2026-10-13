@@ -57,17 +57,120 @@ function Campo(props: { etiqueta: string; children: React.ReactNode; ancho?: str
   );
 }
 
+/**
+ * Lista desplegable del buscador: los niños que coinciden, para elegir uno y
+ * abrir su ficha. Los HERMANOS del mismo contrato van juntos bajo su número:
+ * buscar por el N° de LGS trae a todos.
+ */
+function Sugerencias({ ninos }: { ninos: Nino[] }) {
+  const MAX = 10;
+  const visibles = ninos.slice(0, MAX);
+  // Agrupar por contrato (el N° de LGS sin el documento del niño).
+  const grupos = new Map<string, Nino[]>();
+  for (const n of visibles) {
+    const clave =
+      n.externalRef !== null
+        ? (n.externalRef.split("#")[0] ?? n.externalRef)
+        : n.contratoNumero !== null
+          ? `N° ${String(n.contratoNumero)}`
+          : `sin-${n.id}`;
+    grupos.set(clave, [...(grupos.get(clave) ?? []), n]);
+  }
+  return (
+    <div
+      role="listbox"
+      style={{
+        position: "absolute",
+        top: "calc(100% + 0.25rem)",
+        left: 0,
+        right: 0,
+        zIndex: 20,
+        background: "white",
+        border: "1px solid #d8dce6",
+        borderRadius: "0.6rem",
+        boxShadow: "0 10px 30px rgba(20,30,60,0.15)",
+        maxHeight: "22rem",
+        overflowY: "auto",
+        minWidth: "20rem",
+      }}
+    >
+      {visibles.length === 0 ? (
+        <div style={{ padding: "0.6rem 0.8rem", color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+          Ningún niño coincide.
+        </div>
+      ) : (
+        [...grupos.entries()].map(([clave, hermanos]) => (
+          <div key={clave} style={{ borderBottom: "1px solid #eef1f7" }}>
+            {hermanos.length > 1 && (
+              <div
+                style={{
+                  padding: "0.35rem 0.8rem 0",
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                  color: "var(--lgs-purpura)",
+                }}
+              >
+                Contrato {clave} · {hermanos.length} niños
+              </div>
+            )}
+            {hermanos.map((n) => (
+              <Link
+                key={n.id}
+                href={`/panel/personas/${n.id}`}
+                role="option"
+                style={{
+                  display: "block",
+                  padding: "0.45rem 0.8rem",
+                  color: "inherit",
+                  textDecoration: "none",
+                }}
+              >
+                <strong>
+                  {n.apellidos}, {n.nombres}
+                </strong>
+                <span
+                  style={{ display: "block", fontSize: "0.76rem", color: "var(--texto-suave)" }}
+                >
+                  {n.docTipo} {n.docNumero}
+                  {(n.externalRef !== null || n.contratoNumero !== null) &&
+                    ` · ${textoNumeroContrato({ externalRef: n.externalRef, numero: n.contratoNumero })}`}
+                  {n.salon !== null && ` · ${n.salon}`}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ))
+      )}
+      {ninos.length > MAX && (
+        <div
+          style={{ padding: "0.45rem 0.8rem", fontSize: "0.76rem", color: "var(--texto-suave)" }}
+        >
+          y {ninos.length - MAX} más en la lista de abajo…
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PersonasPage() {
   const [ninos, setNinos] = useState<Nino[] | null>(null);
   const [descargando, setDescargando] = useState(false);
   const [campanias, setCampanias] = useState<{ id: string; nombre: string }[]>([]);
   const [salones, setSalones] = useState<Salon[]>([]);
-  // Filtros (el buscador global puede llegar con ?buscar=<documento>).
-  const [fId, setFId] = useState(() =>
+  // Buscador: nombre, documento o N° de contrato (el buscador global puede
+  // llegar con ?buscar=). `texto` es lo escrito; `fBuscar` lo que se consulta,
+  // un momento después de dejar de escribir.
+  const [texto, setTexto] = useState(() =>
     typeof window !== "undefined"
       ? (new URLSearchParams(window.location.search).get("buscar") ?? "")
       : "",
   );
+  const [fBuscar, setFBuscar] = useState(texto);
+  const [sugerir, setSugerir] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFBuscar(texto.trim()), 300);
+    return () => clearTimeout(t);
+  }, [texto]);
   const [fCampaniaId, setFCampaniaId] = useState("");
   const [fCurso, setFCurso] = useState("");
   const [fSalonId, setFSalonId] = useState("");
@@ -77,7 +180,7 @@ export default function PersonasPage() {
 
   const cargar = useCallback(async () => {
     const p = new URLSearchParams();
-    if (fId) p.set("id", fId);
+    if (fBuscar) p.set("buscar", fBuscar);
     if (fCampaniaId) p.set("campaignId", fCampaniaId);
     if (fCurso) p.set("tipoCurso", fCurso);
     if (fSalonId) p.set("classroomId", fSalonId);
@@ -89,7 +192,7 @@ export default function PersonasPage() {
       const data: { ninos: Nino[] } = await res.json();
       setNinos(data.ninos);
     }
-  }, [fId, fCampaniaId, fCurso, fSalonId, fEstado, fInicioDesde, fFinalHasta]);
+  }, [fBuscar, fCampaniaId, fCurso, fSalonId, fEstado, fInicioDesde, fFinalHasta]);
 
   useEffect(() => {
     async function run() {
@@ -218,13 +321,28 @@ export default function PersonasPage() {
           alignItems: "flex-end",
         }}
       >
-        <Campo etiqueta="Documento (id)" ancho="1 1 12rem">
-          <input
-            placeholder="Buscar por documento…"
-            value={fId}
-            onChange={(e) => setFId(e.target.value)}
-            style={inputStyle}
-          />
+        <Campo etiqueta="Buscar" ancho="2 1 16rem">
+          <div style={{ position: "relative" }}>
+            <input
+              placeholder="Nombre, documento o N° de contrato…"
+              value={texto}
+              onChange={(e) => {
+                setTexto(e.target.value);
+                setSugerir(true);
+              }}
+              onFocus={() => setSugerir(true)}
+              // Se cierra un instante después para que el clic en una sugerencia llegue.
+              onBlur={() => setTimeout(() => setSugerir(false), 150)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setSugerir(false);
+              }}
+              style={{ ...inputStyle, width: "100%" }}
+              aria-autocomplete="list"
+            />
+            {sugerir && texto.trim().length >= 2 && fBuscar === texto.trim() && ninos !== null && (
+              <Sugerencias ninos={ninos} />
+            )}
+          </div>
         </Campo>
         <Campo etiqueta="Campaña" ancho="1 1 12rem">
           <select
@@ -287,10 +405,11 @@ export default function PersonasPage() {
             style={inputStyle}
           />
         </Campo>
-        {(fId || fCampaniaId || fCurso || fSalonId || fEstado || fInicioDesde || fFinalHasta) && (
+        {(texto || fCampaniaId || fCurso || fSalonId || fEstado || fInicioDesde || fFinalHasta) && (
           <button
             onClick={() => {
-              setFId("");
+              setTexto("");
+              setFBuscar("");
               setFCampaniaId("");
               setFCurso("");
               setFSalonId("");

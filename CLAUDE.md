@@ -160,6 +160,13 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   o el menor de un `people_guardianship` (`ES_NINO`). Tiene además filtro de
   **salón**, derivado de la matrícula VIVA (la lista del salón sale de las
   matrículas, nunca de una tabla aparte), y cada fila muestra su salón.
+  **Buscador (2026-10-13)**: el campo "Buscar" de Kids (antes solo documento)
+  manda `buscar` y `listNinos` busca **por palabras** —cada una en nombre,
+  apellido, usuario, N° de contrato o documento—, sin tildes ni mayúsculas y con
+  el documento sin puntos ni guiones: "elysa acevedo" y "acevedo elysa" dan lo
+  mismo, y el N° de LGS sin sufijo trae a TODOS los hermanos. Despliega una lista
+  para elegir y abrir la ficha, con los hermanos agrupados bajo su contrato. El
+  buscador global usa la misma consulta.
   **Ficha del niño** (`/panel/personas/[id]`, 2026-10-02): "Datos personales" va en
   tres líneas fijas —identidad · correo (dos columnas, porque el sintético es largo
   y se montaba sobre el teléfono), teléfono y plataforma · usuario y clave—. La

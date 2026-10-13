@@ -84,6 +84,8 @@ export const listarPersonasHandler = handlerWithAuth(async (request, auth) => {
 
 const listarNinosSchema = z.object({
   id: z.string().max(40).optional(),
+  /** Texto libre: nombre, documento, usuario o N° de contrato (por palabras). */
+  buscar: z.string().max(80).optional(),
   estado: z.enum(["ACTIVA", "INACTIVA"]).optional(),
   tipoCurso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
   campaignId: z.uuid().optional(),
@@ -102,6 +104,7 @@ export const listarNinosHandler = handlerWithAuth(async (request, auth) => {
   const ninos = await listarNinos({
     countryScope: auth.countryScope,
     ...(q.id !== undefined && { id: q.id }),
+    ...(q.buscar !== undefined && { buscar: q.buscar }),
     ...(q.estado !== undefined && { estado: q.estado }),
     ...(q.tipoCurso !== undefined && { tipoCurso: q.tipoCurso }),
     ...(q.campaignId !== undefined && { campaignId: q.campaignId }),

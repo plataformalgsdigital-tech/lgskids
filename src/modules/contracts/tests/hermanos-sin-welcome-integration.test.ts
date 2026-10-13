@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { crearCampania } from "@/modules/catalog";
 import { setSenderForTests, type MensajeSaliente } from "@/modules/notifications";
+import { listarNinos } from "@/modules/people";
 import { crearSalon, welcomeDeNino } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
@@ -136,6 +137,26 @@ describe.runIf(RUN)("hermanos y perfil sin Welcome (integración)", () => {
       [titular.docNumero],
     );
     expect(personas?.n).toBe(1);
+  });
+
+  it("buscar por el N° de contrato trae a los dos hermanos; por nombre, en cualquier orden", async () => {
+    const porContrato = await listarNinos({ countryScope: null, buscar: base, limit: 50 });
+    expect(porContrato.map((n) => n.nombres).sort()).toEqual(["Ana", "Beto"]);
+    const alDerecho = await listarNinos({
+      countryScope: null,
+      buscar: `beto hermanos${marca}`,
+      limit: 50,
+    });
+    const alReves = await listarNinos({
+      countryScope: null,
+      buscar: `HERMANOS${marca} Beto`,
+      limit: 50,
+    });
+    expect(alDerecho.map((n) => n.nombres)).toEqual(["Beto"]);
+    expect(alReves.map((n) => n.nombres)).toEqual(["Beto"]);
+    // El documento se encuentra escrito con guiones o sin ellos.
+    const porDoc = await listarNinos({ countryScope: null, buscar: `HB${marca}`, limit: 50 });
+    expect(porDoc.map((n) => n.nombres)).toEqual(["Beto"]);
   });
 
   it("aprobar sin WhatsApp no manda el enlace de perfil", async () => {

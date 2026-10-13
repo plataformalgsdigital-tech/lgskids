@@ -99,6 +99,25 @@ const ES_NINO = `(EXISTS (SELECT 1 FROM people_guardianship g WHERE g.nino_id = 
  * tiene matrícula viva — su campaña, curso y salón.
  * Alcance por país (ADR-0009) + filtros de la sección Kids.
  */
+/** La columna en minúsculas y sin tildes, para comparar con lo que se escribe. */
+const SIN_TILDES = (col: string) =>
+  `translate(lower(${col}), 'áéíóúàèìòùäëïöüâêîôûñ', 'aeiouaeiouaeiouaeioun')`;
+
+/**
+ * Las palabras de una búsqueda, en minúsculas y sin tildes, más su forma de
+ * DOCUMENTO (solo letras y números, en mayúsculas). Hasta 5: más es ruido.
+ */
+function palabrasDeBusqueda(texto: string): { texto: string; doc: string }[] {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((p) => p !== "")
+    .slice(0, 5)
+    .map((p) => ({ texto: p, doc: p.toUpperCase().replace(/[^A-Z0-9]/g, "") }));
+}
+
 export async function listNinos(params: {
   countryScope: string[] | null;
   id?: string;
@@ -123,18 +142,27 @@ export async function listNinos(params: {
     values.push(`%${params.id}%`);
     where.push(`p.doc_numero ILIKE $${values.length}`);
   }
-  if (params.buscar !== undefined && params.buscar !== "") {
-    // El buscador global: lo mismo que se busca de una persona, más su N° de
-    // contrato (interno o de LGS) para encontrar al niño por cualquiera.
-    values.push(`%${params.buscar}%`);
-    const i = values.length;
-    values.push(params.buscar.trim());
-    const exacto = values.length;
-    where.push(
-      `(p.nombres ILIKE $${String(i)} OR p.apellidos ILIKE $${String(i)}
-        OR p.doc_numero ILIKE $${String(i)} OR u.username ILIKE $${String(i)}
-        OR c.external_ref ILIKE $${String(i)} OR c.numero::text = $${String(exacto)})`,
-    );
+  if (params.buscar !== undefined && params.buscar.trim() !== "") {
+    // Buscador por PALABRAS: cada una tiene que aparecer en el nombre, el
+    // apellido, el documento, el usuario o el N° de contrato (interno o de LGS).
+    // Así "elysa acevedo" y "acevedo elysa" encuentran a la misma niña, y el N°
+    // de LGS sin sufijo trae a TODOS los hermanos de ese contrato. Sin tildes ni
+    // mayúsculas, y el documento sin puntos ni guiones.
+    for (const palabra of palabrasDeBusqueda(params.buscar)) {
+      values.push(`%${palabra.texto}%`);
+      const t = String(values.length);
+      values.push(palabra.texto);
+      const exacto = String(values.length);
+      values.push(palabra.doc === "" ? null : `%${palabra.doc}%`);
+      const d = String(values.length);
+      where.push(
+        `(${SIN_TILDES("p.nombres")} LIKE $${t} OR ${SIN_TILDES("p.apellidos")} LIKE $${t}
+          OR lower(u.username) LIKE $${t} OR lower(c.external_ref) LIKE $${t}
+          OR c.numero::text = $${exacto}
+          OR ($${d}::text IS NOT NULL
+              AND regexp_replace(upper(p.doc_numero), '[^A-Z0-9]', '', 'g') LIKE $${d}))`,
+      );
+    }
   }
   if (params.estado !== undefined) {
     values.push(params.estado);
