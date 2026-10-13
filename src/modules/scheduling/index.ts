@@ -144,6 +144,8 @@ export {
   etiquetaEventoAdmin,
 } from "./domain/evento-admin";
 export type { TipoEventoAdmin } from "./domain/evento-admin";
+export { colisionesDeCampania } from "./application/colisiones";
+export type { Colision } from "./application/colisiones";
 export {
   crearWelcome,
   listarWelcomes,

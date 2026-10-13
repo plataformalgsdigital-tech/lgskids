@@ -429,6 +429,64 @@ export async function reenviarEnlacePerfil(input: {
   });
 }
 
+/**
+ * Los Welcome que coordinación puede agendarle a un niño desde su ficha: los
+ * mismos que vería él (misma regla, `sqlElegible`), incluidos los "para curso en
+ * marcha" si su curso ya empezó.
+ */
+export async function opcionesWelcomeNino(
+  childPersonId: string,
+  countryScope: string[] | null,
+): Promise<{ welcomes: WelcomeDisponible[]; actual: WelcomeDeNino | null; motivo: string | null }> {
+  await exigirAlcance(childPersonId, countryScope);
+  const matricula = await matriculaDeNino(childPersonId);
+  const actual = await welcomeDeNino(childPersonId);
+  if (matricula === null) {
+    return { welcomes: [], actual, motivo: "El niño no tiene matrícula activa." };
+  }
+  const welcomes = await welcomesDisponibles({
+    classroomId: matricula.classroomId,
+    nivel: await nivelDeNino(childPersonId),
+  });
+  return { welcomes, actual, motivo: null };
+}
+
+/**
+ * Coordinación agenda (o cambia) el Welcome de un niño desde su ficha. Pasa por
+ * la MISMA reserva que el enlace de perfil: la regla de elegibilidad y el cupo
+ * con bloqueo. Queda quién lo agendó.
+ */
+export async function agendarWelcomeNino(input: {
+  actorUserId: string;
+  childPersonId: string;
+  welcomeId: string;
+  countryScope: string[] | null;
+  ip?: string | null;
+}): Promise<WelcomeDeNino | null> {
+  await exigirAlcance(input.childPersonId, input.countryScope);
+  const matricula = await matriculaDeNino(input.childPersonId);
+  if (matricula === null) throw new ConflictError("El niño no tiene matrícula activa.");
+  const nivel = await nivelDeNino(input.childPersonId);
+  await withTransaction((tx) =>
+    reservarWelcomeTx(tx, {
+      welcomeId: input.welcomeId,
+      childPersonId: input.childPersonId,
+      classroomId: matricula.classroomId,
+      nivel,
+      agendadoPor: input.actorUserId,
+    }),
+  );
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.welcome_agendado",
+    entidad: "people_person",
+    entidadId: input.childPersonId,
+    payload: { welcomeId: input.welcomeId, desde: "ficha" },
+    ip: input.ip ?? null,
+  });
+  return welcomeDeNino(input.childPersonId);
+}
+
 export interface EstadoPerfilNino {
   perfilCompletadoEn: string | null;
   sobreTi: string | null;

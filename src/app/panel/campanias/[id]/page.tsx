@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/ui/api-fetch";
 import { numeroContrato } from "@/ui/numero-contrato";
+import { ColisionesCampania } from "./ColisionesCampania";
 
 type Estado = "EN_MATRICULA" | "ACTIVA" | "CERRADA";
 
@@ -426,6 +427,7 @@ export default function DetalleCampaniaPage() {
   const [verEstructura, setVerEstructura] = useState(false);
   const [agregando, setAgregando] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("TODOS");
+  const [pestana, setPestana] = useState<"salones" | "colisiones">("salones");
   /** Salón cuyo botón de cupos se tocó: abre la lista de inscritos. */
   const [inscritosDe, setInscritosDe] = useState<{
     id: string;
@@ -910,227 +912,270 @@ export default function DetalleCampaniaPage() {
         </p>
       )}
 
-      <section
+      {/* Pestañas: los salones de la campaña, y los guías cuyas clases se pisan. */}
+      <div
+        role="tablist"
         style={{
+          display: "flex",
+          gap: "0.4rem",
           marginTop: "1rem",
-          border: "1px solid #e3e7f0",
-          borderRadius: "0.9rem",
-          padding: "1.1rem 1.25rem",
+          borderBottom: "2px solid #e3e7f0",
         }}
       >
-        <div
+        {(
+          [
+            ["salones", "Salones"],
+            ["colisiones", "Colisiones"],
+          ] as const
+        ).map(([clave, texto]) => (
+          <button
+            key={clave}
+            type="button"
+            role="tab"
+            aria-selected={pestana === clave}
+            onClick={() => setPestana(clave)}
+            style={{
+              padding: "0.55rem 1.1rem",
+              border: "none",
+              borderBottom: `3px solid ${pestana === clave ? "var(--lgs-azul)" : "transparent"}`,
+              marginBottom: "-2px",
+              background: "transparent",
+              fontWeight: 800,
+              fontSize: "0.92rem",
+              color: pestana === clave ? "var(--lgs-azul)" : "var(--texto-suave)",
+              cursor: "pointer",
+            }}
+          >
+            {texto}
+          </button>
+        ))}
+      </div>
+
+      {pestana === "colisiones" && <ColisionesCampania campaignId={params.id} />}
+
+      {pestana === "salones" && (
+        <section
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "0.5rem",
+            marginTop: "1rem",
+            border: "1px solid #e3e7f0",
+            borderRadius: "0.9rem",
+            padding: "1.1rem 1.25rem",
           }}
         >
-          <h2 style={{ fontSize: "1.15rem", margin: 0 }}>
-            Cursos de {detalle.nombre} ({filas.length} {filas.length === 1 ? "salón" : "salones"})
-          </h2>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => void generarSalones()}
-              disabled={ocupado}
-              title="Crea los salones de la campaña a partir del catálogo de horarios (guía pendiente)"
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "0.6rem",
-                border: "1.5px solid var(--lgs-azul)",
-                background: "white",
-                color: "var(--lgs-azul-oscuro)",
-                fontWeight: 700,
-                fontSize: "0.85rem",
-                cursor: ocupado ? "wait" : "pointer",
-              }}
-            >
-              {ocupado ? "Generando…" : "⚙️ Generar salones del catálogo"}
-            </button>
-            {/* Antes era un enlace al calendario que no creaba nada: ahora agrega
-                el salón aquí, desde un horario del catálogo. */}
-            <button
-              type="button"
-              onClick={() => setAgregando(true)}
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "0.6rem",
-                border: "none",
-                background: "var(--lgs-azul)",
-                color: "white",
-                fontWeight: 700,
-                fontSize: "0.85rem",
-                cursor: "pointer",
-              }}
-            >
-              + Agregar salón
-            </button>
-          </div>
-        </div>
-
-        {filas.length > 0 && (
           <div
-            role="group"
-            aria-label="Filtrar salones por estado"
-            style={{ display: "flex", gap: "0.4rem", marginTop: "0.75rem", flexWrap: "wrap" }}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
           >
-            {(["TODOS", "ACTIVO", "INACTIVO"] as const).map((op) => {
-              const activo = filtroEstado === op;
-              return (
-                <button
-                  key={op}
-                  type="button"
-                  aria-pressed={activo}
-                  onClick={() => setFiltroEstado(op)}
-                  style={{
-                    padding: "0.3rem 0.8rem",
-                    borderRadius: "999px",
-                    border: `1.5px solid ${activo ? "var(--lgs-azul)" : "#d6dbe6"}`,
-                    background: activo ? "var(--lgs-azul)" : "white",
-                    color: activo ? "white" : "var(--texto-suave)",
-                    fontWeight: 600,
-                    fontSize: "0.8rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  {ETIQUETA_FILTRO[op]} ({conteoEstado[op]})
-                </button>
-              );
-            })}
+            <h2 style={{ fontSize: "1.15rem", margin: 0 }}>
+              Cursos de {detalle.nombre} ({filas.length} {filas.length === 1 ? "salón" : "salones"})
+            </h2>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => void generarSalones()}
+                disabled={ocupado}
+                title="Crea los salones de la campaña a partir del catálogo de horarios (guía pendiente)"
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "0.6rem",
+                  border: "1.5px solid var(--lgs-azul)",
+                  background: "white",
+                  color: "var(--lgs-azul-oscuro)",
+                  fontWeight: 700,
+                  fontSize: "0.85rem",
+                  cursor: ocupado ? "wait" : "pointer",
+                }}
+              >
+                {ocupado ? "Generando…" : "⚙️ Generar salones del catálogo"}
+              </button>
+              {/* Antes era un enlace al calendario que no creaba nada: ahora agrega
+                el salón aquí, desde un horario del catálogo. */}
+              <button
+                type="button"
+                onClick={() => setAgregando(true)}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "0.6rem",
+                  border: "none",
+                  background: "var(--lgs-azul)",
+                  color: "white",
+                  fontWeight: 700,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                }}
+              >
+                + Agregar salón
+              </button>
+            </div>
           </div>
-        )}
 
-        {cargandoSalones ? (
-          <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando salones…</p>
-        ) : filas.length === 0 ? (
-          <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
-            Esta campaña aún no tiene salones. Agrégalos en{" "}
-            <Link href="/panel/calendario">Salones</Link>.
-          </p>
-        ) : visibles.length === 0 ? (
-          <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
-            No hay salones {filtroEstado === "ACTIVO" ? "activos" : "inactivos"} en esta campaña.
-          </p>
-        ) : (
-          <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-              <thead>
-                <tr style={{ borderBottom: "1.5px solid #e3e7f0" }}>
-                  <th style={th}>Tipo</th>
-                  <th style={th}>Salón</th>
-                  <th style={th}>País</th>
-                  <th style={th}>Guía</th>
-                  <th style={th}>Horario</th>
-                  <th style={th}>Inicio curso</th>
-                  <th style={th}>Final curso</th>
-                  <th style={th}>Cierre ventas</th>
-                  <th style={th}>Cupos</th>
-                  <th style={th}>Estado</th>
-                  <th style={th}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibles.map(({ curso, salon }) => {
-                  const lleno = salon.ocupados >= salon.cupo;
-                  return (
-                    <tr
-                      key={salon.id}
-                      style={{
-                        borderBottom: "1px solid #edf0f6",
-                        opacity: salon.activo ? 1 : 0.55,
-                      }}
-                    >
-                      <td style={{ ...td, fontWeight: 700, color: "var(--lgs-azul-oscuro)" }}>
-                        {curso.tipo}
-                      </td>
-                      <td style={{ ...td, fontWeight: 600 }}>
-                        {etiquetaSalon(salon.nombre, curso.tipo)}
-                      </td>
-                      <td style={td}>
-                        {PAIS_NOMBRE[salon.holidayCountry] ?? salon.holidayCountry}
-                      </td>
-                      <td style={{ ...td, whiteSpace: "normal" }}>
-                        {salon.guia ?? (
-                          <span style={{ color: "var(--texto-suave)" }}>— sin guía —</span>
-                        )}
-                      </td>
-                      <td style={{ ...td, whiteSpace: "normal" }}>
-                        {resumenHorario(salon.horario)}
-                      </td>
-                      <td style={td}>{curso.inicio}</td>
-                      <td style={td}>{curso.finalCurso}</td>
-                      <td style={td}>{detalle.finalVenta}</td>
-                      <td style={td}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setInscritosDe({
-                              id: salon.id,
-                              titulo: `${curso.tipo} · ${etiquetaSalon(salon.nombre, curso.tipo)}`,
-                              cupo: salon.cupo,
-                            })
-                          }
-                          title="Ver los niños inscritos"
-                          style={{
-                            fontWeight: 700,
-                            padding: "0.15rem 0.5rem",
-                            borderRadius: "0.9rem",
-                            border: "none",
-                            cursor: "pointer",
-                            font: "inherit",
-                            background: lleno ? "#fff8e1" : "#e8f5e9",
-                            color: lleno ? "#8a6d00" : "#1b5e20",
-                          }}
-                        >
-                          {salon.ocupados}/{salon.cupo}
-                        </button>
-                      </td>
-                      <td style={td}>
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            padding: "0.15rem 0.5rem",
-                            borderRadius: "0.9rem",
-                            background: salon.activo ? "#e8f5e9" : "#ffebee",
-                            color: salon.activo ? "#1b5e20" : "#c62828",
-                          }}
-                        >
-                          {salon.activo ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>
-                      <td style={td}>
-                        <span
-                          style={{ display: "inline-flex", gap: "0.6rem", alignItems: "center" }}
-                        >
-                          <Link href={`/panel/calendario/${salon.id}`} title="Editar salón">
-                            ✏️
-                          </Link>
+          {filas.length > 0 && (
+            <div
+              role="group"
+              aria-label="Filtrar salones por estado"
+              style={{ display: "flex", gap: "0.4rem", marginTop: "0.75rem", flexWrap: "wrap" }}
+            >
+              {(["TODOS", "ACTIVO", "INACTIVO"] as const).map((op) => {
+                const activo = filtroEstado === op;
+                return (
+                  <button
+                    key={op}
+                    type="button"
+                    aria-pressed={activo}
+                    onClick={() => setFiltroEstado(op)}
+                    style={{
+                      padding: "0.3rem 0.8rem",
+                      borderRadius: "999px",
+                      border: `1.5px solid ${activo ? "var(--lgs-azul)" : "#d6dbe6"}`,
+                      background: activo ? "var(--lgs-azul)" : "white",
+                      color: activo ? "white" : "var(--texto-suave)",
+                      fontWeight: 600,
+                      fontSize: "0.8rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {ETIQUETA_FILTRO[op]} ({conteoEstado[op]})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {cargandoSalones ? (
+            <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando salones…</p>
+          ) : filas.length === 0 ? (
+            <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+              Esta campaña aún no tiene salones. Agrégalos en{" "}
+              <Link href="/panel/calendario">Salones</Link>.
+            </p>
+          ) : visibles.length === 0 ? (
+            <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+              No hay salones {filtroEstado === "ACTIVO" ? "activos" : "inactivos"} en esta campaña.
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1.5px solid #e3e7f0" }}>
+                    <th style={th}>Tipo</th>
+                    <th style={th}>Salón</th>
+                    <th style={th}>País</th>
+                    <th style={th}>Guía</th>
+                    <th style={th}>Horario</th>
+                    <th style={th}>Inicio curso</th>
+                    <th style={th}>Final curso</th>
+                    <th style={th}>Cierre ventas</th>
+                    <th style={th}>Cupos</th>
+                    <th style={th}>Estado</th>
+                    <th style={th}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map(({ curso, salon }) => {
+                    const lleno = salon.ocupados >= salon.cupo;
+                    return (
+                      <tr
+                        key={salon.id}
+                        style={{
+                          borderBottom: "1px solid #edf0f6",
+                          opacity: salon.activo ? 1 : 0.55,
+                        }}
+                      >
+                        <td style={{ ...td, fontWeight: 700, color: "var(--lgs-azul-oscuro)" }}>
+                          {curso.tipo}
+                        </td>
+                        <td style={{ ...td, fontWeight: 600 }}>
+                          {etiquetaSalon(salon.nombre, curso.tipo)}
+                        </td>
+                        <td style={td}>
+                          {PAIS_NOMBRE[salon.holidayCountry] ?? salon.holidayCountry}
+                        </td>
+                        <td style={{ ...td, whiteSpace: "normal" }}>
+                          {salon.guia ?? (
+                            <span style={{ color: "var(--texto-suave)" }}>— sin guía —</span>
+                          )}
+                        </td>
+                        <td style={{ ...td, whiteSpace: "normal" }}>
+                          {resumenHorario(salon.horario)}
+                        </td>
+                        <td style={td}>{curso.inicio}</td>
+                        <td style={td}>{curso.finalCurso}</td>
+                        <td style={td}>{detalle.finalVenta}</td>
+                        <td style={td}>
                           <button
                             type="button"
-                            onClick={() => void eliminarSalon(salon)}
-                            disabled={ocupado}
-                            title="Eliminar salón"
+                            onClick={() =>
+                              setInscritosDe({
+                                id: salon.id,
+                                titulo: `${curso.tipo} · ${etiquetaSalon(salon.nombre, curso.tipo)}`,
+                                cupo: salon.cupo,
+                              })
+                            }
+                            title="Ver los niños inscritos"
                             style={{
-                              background: "none",
+                              fontWeight: 700,
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: "0.9rem",
                               border: "none",
                               cursor: "pointer",
-                              fontSize: "0.95rem",
+                              font: "inherit",
+                              background: lleno ? "#fff8e1" : "#e8f5e9",
+                              color: lleno ? "#8a6d00" : "#1b5e20",
                             }}
                           >
-                            🗑️
+                            {salon.ocupados}/{salon.cupo}
                           </button>
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                        </td>
+                        <td style={td}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: "0.9rem",
+                              background: salon.activo ? "#e8f5e9" : "#ffebee",
+                              color: salon.activo ? "#1b5e20" : "#c62828",
+                            }}
+                          >
+                            {salon.activo ? "Activo" : "Inactivo"}
+                          </span>
+                        </td>
+                        <td style={td}>
+                          <span
+                            style={{ display: "inline-flex", gap: "0.6rem", alignItems: "center" }}
+                          >
+                            <Link href={`/panel/calendario/${salon.id}`} title="Editar salón">
+                              ✏️
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => void eliminarSalon(salon)}
+                              disabled={ocupado}
+                              title="Eliminar salón"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "0.95rem",
+                              }}
+                            >
+                              🗑️
+                            </button>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Estructura curricular (niveles/lecciones) — secundaria, colapsable */}
       <section style={{ marginTop: "1.25rem" }}>

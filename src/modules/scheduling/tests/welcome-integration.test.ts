@@ -6,6 +6,7 @@ import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, ValidationError } from "@/platform/errors";
+import { colisionesDeCampania } from "../application/colisiones";
 import { crearSalon } from "../application/gestion-salones";
 import {
   crearWelcome,
@@ -187,6 +188,57 @@ describe.runIf(RUN)("Welcome (integración)", () => {
     // Reservar el mismo otra vez no duplica.
     await reservar(grande, a, junior);
     expect((await detalleWelcome(grande)).welcome.inscritos).toBe(1);
+  });
+
+  it("el Welcome para curso EN MARCHA puede ser después del inicio del curso", async () => {
+    // Sin la marca, después del inicio se rechaza (primera prueba); con ella, no.
+    const enMarcha = await nuevo({ fecha: dias(40), enMarcha: true });
+    const lista = await welcomesDisponibles({ classroomId: junior, nivel: "ROOKIE" });
+    expect(lista.find((w) => w.id === enMarcha)?.enMarcha).toBe(true);
+    // Y el niño lo puede agendar con la misma reserva de siempre.
+    const [, , c] = ninos as [string, string, string];
+    await reservar(enMarcha, c, junior);
+    expect((await welcomeDeNino(c))?.welcomeId).toBe(enMarcha);
+  });
+
+  it("colisiones: el mismo guía con dos salones a la misma hora", async () => {
+    const curso = (
+      await queryOne<{ id: string }>(
+        `SELECT id FROM catalog_course WHERE campaign_id = $1 AND tipo = 'JUNIOR'`,
+        [campaniaId],
+      )
+    )?.id as string;
+    const choque = async (nombre: string) =>
+      (
+        await crearSalon({
+          actorUserId: actor,
+          courseId: curso,
+          nombre,
+          guiaUserId: actor,
+          cupo: 5,
+          timezone: "America/Santiago",
+          holidayCountry: "CL",
+          slots: [{ tipo: "SESION", diaSemana: 4, horaLocal: "18:00", duracionMin: 60 }],
+        })
+      ).id;
+    const a = await choque(`Choque A ${marca}`);
+    const b = await choque(`Choque B ${marca}`);
+    try {
+      const lista = await colisionesDeCampania(campaniaId);
+      const c = lista.find(
+        (x) =>
+          [x.salonA, x.salonB].includes(`Choque A ${marca}`) &&
+          [x.salonA, x.salonB].includes(`Choque B ${marca}`),
+      );
+      expect(c?.mismoCurso).toBe(true);
+      expect(c?.choques).toBeGreaterThan(0);
+    } finally {
+      for (const cl of [a, b]) {
+        await execute(`DELETE FROM scheduling_session WHERE classroom_id = $1`, [cl]);
+        await execute(`DELETE FROM scheduling_slot WHERE classroom_id = $1`, [cl]);
+        await execute(`DELETE FROM scheduling_classroom WHERE id = $1`, [cl]);
+      }
+    }
   });
 
   it("se pasa lista solo a quien lo agendó, y no se borra con niños dentro", async () => {

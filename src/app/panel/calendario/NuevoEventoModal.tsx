@@ -137,6 +137,9 @@ export function NuevoEventoModal({
   // EN MATRÍCULA: es la de los niños que están por empezar.
   const [campaniasLista, setCampaniasLista] = useState<CampaniaOpcion[]>([]);
   const esWelcome = !esAdmin && tipo === "WELCOME";
+  // Welcome para niños que entran con el curso YA andando: no exige ser antes
+  // del inicio. Se marca solo al elegir una campaña que ya no está en matrícula.
+  const [enMarcha, setEnMarcha] = useState(false);
 
   const cargarGuias = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/eventos");
@@ -188,6 +191,7 @@ export function NuevoEventoModal({
       setSalonPrincipal("");
       setNivel("ROOKIE");
       setLimite("");
+      setEnMarcha(false);
       setCompartir(false);
       setExtras([]);
     } else if (veniaDeWelcome) {
@@ -273,6 +277,7 @@ export function NuevoEventoModal({
             nivel: nivel === "" ? "ROOKIE" : nivel,
             limiteUsuarios: Number(limite),
             observaciones: observaciones.trim() === "" ? null : observaciones,
+            enMarcha,
           }
         : esAdmin
           ? {
@@ -494,6 +499,10 @@ export function NuevoEventoModal({
                 value={campania}
                 onChange={(e) => {
                   setCampania(e.target.value);
+                  if (esWelcome) {
+                    const estado = campaniasLista.find((c) => c.nombre === e.target.value)?.estado;
+                    setEnMarcha(estado !== undefined && estado !== "EN_MATRICULA");
+                  }
                   setPais("");
                   setCurso("");
                   setSalonPrincipal("");
@@ -683,8 +692,31 @@ export function NuevoEventoModal({
             >
               <strong>👋 Welcome.</strong> La hora va en tu reloj ({zonaNavegador}); cada niño la
               verá en su propia hora. Lo agendan los niños de nivel {nivel || "ROOKIE"} al crear su
-              perfil, solo si su curso empieza después: el Welcome se hace antes del inicio del
-              curso. Campaña, país, curso y salón vacíos = todos.
+              perfil (o coordinación desde su ficha). Campaña, país, curso y salón vacíos = todos.
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "0.45rem",
+                  marginTop: "0.5rem",
+                  fontWeight: 700,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={enMarcha}
+                  onChange={(e) => setEnMarcha(e.target.checked)}
+                  style={{ marginTop: "0.2rem" }}
+                />
+                <span>
+                  Para niños con el curso en marcha
+                  <span style={{ display: "block", fontWeight: 400 }}>
+                    {enMarcha
+                      ? "No exige que sea antes del inicio del curso: es para quien entra con el curso ya andando."
+                      : "Sin marcar, el Welcome tiene que ser antes del inicio del curso."}
+                  </span>
+                </span>
+              </label>
             </div>
           )}
 

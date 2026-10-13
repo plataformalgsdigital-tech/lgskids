@@ -39,7 +39,7 @@ function sqlElegible(pNivel: string): string {
       AND (w.campaign_id IS NULL OR w.campaign_id = nco.campaign_id)
       AND (w.curso IS NULL OR w.curso = nco.tipo::text)
       AND (w.pais IS NULL OR w.pais = ncl.holiday_country)
-      AND w.starts_at < (nco.inicio::timestamp AT TIME ZONE ncl.timezone)`;
+      AND (w.en_marcha OR w.starts_at < (nco.inicio::timestamp AT TIME ZONE ncl.timezone))`;
 }
 
 const INSCRITOS = `(SELECT count(*) FROM scheduling_welcome_reserva r
@@ -61,6 +61,8 @@ export interface WelcomeResumen {
   limiteUsuarios: number;
   inscritos: number;
   observaciones: string | null;
+  /** Para niños que entran con el curso ya andando: no exige ser antes del inicio. */
+  enMarcha: boolean;
 }
 
 const SELECT_WELCOME = `
@@ -68,7 +70,8 @@ const SELECT_WELCOME = `
          w.guia_user_id AS "guiaUserId", ${NOMBRE_GUIA} AS guia,
          w.campaign_id AS "campaignId", ca.nombre AS campania, w.pais::text AS pais,
          w.curso, w.classroom_id AS "classroomId", cl.nombre AS salon, w.nivel,
-         w.limite_usuarios AS "limiteUsuarios", ${INSCRITOS} AS inscritos, w.observaciones
+         w.limite_usuarios AS "limiteUsuarios", ${INSCRITOS} AS inscritos, w.observaciones,
+         w.en_marcha AS "enMarcha"
     FROM scheduling_welcome w
     JOIN identity_user gu ON gu.id = w.guia_user_id
     ${JOIN_NOMBRE_GUIA}
@@ -91,8 +94,14 @@ export async function crearWelcome(input: {
   nivel: NivelWelcome;
   limiteUsuarios: number;
   observaciones?: string | null;
+  /**
+   * Para niños que entran con el curso YA ANDANDO (una migración, una matrícula
+   * tardía): no exige que sea antes del inicio del curso.
+   */
+  enMarcha?: boolean;
   ip?: string | null;
 }): Promise<{ id: string; salones: number }> {
+  const enMarcha = input.enMarcha === true;
   const invalido = validarWelcome(input);
   if (invalido !== null) throw new ValidationError(invalido);
   try {
@@ -116,9 +125,10 @@ export async function crearWelcome(input: {
   );
   if (guia === null) throw new NotFoundError("El guía no existe o está inactivo.");
 
-  // El Welcome es SIEMPRE antes de que empiece el curso: tiene que haber al
-  // menos un salón, con esos filtros, cuyo curso arranque después. Esto valida
-  // también que el salón elegido sea coherente con campaña, país y curso.
+  // El Welcome es antes de que empiece el curso: tiene que haber al menos un
+  // salón, con esos filtros, cuyo curso arranque después — salvo el Welcome
+  // para curso EN MARCHA. Esto valida también que el salón elegido sea
+  // coherente con campaña, país y curso.
   const salones = await queryOne<{ n: number }>(
     `SELECT count(*)::int AS n
        FROM scheduling_classroom cl
@@ -128,12 +138,14 @@ export async function crearWelcome(input: {
         AND ($2::text IS NULL OR cl.holiday_country = $2)
         AND ($3::text IS NULL OR co.tipo::text = $3)
         AND ($4::uuid IS NULL OR cl.id = $4)
-        AND $5::timestamptz < (co.inicio::timestamp AT TIME ZONE cl.timezone)`,
-    [input.campaignId, input.pais, input.curso, input.classroomId, startsAt],
+        AND ($6::boolean OR $5::timestamptz < (co.inicio::timestamp AT TIME ZONE cl.timezone))`,
+    [input.campaignId, input.pais, input.curso, input.classroomId, startsAt, enMarcha],
   );
   if ((salones?.n ?? 0) === 0) {
     throw new ValidationError(
-      "Ningún salón con esos filtros empieza su curso después de esa fecha: el Welcome se hace antes del inicio del curso.",
+      enMarcha
+        ? "Ningún salón activo cumple esos filtros."
+        : "Ningún salón con esos filtros empieza su curso después de esa fecha: el Welcome se hace antes del inicio del curso. Si es para niños con el curso ya andando, márcalo como «para curso en marcha».",
     );
   }
 
@@ -141,8 +153,8 @@ export async function crearWelcome(input: {
   await execute(
     `INSERT INTO scheduling_welcome
        (id, starts_at, timezone, fecha, duracion_min, guia_user_id, campaign_id, pais, curso,
-        classroom_id, nivel, limite_usuarios, observaciones, creado_por)
-     VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        classroom_id, nivel, limite_usuarios, observaciones, creado_por, en_marcha)
+     VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [
       id,
       startsAt,
@@ -158,6 +170,7 @@ export async function crearWelcome(input: {
       input.limiteUsuarios,
       input.observaciones?.trim() || null,
       input.actorUserId,
+      enMarcha,
     ],
   );
   await registrarAuditoria({
@@ -175,6 +188,7 @@ export async function crearWelcome(input: {
       classroomId: input.classroomId,
       nivel: input.nivel,
       limite: input.limiteUsuarios,
+      enMarcha,
       salones: salones?.n ?? 0,
     },
     ip: input.ip ?? null,

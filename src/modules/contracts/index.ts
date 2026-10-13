@@ -40,6 +40,8 @@ export {
   completarPerfilNino,
   reenviarEnlacePerfil,
   estadoPerfilNino,
+  opcionesWelcomeNino,
+  agendarWelcomeNino,
 } from "./application/perfil-nino";
 export type {
   FichaPerfil,

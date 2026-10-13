@@ -23,6 +23,15 @@ interface EstadoPerfil {
   } | null;
 }
 
+interface OpcionWelcome {
+  id: string;
+  startsAt: string;
+  duracionMin: number;
+  guia: string;
+  libres: number;
+  enMarcha: boolean;
+}
+
 const card: CSSProperties = {
   border: "1px solid #e3e7f0",
   borderRadius: "0.9rem",
@@ -51,11 +60,48 @@ export function PerfilWelcome({
   const [estado, setEstado] = useState<EstadoPerfil | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  // Agendar el Welcome desde la ficha (coordinación, `matriculas.gestionar`).
+  const [opciones, setOpciones] = useState<OpcionWelcome[]>([]);
+  const [puedeAgendar, setPuedeAgendar] = useState(false);
+  const [eligiendo, setEligiendo] = useState(false);
+  const [elegido, setElegido] = useState("");
 
   const cargar = useCallback(async () => {
-    const res = await apiFetch(`/api/contracts/ninos/${childPersonId}/perfil`);
+    const [res, resW] = await Promise.all([
+      apiFetch(`/api/contracts/ninos/${childPersonId}/perfil`),
+      apiFetch(`/api/contracts/ninos/${childPersonId}/welcome`),
+    ]);
     if (res.ok) setEstado((await res.json()) as EstadoPerfil);
+    if (resW.ok) {
+      const d = (await resW.json()) as { welcomes: OpcionWelcome[]; puedeAgendar: boolean };
+      setOpciones(d.welcomes);
+      setPuedeAgendar(d.puedeAgendar);
+    }
   }, [childPersonId]);
+
+  async function agendar() {
+    if (elegido === "") return;
+    setOcupado(true);
+    setAviso(null);
+    try {
+      const res = await apiFetch(`/api/contracts/ninos/${childPersonId}/welcome`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ welcomeId: elegido }),
+      });
+      if (!res.ok) {
+        const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
+        setAviso({ ok: false, texto: c.error?.message ?? "No se pudo agendar el Welcome." });
+        return;
+      }
+      setAviso({ ok: true, texto: "Welcome agendado." });
+      setEligiendo(false);
+      setElegido("");
+      await cargar();
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   useEffect(() => {
     async function inicial() {
@@ -215,7 +261,106 @@ export function PerfilWelcome({
               )}
             </span>
           )}
+          {puedeAgendar && !eligiendo && (
+            <button
+              type="button"
+              onClick={() => setEligiendo(true)}
+              style={{
+                marginLeft: "0.6rem",
+                padding: "0.25rem 0.7rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #a5d6a7",
+                background: "#e8f5e9",
+                color: "#1b5e20",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+              }}
+            >
+              📅 {estado.welcome === null ? "Agendar Welcome" : "Cambiar Welcome"}
+            </button>
+          )}
         </div>
+
+        {eligiendo && (
+          <div
+            style={{
+              border: "1px solid #e3e7f0",
+              borderRadius: "0.7rem",
+              padding: "0.7rem 0.8rem",
+              display: "grid",
+              gap: "0.35rem",
+            }}
+          >
+            {opciones.length === 0 ? (
+              <span style={{ color: "#b57a00" }}>
+                No hay Welcome disponibles para este niño. Si su curso ya empezó, crea uno en el
+                calendario marcado «para curso en marcha».
+              </span>
+            ) : (
+              opciones.map((w) => (
+                <label
+                  key={w.id}
+                  style={{
+                    display: "flex",
+                    gap: "0.5rem",
+                    alignItems: "center",
+                    opacity: w.libres === 0 ? 0.5 : 1,
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name={`welcome-${childPersonId}`}
+                    value={w.id}
+                    disabled={w.libres === 0}
+                    checked={elegido === w.id}
+                    onChange={() => setElegido(w.id)}
+                  />
+                  <span>
+                    {fechaHora(w.startsAt)} · {w.duracionMin} min · con {w.guia} ·{" "}
+                    {w.libres === 0 ? "LLENO" : `${String(w.libres)} cupos`}
+                    {w.enMarcha && " · curso en marcha"}
+                  </span>
+                </label>
+              ))
+            )}
+            <span style={{ display: "flex", gap: "0.4rem", marginTop: "0.3rem" }}>
+              <button
+                type="button"
+                disabled={ocupado || elegido === ""}
+                onClick={() => void agendar()}
+                style={{
+                  padding: "0.35rem 0.9rem",
+                  borderRadius: "0.5rem",
+                  border: "none",
+                  background: elegido === "" ? "#c9c6d8" : "var(--lgs-azul)",
+                  color: "white",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {ocupado ? "Agendando…" : "Agendar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEligiendo(false);
+                  setElegido("");
+                }}
+                style={{
+                  padding: "0.35rem 0.9rem",
+                  borderRadius: "0.5rem",
+                  border: "1px solid #e3e7f0",
+                  background: "white",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );

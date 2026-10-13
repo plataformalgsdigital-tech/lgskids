@@ -22,6 +22,7 @@ interface Welcome {
   limiteUsuarios: number;
   inscritos: number;
   observaciones: string | null;
+  enMarcha: boolean;
 }
 
 interface Inscrito {
@@ -230,6 +231,7 @@ export function WelcomeModal({
                 {fila("Curso", welcome.curso ?? "Todos")}
                 {fila("Salón", welcome.salon ?? "Todos")}
                 {fila("Nivel", welcome.nivel)}
+                {welcome.enMarcha && fila("Tipo", "Para niños con el curso en marcha")}
                 {fila(
                   "Inscritos",
                   `${String(welcome.inscritos)} / ${String(welcome.limiteUsuarios)}`,

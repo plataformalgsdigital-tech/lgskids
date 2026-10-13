@@ -1744,6 +1744,42 @@ para niños de varios salones, países y campañas. Migración `20261009000000_w
 - Prueba: `scheduling/tests/welcome-integration.test.ts`.
 - `/mi-panel` muestra **"👋 Mi Welcome"** (hora local, guía y Zoom DEL EVENTO, con la
   misma ventana de ingreso que una clase) hasta que termina.
+- **Welcome para curso EN MARCHA (2026-10-13, migración `20261013100000`)**: para
+  niños que entran con el curso ya andando. `scheduling_welcome.en_marcha` lo libera
+  de "antes del inicio" al crearlo y en `sqlElegible`. En el modal es una casilla que
+  se marca sola al elegir una campaña que ya no está en matrícula.
+- **Coordinación agenda desde la FICHA del niño** ("📅 Agendar/Cambiar Welcome" en
+  "Perfil y Welcome"; `GET|POST /api/contracts/ninos/[id]/welcome`,
+  `matriculas.gestionar`): la MISMA regla y la MISMA reserva con bloqueo que el
+  enlace, con `agendado_por` = quien lo hizo. Auditoría `scheduling.welcome_agendado`.
+
+## Colisiones de guías (2026-10-13)
+
+Pestaña **Colisiones** en la ficha de campaña (`ColisionesCampania.tsx`,
+`GET /api/scheduling/campaigns/[id]/colisiones` → `colisionesDeCampania`,
+`salones.gestionar`): un mismo guía con dos salones cuyas sesiones FUTURAS se
+pisan, con el guía EFECTIVO de cada sesión. Basta con que uno de los dos salones
+sea de la campaña (el choque con otra campaña también cuenta). Dice si los dos son
+del **mismo curso**: el negocio decidirá si en ese caso el guía puede dictarlos
+juntos; entre cursos distintos no. Solo informa: no bloquea ni cambia nada.
+
+## Migración de AGOSTO2026 (2026-10-13)
+
+Los niños de la campaña de agosto entraron con el curso ya andando (empezó el
+17-ago). Se cargaron con un script de una sola vez (no está en el repo) que
+replica la integración de LGS: por cada `KIDS_INSCRIPCIONES` de LGS con salón de
+agosto, titular y niño desde `PEOPLE` (docTipo "CC", ref `contrato#numeroId`),
+**fecha de inicio = `inicioContrato` de LGS**, `crearReservaBeneficiario` +
+`aprobarContrato({ enviarPerfil: false })` como `sistema-lgs`, y en LGS la
+inscripción quedó `enviadoAKids`/`aprobadoEnKids` con usuario y clave inicial (lo
+que hace su `matricularKids`). Resultado: **50 niños APROBADOS con cuenta** (sin
+copia en la bóveda: el script corrió sin la llave; la tendrán al elegir su clave
+con el enlace de perfil). Alonso Ruiz pasó a Junior Salón 05 (9 años a su fecha de
+inicio). Se activaron Junior 02, Junior 11, Youngster 11 y Youngster 12 (sin guía).
+**Pendientes**: los enlaces de perfil no se mandaron (decisión del negocio: "se
+enviarán después", con "Enviar enlace sin Welcome"); 18 niños del CSV no tenían
+inscripción en LGS (6 de salones que se suman después, 2 devueltos/retractados que
+quedan solo en LGS, y 10 por revisar en LGS).
 
 ## Creación de perfil del niño (2026-10-10)
 
