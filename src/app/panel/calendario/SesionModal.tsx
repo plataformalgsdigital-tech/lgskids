@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ReportarCasoModal } from "../servicio/casos-atencion/ReportarCasoModal";
 import { CancelacionSesion } from "./CancelacionSesion";
 import type { EventoEditable } from "./NuevoEventoModal";
 
@@ -233,12 +234,19 @@ export function SesionModal({
   /** Por defecto se abre a TODA la lista; aquí van los que el guía desmarca. */
   const [excluidos, setExcluidos] = useState<Set<string>>(new Set());
 
+  // Casos de atención reportados en esta sesión (el ⚠ de la lista).
+  const [casosSesion, setCasosSesion] = useState<{ childPersonId: string; codigo: string }[]>([]);
+  const [reportando, setReportando] = useState(false);
+  const casoDe = (childPersonId: string) =>
+    casosSesion.find((c) => c.childPersonId === childPersonId) ?? null;
+
   const cargar = useCallback(async () => {
     try {
-      const [rl, rr, rm] = await Promise.all([
+      const [rl, rr, rm, rc] = await Promise.all([
         apiFetch(`/api/attendance/sessions/${sessionId}`),
         apiFetch(`/api/scheduling/sessions/${sessionId}/registro`),
         apiFetch(`/api/scheduling/sessions/${sessionId}/misiones`),
+        apiFetch(`/api/casos/sesion/${sessionId}`),
       ]);
       if (!rl.ok) {
         setError("No se pudo cargar la sesión.");
@@ -247,6 +255,11 @@ export function SesionModal({
       const datos = (await rl.json()) as { sesion: Sesion; lista: Fila[] };
       setSesion(datos.sesion);
       setLista(datos.lista);
+      if (rc.ok) {
+        setCasosSesion(
+          ((await rc.json()) as { reportes: { childPersonId: string; codigo: string }[] }).reportes,
+        );
+      }
       if (rr.ok) {
         setRepeticiones(((await rr.json()) as { repeticiones: Repeticion[] }).repeticiones);
       }
@@ -1488,8 +1501,16 @@ export function SesionModal({
                         </span>
                       </button>
                       {f.marca?.participo === true && <span title="Participó">💬</span>}
-                      {f.marca?.requiereAtencion === true && (
-                        <span title="Requiere atención">⚠️</span>
+                      {(casoDe(f.childPersonId) !== null || f.marca?.requiereAtencion === true) && (
+                        <span
+                          title={
+                            casoDe(f.childPersonId) !== null
+                              ? `Caso de atención ${casoDe(f.childPersonId)?.codigo ?? ""}`
+                              : "Requiere atención"
+                          }
+                        >
+                          ⚠️
+                        </span>
                       )}
                       <span
                         style={{
@@ -1673,21 +1694,36 @@ export function SesionModal({
                     />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFicha((f) => ({ ...f, requiereAtencion: !f.requiereAtencion }))
-                    }
+                  {/* "Requiere atención" REPORTA un caso de atención (Servicio ›
+                      Casos de atención): ya no es una marca suelta en la ficha. */}
+                  <div
                     style={{
-                      ...boton,
-                      alignSelf: "flex-start",
-                      background: ficha.requiereAtencion ? "#ffebee" : "white",
-                      borderColor: ficha.requiereAtencion ? "#c62828" : "#e3e7f0",
-                      color: ficha.requiereAtencion ? "#c62828" : "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      flexWrap: "wrap",
                     }}
                   >
-                    ⚠️ {ficha.requiereAtencion ? "Marcado: requiere atención" : "Requiere atención"}
-                  </button>
+                    <button
+                      type="button"
+                      disabled={ocupado || sesion?.cancelada === true}
+                      onClick={() => setReportando(true)}
+                      style={{
+                        ...boton,
+                        alignSelf: "flex-start",
+                        background: casoDe(alumno.childPersonId) !== null ? "#ffebee" : "white",
+                        borderColor: casoDe(alumno.childPersonId) !== null ? "#c62828" : "#e3e7f0",
+                        color: casoDe(alumno.childPersonId) !== null ? "#c62828" : "inherit",
+                      }}
+                    >
+                      ⚠️ Requiere atención
+                    </button>
+                    {casoDe(alumno.childPersonId) !== null && (
+                      <span style={{ fontSize: "0.8rem", color: "#c62828", fontWeight: 600 }}>
+                        Caso {casoDe(alumno.childPersonId)?.codigo} reportado en esta sesión
+                      </span>
+                    )}
+                  </div>
 
                   <button
                     type="button"
@@ -1703,6 +1739,20 @@ export function SesionModal({
           </div>
         </div>
       </div>
+
+      {reportando && alumno !== null && sesion !== null && (
+        <ReportarCasoModal
+          nino={{ id: alumno.childPersonId, nombre: `${alumno.nombres} ${alumno.apellidos}` }}
+          sessionId={sesion.id}
+          sesionLabel={`${tituloSalon(sesion)} · ${sesion.fecha}`}
+          onCerrar={() => setReportando(false)}
+          onReportado={(texto) => {
+            setReportando(false);
+            setAviso(texto);
+            void cargar();
+          }}
+        />
+      )}
 
       <style>{`@media (max-width: 900px) { .ses-dos { grid-template-columns: 1fr !important; } }`}</style>
     </div>

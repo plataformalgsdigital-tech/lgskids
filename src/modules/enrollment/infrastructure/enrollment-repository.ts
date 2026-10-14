@@ -277,14 +277,17 @@ export async function matriculasParaIntake(): Promise<MatriculaIntakeItem[]> {
       fechaNacimiento: (r["fechaNacimiento"] as string | null) ?? null,
       username: (r["username"] as string | null) ?? null,
     },
-    apoderado: r["apDoc"] == null ? null : {
-      nombres: String(r["apNombres"] ?? ""),
-      apellidos: String(r["apApellidos"] ?? ""),
-      docNumero: String(r["apDoc"]),
-      email: (r["apEmail"] as string | null) ?? null,
-      telefono: (r["apTelefono"] as string | null) ?? null,
-      parentesco: (r["parentesco"] as string | null) ?? null,
-    },
+    apoderado:
+      r["apDoc"] == null
+        ? null
+        : {
+            nombres: String(r["apNombres"] ?? ""),
+            apellidos: String(r["apApellidos"] ?? ""),
+            docNumero: String(r["apDoc"]),
+            email: (r["apEmail"] as string | null) ?? null,
+            telefono: (r["apTelefono"] as string | null) ?? null,
+            parentesco: (r["parentesco"] as string | null) ?? null,
+          },
   }));
 }
 

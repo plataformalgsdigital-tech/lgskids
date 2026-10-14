@@ -30,6 +30,10 @@ export const PERMISOS = {
   /** WhatsApp a los apoderados: Gestión y el botón de credenciales de la ficha. */
   MENSAJES_ENVIAR: "mensajes.enviar",
   MENSAJES_PLANTILLAS: "mensajes.plantillas",
+  /** Servicio › Casos de atención: ver la bandeja y los casos. */
+  CASOS_VER: "casos.ver",
+  /** Asignar, contactar, anotar, cerrar y abrir casos desde la bandeja. */
+  CASOS_GESTIONAR: "casos.gestionar",
   // ── Visibilidad del menú ────────────────────────────────────────────────
   // Separados a propósito de los permisos funcionales: apagar un ítem del
   // menú NO debe quitarle capacidades a nadie. Un guía puede necesitar
@@ -178,6 +182,8 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.MENSAJES_ENVIAR,
     PERMISOS.MENSAJES_PLANTILLAS,
     PERMISOS.MENU_MENSAJES,
+    PERMISOS.CASOS_VER,
+    PERMISOS.CASOS_GESTIONAR,
   ],
   guia: [
     PERMISOS.PANEL_GUIA,

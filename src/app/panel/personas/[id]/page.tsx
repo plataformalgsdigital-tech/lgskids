@@ -8,6 +8,7 @@ import { numeroContrato } from "@/ui/numero-contrato";
 import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
 import { AcademicInfo } from "./AcademicInfo";
 import { EnviarCredencialesModal } from "./EnviarCredencialesModal";
+import { CasosNino } from "./CasosNino";
 import { PerfilWelcome } from "./PerfilWelcome";
 
 interface Nino {
@@ -393,6 +394,9 @@ export default function DetalleNinoPage() {
             tieneCuenta={nino.userId !== null}
             puedeEnviar={puedeEnviarMensajes}
           />
+
+          {/* Casos de atención del niño (se oculta sola sin `casos.ver`). */}
+          <CasosNino childPersonId={nino.id} />
 
           {/* Información académica */}
           <section style={{ ...card, marginTop: "1rem" }}>

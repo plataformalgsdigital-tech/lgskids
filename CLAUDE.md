@@ -997,7 +997,7 @@ se toca lo que miden:
 
 ## Estructura
 
-- `src/modules/<m>/` — 16 módulos: 15 de negocio + `dbadmin`, que es
+- `src/modules/<m>/` — 17 módulos: 16 de negocio (el último, `casos`) + `dbadmin`, que es
   herramienta de administración (ver "Explorador de la base de datos"); anatomía
   domain/application/infrastructure/api/ui + `index.ts` (API pública, lo
   ÚNICO importable desde fuera; lo verifica `.dependency-cruiser.cjs`).
@@ -1471,7 +1471,7 @@ solo servía para completar la ficha.
   ayer. Los filtros de las cuatro son UN componente, `servicio/FiltrosServicio.tsx`.
   **Toda consulta de Servicio descarga
   CSV** con `src/ui/csv.ts` (`;`, BOM y celdas que empiezan por `=`/`@` neutralizadas
-  contra inyección de fórmulas). Casos de atención y Reactivados abren por ahora la página
+  contra inyección de fórmulas). **Casos de atención**: ver su sección. Reactivados abre por ahora la página
   **EN CONSTRUCCIÓN** —`src/ui/EnConstruccion.tsx`, vía `servicio/[opcion]`, que es
   también la de Sesiones › Suspensiones y Feriados—; al construir una, se le crea su
   carpeta y se saca de `OPCIONES`. Cada una con su `menu.servicio_*`, migración
@@ -1839,6 +1839,59 @@ formulario de crear (`NuevoEventoModal` con `editar`) y el mismo permiso
   clicable para quien tiene `eventos.crear`.
 - Auditoría: `scheduling.welcome_editado`, `scheduling.evento_editado` y
   `scheduling.evento_admin_editado`. Pruebas en `welcome-integration.test.ts`.
+
+## Casos de atención (2026-10-14)
+
+Módulo `casos`, migración `20261014400000_casos_atencion`. Réplica del proceso de
+MOSAICO (Servicio › Casos de Atención) ajustada a KIDS: el guía REPORTA desde la
+sesión con **"⚠️ Requiere atención"** (antes era una marca suelta en la ficha, que se
+sigue mostrando si existía), el reporte abre un caso o se suma a uno abierto,
+Servicio lo ASIGNA a un área, el área contacta a la familia, registra el acuerdo y lo
+CIERRA con su conclusión.
+
+- **Reglas puras en `casos/domain/casos.ts`** (con pruebas): tipos (Asistencia,
+  Conducta, Desempeño, Salud, Pago, Otro), estados, ÁREAS de KIDS (Servicio Académico,
+  Coordinación Académica, Finanzas de LGS — no hay Nivelación: aquí es el estado de
+  cierre "Refuerzo agendado"), `CIERRES_POR_AREA`, `problemaTransicion` (desde un área
+  solo se deriva a Finanzas; cerrado = solo lectura, no se reabre), `problemaCierre`
+  (acuerdo obligatorio salvo "Sin poder contactar"; la fecha de compromiso es
+  opcional), `reincidencia` por reglas (MOSAICO usaba IA) y el código
+  `CA-<contrato>-NN` por CONTRATO (N° de LGS sin el sufijo, o `K<numero>`), con
+  `pg_advisory_xact_lock`. `numero_caso` es el N° del NIÑO.
+- **Cuatro errores de MOSAICO que NO se copiaron**: "abierto" se decidía de dos formas
+  (aquí UNA: `cierraElCaso`); un caso asignado no admitía contactos; asignar lo marcaba
+  como cerrado; y el desplegable ofrecía estados que el servidor rechazaba (aquí el
+  vocabulario y los cierres los sirve `GET /api/casos/vocabulario` y la pantalla no
+  copia listas).
+- Tablas: `casos_caso` (TEXT con CHECK, no ENUM: sumar un valor es una línea),
+  `casos_reporte` (INMUTABLE, con `leido_*`: abrir el caso los marca leídos),
+  `casos_contacto` (intento numerado por canal) y `casos_seguimiento` (cada cambio de
+  estado/área con su motivo —al cerrar, la CONCLUSIÓN— y cada nota). El contexto del
+  niño (salón, campaña, guía, apoderado, teléfono) se DERIVA al leer, nunca se copia.
+- **Reportar** (`POST /api/casos/reportes` → `reportarCaso`): con casos abiertos hay
+  que elegir destino (sumar a uno o "NUEVO"); sin elegir, 409 con los casos en
+  `details` (la pantalla pregunta). Un caso abierto por TIPO. Desde la sesión exige
+  `asistencia.gestionar`, que la sesión sea del guía (o `salones.gestionar`) y que el
+  niño esté en la lista del salón (`exigirReporteDesdeSesion`); desde la bandeja
+  ("+ Adicionar caso": campaña → curso → salón → niño, opcionalmente a nombre de un
+  guía), `casos.gestionar`.
+- **Bandeja** `/panel/servicio/casos-atencion` (`GET /api/casos?vista=` →
+  `bandejaCasos`): Sin asignar · Servicio Académico · Coordinación · Finanzas ·
+  Histórico, con conteos, filtros comunes de Servicio + tipo y origen, fechas
+  opcionales (apertura; en el histórico, cierre), "Asignar" (`GestionarCasoModal`: a un
+  área con comentario, o cerrar con conclusión, acuerdo, "no continúa" y firma) y CSV.
+  **Caso** `/panel/servicio/casos-atencion/[id]` (`GET|POST /api/casos/[id]`): KPIs,
+  contexto, contactos, acuerdo, seguimiento con notas, derivar/cerrar.
+- **"No continúa" es informativo**, como en MOSAICO: no inactiva el contrato ni libera
+  el cupo.
+- La ficha del niño tiene la tarjeta "Casos de atención" (`CasosNino.tsx`, se oculta
+  sin `casos.ver`); la lista de la sesión pinta ⚠ con el código
+  (`GET /api/casos/sesion/[sessionId]`); y `calcularGuiaMes.casosAtencion` suma los
+  reportes del guía a las marcas viejas.
+- Permisos `casos.ver` y `casos.gestionar` (la migración los concede a quien tiene
+  `personas.ver`); el ítem del menú pide `casos.ver`. Auditoría:
+  `casos.caso_abierto|reporte_sumado|caso_asignado|caso_cerrado`.
+- Pruebas: `casos/tests/casos.test.ts` y `casos-integration.test.ts`.
 
 ## Cancelación de sesión por el guía (2026-10-14)
 

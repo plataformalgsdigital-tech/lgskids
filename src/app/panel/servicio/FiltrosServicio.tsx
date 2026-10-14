@@ -63,12 +63,15 @@ export function FiltrosServicio({
   filtros,
   onCambio,
   conUsuario = true,
+  conFechas = true,
   children,
 }: {
   filtros: FiltrosBase;
   onCambio: (cambio: Partial<FiltrosBase>) => void;
   /** Las sesiones no son de un niño: ahí no va el buscador de usuario. */
   conUsuario?: boolean;
+  /** Elegir un salón (alta de un caso) no lleva rango de fechas. */
+  conFechas?: boolean;
   children?: ReactNode;
 }) {
   const [campanias, setCampanias] = useState<Campania[]>([]);
@@ -157,26 +160,30 @@ export function FiltrosServicio({
           ))}
         </select>
       </label>
-      <label>
-        <span style={rotuloServicio}>Fecha inicial</span>
-        <input
-          type="date"
-          value={filtros.desde}
-          max={filtros.hasta}
-          onChange={(e) => onCambio({ desde: e.target.value })}
-          style={campoServicio}
-        />
-      </label>
-      <label>
-        <span style={rotuloServicio}>Fecha final</span>
-        <input
-          type="date"
-          value={filtros.hasta}
-          min={filtros.desde}
-          onChange={(e) => onCambio({ hasta: e.target.value })}
-          style={campoServicio}
-        />
-      </label>
+      {conFechas && (
+        <>
+          <label>
+            <span style={rotuloServicio}>Fecha inicial</span>
+            <input
+              type="date"
+              value={filtros.desde}
+              max={filtros.hasta}
+              onChange={(e) => onCambio({ desde: e.target.value })}
+              style={campoServicio}
+            />
+          </label>
+          <label>
+            <span style={rotuloServicio}>Fecha final</span>
+            <input
+              type="date"
+              value={filtros.hasta}
+              min={filtros.desde}
+              onChange={(e) => onCambio({ hasta: e.target.value })}
+              style={campoServicio}
+            />
+          </label>
+        </>
+      )}
       {children}
     </div>
   );
@@ -184,7 +191,10 @@ export function FiltrosServicio({
 
 /** Los filtros como query string (solo los que tienen valor). */
 export function qsFiltros(f: FiltrosBase, extra: Record<string, string> = {}): string {
-  const qs = new URLSearchParams({ desde: f.desde, hasta: f.hasta });
+  const qs = new URLSearchParams();
+  // Sin fecha = sin corte (la bandeja de casos abre así).
+  if (f.desde !== "") qs.set("desde", f.desde);
+  if (f.hasta !== "") qs.set("hasta", f.hasta);
   if (f.buscar.trim() !== "") qs.set("buscar", f.buscar.trim());
   if (f.campaignId !== "") qs.set("campaignId", f.campaignId);
   if (f.curso !== "") qs.set("curso", f.curso);

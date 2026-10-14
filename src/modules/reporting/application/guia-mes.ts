@@ -71,6 +71,17 @@ export async function calcularGuiaMes(periodo: string): Promise<GuiaMes[]> {
         WHERE c.estado = 'APROBADA'
           AND to_char((c.starts_at AT TIME ZONE COALESCE(cl.timezone, 'UTC')), 'YYYY-MM') = $1
         GROUP BY c.guia_user_id
+     ), reportado AS (
+       -- Casos de atención reportados por el guía (2026-10-14). La marca vieja
+       -- "requiere atención" de la ficha se sigue contando arriba.
+       SELECT r.guia_user_id AS guia_id, count(*)::int AS n
+         FROM casos_reporte r
+         LEFT JOIN scheduling_session s ON s.id = r.session_id
+         LEFT JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+        WHERE r.guia_user_id IS NOT NULL
+          AND to_char((COALESCE(s.starts_at, r.created_at) AT TIME ZONE COALESCE(cl.timezone, 'UTC')),
+                      'YYYY-MM') = $1
+        GROUP BY r.guia_user_id
      )
      SELECT g.id AS "guiaUserId", g.username AS guia, $1::text AS periodo,
             COALESCE(d."sesionesDictadas", 0) AS "sesionesDictadas",
@@ -80,12 +91,13 @@ export async function calcularGuiaMes(periodo: string): Promise<GuiaMes[]> {
             COALESCE(d.presentes, 0) AS presentes,
             COALESCE(d.ausentes, 0) AS ausentes,
             COALESCE(d.justificados, 0) AS justificados,
-            COALESCE(d."casosAtencion", 0) AS "casosAtencion",
+            COALESCE(d."casosAtencion", 0) + COALESCE(rp.n, 0) AS "casosAtencion",
             COALESCE(x.n, 0) AS "sesionesCanceladas"
        FROM identity_user g
        LEFT JOIN dictado d ON d.guia_id = g.id
        LEFT JOIN cancelado x ON x.guia_id = g.id
-      WHERE d.guia_id IS NOT NULL OR x.guia_id IS NOT NULL
+       LEFT JOIN reportado rp ON rp.guia_id = g.id
+      WHERE d.guia_id IS NOT NULL OR x.guia_id IS NOT NULL OR rp.guia_id IS NOT NULL
       ORDER BY g.username`,
     [periodo],
   );

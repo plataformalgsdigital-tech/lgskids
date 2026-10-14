@@ -148,7 +148,7 @@ export const MENU: {
   },
   {
     seccion: "Servicio",
-    permiso: "personas.ver",
+    permiso: "casos.ver",
     etiqueta: "Casos de atención",
     color: "var(--lgs-amarillo)",
     href: "/panel/servicio/casos-atencion",

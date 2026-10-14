@@ -79,6 +79,8 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.MENU_MENSAJES]: "Mensajes",
   [PERMISOS.MENSAJES_ENVIAR]: "Enviar mensajes de WhatsApp",
   [PERMISOS.MENSAJES_PLANTILLAS]: "Gestionar plantillas de mensajes",
+  [PERMISOS.CASOS_VER]: "Ver casos de atención",
+  [PERMISOS.CASOS_GESTIONAR]: "Gestionar casos de atención",
   [PERMISOS.MENU_GUIAS]: "Guías",
   [PERMISOS.MENU_MIS_CLASES]: "Mis clases",
   [PERMISOS.MENU_MIS_SALONES]: "Mis salones",
@@ -202,6 +204,9 @@ async function main(): Promise<void> {
       // Las demás de Servicio: migración 20261014100000_menu_servicio_opciones.
       ["menu.servicio_welcome", ["personas.ver"]],
       ["menu.servicio_asistencia", ["personas.ver"]],
+      // Migración 20261014400000_casos_atencion.
+      ["casos.ver", ["personas.ver"]],
+      ["casos.gestionar", ["personas.ver"]],
       // Migración 20261014300000_cancelacion_sesion.
       ["menu.servicio_justificacion", ["personas.ver"]],
       ["menu.servicio_sesiones", ["personas.ver"]],
