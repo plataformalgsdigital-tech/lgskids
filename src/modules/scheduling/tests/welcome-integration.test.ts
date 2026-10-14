@@ -409,24 +409,32 @@ describe.runIf(RUN)("Welcome (integración)", () => {
     expect(r.marcados).toBe(1);
     expect((await detalleWelcome(id)).inscritos[0]?.asistio).toBe(true);
     await expect(eliminarWelcome({ actorUserId: actor, id })).rejects.toBeInstanceOf(ConflictError);
-
-    // Servicio › Welcome: lo lista con su asistencia, y filtra por ella.
-    const base = {
-      countryScope: null,
-      desde: dias(12),
-      hasta: dias(12),
-      zona: "America/Bogota",
-      buscar: `welcome${marca}`,
-    };
-    const todos = await agendadosWelcome(base);
-    expect(todos.find((a) => a.childPersonId === c)?.asistio).toBe(true);
-    expect(
-      (await agendadosWelcome({ ...base, asistencia: "SI" })).map((a) => a.childPersonId),
-    ).toContain(c);
-    expect(
-      (await agendadosWelcome({ ...base, asistencia: "NO" })).map((a) => a.childPersonId),
-    ).not.toContain(c);
-    // El niño es de Chile: quien solo ve Colombia no lo ve.
-    expect(await agendadosWelcome({ ...base, countryScope: ["CO"] })).toHaveLength(0);
   });
+
+  // Prueba aparte (usa lo que dejó la anterior: `c` agendado y presente el día 12):
+  // juntas pasaban de los 5 s por defecto en CI con las pruebas en paralelo.
+  it(
+    "Servicio › Welcome lo lista con su asistencia y filtra por ella",
+    { timeout: 20_000 },
+    async () => {
+      const [, , c] = ninos as [string, string, string];
+      const base = {
+        countryScope: null,
+        desde: dias(12),
+        hasta: dias(12),
+        zona: "America/Bogota",
+        buscar: `welcome${marca}`,
+      };
+      const todos = await agendadosWelcome(base);
+      expect(todos.find((a) => a.childPersonId === c)?.asistio).toBe(true);
+      expect(
+        (await agendadosWelcome({ ...base, asistencia: "SI" })).map((a) => a.childPersonId),
+      ).toContain(c);
+      expect(
+        (await agendadosWelcome({ ...base, asistencia: "NO" })).map((a) => a.childPersonId),
+      ).not.toContain(c);
+      // El niño es de Chile: quien solo ve Colombia no lo ve.
+      expect(await agendadosWelcome({ ...base, countryScope: ["CO"] })).toHaveLength(0);
+    },
+  );
 });
