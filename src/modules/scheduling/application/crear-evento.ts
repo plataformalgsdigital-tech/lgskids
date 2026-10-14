@@ -355,6 +355,144 @@ export async function crearEvento(input: {
   return { grupoId, sesiones: creadas };
 }
 
+/**
+ * EDITA un evento creado a mano en el calendario (sesión extra, club, taller o
+ * refuerzo: los que NO nacen del horario del salón). Los niños inscritos se
+ * mantienen: la lista sale de las matrículas del salón, no del evento.
+ *
+ * Un evento COMPARTIDO entre salones es UNA clase: se edita en todos sus salones
+ * a la vez (misma hora de pared en la zona de cada uno, como al crearlo). El
+ * salón no se cambia aquí. Uno ya CERRADO (dictado y registrado) no se mueve: su
+ * registro dice cuándo ocurrió.
+ */
+export async function editarEvento(input: {
+  actorUserId: string;
+  sessionId: string;
+  tipo: TipoEvento;
+  fecha: string;
+  horaLocal: string;
+  duracionMin: number;
+  nivel?: string | null;
+  limiteUsuarios?: number | null;
+  guiaUserId: string;
+  observaciones?: string | null;
+  ip?: string | null;
+}): Promise<{ sesiones: number }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) {
+    throw new ValidationError("La fecha debe ser YYYY-MM-DD.");
+  }
+  if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(input.horaLocal)) {
+    throw new ValidationError("La hora debe ser HH:MM.");
+  }
+  if (input.duracionMin < 15 || input.duracionMin > 300) {
+    throw new ValidationError("La duración debe estar entre 15 y 300 minutos.");
+  }
+  if (input.tipo === "TALLER" && !DURACIONES_TALLER.includes(input.duracionMin)) {
+    throw new ValidationError("Un taller dura una o dos horas.");
+  }
+  const sesion = await queryOne<{ id: string; slotId: string | null; grupoId: string | null }>(
+    `SELECT id, slot_id AS "slotId", grupo_id AS "grupoId" FROM scheduling_session WHERE id = $1`,
+    [input.sessionId],
+  );
+  if (sesion === null) throw new NotFoundError("El evento no existe.");
+  if (sesion.slotId !== null) {
+    throw new ConflictError(
+      "Esta es una clase del horario del salón: se mueve con una suspensión, no se edita.",
+    );
+  }
+  const guia = await queryOne<{ id: string }>(
+    `SELECT id FROM identity_user WHERE id = $1 AND estado = 'ACTIVO'`,
+    [input.guiaUserId],
+  );
+  if (guia === null) throw new NotFoundError("El guía no existe o está inactivo.");
+
+  const [hh, mm] = input.horaLocal.split(":");
+  const [y, m, d] = input.fecha.split("-");
+  let editadas = 0;
+  const antes: unknown[] = [];
+  await withTransaction(async (tx) => {
+    // El evento y, si es compartido, sus hermanos de grupo.
+    const filas = await queryRows<{
+      id: string;
+      classroomId: string;
+      salon: string;
+      timezone: string;
+      cupo: number;
+      cerradaEn: string | null;
+      startsAt: string;
+      guiaUserId: string | null;
+    }>(
+      `SELECT s.id, s.classroom_id AS "classroomId", cl.nombre AS salon, cl.timezone, cl.cupo,
+              s.cerrada_en AS "cerradaEn", s.starts_at AS "startsAt",
+              s.guia_user_id AS "guiaUserId"
+         FROM scheduling_session s JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+        WHERE s.slot_id IS NULL
+          AND (s.id = $1 OR ($2::uuid IS NOT NULL AND s.grupo_id = $2))
+        FOR UPDATE OF s`,
+      [sesion.id, sesion.grupoId],
+      tx,
+    );
+    if (filas.some((f) => f.cerradaEn !== null)) {
+      throw new ConflictError("El evento ya se dictó y se cerró: no se puede editar.");
+    }
+    for (const f of filas) {
+      const startsAt = wallTimeToUtc(
+        { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
+        f.timezone,
+      );
+      const choque = await queryOne<{ id: string }>(
+        `SELECT id FROM scheduling_session WHERE classroom_id = $1 AND starts_at = $2 AND id <> $3`,
+        [f.classroomId, startsAt, f.id],
+        tx,
+      );
+      if (choque !== null) {
+        throw new ConflictError(`${f.salon} ya tiene otro evento a esa hora.`);
+      }
+      antes.push({ salon: f.salon, startsAt: f.startsAt, guiaUserId: f.guiaUserId });
+      await execute(
+        `UPDATE scheduling_session
+            SET tipo = $2::scheduling_slot_tipo, fecha = $3::date, starts_at = $4,
+                duracion_min = $5, guia_user_id = $6, nivel = $7, observaciones = $8,
+                limite_usuarios = $9
+          WHERE id = $1`,
+        [
+          f.id,
+          input.tipo,
+          input.fecha,
+          startsAt,
+          input.duracionMin,
+          input.guiaUserId,
+          input.nivel ?? null,
+          input.observaciones?.trim() === "" ? null : (input.observaciones ?? null),
+          input.limiteUsuarios ?? f.cupo,
+        ],
+        tx,
+      );
+      editadas++;
+    }
+  });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.evento_editado",
+    entidad: "scheduling_session",
+    entidadId: input.sessionId,
+    payload: {
+      antes,
+      despues: {
+        tipo: input.tipo,
+        fecha: input.fecha,
+        hora: input.horaLocal,
+        duracionMin: input.duracionMin,
+        guiaUserId: input.guiaUserId,
+      },
+      sesiones: editadas,
+    },
+    ip: input.ip ?? null,
+  });
+  return { sesiones: editadas };
+}
+
 // ============================================================
 // Evento ADMINISTRATIVO: la audiencia son GUÍAS, no niños
 // ============================================================
@@ -403,41 +541,8 @@ export async function crearEventoAdmin(input: {
   guiaUserIds: string[];
   ip?: string | null;
 }): Promise<EventoAdminCreado> {
-  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(input.fecha)) {
-    throw new ValidationError("La fecha debe ser YYYY-MM-DD.");
-  }
-  if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(input.horaLocal)) {
-    throw new ValidationError("La hora debe ser HH:MM.");
-  }
-  if (!esTipoEventoAdmin(input.tipo)) {
-    throw new ValidationError(
-      "Tipo inválido: un evento administrativo es Meeting, Training, Observation o Development.",
-    );
-  }
-  // Una clase dura minutos; una capacitación puede ocupar la jornada.
-  if (input.duracionMin < DURACION_ADMIN_MIN || input.duracionMin > DURACION_ADMIN_MAX) {
-    throw new ValidationError("La duración debe estar entre 1 y 8 horas.");
-  }
-  const guias = [...new Set(input.guiaUserIds)];
-  if (guias.length === 0) {
-    throw new ValidationError("Elige al menos un guía: si no, nadie vería el evento.");
-  }
-
-  // La zona la manda el cliente; si no es una IANA válida, Intl lanza y el
-  // evento quedaría en un instante arbitrario. Mejor rechazarlo.
+  const { startsAt, guias } = validarEventoAdmin(input);
   const timezone = input.zona;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
-  } catch {
-    throw new ValidationError(`Zona horaria desconocida: ${timezone}.`);
-  }
-
-  const [hh, mm] = input.horaLocal.split(":");
-  const [y, m, d] = input.fecha.split("-");
-  const startsAt = wallTimeToUtc(
-    { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
-    timezone,
-  );
 
   const id = newId();
   await withTransaction(async (tx) => {
@@ -485,6 +590,156 @@ export async function crearEventoAdmin(input: {
   });
 
   return { id, guias: guias.length };
+}
+
+/** Lo que define un evento administrativo: lo mismo al crearlo y al editarlo. */
+export type DatosEventoAdmin = Parameters<typeof crearEventoAdmin>[0];
+
+/** La MISMA validación al crear y al editar; devuelve el instante y la audiencia. */
+function validarEventoAdmin(input: DatosEventoAdmin): { startsAt: Date; guias: string[] } {
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(input.fecha)) {
+    throw new ValidationError("La fecha debe ser YYYY-MM-DD.");
+  }
+  if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(input.horaLocal)) {
+    throw new ValidationError("La hora debe ser HH:MM.");
+  }
+  if (!esTipoEventoAdmin(input.tipo)) {
+    throw new ValidationError(
+      "Tipo inválido: un evento administrativo es Meeting, Training, Observation o Development.",
+    );
+  }
+  // Una clase dura minutos; una capacitación puede ocupar la jornada.
+  if (input.duracionMin < DURACION_ADMIN_MIN || input.duracionMin > DURACION_ADMIN_MAX) {
+    throw new ValidationError("La duración debe estar entre 1 y 8 horas.");
+  }
+  const guias = [...new Set(input.guiaUserIds)];
+  if (guias.length === 0) {
+    throw new ValidationError("Elige al menos un guía: si no, nadie vería el evento.");
+  }
+
+  // La zona la manda el cliente; si no es una IANA válida, Intl lanza y el
+  // evento quedaría en un instante arbitrario. Mejor rechazarlo.
+  const timezone = input.zona;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+  } catch {
+    throw new ValidationError(`Zona horaria desconocida: ${timezone}.`);
+  }
+
+  const [hh, mm] = input.horaLocal.split(":");
+  const [y, m, d] = input.fecha.split("-");
+  const startsAt = wallTimeToUtc(
+    { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
+    timezone,
+  );
+  return { startsAt, guias };
+}
+
+/**
+ * EDITA un evento administrativo, aunque ya tenga guías en su audiencia. La
+ * audiencia nueva REEMPLAZA a la anterior: los que siguen conservan su marca de
+ * asistencia; los que salen dejan de verlo.
+ */
+export async function editarEventoAdmin(
+  input: DatosEventoAdmin & { id: string },
+): Promise<{ id: string; guias: number }> {
+  const antes = await detalleEventoAdmin(input.id);
+  const { startsAt, guias } = validarEventoAdmin(input);
+  await withTransaction(async (tx) => {
+    await execute(
+      `UPDATE scheduling_evento_admin
+          SET tipo = $2, titulo = $3, fecha = $4::date, starts_at = $5, timezone = $6,
+              duracion_min = $7, campania = $8, pais = $9, curso = $10, classroom_id = $11,
+              nivel = $12, limite_usuarios = $13, observaciones = $14
+        WHERE id = $1`,
+      [
+        input.id,
+        input.tipo,
+        input.titulo?.trim() === "" ? null : (input.titulo ?? null),
+        input.fecha,
+        startsAt,
+        input.zona,
+        input.duracionMin,
+        input.campania ?? null,
+        input.pais ?? null,
+        input.curso ?? null,
+        input.classroomId ?? null,
+        input.nivel ?? null,
+        input.limiteUsuarios ?? null,
+        input.observaciones?.trim() === "" ? null : (input.observaciones ?? null),
+      ],
+      tx,
+    );
+    await execute(
+      `DELETE FROM scheduling_evento_admin_guia
+        WHERE evento_id = $1 AND NOT (guia_user_id = ANY($2::uuid[]))`,
+      [input.id, guias],
+      tx,
+    );
+    for (const guiaUserId of guias) {
+      await execute(
+        `INSERT INTO scheduling_evento_admin_guia (evento_id, guia_user_id)
+         VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [input.id, guiaUserId],
+        tx,
+      );
+    }
+  });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.evento_admin_editado",
+    entidad: "scheduling_evento_admin",
+    entidadId: input.id,
+    payload: {
+      antes: {
+        tipo: antes.tipo,
+        startsAt: antes.startsAt,
+        duracionMin: antes.duracionMin,
+        guias: antes.guiaUserIds.length,
+      },
+      despues: {
+        tipo: input.tipo,
+        fecha: input.fecha,
+        hora: input.horaLocal,
+        zona: input.zona,
+        duracionMin: input.duracionMin,
+        guias: guias.length,
+      },
+    },
+    ip: input.ip ?? null,
+  });
+  return { id: input.id, guias: guias.length };
+}
+
+export interface DetalleEventoAdmin {
+  id: string;
+  tipo: string;
+  titulo: string | null;
+  startsAt: string;
+  duracionMin: number;
+  campania: string | null;
+  pais: string | null;
+  curso: string | null;
+  classroomId: string | null;
+  nivel: string | null;
+  limiteUsuarios: number | null;
+  observaciones: string | null;
+  guiaUserIds: string[];
+}
+
+/** El evento administrativo completo, para editarlo. */
+export async function detalleEventoAdmin(id: string): Promise<DetalleEventoAdmin> {
+  const e = await queryOne<DetalleEventoAdmin>(
+    `SELECT e.id, e.tipo, e.titulo, e.starts_at AS "startsAt", e.duracion_min AS "duracionMin",
+            e.campania, e.pais::text AS pais, e.curso, e.classroom_id AS "classroomId", e.nivel,
+            e.limite_usuarios AS "limiteUsuarios", e.observaciones,
+            COALESCE((SELECT array_agg(g.guia_user_id) FROM scheduling_evento_admin_guia g
+                       WHERE g.evento_id = e.id), ARRAY[]::uuid[]) AS "guiaUserIds"
+       FROM scheduling_evento_admin e WHERE e.id = $1`,
+    [id],
+  );
+  if (e === null) throw new NotFoundError("El evento no existe.");
+  return e;
 }
 
 export interface EventoAdmin {

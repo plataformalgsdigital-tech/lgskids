@@ -3,14 +3,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { crearCampania } from "@/modules/catalog";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
-import { execute, queryOne } from "@/platform/db/query";
+import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, ValidationError } from "@/platform/errors";
 import { colisionesDeCampania } from "../application/colisiones";
+import {
+  crearEvento,
+  crearEventoAdmin,
+  detalleEventoAdmin,
+  editarEvento,
+  editarEventoAdmin,
+  marcarAsistenciaEventoAdmin,
+} from "../application/crear-evento";
 import { crearSalon } from "../application/gestion-salones";
 import {
   crearWelcome,
   detalleWelcome,
+  editarWelcome,
   eliminarWelcome,
   marcarAsistenciaWelcome,
   reservarWelcomeTx,
@@ -238,6 +247,149 @@ describe.runIf(RUN)("Welcome (integración)", () => {
         await execute(`DELETE FROM scheduling_slot WHERE classroom_id = $1`, [cl]);
         await execute(`DELETE FROM scheduling_classroom WHERE id = $1`, [cl]);
       }
+    }
+  });
+
+  it("EDITAR un Welcome con niños agendados los conserva, y el límite no baja de ellos", async () => {
+    const id = await nuevo({ fecha: dias(13), limiteUsuarios: 3 });
+    const [a, b] = ninos as [string, string];
+    await reservar(id, a, junior);
+    await reservar(id, b, junior);
+    const base = {
+      actorUserId: actor,
+      id,
+      fecha: dias(14),
+      horaLocal: "10:30",
+      zona: "America/Santiago",
+      duracionMin: 45,
+      guiaUserId: actor,
+      campaignId: campaniaId,
+      pais: null,
+      curso: null,
+      classroomId: null,
+      nivel: "ROOKIE",
+      observaciones: "Movido",
+    } as const;
+    await expect(editarWelcome({ ...base, limiteUsuarios: 1 })).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+    await editarWelcome({ ...base, limiteUsuarios: 2 });
+    const { welcome, inscritos } = await detalleWelcome(id);
+    expect(welcome.duracionMin).toBe(45);
+    expect(welcome.limiteUsuarios).toBe(2);
+    expect(inscritos.map((i) => i.childPersonId).sort()).toEqual([a, b].sort());
+    // Sigue siendo la MISMA regla del alta: no puede quedar después del inicio.
+    await expect(
+      editarWelcome({ ...base, fecha: dias(40), limiteUsuarios: 2 }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("EDITAR un evento suelto compartido mueve todos sus salones; cerrado ya no se edita", async () => {
+    const creado = await crearEvento({
+      actorUserId: actor,
+      classroomIds: [junior, youngster],
+      tipo: "CLUB",
+      fecha: dias(5),
+      horaLocal: "11:00",
+      duracionMin: 60,
+      guiaUserId: actor,
+    });
+    const [primera] = creado.sesiones;
+    const r = await editarEvento({
+      actorUserId: actor,
+      sessionId: primera?.id as string,
+      tipo: "TALLER",
+      fecha: dias(6),
+      horaLocal: "12:00",
+      duracionMin: 120,
+      guiaUserId: actor,
+      observaciones: "Taller movido",
+    });
+    expect(r.sesiones).toBe(2);
+    const filas = await queryRows<{ tipo: string; fecha: string; duracionMin: number }>(
+      `SELECT tipo::text, fecha::text, duracion_min AS "duracionMin"
+         FROM scheduling_session WHERE id = ANY($1)`,
+      [creado.sesiones.map((s) => s.id)],
+    );
+    expect(filas).toHaveLength(2);
+    for (const f of filas) {
+      expect(f).toEqual({ tipo: "TALLER", fecha: dias(6), duracionMin: 120 });
+    }
+
+    await execute(`UPDATE scheduling_session SET cerrada_en = now() WHERE id = $1`, [primera?.id]);
+    await expect(
+      editarEvento({
+        actorUserId: actor,
+        sessionId: creado.sesiones[1]?.id as string,
+        tipo: "CLUB",
+        fecha: dias(7),
+        horaLocal: "12:00",
+        duracionMin: 60,
+        guiaUserId: actor,
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("una clase del HORARIO no se edita como evento", async () => {
+    const regular = await queryOne<{ id: string }>(
+      `SELECT id FROM scheduling_session WHERE classroom_id = $1 AND slot_id IS NOT NULL LIMIT 1`,
+      [junior],
+    );
+    await expect(
+      editarEvento({
+        actorUserId: actor,
+        sessionId: regular?.id as string,
+        tipo: "SESION",
+        fecha: dias(8),
+        horaLocal: "12:00",
+        duracionMin: 60,
+        guiaUserId: actor,
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("EDITAR un evento administrativo cambia la audiencia y conserva la asistencia de quien sigue", async () => {
+    const otro = (
+      await queryOne<{ id: string }>(
+        `SELECT id FROM identity_user WHERE estado = 'ACTIVO' AND id <> $1 LIMIT 1`,
+        [actor],
+      )
+    )?.id as string;
+    const datos = {
+      actorUserId: actor,
+      tipo: "MEETING",
+      titulo: `Reunión ${marca}`,
+      fecha: dias(4),
+      horaLocal: "09:00",
+      duracionMin: 60,
+      zona: "America/Bogota",
+      guiaUserIds: [actor, otro],
+    } as const;
+    const { id } = await crearEventoAdmin({ ...datos, guiaUserIds: [...datos.guiaUserIds] });
+    try {
+      await marcarAsistenciaEventoAdmin({
+        actorUserId: actor,
+        eventoId: id,
+        marcas: [{ guiaUserId: actor, asistio: true }],
+      });
+      const r = await editarEventoAdmin({
+        ...datos,
+        id,
+        tipo: "TRAINING",
+        duracionMin: 120,
+        guiaUserIds: [actor],
+      });
+      expect(r.guias).toBe(1);
+      const det = await detalleEventoAdmin(id);
+      expect(det.tipo).toBe("TRAINING");
+      expect(det.guiaUserIds).toEqual([actor]);
+      const asis = await queryOne<{ asistio: boolean | null }>(
+        `SELECT asistio FROM scheduling_evento_admin_guia WHERE evento_id = $1 AND guia_user_id = $2`,
+        [id, actor],
+      );
+      expect(asis?.asistio).toBe(true);
+    } finally {
+      await execute(`DELETE FROM scheduling_evento_admin WHERE id = $1`, [id]);
     }
   });
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import type { EventoEditable } from "./NuevoEventoModal";
 
 /**
  * Evento del calendario en MODAL (antes era una página aparte).
@@ -58,6 +59,14 @@ interface Sesion {
   leccionNivel: string | null;
   /** Puesto entre las clases regulares del salón (sin clubes ni extras). */
   claseNumero: number | null;
+  /** Creado a mano en el calendario (sin slot): se puede editar. */
+  esEvento: boolean;
+  duracionMin: number;
+  nivel: string | null;
+  observaciones: string | null;
+  limiteUsuarios: number | null;
+  timezone: string;
+  grupoId: string | null;
 }
 
 const NIVEL_UI: Record<string, string> = {
@@ -164,11 +173,18 @@ export function SesionModal({
   sessionId,
   puedeGestionarSalones,
   onCerrar,
+  onEditar,
 }: {
   sessionId: string;
   /** `salones.gestionar`: solo coordinación cambia guía y suspende. */
   puedeGestionarSalones: boolean;
   onCerrar: () => void;
+  /**
+   * Abre el formulario en modo edición. Solo llega con `eventos.crear`, y solo
+   * aplica a lo creado a mano en el calendario: las sesiones del horario se
+   * mueven suspendiendo o regenerando.
+   */
+  onEditar?: ((evento: EventoEditable) => void) | undefined;
 }) {
   const [sesion, setSesion] = useState<Sesion | null>(null);
   const [lista, setLista] = useState<Fila[]>([]);
@@ -802,6 +818,31 @@ export function SesionModal({
             >
               🔓 Abrir misión
             </button>
+            {onEditar !== undefined && sesion !== null && sesion.esEvento && !cerrada && (
+              <button
+                type="button"
+                style={boton}
+                disabled={ocupado}
+                onClick={() =>
+                  onEditar({
+                    clase: "suelto",
+                    id: sesion.id,
+                    tipo: sesion.tipo,
+                    startsAt: sesion.startsAt,
+                    timezone: sesion.timezone,
+                    duracionMin: sesion.duracionMin,
+                    guiaUserId: sesion.guiaUserId,
+                    nivel: sesion.nivel,
+                    limiteUsuarios: sesion.limiteUsuarios,
+                    observaciones: sesion.observaciones,
+                    salon: tituloSalon(sesion),
+                    compartido: sesion.grupoId !== null,
+                  })
+                }
+              >
+                ✏️ Editar evento
+              </button>
+            )}
             {puedeGestionarSalones && (
               <button
                 type="button"

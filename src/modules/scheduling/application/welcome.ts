@@ -78,9 +78,10 @@ const SELECT_WELCOME = `
     LEFT JOIN catalog_campaign ca ON ca.id = w.campaign_id
     LEFT JOIN scheduling_classroom cl ON cl.id = w.classroom_id`;
 
-export async function crearWelcome(input: {
+/** Lo que define un Welcome: lo mismo al crearlo y al editarlo. */
+export interface DatosWelcome {
   actorUserId: string;
-  /** Fecha y hora en el reloj de quien lo crea (`zona`). */
+  /** Fecha y hora en el reloj de quien lo escribe (`zona`). */
   fecha: string;
   horaLocal: string;
   zona: string;
@@ -100,7 +101,16 @@ export async function crearWelcome(input: {
    */
   enMarcha?: boolean;
   ip?: string | null;
-}): Promise<{ id: string; salones: number }> {
+}
+
+/**
+ * Valida un Welcome y calcula su instante. La MISMA regla al crear y al editar:
+ * futuro, guía activo, y al menos un salón con esos filtros (cuyo curso empiece
+ * después, salvo "curso en marcha").
+ */
+async function validarDatosWelcome(
+  input: DatosWelcome,
+): Promise<{ startsAt: Date; enMarcha: boolean; salones: number }> {
   const enMarcha = input.enMarcha === true;
   const invalido = validarWelcome(input);
   if (invalido !== null) throw new ValidationError(invalido);
@@ -148,7 +158,11 @@ export async function crearWelcome(input: {
         : "Ningún salón con esos filtros empieza su curso después de esa fecha: el Welcome se hace antes del inicio del curso. Si es para niños con el curso ya andando, márcalo como «para curso en marcha».",
     );
   }
+  return { startsAt, enMarcha, salones: salones?.n ?? 0 };
+}
 
+export async function crearWelcome(input: DatosWelcome): Promise<{ id: string; salones: number }> {
+  const { startsAt, enMarcha, salones } = await validarDatosWelcome(input);
   const id = newId();
   await execute(
     `INSERT INTO scheduling_welcome
@@ -189,11 +203,81 @@ export async function crearWelcome(input: {
       nivel: input.nivel,
       limite: input.limiteUsuarios,
       enMarcha,
-      salones: salones?.n ?? 0,
+      salones,
     },
     ip: input.ip ?? null,
   });
-  return { id, salones: salones?.n ?? 0 };
+  return { id, salones };
+}
+
+/**
+ * EDITA un Welcome, aunque ya tenga niños agendados: ellos se quedan con su
+ * reserva (la regla de quién puede AGENDAR se aplica al agendar, no se le quita
+ * el Welcome a quien ya lo tiene). Lo único que no se permite es bajar el
+ * límite por debajo de los ya agendados.
+ */
+export async function editarWelcome(
+  input: DatosWelcome & { id: string },
+): Promise<{ id: string; inscritos: number }> {
+  const { welcome: antes } = await detalleWelcome(input.id);
+  if (input.limiteUsuarios < antes.inscritos) {
+    throw new ConflictError(
+      `Ya hay ${String(antes.inscritos)} niño(s) agendado(s): el límite no puede ser menor.`,
+    );
+  }
+  const { startsAt, enMarcha } = await validarDatosWelcome(input);
+  await execute(
+    `UPDATE scheduling_welcome
+        SET starts_at = $2, timezone = $3, fecha = $4::date, duracion_min = $5,
+            guia_user_id = $6, campaign_id = $7, pais = $8, curso = $9, classroom_id = $10,
+            nivel = $11, limite_usuarios = $12, observaciones = $13, en_marcha = $14
+      WHERE id = $1`,
+    [
+      input.id,
+      startsAt,
+      input.zona,
+      input.fecha,
+      input.duracionMin,
+      input.guiaUserId,
+      input.campaignId,
+      input.pais,
+      input.curso,
+      input.classroomId,
+      input.nivel,
+      input.limiteUsuarios,
+      input.observaciones?.trim() || null,
+      enMarcha,
+    ],
+  );
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.welcome_editado",
+    entidad: "scheduling_welcome",
+    entidadId: input.id,
+    payload: {
+      antes: {
+        startsAt: antes.startsAt,
+        duracionMin: antes.duracionMin,
+        guiaUserId: antes.guiaUserId,
+        limite: antes.limiteUsuarios,
+        nivel: antes.nivel,
+        enMarcha: antes.enMarcha,
+      },
+      despues: {
+        fecha: input.fecha,
+        hora: input.horaLocal,
+        zona: input.zona,
+        duracionMin: input.duracionMin,
+        guiaUserId: input.guiaUserId,
+        limite: input.limiteUsuarios,
+        nivel: input.nivel,
+        enMarcha,
+      },
+      inscritos: antes.inscritos,
+    },
+    ip: input.ip ?? null,
+  });
+  return { id: input.id, inscritos: antes.inscritos };
 }
 
 /**

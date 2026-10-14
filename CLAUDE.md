@@ -1760,6 +1760,31 @@ para niños de varios salones, países y campañas. Migración `20261009000000_w
   `matriculas.gestionar`): la MISMA regla y la MISMA reserva con bloqueo que el
   enlace, con `agendado_por` = quien lo hizo. Auditoría `scheduling.welcome_agendado`.
 
+## Editar eventos del calendario (2026-10-13)
+
+Lo creado a mano en el calendario se EDITA, aunque ya tenga inscritos, con el MISMO
+formulario de crear (`NuevoEventoModal` con `editar`) y el mismo permiso
+(`eventos.crear`). Cada clase conserva a los suyos:
+
+- **Welcome** (`PATCH /api/scheduling/welcomes/[id]` → `editarWelcome`): los niños
+  agendados SIGUEN agendados; el límite no puede bajar de los inscritos (409) y rige
+  la misma validación del alta (`validarDatosWelcome`: antes del inicio salvo "en
+  marcha"). Botón "✏️ Editar" en su modal.
+- **Evento suelto** (sesión extra, club, taller, refuerzo; `PATCH
+/api/scheduling/eventos/[sessionId]` → `editarEvento`): la lista sale de las
+  matrículas del salón, así que no hay inscritos que mover. El salón NO cambia; si es
+  compartido (`grupo_id`), el cambio se aplica a TODOS sus salones, cada uno en su
+  reloj. Se rechaza si alguna ya está CERRADA y si es una clase del HORARIO (con slot:
+  esas se mueven con suspensión). Botón "✏️ Editar evento" en `SesionModal`
+  (`getSessionInfo` ganó `esEvento`, `duracionMin`, `nivel`, `limiteUsuarios`,
+  `timezone`, `grupoId`).
+- **Administrativo** (`GET|PATCH /api/scheduling/eventos-admin/[id]` →
+  `detalleEventoAdmin`/`editarEventoAdmin`): la audiencia nueva reemplaza a la vieja;
+  quien sigue conserva su asistencia. En el calendario la ficha naranja se vuelve
+  clicable para quien tiene `eventos.crear`.
+- Auditoría: `scheduling.welcome_editado`, `scheduling.evento_editado` y
+  `scheduling.evento_admin_editado`. Pruebas en `welcome-integration.test.ts`.
+
 ## Colisiones de guías (2026-10-13)
 
 Pestaña **Colisiones** en la ficha de campaña (`ColisionesCampania.tsx`,

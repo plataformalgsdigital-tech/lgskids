@@ -110,6 +110,9 @@ export {
 export type { RegistroAbierto } from "./application/registro-abierto";
 export {
   crearEventoAdmin,
+  editarEventoAdmin,
+  detalleEventoAdmin,
+  editarEvento,
   eventosAdmin,
   audienciaEventoAdmin,
   marcarAsistenciaEventoAdmin,
@@ -148,6 +151,7 @@ export { colisionesDeCampania } from "./application/colisiones";
 export type { Colision } from "./application/colisiones";
 export {
   crearWelcome,
+  editarWelcome,
   listarWelcomes,
   detalleWelcome,
   guiaDeWelcome,

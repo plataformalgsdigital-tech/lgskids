@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { horaLocal } from "@/ui/fecha-local";
+import type { EventoEditable } from "./NuevoEventoModal";
 
 /**
  * Detalle de un WELCOME: cuándo (en el reloj de quien mira), quién lo dicta,
@@ -13,10 +14,12 @@ interface Welcome {
   id: string;
   startsAt: string;
   duracionMin: number;
+  guiaUserId: string;
   guia: string;
   campania: string | null;
   pais: string | null;
   curso: string | null;
+  classroomId: string | null;
   salon: string | null;
   nivel: string;
   limiteUsuarios: number;
@@ -55,10 +58,13 @@ export function WelcomeModal({
   welcomeId,
   onCerrar,
   onCambio,
+  onEditar,
 }: {
   welcomeId: string;
   onCerrar: () => void;
   onCambio: () => void;
+  /** Abre el formulario en modo edición (aunque ya tenga niños agendados). */
+  onEditar?: (evento: EventoEditable) => void;
 }) {
   const [welcome, setWelcome] = useState<Welcome | null>(null);
   const [inscritos, setInscritos] = useState<Inscrito[]>([]);
@@ -321,7 +327,34 @@ export function WelcomeModal({
               </div>
 
               {puedeEliminar && (
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+                  {onEditar !== undefined && (
+                    <button
+                      type="button"
+                      disabled={ocupado}
+                      onClick={() =>
+                        onEditar({
+                          clase: "welcome",
+                          id: welcome.id,
+                          startsAt: welcome.startsAt,
+                          duracionMin: welcome.duracionMin,
+                          guiaUserId: welcome.guiaUserId,
+                          campania: welcome.campania,
+                          pais: welcome.pais,
+                          curso: welcome.curso,
+                          classroomId: welcome.classroomId,
+                          nivel: welcome.nivel,
+                          limiteUsuarios: welcome.limiteUsuarios,
+                          observaciones: welcome.observaciones,
+                          enMarcha: welcome.enMarcha,
+                          inscritos: welcome.inscritos,
+                        })
+                      }
+                      style={boton}
+                    >
+                      ✏️ Editar
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={ocupado || welcome.inscritos > 0}

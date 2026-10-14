@@ -12,7 +12,7 @@ import {
 import { apiFetch } from "@/ui/api-fetch";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
 import { SesionModal } from "./SesionModal";
-import { NuevoEventoModal } from "./NuevoEventoModal";
+import { NuevoEventoModal, type EventoEditable, type SalonOpcion } from "./NuevoEventoModal";
 import { WelcomeModal } from "./WelcomeModal";
 
 interface Salon {
@@ -140,7 +140,7 @@ function fechaBonita(iso: string): string {
 }
 
 /** Calendario mensual con las sesiones de TODOS los salones. */
-function CalendarioSalones() {
+function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
   const [y, setY] = useState<number>(() => new Date().getFullYear());
   const [m, setM] = useState<number>(() => new Date().getMonth()); // 0-based
   const [sesiones, setSesiones] = useState<AgendaSesion[] | null>(null);
@@ -156,6 +156,25 @@ function CalendarioSalones() {
   // Evento abierto en MODAL: antes se navegaba a una página aparte.
   const [sesionAbierta, setSesionAbierta] = useState<string | null>(null);
   const [puedeGestionarSalones, setPuedeGestionarSalones] = useState(false);
+  // Editar un evento creado en el calendario: lo mismo que crearlo (`eventos.crear`).
+  const [puedeEditarEventos, setPuedeEditarEventos] = useState(false);
+  const [editando, setEditando] = useState<EventoEditable | null>(null);
+  const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
+
+  /** El evento administrativo se trae completo (audiencia incluida) antes de editarlo. */
+  async function abrirEdicionAdmin(id: string) {
+    setErrorEdicion(null);
+    const res = await apiFetch(`/api/scheduling/eventos-admin/${id}`);
+    if (!res.ok) {
+      const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
+      setErrorEdicion(c.error?.message ?? "No se pudo abrir el evento.");
+      return;
+    }
+    const { evento } = (await res.json()) as {
+      evento: Omit<Extract<EventoEditable, { clase: "admin" }>, "clase">;
+    };
+    setEditando({ clase: "admin", ...evento });
+  }
 
   useEffect(() => {
     async function permisos() {
@@ -163,6 +182,7 @@ function CalendarioSalones() {
       if (!res.ok) return;
       const me = (await res.json()) as { permisos: { code: string }[] };
       setPuedeGestionarSalones(me.permisos.some((p) => p.code === "salones.gestionar"));
+      setPuedeEditarEventos(me.permisos.some((p) => p.code === "eventos.crear"));
     }
     void permisos();
   }, []);
@@ -379,10 +399,18 @@ function CalendarioSalones() {
                 {dia}
               </button>
               {adminDelDia.map((e) => (
-                <div
+                <button
+                  type="button"
                   key={e.id}
-                  title={`${e.titulo ?? "Evento administrativo"} · ${String(e.guias)} guías${e.observaciones !== null ? ` · ${e.observaciones}` : ""}`}
+                  // Solo quien puede crearlos los abre para editar; el guía lo ve y punto.
+                  disabled={!puedeEditarEventos}
+                  onClick={() => void abrirEdicionAdmin(e.id)}
+                  title={`${e.titulo ?? "Evento administrativo"} · ${String(e.guias)} guías${e.observaciones !== null ? ` · ${e.observaciones}` : ""}${puedeEditarEventos ? " · clic para editar" : ""}`}
                   style={{
+                    width: "100%",
+                    textAlign: "left",
+                    font: "inherit",
+                    cursor: puedeEditarEventos ? "pointer" : "default",
                     background: "#fff3e0",
                     color: "#e65100",
                     border: "1px solid #ffcc80",
@@ -396,7 +424,7 @@ function CalendarioSalones() {
                   }}
                 >
                   🏛️ {horaLocal(e.startsAt)} {e.titulo ?? "Administrativo"}
-                </div>
+                </button>
               ))}
               {welcomeDelDia.map((w) => (
                 <button
@@ -624,6 +652,14 @@ function CalendarioSalones() {
           sessionId={sesionAbierta}
           puedeGestionarSalones={puedeGestionarSalones}
           onCerrar={() => setSesionAbierta(null)}
+          onEditar={
+            puedeEditarEventos
+              ? (ev) => {
+                  setSesionAbierta(null);
+                  setEditando(ev);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -632,7 +668,29 @@ function CalendarioSalones() {
           welcomeId={welcomeAbierto}
           onCerrar={() => setWelcomeAbierto(null)}
           onCambio={() => setRecarga((n) => n + 1)}
+          onEditar={(ev) => {
+            setWelcomeAbierto(null);
+            setEditando(ev);
+          }}
         />
+      )}
+
+      {editando !== null && (
+        <NuevoEventoModal
+          salones={salones}
+          modo={editando.clase === "admin" ? "administrativo" : "academico"}
+          editar={editando}
+          onCerrar={() => setEditando(null)}
+          onCreado={() => {
+            setEditando(null);
+            setRecarga((n) => n + 1);
+          }}
+        />
+      )}
+      {errorEdicion !== null && (
+        <p role="alert" style={{ marginTop: "0.6rem", color: "#c62828", fontWeight: 600 }}>
+          {errorEdicion}
+        </p>
       )}
     </div>
   );
@@ -859,7 +917,9 @@ export default function SalonesPage() {
       </div>
 
       {/* La llave cambia al crear un evento: así el mes se vuelve a cargar. */}
-      {vista === "calendario" && <CalendarioSalones key={versionCalendario} />}
+      {vista === "calendario" && (
+        <CalendarioSalones key={versionCalendario} salones={salones ?? []} />
+      )}
 
       {vista === "lista" && mostrarForm && (
         <form

@@ -52,6 +52,75 @@ interface CampaniaOpcion {
   estado: string;
 }
 
+/**
+ * Un evento YA creado que se abre para EDITAR. Cada clase guarda con su propia
+ * ruta y conserva a sus inscritos (niños agendados, lista del salón o guías
+ * convocados). El tipo no cambia de clase: un Welcome sigue siendo Welcome.
+ */
+export type EventoEditable =
+  | {
+      clase: "welcome";
+      id: string;
+      startsAt: string;
+      duracionMin: number;
+      guiaUserId: string;
+      campania: string | null;
+      pais: string | null;
+      curso: string | null;
+      classroomId: string | null;
+      nivel: string;
+      limiteUsuarios: number;
+      observaciones: string | null;
+      enMarcha: boolean;
+      inscritos: number;
+    }
+  | {
+      clase: "suelto";
+      id: string;
+      tipo: string;
+      startsAt: string;
+      /** Zona del salón: la hora del evento se escribe en su reloj. */
+      timezone: string;
+      duracionMin: number;
+      guiaUserId: string | null;
+      nivel: string | null;
+      limiteUsuarios: number | null;
+      observaciones: string | null;
+      salon: string;
+      compartido: boolean;
+    }
+  | {
+      clase: "admin";
+      id: string;
+      tipo: string;
+      titulo: string | null;
+      startsAt: string;
+      duracionMin: number;
+      campania: string | null;
+      pais: string | null;
+      curso: string | null;
+      classroomId: string | null;
+      nivel: string | null;
+      limiteUsuarios: number | null;
+      observaciones: string | null;
+      guiaUserIds: string[];
+    };
+
+/** Fecha y hora de PARED de un instante en una zona (o en la del navegador). */
+function pared(iso: string, zona?: string): { fecha: string; hora: string } {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: zona,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const p = (t: string) => partes.find((x) => x.type === t)?.value ?? "00";
+  return { fecha: `${p("year")}-${p("month")}-${p("day")}`, hora: `${p("hour")}:${p("minute")}` };
+}
+
 interface TipoAdmin {
   valor: string;
   etiqueta: string;
@@ -90,6 +159,7 @@ const boton: CSSProperties = {
 export function NuevoEventoModal({
   salones,
   modo,
+  editar,
   onCerrar,
   onCreado,
 }: {
@@ -99,6 +169,8 @@ export function NuevoEventoModal({
    * "administrativo" crea un evento interno cuya audiencia son GUÍAS elegidos.
    */
   modo: "academico" | "administrativo";
+  /** Si viene, el formulario EDITA ese evento en vez de crear uno. */
+  editar?: EventoEditable;
   onCerrar: () => void;
   onCreado: () => void;
 }) {
@@ -107,28 +179,66 @@ export function NuevoEventoModal({
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
+  // Al editar, todo arranca con lo que el evento ya tiene. La hora de un evento
+  // suelto es la de PARED de su salón; la del Welcome y la del administrativo,
+  // la del reloj de quien edita (son instantes).
+  const inicio =
+    editar !== undefined
+      ? pared(editar.startsAt, editar.clase === "suelto" ? editar.timezone : undefined)
+      : null;
   const hoy = new Date();
   const [fecha, setFecha] = useState(
-    `${String(hoy.getFullYear())}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`,
+    inicio?.fecha ??
+      `${String(hoy.getFullYear())}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`,
   );
-  const [hora, setHora] = useState("16:00");
-  const [duracion, setDuracion] = useState(60);
+  const [hora, setHora] = useState(inicio?.hora ?? "16:00");
+  const [duracion, setDuracion] = useState(editar?.duracionMin ?? 60);
   // En modo administrativo arranca vacío y toma el primer tipo que sirva la
   // API: fijar un literal aquí sería una cuarta copia del vocabulario.
-  const [tipo, setTipo] = useState<string>(esAdmin ? "" : "SESION");
-  const [campania, setCampania] = useState("");
-  const [pais, setPais] = useState("");
-  const [curso, setCurso] = useState("");
-  const [salonPrincipal, setSalonPrincipal] = useState("");
-  const [nivel, setNivel] = useState("");
-  const [limite, setLimite] = useState(esAdmin ? String(LIMITE_ADMIN_DEFECTO) : "");
-  const [guiaUserId, setGuiaUserId] = useState("");
-  const [observaciones, setObservaciones] = useState("");
+  const [tipo, setTipo] = useState<string>(
+    editar?.clase === "welcome"
+      ? "WELCOME"
+      : editar !== undefined
+        ? editar.tipo
+        : esAdmin
+          ? ""
+          : "SESION",
+  );
+  const [campania, setCampania] = useState(
+    editar !== undefined && editar.clase !== "suelto" ? (editar.campania ?? "") : "",
+  );
+  const [pais, setPais] = useState(
+    editar !== undefined && editar.clase !== "suelto" ? (editar.pais ?? "") : "",
+  );
+  const [curso, setCurso] = useState(
+    editar !== undefined && editar.clase !== "suelto" ? (editar.curso ?? "") : "",
+  );
+  const [salonPrincipal, setSalonPrincipal] = useState(
+    editar !== undefined && editar.clase !== "suelto" ? (editar.classroomId ?? "") : "",
+  );
+  const [nivel, setNivel] = useState(editar?.nivel ?? "");
+  const [limite, setLimite] = useState(
+    editar !== undefined
+      ? editar.limiteUsuarios !== null
+        ? String(editar.limiteUsuarios)
+        : ""
+      : esAdmin
+        ? String(LIMITE_ADMIN_DEFECTO)
+        : "",
+  );
+  const [guiaUserId, setGuiaUserId] = useState(
+    editar !== undefined && editar.clase !== "admin" ? (editar.guiaUserId ?? "") : "",
+  );
+  const [observaciones, setObservaciones] = useState(editar?.observaciones ?? "");
   const [compartir, setCompartir] = useState(false);
   const [extras, setExtras] = useState<string[]>([]);
   // Audiencia del evento administrativo: qué guías lo verán.
-  const [titulo, setTitulo] = useState("");
-  const [audiencia, setAudiencia] = useState<string[]>([]);
+  const [titulo, setTitulo] = useState(editar?.clase === "admin" ? (editar.titulo ?? "") : "");
+  const [audiencia, setAudiencia] = useState<string[]>(
+    editar?.clase === "admin" ? editar.guiaUserIds : [],
+  );
+  /** Editando un evento suelto: su salón no cambia (se elige al crearlo). */
+  const salonFijo = editar?.clase === "suelto";
   // Vocabulario y rangos del dominio, servidos por la API.
   const [tiposAdmin, setTiposAdmin] = useState<TipoAdmin[]>([]);
   const [horasAdmin, setHorasAdmin] = useState<number[]>([]);
@@ -139,7 +249,7 @@ export function NuevoEventoModal({
   const esWelcome = !esAdmin && tipo === "WELCOME";
   // Welcome para niños que entran con el curso YA andando: no exige ser antes
   // del inicio. Se marca solo al elegir una campaña que ya no está en matrícula.
-  const [enMarcha, setEnMarcha] = useState(false);
+  const [enMarcha, setEnMarcha] = useState(editar?.clase === "welcome" ? editar.enMarcha : false);
 
   const cargarGuias = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/eventos");
@@ -256,7 +366,7 @@ export function NuevoEventoModal({
     ? fecha !== "" && hora !== "" && audiencia.length > 0
     : esWelcome
       ? fecha !== "" && hora !== "" && guiaUserId !== "" && Number(limite) > 0
-      : fecha !== "" && hora !== "" && salonPrincipal !== "" && guiaUserId !== "";
+      : fecha !== "" && hora !== "" && (salonFijo || salonPrincipal !== "") && guiaUserId !== "";
   const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   async function crear() {
@@ -279,25 +389,9 @@ export function NuevoEventoModal({
             observaciones: observaciones.trim() === "" ? null : observaciones,
             enMarcha,
           }
-        : esAdmin
+        : salonFijo
           ? {
-              tipo,
-              titulo: titulo.trim() === "" ? null : titulo,
-              fecha,
-              horaLocal: hora,
-              duracionMin: duracion,
-              zona: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              pais: pais === "" ? null : pais,
-              campania: campania === "" ? null : campania,
-              curso: curso === "" ? null : curso,
-              classroomId: salonPrincipal === "" ? null : salonPrincipal,
-              nivel: nivel === "" ? null : nivel,
-              limiteUsuarios: limite === "" ? null : Number(limite),
-              observaciones: observaciones.trim() === "" ? null : observaciones,
-              guiaUserIds: audiencia,
-            }
-          : {
-              classroomIds: seleccionados,
+              // Evento suelto en edición: el salón (o salones) no cambia.
               tipo,
               fecha,
               horaLocal: hora,
@@ -306,22 +400,53 @@ export function NuevoEventoModal({
               limiteUsuarios: limite === "" ? null : Number(limite),
               guiaUserId,
               observaciones: observaciones.trim() === "" ? null : observaciones,
-            };
-      const res = await apiFetch(
-        esWelcome
-          ? "/api/scheduling/welcomes"
+            }
           : esAdmin
-            ? "/api/scheduling/eventos-admin"
-            : "/api/scheduling/eventos",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cuerpo),
-        },
-      );
+            ? {
+                tipo,
+                titulo: titulo.trim() === "" ? null : titulo,
+                fecha,
+                horaLocal: hora,
+                duracionMin: duracion,
+                zona: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                pais: pais === "" ? null : pais,
+                campania: campania === "" ? null : campania,
+                curso: curso === "" ? null : curso,
+                classroomId: salonPrincipal === "" ? null : salonPrincipal,
+                nivel: nivel === "" ? null : nivel,
+                limiteUsuarios: limite === "" ? null : Number(limite),
+                observaciones: observaciones.trim() === "" ? null : observaciones,
+                guiaUserIds: audiencia,
+              }
+            : {
+                classroomIds: seleccionados,
+                tipo,
+                fecha,
+                horaLocal: hora,
+                duracionMin: duracion,
+                nivel: nivel === "" ? null : nivel,
+                limiteUsuarios: limite === "" ? null : Number(limite),
+                guiaUserId,
+                observaciones: observaciones.trim() === "" ? null : observaciones,
+              };
+      const base = esWelcome
+        ? "/api/scheduling/welcomes"
+        : esAdmin
+          ? "/api/scheduling/eventos-admin"
+          : "/api/scheduling/eventos";
+      const res = await apiFetch(editar !== undefined ? `${base}/${editar.id}` : base, {
+        method: editar !== undefined ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      });
       if (!res.ok) {
         const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
-        setError(c.error?.message ?? "No se pudo crear el evento.");
+        setError(
+          c.error?.message ??
+            (editar !== undefined
+              ? "No se pudo guardar el evento."
+              : "No se pudo crear el evento."),
+        );
         return;
       }
       onCreado();
@@ -369,7 +494,14 @@ export function NuevoEventoModal({
           }}
         >
           <h2 style={{ fontSize: "1.2rem", fontWeight: 800 }}>
-            {esAdmin ? "🏛️ Evento administrativo" : "🎓 Evento académico"}
+            {editar !== undefined ? "✏️ Editar " : ""}
+            {esAdmin
+              ? editar !== undefined
+                ? "evento administrativo"
+                : "🏛️ Evento administrativo"
+              : editar !== undefined
+                ? "evento académico"
+                : "🎓 Evento académico"}
           </h2>
           <button
             type="button"
@@ -392,6 +524,26 @@ export function NuevoEventoModal({
           {error !== null && (
             <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>
               {error}
+            </p>
+          )}
+
+          {editar !== undefined && (
+            <p
+              style={{
+                margin: 0,
+                padding: "0.6rem 0.8rem",
+                borderRadius: "0.6rem",
+                background: "#fff8e1",
+                border: "1px solid #ffe082",
+                fontSize: "0.83rem",
+                lineHeight: 1.45,
+              }}
+            >
+              {editar.clase === "welcome"
+                ? `Tiene ${String(editar.inscritos)} niño${editar.inscritos === 1 ? "" : "s"} agendado${editar.inscritos === 1 ? "" : "s"}: siguen agendados con los cambios. El límite no puede quedar por debajo de esa cifra.`
+                : editar.clase === "suelto"
+                  ? `Salón: ${editar.salon}${editar.compartido ? " (evento compartido: el cambio se aplica en todos sus salones)" : ""}. La lista sale de las matrículas del salón, así que los niños siguen inscritos.`
+                  : "Los guías que sigan en la audiencia conservan su asistencia; los que se quiten dejan de verlo."}
             </p>
           )}
 
@@ -483,114 +635,135 @@ export function NuevoEventoModal({
                 onChange={(e) => elegirTipo(e.target.value)}
                 style={campo}
               >
-                {(esAdmin ? tiposAdmin : TIPOS_ACADEMICO).map((t) => (
+                {(esAdmin
+                  ? tiposAdmin
+                  : TIPOS_ACADEMICO.filter((t) =>
+                      // Editando, el tipo no cambia de clase: un Welcome sigue
+                      // siendo Welcome y una clase suelta no se vuelve Welcome.
+                      editar === undefined
+                        ? true
+                        : editar.clase === "welcome"
+                          ? t.valor === "WELCOME"
+                          : t.valor !== "WELCOME",
+                    )
+                ).map((t) => (
                   <option key={t.valor} value={t.valor}>
                     {t.etiqueta}
                   </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label style={rotulo} htmlFor="ev-camp">
-                Campaña {filtrosLibres ? "" : "*"}
-              </label>
-              <select
-                id="ev-camp"
-                value={campania}
-                onChange={(e) => {
-                  setCampania(e.target.value);
-                  if (esWelcome) {
-                    const estado = campaniasLista.find((c) => c.nombre === e.target.value)?.estado;
-                    setEnMarcha(estado !== undefined && estado !== "EN_MATRICULA");
-                  }
-                  setPais("");
-                  setCurso("");
-                  setSalonPrincipal("");
-                  setExtras([]);
-                }}
-                style={campo}
-              >
-                <option value="">
-                  {filtrosLibres ? "Todas las campañas" : "Seleccionar campaña"}
-                </option>
-                {campanias.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                    {esWelcome &&
-                    campaniasLista.find((x) => x.nombre === c)?.estado === "EN_MATRICULA"
-                      ? " (en matrícula)"
-                      : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={rotulo} htmlFor="ev-pais">
-                País {filtrosLibres ? "" : "*"}
-              </label>
-              <select
-                id="ev-pais"
-                value={pais}
-                disabled={!filtrosLibres && campania === ""}
-                onChange={(e) => {
-                  setPais(e.target.value);
-                  setCurso("");
-                  setSalonPrincipal("");
-                  setExtras([]);
-                }}
-                style={campo}
-              >
-                <option value="">{filtrosLibres ? "Todos los países" : "Seleccionar país"}</option>
-                {paises.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={rotulo} htmlFor="ev-curso">
-                Curso {filtrosLibres ? "" : "*"}
-              </label>
-              <select
-                id="ev-curso"
-                value={curso}
-                disabled={!filtrosLibres && pais === ""}
-                onChange={(e) => {
-                  setCurso(e.target.value);
-                  setSalonPrincipal("");
-                }}
-                style={campo}
-              >
-                <option value="">{filtrosLibres ? "Todos los cursos" : "Seleccionar curso"}</option>
-                {cursos.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={rotulo} htmlFor="ev-salon">
-                Salón {filtrosLibres ? "" : "*"}
-              </label>
-              <select
-                id="ev-salon"
-                value={salonPrincipal}
-                disabled={!filtrosLibres && curso === ""}
-                onChange={(e) => setSalonPrincipal(e.target.value)}
-                style={campo}
-              >
-                <option value="">
-                  {filtrosLibres ? "Todos los salones" : "Seleccionar salón"}
-                </option>
-                {salonesFiltrados.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!salonFijo && (
+              <>
+                <div>
+                  <label style={rotulo} htmlFor="ev-camp">
+                    Campaña {filtrosLibres ? "" : "*"}
+                  </label>
+                  <select
+                    id="ev-camp"
+                    value={campania}
+                    onChange={(e) => {
+                      setCampania(e.target.value);
+                      if (esWelcome) {
+                        const estado = campaniasLista.find(
+                          (c) => c.nombre === e.target.value,
+                        )?.estado;
+                        setEnMarcha(estado !== undefined && estado !== "EN_MATRICULA");
+                      }
+                      setPais("");
+                      setCurso("");
+                      setSalonPrincipal("");
+                      setExtras([]);
+                    }}
+                    style={campo}
+                  >
+                    <option value="">
+                      {filtrosLibres ? "Todas las campañas" : "Seleccionar campaña"}
+                    </option>
+                    {campanias.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                        {esWelcome &&
+                        campaniasLista.find((x) => x.nombre === c)?.estado === "EN_MATRICULA"
+                          ? " (en matrícula)"
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={rotulo} htmlFor="ev-pais">
+                    País {filtrosLibres ? "" : "*"}
+                  </label>
+                  <select
+                    id="ev-pais"
+                    value={pais}
+                    disabled={!filtrosLibres && campania === ""}
+                    onChange={(e) => {
+                      setPais(e.target.value);
+                      setCurso("");
+                      setSalonPrincipal("");
+                      setExtras([]);
+                    }}
+                    style={campo}
+                  >
+                    <option value="">
+                      {filtrosLibres ? "Todos los países" : "Seleccionar país"}
+                    </option>
+                    {paises.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={rotulo} htmlFor="ev-curso">
+                    Curso {filtrosLibres ? "" : "*"}
+                  </label>
+                  <select
+                    id="ev-curso"
+                    value={curso}
+                    disabled={!filtrosLibres && pais === ""}
+                    onChange={(e) => {
+                      setCurso(e.target.value);
+                      setSalonPrincipal("");
+                    }}
+                    style={campo}
+                  >
+                    <option value="">
+                      {filtrosLibres ? "Todos los cursos" : "Seleccionar curso"}
+                    </option>
+                    {cursos.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={rotulo} htmlFor="ev-salon">
+                    Salón {filtrosLibres ? "" : "*"}
+                  </label>
+                  <select
+                    id="ev-salon"
+                    value={salonPrincipal}
+                    disabled={!filtrosLibres && curso === ""}
+                    onChange={(e) => setSalonPrincipal(e.target.value)}
+                    style={campo}
+                  >
+                    <option value="">
+                      {filtrosLibres ? "Todos los salones" : "Seleccionar salón"}
+                    </option>
+                    {salonesFiltrados.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
             <div>
               <label style={rotulo} htmlFor="ev-nivel">
                 Nivel
@@ -721,7 +894,7 @@ export function NuevoEventoModal({
           )}
 
           {/* Compartir entre cursos: solo tiene sentido en el evento académico. */}
-          {!esAdmin && !esWelcome && (
+          {!esAdmin && !esWelcome && !salonFijo && (
             <div
               style={{
                 padding: "0.8rem 0.9rem",
@@ -934,10 +1107,14 @@ export function NuevoEventoModal({
               }}
             >
               {ocupado
-                ? "Creando…"
-                : esAdmin
-                  ? `Crear evento (${String(audiencia.length)} guías)`
-                  : `Crear evento${seleccionados.length > 1 ? ` (${String(seleccionados.length)} salones)` : ""}`}
+                ? editar !== undefined
+                  ? "Guardando…"
+                  : "Creando…"
+                : editar !== undefined
+                  ? "Guardar cambios"
+                  : esAdmin
+                    ? `Crear evento (${String(audiencia.length)} guías)`
+                    : `Crear evento${seleccionados.length > 1 ? ` (${String(seleccionados.length)} salones)` : ""}`}
             </button>
           </div>
         </div>

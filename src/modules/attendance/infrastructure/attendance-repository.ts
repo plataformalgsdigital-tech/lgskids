@@ -49,6 +49,20 @@ export interface SessionInfo {
    * lección. Null si no es una clase regular.
    */
   claseNumero: number | null;
+  /**
+   * Evento creado A MANO en el calendario (sesión extra, club, taller o
+   * refuerzo): no nace del horario del salón (`slot_id` NULL). Es lo que se puede
+   * EDITAR; las clases del horario se mueven con suspensiones y regeneración.
+   */
+  esEvento: boolean;
+  duracionMin: number;
+  nivel: string | null;
+  observaciones: string | null;
+  limiteUsuarios: number | null;
+  /** Zona del salón: la hora del evento se escribe en su reloj. */
+  timezone: string;
+  /** Evento compartido entre salones (misma hora, guía y Zoom). */
+  grupoId: string | null;
 }
 
 /** Nombre COMPLETO del guía efectivo `g` (su ficha, la del staff o el usuario). */
@@ -72,7 +86,10 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             cl.meeting_url AS "meetingUrl", cl.cupo,
             s.cerrada_por AS "cerradaPor", s.cerrada_en::text AS "cerradaEn",
             ca.nombre AS campania, co.tipo::text AS "cursoTipo",
-            sec.leccion, sec.nivel AS "leccionNivel", ord.n::int AS "claseNumero"
+            sec.leccion, sec.nivel AS "leccionNivel", ord.n::int AS "claseNumero",
+            (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
+            s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,
+            s.grupo_id AS "grupoId"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course co ON co.id = cl.course_id
