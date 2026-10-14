@@ -56,6 +56,7 @@ export const PERMISOS = {
   MENU_SIN_PERFIL: "menu.sin_perfil",
   MENU_SERVICIO_WELCOME: "menu.servicio_welcome",
   MENU_SERVICIO_ASISTENCIA: "menu.servicio_asistencia",
+  MENU_SERVICIO_JUSTIFICACION: "menu.servicio_justificacion",
   MENU_SERVICIO_SESIONES: "menu.servicio_sesiones",
   MENU_SERVICIO_CASOS: "menu.servicio_casos",
   MENU_SERVICIO_REACTIVADOS: "menu.servicio_reactivados",
@@ -158,6 +159,7 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.MENU_SIN_PERFIL,
     PERMISOS.MENU_SERVICIO_WELCOME,
     PERMISOS.MENU_SERVICIO_ASISTENCIA,
+    PERMISOS.MENU_SERVICIO_JUSTIFICACION,
     PERMISOS.MENU_SERVICIO_SESIONES,
     PERMISOS.MENU_SERVICIO_CASOS,
     PERMISOS.MENU_SERVICIO_REACTIVADOS,
@@ -249,6 +251,7 @@ export const SECCIONES_MENU: {
     hijos: [
       { etiqueta: "Welcome", permiso: PERMISOS.MENU_SERVICIO_WELCOME },
       { etiqueta: "Asistencia", permiso: PERMISOS.MENU_SERVICIO_ASISTENCIA },
+      { etiqueta: "Justificación falta", permiso: PERMISOS.MENU_SERVICIO_JUSTIFICACION },
       { etiqueta: "Sesiones", permiso: PERMISOS.MENU_SERVICIO_SESIONES },
       { etiqueta: "Usuarios sin perfil creado", permiso: PERMISOS.MENU_SIN_PERFIL },
       { etiqueta: "Casos de atención", permiso: PERMISOS.MENU_SERVICIO_CASOS },

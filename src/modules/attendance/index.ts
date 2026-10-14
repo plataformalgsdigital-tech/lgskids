@@ -12,6 +12,7 @@ export type { ListaDeSesion, FilaLista, EstadoAsistencia } from "./application/a
 export {
   inasistencias,
   justificarInasistencia,
+  soporteDeInasistencia,
   LARGO_JUSTIFICACION,
   DIAS_MAX_INASISTENCIAS,
   MAX_INASISTENCIAS,

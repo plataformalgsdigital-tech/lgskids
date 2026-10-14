@@ -8,7 +8,18 @@ import { crearNino } from "@/modules/people";
 import { aprobarContrato, crearContrato } from "@/modules/contracts";
 import { registrarIntento } from "@/modules/assessment";
 import { listaDeSesion, marcarAsistencia } from "../application/asistencia";
-import { inasistencias, justificarInasistencia } from "../application/inasistencias";
+import {
+  inasistencias,
+  justificarInasistencia,
+  soporteDeInasistencia,
+} from "../application/inasistencias";
+import { eliminarArchivo } from "@/modules/files";
+
+/** PNG de 1×1: un soporte válido para `files`. */
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
 import {
   enviarMensajeInasistencia,
   setSenderForTests,
@@ -275,15 +286,38 @@ describe.runIf(RUN)("asistencia y cuestionarios (integración)", () => {
         countryScope: null,
       }),
     ).rejects.toBeInstanceOf(ValidationError);
-    await justificarInasistencia({
+    // Un soporte que no es PDF ni imagen se rechaza, y no justifica nada.
+    await expect(
+      justificarInasistencia({
+        actorUserId: ACTOR,
+        attendanceId,
+        justificacion: "Estaba enfermo",
+        countryScope: null,
+        soporte: { nombre: "audio.mp3", mime: "audio/mpeg", bytes: Buffer.from("ID3") },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect((await inasistencias(base))[0]?.estado).toBe("AUSENTE");
+
+    const r = await justificarInasistencia({
       actorUserId: ACTOR,
       attendanceId,
       justificacion: "Estaba enfermo; avisó la mamá",
       countryScope: null,
+      soporte: { nombre: "certificado.png", mime: "image/png", bytes: PNG },
     });
-    const [ahora] = await inasistencias(base);
-    expect(ahora?.estado).toBe("JUSTIFICADO");
-    expect(ahora?.justificacion).toBe("Estaba enfermo; avisó la mamá");
+    try {
+      const [ahora] = await inasistencias(base);
+      expect(ahora?.estado).toBe("JUSTIFICADO");
+      expect(ahora?.justificacion).toBe("Estaba enfermo; avisó la mamá");
+      expect(ahora?.tieneSoporte).toBe(true);
+      const soporte = await soporteDeInasistencia(attendanceId, null);
+      expect(soporte.nombre).toBe("certificado.png");
+      expect(soporte.bytes.length).toBeGreaterThan(0);
+      // Fuera del alcance por país, ni el soporte.
+      await expect(soporteDeInasistencia(attendanceId, ["CL"])).rejects.toThrow();
+    } finally {
+      if (r.soporteId !== null) await eliminarArchivo(r.soporteId);
+    }
     await expect(
       justificarInasistencia({
         actorUserId: ACTOR,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { CancelacionSesion } from "./CancelacionSesion";
 import type { EventoEditable } from "./NuevoEventoModal";
 
 /**
@@ -67,6 +68,8 @@ interface Sesion {
   limiteUsuarios: number | null;
   timezone: string;
   grupoId: string | null;
+  /** Cancelada por el guía y sin reemplazo: no se registra ni se pasa lista. */
+  cancelada: boolean;
 }
 
 const NIVEL_UI: Record<string, string> = {
@@ -779,12 +782,23 @@ export function SesionModal({
             )}
           </section>
 
+          {/* ── Cancelación del guía (aviso y decisión de administración) ── */}
+          {sesion !== null && (
+            <CancelacionSesion
+              sessionId={sesion.id}
+              guiaActualId={sesion.guiaUserId}
+              cerrada={cerrada}
+              onCambio={() => void cargar()}
+            />
+          )}
+
           {/* ── Acciones ────────────────────────────────────────── */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <button
               type="button"
               style={botonPrimario}
-              disabled={ocupado || cerrada}
+              disabled={ocupado || cerrada || sesion?.cancelada === true}
+              title={sesion?.cancelada === true ? "La sesión está cancelada" : undefined}
               onClick={abrirRegistro}
             >
               ✔ Registrar sesión

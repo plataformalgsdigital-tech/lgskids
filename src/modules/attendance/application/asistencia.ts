@@ -179,6 +179,10 @@ export async function marcarAsistencia(input: {
   }
   const sesion = await getSessionInfo(input.sessionId);
   if (sesion === null) throw new NotFoundError("La sesión no existe.");
+  // Cancelada sin reemplazo: no se dictó, así que nadie "faltó" ni "asistió".
+  if (sesion.cancelada) {
+    throw new ValidationError("La sesión está cancelada: no se pasa lista.");
+  }
 
   const roster = new Set((await getRosterConPais(sesion.classroomId)).map((r) => r.childPersonId));
   for (const marca of input.marcas) {

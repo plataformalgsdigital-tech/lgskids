@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import { SQL_SECUENCIA_LECCIONES } from "@/modules/catalog";
-import { SQL_ORDINAL_CLASE } from "@/modules/scheduling";
+import { SQL_ORDINAL_CLASE, SQL_SESION_CANCELADA } from "@/modules/scheduling";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
 
@@ -63,6 +63,8 @@ export interface SessionInfo {
   timezone: string;
   /** Evento compartido entre salones (misma hora, guía y Zoom). */
   grupoId: string | null;
+  /** El guía la canceló y administración lo aprobó sin cubrirla: no se dicta. */
+  cancelada: boolean;
 }
 
 /** Nombre COMPLETO del guía efectivo `g` (su ficha, la del staff o el usuario). */
@@ -89,7 +91,7 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             sec.leccion, sec.nivel AS "leccionNivel", ord.n::int AS "claseNumero",
             (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
             s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,
-            s.grupo_id AS "grupoId"
+            s.grupo_id AS "grupoId", ${SQL_SESION_CANCELADA("s")} AS cancelada
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course co ON co.id = cl.course_id

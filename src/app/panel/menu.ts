@@ -123,6 +123,15 @@ export const MENU: {
   },
   {
     seccion: "Servicio",
+    // Su razón de ser es justificar: sin `asistencia.gestionar` no tiene uso.
+    permiso: "asistencia.gestionar",
+    etiqueta: "Justificación falta",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/servicio/justificacion",
+    permisoMenu: "menu.servicio_justificacion",
+  },
+  {
+    seccion: "Servicio",
     permiso: "personas.ver",
     etiqueta: "Sesiones",
     color: "var(--lgs-cian)",

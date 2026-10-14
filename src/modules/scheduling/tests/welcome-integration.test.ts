@@ -16,6 +16,7 @@ import {
   marcarAsistenciaEventoAdmin,
 } from "../application/crear-evento";
 import { crearSalon } from "../application/gestion-salones";
+import { agendadosWelcome } from "../application/servicio";
 import {
   crearWelcome,
   detalleWelcome,
@@ -408,5 +409,24 @@ describe.runIf(RUN)("Welcome (integración)", () => {
     expect(r.marcados).toBe(1);
     expect((await detalleWelcome(id)).inscritos[0]?.asistio).toBe(true);
     await expect(eliminarWelcome({ actorUserId: actor, id })).rejects.toBeInstanceOf(ConflictError);
+
+    // Servicio › Welcome: lo lista con su asistencia, y filtra por ella.
+    const base = {
+      countryScope: null,
+      desde: dias(12),
+      hasta: dias(12),
+      zona: "America/Bogota",
+      buscar: `welcome${marca}`,
+    };
+    const todos = await agendadosWelcome(base);
+    expect(todos.find((a) => a.childPersonId === c)?.asistio).toBe(true);
+    expect(
+      (await agendadosWelcome({ ...base, asistencia: "SI" })).map((a) => a.childPersonId),
+    ).toContain(c);
+    expect(
+      (await agendadosWelcome({ ...base, asistencia: "NO" })).map((a) => a.childPersonId),
+    ).not.toContain(c);
+    // El niño es de Chile: quien solo ve Colombia no lo ve.
+    expect(await agendadosWelcome({ ...base, countryScope: ["CO"] })).toHaveLength(0);
   });
 });

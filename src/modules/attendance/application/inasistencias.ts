@@ -1,3 +1,10 @@
+import {
+  TAMANO_MAXIMO_BYTES,
+  descargarArchivo,
+  eliminarArchivo,
+  subirArchivo,
+  type PoliticaArchivo,
+} from "@/modules/files";
 import { queryOne, queryRows } from "@/platform/db/query";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { marcarAsistencia } from "./asistencia";
@@ -41,6 +48,8 @@ export interface Inasistencia {
   guia: string | null;
   apoderado: string | null;
   telefono: string | null;
+  /** La justificación trae un documento adjunto (se ve por su ruta propia). */
+  tieneSoporte: boolean;
 }
 
 export interface FiltrosInasistencias {
@@ -130,7 +139,10 @@ export async function inasistencias(f: FiltrosInasistencias): Promise<Inasistenc
             COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
                      NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
                      gu.username) AS guia,
-            ap.nombre AS apoderado, COALESCE(ap.telefono, b.telefono) AS telefono
+            ap.nombre AS apoderado, COALESCE(ap.telefono, b.telefono) AS telefono,
+            EXISTS (SELECT 1 FROM files_object fo
+                     WHERE fo.entidad = 'attendance_soporte' AND fo.entidad_id = a.id::text)
+              AS "tieneSoporte"
        FROM attendance_attendance a
        JOIN scheduling_session s ON s.id = a.session_id
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
@@ -173,8 +185,10 @@ export async function justificarInasistencia(input: {
   attendanceId: string;
   justificacion: string;
   countryScope: string[] | null;
+  /** El soporte que mandó la familia (certificado médico, nota): opcional. */
+  soporte?: { nombre: string; mime: string; bytes: Buffer } | null;
   ip?: string | null;
-}): Promise<{ sessionId: string; childPersonId: string }> {
+}): Promise<{ sessionId: string; childPersonId: string; soporteId: string | null }> {
   const justificacion = input.justificacion.trim();
   if (justificacion === "") throw new ValidationError("Escribe el motivo de la justificación.");
   if (justificacion.length > LARGO_JUSTIFICACION) {
@@ -182,6 +196,62 @@ export async function justificarInasistencia(input: {
       `La justificación admite hasta ${String(LARGO_JUSTIFICACION)} caracteres.`,
     );
   }
+  const marca = await marcaEnAlcance(input.attendanceId, input.countryScope);
+  if (marca.estado !== "AUSENTE") {
+    throw new ConflictError(
+      marca.estado === "JUSTIFICADO"
+        ? "Esa inasistencia ya está justificada."
+        : "El niño asistió a esa sesión: no hay nada que justificar.",
+    );
+  }
+  // El soporte se sube ANTES: si falla (tipo o tamaño), no se justifica nada.
+  // Si después falla la marca, se suelta, para no dejar un archivo sin dueño.
+  let soporteId: string | null = null;
+  if (input.soporte != null) {
+    soporteId = (
+      await subirArchivo({
+        actorUserId: input.actorUserId,
+        nombreOriginal: input.soporte.nombre,
+        mime: input.soporte.mime,
+        bytes: input.soporte.bytes,
+        entidad: ENTIDAD_SOPORTE,
+        entidadId: input.attendanceId,
+        politica: POLITICA_SOPORTE,
+      })
+    ).id;
+  }
+  try {
+    await marcarAsistencia({
+      actorUserId: input.actorUserId,
+      sessionId: marca.sessionId,
+      marcas: [{ childPersonId: marca.childPersonId, estado: "JUSTIFICADO", justificacion }],
+      ip: input.ip ?? null,
+    });
+  } catch (error) {
+    if (soporteId !== null) await eliminarArchivo(soporteId);
+    throw error;
+  }
+  return { sessionId: marca.sessionId, childPersonId: marca.childPersonId, soporteId };
+}
+
+/** Entidad de `files` del soporte de una justificación (clave: id de la marca). */
+const ENTIDAD_SOPORTE = "attendance_soporte";
+
+/** Un certificado o una nota: PDF o foto, hasta 10 MB. Nada de audio ni HTML. */
+const POLITICA_SOPORTE: PoliticaArchivo = {
+  mimes: new Map([
+    ["application/pdf", "pdf"],
+    ["image/jpeg", "jpg"],
+    ["image/png", "png"],
+    ["image/webp", "webp"],
+  ]),
+  tamanoMaximo: TAMANO_MAXIMO_BYTES,
+};
+
+async function marcaEnAlcance(
+  attendanceId: string,
+  countryScope: string[] | null,
+): Promise<{ sessionId: string; childPersonId: string; estado: string }> {
   const marca = await queryOne<{
     sessionId: string;
     childPersonId: string;
@@ -192,23 +262,30 @@ export async function justificarInasistencia(input: {
             a.estado::text AS estado, p.country_code AS pais
        FROM attendance_attendance a JOIN people_person p ON p.id = a.child_person_id
       WHERE a.id = $1`,
-    [input.attendanceId],
+    [attendanceId],
   );
-  if (marca === null || (input.countryScope !== null && !input.countryScope.includes(marca.pais))) {
+  if (marca === null || (countryScope !== null && !countryScope.includes(marca.pais))) {
     throw new NotFoundError("La marca de asistencia no existe.");
   }
-  if (marca.estado !== "AUSENTE") {
-    throw new ConflictError(
-      marca.estado === "JUSTIFICADO"
-        ? "Esa inasistencia ya está justificada."
-        : "El niño asistió a esa sesión: no hay nada que justificar.",
-    );
-  }
-  await marcarAsistencia({
-    actorUserId: input.actorUserId,
-    sessionId: marca.sessionId,
-    marcas: [{ childPersonId: marca.childPersonId, estado: "JUSTIFICADO", justificacion }],
-    ip: input.ip ?? null,
-  });
-  return { sessionId: marca.sessionId, childPersonId: marca.childPersonId };
+  return marca;
+}
+
+/**
+ * El soporte de una justificación, para verlo. Se pide por el id de la MARCA,
+ * nunca por el del archivo: una ruta que sirviera cualquier id de `files`
+ * entregaría también fotos de niños (regla 9).
+ */
+export async function soporteDeInasistencia(
+  attendanceId: string,
+  countryScope: string[] | null,
+): Promise<{ nombre: string; mime: string; bytes: Buffer }> {
+  await marcaEnAlcance(attendanceId, countryScope);
+  const f = await queryOne<{ id: string }>(
+    `SELECT id FROM files_object WHERE entidad = $1 AND entidad_id = $2
+      ORDER BY created_at DESC LIMIT 1`,
+    [ENTIDAD_SOPORTE, attendanceId],
+  );
+  if (f === null) throw new NotFoundError("Esa justificación no tiene soporte.");
+  const { meta, bytes } = await descargarArchivo(f.id);
+  return { nombre: meta.nombreOriginal, mime: meta.mime, bytes };
 }

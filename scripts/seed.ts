@@ -89,6 +89,7 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.MENU_SIN_PERFIL]: "Usuarios sin perfil creado",
   [PERMISOS.MENU_SERVICIO_WELCOME]: "Welcome (Servicio)",
   [PERMISOS.MENU_SERVICIO_ASISTENCIA]: "Asistencia (Servicio)",
+  [PERMISOS.MENU_SERVICIO_JUSTIFICACION]: "Justificación falta",
   [PERMISOS.MENU_SERVICIO_SESIONES]: "Sesiones (Servicio)",
   [PERMISOS.MENU_SERVICIO_CASOS]: "Casos de atención",
   [PERMISOS.MENU_SERVICIO_REACTIVADOS]: "Reactivados",
@@ -201,6 +202,8 @@ async function main(): Promise<void> {
       // Las demás de Servicio: migración 20261014100000_menu_servicio_opciones.
       ["menu.servicio_welcome", ["personas.ver"]],
       ["menu.servicio_asistencia", ["personas.ver"]],
+      // Migración 20261014300000_cancelacion_sesion.
+      ["menu.servicio_justificacion", ["personas.ver"]],
       ["menu.servicio_sesiones", ["personas.ver"]],
       ["menu.servicio_casos", ["personas.ver"]],
       ["menu.servicio_reactivados", ["personas.ver"]],

@@ -1,6 +1,7 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
+import { SQL_SESION_CANCELADA } from "./cancelacion";
 import { crearEvento } from "./crear-evento";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { withTransaction } from "@/platform/db/transaction";
@@ -51,10 +52,11 @@ export async function cerrarSesion(input: {
     starts_at: string;
     cerrada_en: string | null;
     guia_salon: string | null;
+    cancelada: boolean;
   }>(
     `SELECT s.id, s.classroom_id, cl.nombre AS salon, s.fecha::text AS fecha,
             s.starts_at::text AS starts_at, s.cerrada_en::text AS cerrada_en,
-            cl.guia_user_id AS guia_salon
+            cl.guia_user_id AS guia_salon, ${SQL_SESION_CANCELADA("s")} AS cancelada
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
       WHERE s.id = $1`,
@@ -63,6 +65,11 @@ export async function cerrarSesion(input: {
   if (sesion === null) throw new NotFoundError("La sesión no existe.");
   if (sesion.cerrada_en !== null) {
     throw new ConflictError("Esta sesión ya fue cerrada.");
+  }
+  if (sesion.cancelada) {
+    throw new ConflictError(
+      "Esta sesión está CANCELADA (el guía avisó y administración la canceló sin reemplazo).",
+    );
   }
   if (new Date(sesion.starts_at).getTime() > Date.now()) {
     throw new ValidationError("No se puede cerrar una sesión que todavía no empieza.");

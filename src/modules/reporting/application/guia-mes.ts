@@ -1,3 +1,4 @@
+import { SQL_SESION_CANCELADA } from "@/modules/scheduling";
 import { execute, queryRows } from "@/platform/db/query";
 import { ValidationError } from "@/platform/errors";
 
@@ -27,6 +28,8 @@ export interface GuiaMes {
   ausentes: number;
   justificados: number;
   casosAtencion: number;
+  /** Sesiones que el guía canceló y administración aprobó (2026-10-14). */
+  sesionesCanceladas: number;
 }
 
 function validarPeriodo(periodo: string): void {
@@ -38,23 +41,51 @@ function validarPeriodo(periodo: string): void {
 /** Cálculo vivo del período, desde las sesiones y sus marcas de asistencia. */
 export async function calcularGuiaMes(periodo: string): Promise<GuiaMes[]> {
   validarPeriodo(periodo);
+  // Una sesión CANCELADA sin reemplazo no se dictó: no cuenta como dictada para
+  // nadie. Cubierta por otro guía, ya es de él (`s.guia_user_id`). Y al guía que
+  // canceló se le cuenta aparte, desde `scheduling_cancelacion`, que guarda su
+  // propia copia del instante porque la regeneración puede borrar la sesión.
   return queryRows<GuiaMes>(
-    `SELECT g.id AS "guiaUserId", g.username AS guia, $1::text AS periodo,
-            count(DISTINCT s.id) FILTER (WHERE s.tipo = 'SESION')::int  AS "sesionesDictadas",
-            count(DISTINCT s.id) FILTER (WHERE s.cerrada_en IS NOT NULL)::int AS "sesionesCerradas",
-            count(DISTINCT s.id) FILTER (WHERE s.tipo = 'CLUB')::int    AS clubes,
-            count(DISTINCT a.child_person_id)::int                      AS "ninosAtendidos",
-            count(a.*) FILTER (WHERE a.estado = 'PRESENTE')::int         AS presentes,
-            count(a.*) FILTER (WHERE a.estado = 'AUSENTE')::int          AS ausentes,
-            count(a.*) FILTER (WHERE a.estado = 'JUSTIFICADO')::int      AS justificados,
-            count(a.*) FILTER (WHERE a.requiere_atencion)::int           AS "casosAtencion"
-       FROM scheduling_session s
-       JOIN scheduling_classroom cl ON cl.id = s.classroom_id
-       -- El guía de la sesión manda; si no quedó sellado, el del salón.
-       JOIN identity_user g ON g.id = COALESCE(s.guia_user_id, cl.guia_user_id)
-       LEFT JOIN attendance_attendance a ON a.session_id = s.id
-      WHERE to_char((s.starts_at AT TIME ZONE cl.timezone), 'YYYY-MM') = $1
-      GROUP BY g.id, g.username
+    `WITH dictado AS (
+       SELECT g.id AS guia_id,
+              count(DISTINCT s.id) FILTER (WHERE s.tipo = 'SESION')::int  AS "sesionesDictadas",
+              count(DISTINCT s.id) FILTER (WHERE s.cerrada_en IS NOT NULL)::int AS "sesionesCerradas",
+              count(DISTINCT s.id) FILTER (WHERE s.tipo = 'CLUB')::int    AS clubes,
+              count(DISTINCT a.child_person_id)::int                      AS "ninosAtendidos",
+              count(a.*) FILTER (WHERE a.estado = 'PRESENTE')::int         AS presentes,
+              count(a.*) FILTER (WHERE a.estado = 'AUSENTE')::int          AS ausentes,
+              count(a.*) FILTER (WHERE a.estado = 'JUSTIFICADO')::int      AS justificados,
+              count(a.*) FILTER (WHERE a.requiere_atencion)::int           AS "casosAtencion"
+         FROM scheduling_session s
+         JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+         -- El guía de la sesión manda; si no quedó sellado, el del salón.
+         JOIN identity_user g ON g.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+         LEFT JOIN attendance_attendance a ON a.session_id = s.id
+        WHERE to_char((s.starts_at AT TIME ZONE cl.timezone), 'YYYY-MM') = $1
+          AND NOT ${SQL_SESION_CANCELADA("s")}
+        GROUP BY g.id
+     ), cancelado AS (
+       SELECT c.guia_user_id AS guia_id, count(*)::int AS n
+         FROM scheduling_cancelacion c
+         LEFT JOIN scheduling_classroom cl ON cl.id = c.classroom_id
+        WHERE c.estado = 'APROBADA'
+          AND to_char((c.starts_at AT TIME ZONE COALESCE(cl.timezone, 'UTC')), 'YYYY-MM') = $1
+        GROUP BY c.guia_user_id
+     )
+     SELECT g.id AS "guiaUserId", g.username AS guia, $1::text AS periodo,
+            COALESCE(d."sesionesDictadas", 0) AS "sesionesDictadas",
+            COALESCE(d."sesionesCerradas", 0) AS "sesionesCerradas",
+            COALESCE(d.clubes, 0) AS clubes,
+            COALESCE(d."ninosAtendidos", 0) AS "ninosAtendidos",
+            COALESCE(d.presentes, 0) AS presentes,
+            COALESCE(d.ausentes, 0) AS ausentes,
+            COALESCE(d.justificados, 0) AS justificados,
+            COALESCE(d."casosAtencion", 0) AS "casosAtencion",
+            COALESCE(x.n, 0) AS "sesionesCanceladas"
+       FROM identity_user g
+       LEFT JOIN dictado d ON d.guia_id = g.id
+       LEFT JOIN cancelado x ON x.guia_id = g.id
+      WHERE d.guia_id IS NOT NULL OR x.guia_id IS NOT NULL
       ORDER BY g.username`,
     [periodo],
   );
@@ -71,8 +102,9 @@ export async function consolidarGuiaMes(periodo: string): Promise<{ guias: numbe
     await execute(
       `INSERT INTO reporting_guia_mes
          (guia_user_id, periodo, sesiones_dictadas, sesiones_cerradas, clubes,
-          ninos_atendidos, presentes, ausentes, justificados, casos_atencion, consolidado_en)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+          ninos_atendidos, presentes, ausentes, justificados, casos_atencion,
+          sesiones_canceladas, consolidado_en)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
        ON CONFLICT (guia_user_id, periodo) DO UPDATE
           SET sesiones_dictadas = EXCLUDED.sesiones_dictadas,
               sesiones_cerradas = EXCLUDED.sesiones_cerradas,
@@ -82,6 +114,7 @@ export async function consolidarGuiaMes(periodo: string): Promise<{ guias: numbe
               ausentes = EXCLUDED.ausentes,
               justificados = EXCLUDED.justificados,
               casos_atencion = EXCLUDED.casos_atencion,
+              sesiones_canceladas = EXCLUDED.sesiones_canceladas,
               consolidado_en = now()`,
       [
         f.guiaUserId,
@@ -94,6 +127,7 @@ export async function consolidarGuiaMes(periodo: string): Promise<{ guias: numbe
         f.ausentes,
         f.justificados,
         f.casosAtencion,
+        f.sesionesCanceladas,
       ],
     );
   }
@@ -119,6 +153,7 @@ export async function leerGuiaMes(
             r.sesiones_dictadas AS "sesionesDictadas", r.sesiones_cerradas AS "sesionesCerradas",
             r.clubes, r.ninos_atendidos AS "ninosAtendidos", r.presentes, r.ausentes,
             r.justificados, r.casos_atencion AS "casosAtencion",
+            r.sesiones_canceladas AS "sesionesCanceladas",
             r.consolidado_en::text AS "consolidadoEn"
        FROM reporting_guia_mes r
        LEFT JOIN identity_user u ON u.id = r.guia_user_id

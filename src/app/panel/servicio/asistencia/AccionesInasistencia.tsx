@@ -11,6 +11,9 @@ import { apiFetch } from "@/ui/api-fetch";
  * deriva a quién y qué.
  */
 
+/** El tope de `files`: avisar antes de subir ahorra esperar un rechazo. */
+const TAMANO_MAXIMO_SOPORTE = 10 * 1024 * 1024;
+
 export interface LineaInasistencia {
   attendanceId: string;
   nombre: string;
@@ -231,17 +234,25 @@ export function JustificarInasistencia({
   onJustificado: (aviso: string) => void;
 }) {
   const [motivo, setMotivo] = useState("");
+  const [soporte, setSoporte] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
   async function guardar() {
+    if (soporte !== null && soporte.size > TAMANO_MAXIMO_SOPORTE) {
+      setError("El soporte pesa más de 10 MB. Sube una foto o un PDF más liviano.");
+      return;
+    }
     setOcupado(true);
     setError(null);
     try {
+      // Multipart: el motivo y, si lo hay, el soporte que mandó la familia.
+      const form = new FormData();
+      form.set("justificacion", motivo);
+      if (soporte !== null) form.set("soporte", soporte);
       const res = await apiFetch(`/api/attendance/inasistencias/${linea.attendanceId}/justificar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ justificacion: motivo }),
+        body: form,
       });
       if (!res.ok) {
         setError(await mensajeDeError(res, "No se pudo justificar."));
@@ -275,6 +286,19 @@ export function JustificarInasistencia({
             fontSize: "0.9rem",
           }}
         />
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+        <span style={{ fontSize: "0.8rem", fontWeight: 700 }}>
+          Soporte (opcional): certificado, nota u otro documento
+        </span>
+        <input
+          type="file"
+          accept="application/pdf,image/jpeg,image/png,image/webp"
+          onChange={(e) => setSoporte(e.target.files?.[0] ?? null)}
+        />
+        <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+          PDF o foto (JPG, PNG, WebP), hasta 10 MB. Queda privado: solo lo ve el equipo.
+        </span>
       </label>
       <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
         Pasa a “Justificado” y el motivo queda en la asistencia del niño, igual que si lo hubiera

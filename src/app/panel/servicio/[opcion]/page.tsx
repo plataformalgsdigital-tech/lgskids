@@ -7,16 +7,6 @@ import { EnConstruccion } from "@/ui/EnConstruccion";
  * Cuando una de estas se construya, se le hace su carpeta y se saca de aquí.
  */
 const OPCIONES: Record<string, { titulo: string; descripcion: string }> = {
-  welcome: {
-    titulo: "Welcome",
-    descripcion:
-      "Los Welcome programados y los niños agendados en cada uno, para hacerles seguimiento.",
-  },
-  sesiones: {
-    titulo: "Sesiones",
-    descripcion:
-      "Lista de sesiones para atender a las familias: quién asistió y qué quedó pendiente.",
-  },
   "casos-atencion": {
     titulo: "Casos de atención",
     descripcion: "Casos reportados por guías y familias, con su seguimiento hasta cerrarlos.",

@@ -28,6 +28,13 @@ const TARJETAS: Tarjeta[] = [
     href: "/panel/sesiones/refuerzos",
   },
   {
+    titulo: "Cancelaciones",
+    desc: "Avisos de los guías que no pueden dictar una sesión: cancelarla (cuenta en sus horas), cubrirla con otro guía solo esa vez, o rechazar.",
+    emoji: "📣",
+    color: "#6a1b9a",
+    href: "/panel/sesiones/cancelaciones",
+  },
+  {
     titulo: "Eventos administrativos",
     desc: "Reuniones, capacitaciones y talleres internos. La audiencia son guías, no niños.",
     emoji: "📋",

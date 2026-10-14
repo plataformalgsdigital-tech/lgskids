@@ -1451,9 +1451,27 @@ solo servía para completar la ficha.
   Y **✍️ Justificar** (`POST /api/attendance/inasistencias/[attendanceId]/justificar` →
   `justificarInasistencia`, `asistencia.gestionar` + `personas.ver`): AUSENTE →
   JUSTIFICADO con el motivo, por `marcarAsistencia` (regla 4; el niño tiene que seguir
-  en la lista de ese salón). **Toda consulta de Servicio descarga
+  en la lista de ese salón). Justificar admite un **SOPORTE** adjunto (PDF/JPG/PNG/WebP,
+  10 MB; multipart): va a `files` como `attendance_soporte` con la clave = id de la MARCA,
+  se sube ANTES de marcar y se suelta si la marca falla, y se ve por
+  `GET /api/attendance/inasistencias/[attendanceId]/soporte` (por la marca, NUNCA por el id
+  del archivo — regla 9). **Justificación falta** (`/panel/servicio/justificacion`,
+  `menu.servicio_justificacion`, funcional `asistencia.gestionar`) es la MISMA pantalla
+  (`ConsultaAsistencia` con `modo="justificacion"`): las faltas AUSENTES de la última
+  semana, con "Anexar y justificar", y el filtro "Ya justificadas" con su 📎 soporte.
+  **Welcome** (`/panel/servicio/welcome` → `GET /api/scheduling/servicio/welcome` →
+  `agendadosWelcome`, `salones.ver` + `personas.ver`): niños agendados (reserva ACTIVA) con
+  asistió / no asistió / sin pasar lista; fechas en el reloj de quien mira (`zona`), y
+  campaña/curso/salón de la MATRÍCULA del niño, no los filtros del Welcome. Abre en
+  −7…+14 días. **Sesiones** (`/panel/servicio/sesiones` → `GET
+/api/scheduling/servicio/sesiones` → `sesionesServicio`, mismos permisos, alcance por
+  país del SALÓN): REALIZADA (cerrada), NO_REALIZADA (pasó sin registrar; avisa si tiene
+  lista pasada), CANCELADA (ver "Cancelación de sesión por el guía"), SUSPENDIDA (sale de
+  `scheduling_suspension`: el día suspendido ya no tiene sesión) y PROGRAMADA. Abre en
+  ayer. Los filtros de las cuatro son UN componente, `servicio/FiltrosServicio.tsx`.
+  **Toda consulta de Servicio descarga
   CSV** con `src/ui/csv.ts` (`;`, BOM y celdas que empiezan por `=`/`@` neutralizadas
-  contra inyección de fórmulas). Las demás, salvo "sin perfil", abren por ahora la página
+  contra inyección de fórmulas). Casos de atención y Reactivados abren por ahora la página
   **EN CONSTRUCCIÓN** —`src/ui/EnConstruccion.tsx`, vía `servicio/[opcion]`, que es
   también la de Sesiones › Suspensiones y Feriados—; al construir una, se le crea su
   carpeta y se saca de `OPCIONES`. Cada una con su `menu.servicio_*`, migración
@@ -1821,6 +1839,38 @@ formulario de crear (`NuevoEventoModal` con `editar`) y el mismo permiso
   clicable para quien tiene `eventos.crear`.
 - Auditoría: `scheduling.welcome_editado`, `scheduling.evento_editado` y
   `scheduling.evento_admin_editado`. Pruebas en `welcome-integration.test.ts`.
+
+## Cancelación de sesión por el guía (2026-10-14)
+
+Migración `20261014300000_cancelacion_sesion`. Como lo definió el negocio: el guía
+**AVISA** que no puede dictar una sesión; quien la **CANCELA** es administración, y
+eso cuenta en el control de horas del guía; administración puede **cubrirla con otro
+guía**, un cambio TEMPORAL que no afecta las sesiones futuras, solo esa.
+
+- `scheduling_cancelacion` (`application/cancelacion.ts`): PENDIENTE → APROBADA |
+  RECHAZADA, un aviso vivo por sesión (índice único parcial). Guarda su COPIA de salón,
+  fecha e instante y `session_id` va con `ON DELETE SET NULL`: la regeneración del salón
+  es destructiva y el control de horas no puede perder la cancelación.
+- `avisarCancelacion` (guía con `asistencia.gestionar`, solo SUS sesiones; con
+  `salones.gestionar`, cualquiera), `resolverCancelacion` y `cancelarPorGuia` (las dos
+  de administración; la segunda es aviso + aprobación en UNA transacción). Cubrir =
+  escribir `scheduling_session.guia_user_id` de ESA sesión, como "Cambiar guía" del modal.
+- **APROBADA sin reemplazo = CANCELADA** (`SQL_SESION_CANCELADA`, un solo fragmento que
+  usan todos): no se registra (`cerrarSesion`) ni se pasa lista (`marcarAsistencia`
+  responde 400; `getSessionInfo` ganó `cancelada`), y no cuenta como dictada en
+  `calcularGuiaMes`. Con reemplazo, la sesión es del que cubrió.
+- **Control de horas**: `GuiaMes.sesionesCanceladas` (columna
+  `reporting_guia_mes.sesiones_canceladas`) = cancelaciones APROBADAS del guía en el mes,
+  con o sin reemplazo.
+- UI: tarjeta "Cancelación del guía" en el modal de la sesión (`CancelacionSesion.tsx`:
+  avisar, y administración aprueba con "¿Quién la cubre?" o rechaza; o cancela de una
+  vez) y la bandeja **Sesiones › Cancelaciones** (`/panel/sesiones/cancelaciones`,
+  `salones.gestionar`). Endpoints: `GET|POST /api/scheduling/sessions/[sessionId]/cancelacion`,
+  `GET /api/scheduling/cancelaciones` y `POST /api/scheduling/cancelaciones/[id]`.
+  Auditoría: `scheduling.cancelacion_avisada|aprobada|rechazada`.
+- Distinto de la **SUSPENSIÓN**, que decide administración y corre la sesión al final
+  del curso regenerando el salón.
+- Prueba: `scheduling/tests/cancelacion-integration.test.ts`.
 
 ## Colisiones de guías (2026-10-13)
 
