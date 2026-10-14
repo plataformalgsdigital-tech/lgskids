@@ -16,6 +16,7 @@ export const MARCADORES = [
   "contrato",
   "plataforma",
   "enlace",
+  "fecha",
 ] as const;
 
 export type Marcador = (typeof MARCADORES)[number];
@@ -32,6 +33,7 @@ export const DESCRIPCION_MARCADOR: Record<Marcador, string> = {
   contrato: "N° de contrato",
   plataforma: "País",
   enlace: "Enlace de creación de perfil (solo el envío automático y la ficha)",
+  fecha: "Fecha de la sesión (solo el aviso de inasistencia de Servicio)",
 };
 
 /**
@@ -82,3 +84,5 @@ export const SLUG_CREDENCIALES = "credenciales-kids";
 export const SLUG_CREACION_PERFIL = "creacion-perfil-kids";
 /** La misma, para quien entra con el curso andando: no menciona el Welcome. */
 export const SLUG_CREACION_PERFIL_SIN_WELCOME = "creacion-perfil-kids-sin-welcome";
+/** La que propone Servicio › Asistencia al escribirle a la familia de un ausente. */
+export const SLUG_INASISTENCIA = "inasistencia-kids";

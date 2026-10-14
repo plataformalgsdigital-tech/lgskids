@@ -1441,7 +1441,17 @@ solo servía para completar la ficha.
   fechas LOCALES del salón —abre en el día anterior—, con filtros de usuario (por
   palabras, documento sin guiones), campaña, curso, salón y estado, y el apoderado
   con teléfono; una sesión SIN marca no entra (eso es "sesiones sin marcar" del
-  Tablero). Rango máx. 93 días y 2.000 filas. **Toda consulta de Servicio descarga
+  Tablero). Rango máx. 93 días y 2.000 filas. El estado **Asistentes** (PRESENTE) lista
+  a los que sí fueron. Cada AUSENTE tiene dos acciones: **📲 WhatsApp**
+  (`GET|POST /api/notifications/inasistencia/[attendanceId]` → `vistaInasistencia` /
+  `enviarMensajeInasistencia`, `mensajes.enviar` + `personas.ver`): propone la plantilla
+  `inasistencia-kids` (marcador nuevo `{{fecha}}`, migración `20261014200000`), quien
+  envía la edita y sale AHORA al apoderado —destino derivado en el servidor—; sin datos
+  secretos, así que queda tal cual en el historial y una falla la reintenta el worker.
+  Y **✍️ Justificar** (`POST /api/attendance/inasistencias/[attendanceId]/justificar` →
+  `justificarInasistencia`, `asistencia.gestionar` + `personas.ver`): AUSENTE →
+  JUSTIFICADO con el motivo, por `marcarAsistencia` (regla 4; el niño tiene que seguir
+  en la lista de ese salón). **Toda consulta de Servicio descarga
   CSV** con `src/ui/csv.ts` (`;`, BOM y celdas que empiezan por `=`/`@` neutralizadas
   contra inyección de fórmulas). Las demás, salvo "sin perfil", abren por ahora la página
   **EN CONSTRUCCIÓN** —`src/ui/EnConstruccion.tsx`, vía `servicio/[opcion]`, que es

@@ -13,7 +13,12 @@ export {
   notificarPremiosPendientes,
 } from "./application/outbox";
 export type { NotificationSenderPort, MensajeSaliente, Canal } from "./application/ports";
-export { enviarEnlacePerfil } from "./application/mensajes";
+export {
+  enviarEnlacePerfil,
+  vistaInasistencia,
+  enviarMensajeInasistencia,
+} from "./application/mensajes";
+export type { VistaInasistencia } from "./application/mensajes";
 export { setSenderForTests } from "./infrastructure/senders";
 export {
   plantillasListarHandler,

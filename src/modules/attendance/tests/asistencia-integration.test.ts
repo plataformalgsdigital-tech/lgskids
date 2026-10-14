@@ -3,12 +3,18 @@ import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
-import { ValidationError } from "@/platform/errors";
+import { ConflictError, ValidationError } from "@/platform/errors";
 import { crearNino } from "@/modules/people";
 import { aprobarContrato, crearContrato } from "@/modules/contracts";
 import { registrarIntento } from "@/modules/assessment";
 import { listaDeSesion, marcarAsistencia } from "../application/asistencia";
-import { inasistencias } from "../application/inasistencias";
+import { inasistencias, justificarInasistencia } from "../application/inasistencias";
+import {
+  enviarMensajeInasistencia,
+  setSenderForTests,
+  vistaInasistencia,
+  type MensajeSaliente,
+} from "@/modules/notifications";
 
 /**
  * INTEGRACIÓN Fase 8: lista derivada con aviso de feriado del país del niño,
@@ -211,6 +217,91 @@ describe.runIf(RUN)("asistencia y cuestionarios (integración)", () => {
     await expect(
       inasistencias({ ...base, desde: "2026-08-08", hasta: "2026-08-07" }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("Servicio › Asistencia: escribe a la familia y JUSTIFICA un ausente por el camino de siempre", async () => {
+    const base = { countryScope: null, desde: "2026-08-07", hasta: "2026-08-07", classroomId };
+    // Vuelve a AUSENTE (la prueba anterior lo dejó justificado).
+    await marcarAsistencia({
+      actorUserId: ACTOR,
+      sessionId,
+      marcas: [{ childPersonId: ninoId, estado: "AUSENTE" }],
+    });
+    const [linea] = await inasistencias({ ...base, estado: "AUSENTE" });
+    expect(linea?.childPersonId).toBe(ninoId);
+    const attendanceId = linea?.attendanceId as string;
+
+    // WhatsApp: el destino sale del apoderado; el texto propuesto lleva la fecha.
+    await execute(`UPDATE people_person SET telefono = '3001234567' WHERE doc_numero = $1`, [
+      `AT-${sufijo}-A`,
+    ]);
+    const enviados: MensajeSaliente[] = [];
+    setSenderForTests({
+      enviar: (m) => {
+        enviados.push(m);
+        return Promise.resolve({ ok: true });
+      },
+    });
+    try {
+      const vista = await vistaInasistencia(attendanceId, null);
+      expect(vista.problema).toBeNull();
+      expect(vista.destinatario.whatsapp).toBe("573001234567");
+      expect(vista.mensaje).toContain("7 de agosto");
+      // Otro país no la ve.
+      await expect(vistaInasistencia(attendanceId, ["CL"])).rejects.toThrow();
+      // `enviado_por` del historial es clave foránea: hace falta un usuario real.
+      const sistema = await queryOne<{ id: string }>(
+        `SELECT id FROM identity_user WHERE username = 'sistema-lgs'`,
+      );
+      const r = await enviarMensajeInasistencia({
+        actorUserId: sistema?.id as string,
+        attendanceId,
+        mensaje: "Hola Luisa, ¿todo bien con Sara?",
+        countryScope: null,
+      });
+      expect(r.ok).toBe(true);
+      expect(enviados.at(-1)?.mensaje).toBe("Hola Luisa, ¿todo bien con Sara?");
+    } finally {
+      setSenderForTests(null);
+      await execute(`DELETE FROM notifications_outbox WHERE child_person_id = $1`, [ninoId]);
+    }
+
+    // Justificar: pasa a JUSTIFICADO con el motivo, y no se justifica dos veces.
+    await expect(
+      justificarInasistencia({
+        actorUserId: ACTOR,
+        attendanceId,
+        justificacion: " ",
+        countryScope: null,
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await justificarInasistencia({
+      actorUserId: ACTOR,
+      attendanceId,
+      justificacion: "Estaba enfermo; avisó la mamá",
+      countryScope: null,
+    });
+    const [ahora] = await inasistencias(base);
+    expect(ahora?.estado).toBe("JUSTIFICADO");
+    expect(ahora?.justificacion).toBe("Estaba enfermo; avisó la mamá");
+    await expect(
+      justificarInasistencia({
+        actorUserId: ACTOR,
+        attendanceId,
+        justificacion: "x",
+        countryScope: null,
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    // "Asistentes": con PRESENTE la lista trae a los que sí fueron, y a nadie más.
+    expect(await inasistencias({ ...base, estado: "PRESENTE" })).toHaveLength(0);
+    await marcarAsistencia({
+      actorUserId: ACTOR,
+      sessionId,
+      marcas: [{ childPersonId: ninoId, estado: "PRESENTE" }],
+    });
+    expect((await inasistencias({ ...base, estado: "PRESENTE" }))[0]?.estado).toBe("PRESENTE");
+    expect(await inasistencias(base)).toHaveLength(0);
   });
 
   it("un niño ajeno al salón es rechazado", async () => {

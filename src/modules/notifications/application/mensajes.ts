@@ -8,6 +8,7 @@ import {
   SLUG_CREACION_PERFIL,
   SLUG_CREACION_PERFIL_SIN_WELCOME,
   SLUG_CREDENCIALES,
+  SLUG_INASISTENCIA,
   SLUG_RE,
   marcadoresDe,
   rellenarParaHistorial,
@@ -680,6 +681,143 @@ export async function enviarEnlacePerfil(input: {
         destinatario: destinatario.whatsapp,
         error: resultado.error ?? "desconocido",
       };
+}
+
+// —— Aviso de inasistencia (Servicio › Asistencia) ———————————————————————————
+
+interface MarcaInasistencia {
+  childPersonId: string;
+  fecha: string;
+  estado: string;
+}
+
+/** La marca de asistencia de la línea, con su fecha (local del salón). */
+async function marcaDe(attendanceId: string): Promise<MarcaInasistencia> {
+  const m = await queryOne<MarcaInasistencia>(
+    `SELECT a.child_person_id AS "childPersonId", s.fecha::text AS fecha, a.estado::text AS estado
+       FROM attendance_attendance a JOIN scheduling_session s ON s.id = a.session_id
+      WHERE a.id = $1`,
+    [attendanceId],
+  );
+  if (m === null) throw new NotFoundError("La marca de asistencia no existe.");
+  return m;
+}
+
+/** "jueves 12 de octubre": la fecha de la sesión como la lee una familia. */
+function fechaLegible(fecha: string): string {
+  return new Date(`${fecha}T12:00:00Z`).toLocaleDateString("es", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
+
+export interface VistaInasistencia {
+  destinatario: Destinatario;
+  /** El texto propuesto (la plantilla rellenada); quien envía lo puede editar. */
+  mensaje: string;
+  problema: string | null;
+}
+
+/**
+ * Lo que se le escribiría a la familia por una inasistencia: a quién (derivado
+ * aquí, nunca de la pantalla) y el texto de la plantilla `inasistencia-kids`
+ * ya rellenado con el niño y la fecha de la sesión.
+ */
+export async function vistaInasistencia(
+  attendanceId: string,
+  countryScope: string[] | null,
+): Promise<VistaInasistencia> {
+  const marca = await marcaDe(attendanceId);
+  const f = await queryOne<FilaPlantilla>(`${SELECT_PLANTILLA} WHERE slug = $1`, [
+    SLUG_INASISTENCIA,
+  ]);
+  const { fila, destinatario } = await destinatarioDe(marca.childPersonId, countryScope, null);
+  const mensaje =
+    f !== null && f.activo
+      ? rellenarParaHistorial(f.contenido, {
+          ...contextoDe(fila),
+          fecha: fechaLegible(marca.fecha),
+        })
+      : "";
+  return {
+    destinatario,
+    mensaje,
+    problema:
+      destinatario.whatsapp === null
+        ? `No hay a qué número enviarlo: ${destinatario.problema ?? "sin teléfono"}.`
+        : null,
+  };
+}
+
+/**
+ * Envía AHORA el aviso de inasistencia —el texto que quien envía revisó y quizá
+ * editó— al apoderado. El texto no lleva datos secretos, así que queda tal cual
+ * en el historial y, si falla, el worker lo reintenta como cualquier envío.
+ */
+export async function enviarMensajeInasistencia(input: {
+  actorUserId: string;
+  attendanceId: string;
+  mensaje: string;
+  countryScope: string[] | null;
+  ip?: string | null;
+}): Promise<{ ok: boolean; destinatario: string; error?: string }> {
+  const mensaje = input.mensaje.trim();
+  if (mensaje === "") throw new ValidationError("Escribe el mensaje.");
+  if (mensaje.length > LARGO_MAXIMO_CONTENIDO) {
+    throw new ValidationError(
+      `El mensaje admite hasta ${String(LARGO_MAXIMO_CONTENIDO)} caracteres.`,
+    );
+  }
+  const marca = await marcaDe(input.attendanceId);
+  const { destinatario } = await destinatarioDe(marca.childPersonId, input.countryScope, null);
+  if (destinatario.whatsapp === null) {
+    throw new ValidationError(
+      `No hay a qué número enviarlo: ${destinatario.problema ?? "sin teléfono"}.`,
+    );
+  }
+  const resultado = await getSender().enviar({
+    canal: "WHATSAPP",
+    destinatario: destinatario.whatsapp,
+    mensaje,
+  });
+  await execute(
+    `INSERT INTO notifications_outbox
+       (id, canal, destinatario, mensaje, payload, estado, intentos, ultimo_error, enviada_en,
+        plantilla_slug, child_person_id, enviado_por)
+     VALUES ($1, 'WHATSAPP', $2, $3, $4, $5::notifications_estado, 1, $6,
+             CASE WHEN $5 = 'ENVIADA' THEN now() END, $7, $8, $9)`,
+    [
+      newId(),
+      destinatario.whatsapp,
+      mensaje,
+      JSON.stringify({ inasistencia: input.attendanceId, fecha: marca.fecha }),
+      resultado.ok ? "ENVIADA" : "FALLIDA",
+      resultado.ok ? null : (resultado.error ?? "desconocido"),
+      SLUG_INASISTENCIA,
+      marca.childPersonId,
+      input.actorUserId,
+    ],
+  );
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: resultado.ok
+      ? "notifications.inasistencia_enviada"
+      : "notifications.inasistencia_fallida",
+    entidad: "attendance_attendance",
+    entidadId: input.attendanceId,
+    payload: {
+      destinatario: destinatario.whatsapp,
+      telefonoDe: destinatario.telefonoDe,
+      fecha: marca.fecha,
+      ...(resultado.ok ? {} : { error: resultado.error }),
+    },
+    ip: input.ip ?? null,
+  });
+  return resultado.ok
+    ? { ok: true, destinatario: destinatario.whatsapp }
+    : { ok: false, destinatario: destinatario.whatsapp, error: resultado.error ?? "desconocido" };
 }
 
 // —— Historial ————————————————————————————————————————————————————————

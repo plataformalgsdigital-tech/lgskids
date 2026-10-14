@@ -27,7 +27,7 @@ export const GET = handlerWithAuth(async (request, auth) => {
       campaignId: z.uuid().optional(),
       curso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
       classroomId: z.uuid().optional(),
-      estado: z.enum(["AUSENTE", "JUSTIFICADO"]).optional(),
+      estado: z.enum(["AUSENTE", "JUSTIFICADO", "PRESENTE"]).optional(),
     })
     .parse({
       desde: p.get("desde"),
@@ -48,5 +48,11 @@ export const GET = handlerWithAuth(async (request, auth) => {
     classroomId: q.classroomId ?? null,
     estado: q.estado ?? null,
   });
-  return json({ inasistencias: filas, tope: MAX_INASISTENCIAS });
+  return json({
+    inasistencias: filas,
+    tope: MAX_INASISTENCIAS,
+    // Las acciones de cada línea: la pantalla solo muestra lo que el servidor aceptará.
+    puedeJustificar: profile.hasPermission(PERMISOS.ASISTENCIA_GESTIONAR),
+    puedeEnviar: profile.hasPermission(PERMISOS.MENSAJES_ENVIAR),
+  });
 });

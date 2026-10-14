@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { descargarCsv } from "@/ui/csv";
+import {
+  JustificarInasistencia,
+  WhatsAppInasistencia,
+  type LineaInasistencia,
+} from "./AccionesInasistencia";
 
 /**
  * Servicio › Asistencia: los niños que NO asistieron a sus sesiones. Abre en el
@@ -17,7 +22,7 @@ interface Fila {
   fecha: string;
   hora: string;
   tipoSesion: string;
-  estado: "AUSENTE" | "JUSTIFICADO";
+  estado: "AUSENTE" | "JUSTIFICADO" | "PRESENTE";
   justificacion: string | null;
   childPersonId: string;
   nombre: string;
@@ -45,6 +50,21 @@ interface Campania {
 }
 
 const TIPO: Record<string, string> = { SESION: "Sesión", CLUB: "Club", TALLER: "Taller" };
+const ESTADO: Record<Fila["estado"], { texto: string; color: string }> = {
+  AUSENTE: { texto: "Ausente", color: "#c62828" },
+  JUSTIFICADO: { texto: "Justificado", color: "#b57a00" },
+  PRESENTE: { texto: "Asistió", color: "#2e7d32" },
+};
+const botonLinea: CSSProperties = {
+  padding: "0.3rem 0.55rem",
+  borderRadius: "0.5rem",
+  border: "1px solid #e3e7f0",
+  background: "white",
+  cursor: "pointer",
+  fontWeight: 700,
+  fontSize: "0.76rem",
+  whiteSpace: "nowrap",
+};
 
 const campo: CSSProperties = {
   padding: "0.5rem 0.65rem",
@@ -81,6 +101,13 @@ export default function ServicioAsistenciaPage() {
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [tope, setTope] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [puedeJustificar, setPuedeJustificar] = useState(false);
+  const [puedeEnviar, setPuedeEnviar] = useState(false);
+  const [accion, setAccion] = useState<{
+    tipo: "whatsapp" | "justificar";
+    linea: LineaInasistencia;
+  } | null>(null);
 
   useEffect(() => {
     async function catalogos() {
@@ -109,9 +136,16 @@ export default function ServicioAsistenciaPage() {
       setFilas([]);
       return;
     }
-    const d = (await res.json()) as { inasistencias: Fila[]; tope: number };
+    const d = (await res.json()) as {
+      inasistencias: Fila[];
+      tope: number;
+      puedeJustificar: boolean;
+      puedeEnviar: boolean;
+    };
     setFilas(d.inasistencias);
     setTope(d.tope);
+    setPuedeJustificar(d.puedeJustificar);
+    setPuedeEnviar(d.puedeEnviar);
   }, [desde, hasta, buscar, campaignId, curso, classroomId, estado]);
 
   useEffect(() => {
@@ -153,7 +187,7 @@ export default function ServicioAsistenciaPage() {
         f.fecha,
         f.hora,
         TIPO[f.tipoSesion] ?? f.tipoSesion,
-        f.estado === "AUSENTE" ? "Ausente" : "Justificado",
+        ESTADO[f.estado].texto,
         f.justificacion,
         f.nombre,
         f.documento,
@@ -183,8 +217,9 @@ export default function ServicioAsistenciaPage() {
         <div>
           <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Asistencia</h1>
           <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem", marginTop: "0.3rem" }}>
-            Niños que no asistieron a sus sesiones (ausentes y justificados). Por defecto, las del
-            día anterior; la fecha es la del salón.
+            Niños que no asistieron a sus sesiones (o, con el filtro de estado, los que sí). Por
+            defecto, las del día anterior; la fecha es la del salón. A cada ausente se le puede
+            escribir a la familia por WhatsApp o justificar la inasistencia.
           </p>
         </div>
         <button
@@ -296,6 +331,7 @@ export default function ServicioAsistenciaPage() {
             <option value="">Ausentes y justificados</option>
             <option value="AUSENTE">Solo ausentes</option>
             <option value="JUSTIFICADO">Solo justificados</option>
+            <option value="PRESENTE">Asistentes</option>
           </select>
         </label>
       </div>
@@ -305,17 +341,23 @@ export default function ServicioAsistenciaPage() {
           {error}
         </p>
       )}
+      {aviso !== null && <p style={{ color: "#1b5e20", fontWeight: 600 }}>{aviso}</p>}
 
       {filas === null ? (
         <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
       ) : filas.length === 0 ? (
         <p style={{ color: "var(--texto-suave)" }}>
-          Nadie faltó en esas fechas con estos filtros. 🎉
+          {estado === "PRESENTE"
+            ? "Nadie registró asistencia en esas fechas con estos filtros."
+            : "Nadie faltó en esas fechas con estos filtros. 🎉"}
         </p>
       ) : (
         <>
           <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", margin: "0 0 0.5rem" }}>
-            {filas.length} inasistencia{filas.length === 1 ? "" : "s"}
+            {filas.length}{" "}
+            {estado === "PRESENTE"
+              ? `asistencia${filas.length === 1 ? "" : "s"}`
+              : `inasistencia${filas.length === 1 ? "" : "s"}`}
             {filas.length >= tope
               ? ` (se muestran las primeras ${String(tope)}: acota el filtro)`
               : ""}
@@ -330,6 +372,7 @@ export default function ServicioAsistenciaPage() {
                   <th style={celda}>Guía</th>
                   <th style={celda}>Estado</th>
                   <th style={celda}>Apoderado</th>
+                  {(puedeEnviar || puedeJustificar) && <th style={celda}>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -357,13 +400,8 @@ export default function ServicioAsistenciaPage() {
                     </td>
                     <td style={celda}>{f.guia ?? "—"}</td>
                     <td style={celda}>
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          color: f.estado === "AUSENTE" ? "#c62828" : "#b57a00",
-                        }}
-                      >
-                        {f.estado === "AUSENTE" ? "Ausente" : "Justificado"}
+                      <span style={{ fontWeight: 700, color: ESTADO[f.estado].color }}>
+                        {ESTADO[f.estado].texto}
                       </span>
                       {f.justificacion !== null && (
                         <div style={{ color: "var(--texto-suave)", fontSize: "0.78rem" }}>
@@ -379,12 +417,68 @@ export default function ServicioAsistenciaPage() {
                         </div>
                       )}
                     </td>
+                    {(puedeEnviar || puedeJustificar) && (
+                      <td style={celda}>
+                        {/* Solo el AUSENTE tiene acciones: el justificado ya
+                            tiene su motivo y el que asistió no necesita aviso. */}
+                        {f.estado === "AUSENTE" && (
+                          <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+                            {puedeEnviar && (
+                              <button
+                                type="button"
+                                style={{ ...botonLinea, color: "#128c4b" }}
+                                onClick={() => {
+                                  setAviso(null);
+                                  setAccion({ tipo: "whatsapp", linea: f });
+                                }}
+                              >
+                                📲 WhatsApp
+                              </button>
+                            )}
+                            {puedeJustificar && (
+                              <button
+                                type="button"
+                                style={botonLinea}
+                                onClick={() => {
+                                  setAviso(null);
+                                  setAccion({ tipo: "justificar", linea: f });
+                                }}
+                              >
+                                ✍️ Justificar
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </>
+      )}
+
+      {accion?.tipo === "whatsapp" && (
+        <WhatsAppInasistencia
+          linea={accion.linea}
+          onCerrar={() => setAccion(null)}
+          onEnviado={(texto) => {
+            setAccion(null);
+            setAviso(texto);
+          }}
+        />
+      )}
+      {accion?.tipo === "justificar" && (
+        <JustificarInasistencia
+          linea={accion.linea}
+          onCerrar={() => setAccion(null)}
+          onJustificado={(texto) => {
+            setAccion(null);
+            setAviso(texto);
+            void cargar();
+          }}
+        />
       )}
     </main>
   );

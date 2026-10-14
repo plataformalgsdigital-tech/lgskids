@@ -11,6 +11,8 @@ export { listaDeSesion, marcarAsistencia, verificarAccesoGuia } from "./applicat
 export type { ListaDeSesion, FilaLista, EstadoAsistencia } from "./application/asistencia";
 export {
   inasistencias,
+  justificarInasistencia,
+  LARGO_JUSTIFICACION,
   DIAS_MAX_INASISTENCIAS,
   MAX_INASISTENCIAS,
 } from "./application/inasistencias";

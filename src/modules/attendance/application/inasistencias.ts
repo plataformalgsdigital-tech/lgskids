@@ -1,5 +1,6 @@
-import { queryRows } from "@/platform/db/query";
-import { ValidationError } from "@/platform/errors";
+import { queryOne, queryRows } from "@/platform/db/query";
+import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
+import { marcarAsistencia } from "./asistencia";
 
 /**
  * Servicio › Asistencia (2026-10-14): los niños que NO asistieron a sus
@@ -27,7 +28,7 @@ export interface Inasistencia {
   /** Hora de pared del salón, HH:MM. */
   hora: string;
   tipoSesion: string;
-  estado: "AUSENTE" | "JUSTIFICADO";
+  estado: "AUSENTE" | "JUSTIFICADO" | "PRESENTE";
   justificacion: string | null;
   childPersonId: string;
   nombre: string;
@@ -51,8 +52,11 @@ export interface FiltrosInasistencias {
   campaignId?: string | null;
   curso?: string | null;
   classroomId?: string | null;
-  /** Sin valor: las dos (ausente y justificada). */
-  estado?: "AUSENTE" | "JUSTIFICADO" | null;
+  /**
+   * Sin valor: las dos inasistencias (ausente y justificada). PRESENTE lista a
+   * los que SÍ asistieron, con los mismos filtros.
+   */
+  estado?: "AUSENTE" | "JUSTIFICADO" | "PRESENTE" | null;
 }
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -81,7 +85,11 @@ export async function inasistencias(f: FiltrosInasistencias): Promise<Inasistenc
     values.push(valor);
     condiciones.push(sql(`$${String(values.length)}`));
   };
-  if (f.estado != null) agregar((n) => `a.estado = ${n}::attendance_estado`, f.estado);
+  if (f.estado != null) {
+    agregar((n) => `a.estado = ${n}::attendance_estado`, f.estado);
+  } else {
+    condiciones.push(`a.estado IN ('AUSENTE', 'JUSTIFICADO')`);
+  }
   if (f.campaignId != null && f.campaignId !== "") agregar((n) => `ca.id = ${n}`, f.campaignId);
   if (f.curso != null && f.curso !== "") agregar((n) => `co.tipo::text = ${n}`, f.curso);
   if (f.classroomId != null && f.classroomId !== "") {
@@ -141,12 +149,66 @@ export async function inasistencias(f: FiltrosInasistencias): Promise<Inasistenc
              WHERE g.nino_id = b.id
              ORDER BY (p.telefono IS NULL OR p.telefono = ''), p.nombres
              LIMIT 1) ap ON true
-      WHERE a.estado IN ('AUSENTE', 'JUSTIFICADO')
-        AND s.fecha BETWEEN $1::date AND $2::date
+      WHERE s.fecha BETWEEN $1::date AND $2::date
         AND ($3::text[] IS NULL OR b.country_code = ANY($3::text[]))
         ${condiciones.map((c) => `AND ${c}`).join("\n        ")}
       ORDER BY s.fecha DESC, s.starts_at, cl.nombre, b.apellidos, b.nombres
       LIMIT $${String(values.length)}`,
     values,
   );
+}
+
+/** Largo máximo de la justificación que escribe servicio. */
+export const LARGO_JUSTIFICACION = 300;
+
+/**
+ * Servicio › Asistencia › "Justificar": la familia explicó la inasistencia y
+ * servicio la pasa de AUSENTE a JUSTIFICADO con el motivo. Pasa por
+ * `marcarAsistencia`, el MISMO camino de pasar lista (regla 4: es el que
+ * dispara la progresión); aquí solo se comprueba que la marca exista, sea del
+ * alcance de quien la toca y siga AUSENTE.
+ */
+export async function justificarInasistencia(input: {
+  actorUserId: string;
+  attendanceId: string;
+  justificacion: string;
+  countryScope: string[] | null;
+  ip?: string | null;
+}): Promise<{ sessionId: string; childPersonId: string }> {
+  const justificacion = input.justificacion.trim();
+  if (justificacion === "") throw new ValidationError("Escribe el motivo de la justificación.");
+  if (justificacion.length > LARGO_JUSTIFICACION) {
+    throw new ValidationError(
+      `La justificación admite hasta ${String(LARGO_JUSTIFICACION)} caracteres.`,
+    );
+  }
+  const marca = await queryOne<{
+    sessionId: string;
+    childPersonId: string;
+    estado: string;
+    pais: string;
+  }>(
+    `SELECT a.session_id AS "sessionId", a.child_person_id AS "childPersonId",
+            a.estado::text AS estado, p.country_code AS pais
+       FROM attendance_attendance a JOIN people_person p ON p.id = a.child_person_id
+      WHERE a.id = $1`,
+    [input.attendanceId],
+  );
+  if (marca === null || (input.countryScope !== null && !input.countryScope.includes(marca.pais))) {
+    throw new NotFoundError("La marca de asistencia no existe.");
+  }
+  if (marca.estado !== "AUSENTE") {
+    throw new ConflictError(
+      marca.estado === "JUSTIFICADO"
+        ? "Esa inasistencia ya está justificada."
+        : "El niño asistió a esa sesión: no hay nada que justificar.",
+    );
+  }
+  await marcarAsistencia({
+    actorUserId: input.actorUserId,
+    sessionId: marca.sessionId,
+    marcas: [{ childPersonId: marca.childPersonId, estado: "JUSTIFICADO", justificacion }],
+    ip: input.ip ?? null,
+  });
+  return { sessionId: marca.sessionId, childPersonId: marca.childPersonId };
 }
