@@ -15,10 +15,12 @@ export {
   cambioAcademico,
   cancelarMatriculaDeContratoTx,
   obtenerRoster,
+  listarMatriculasIntake,
   historialDeNino,
   matriculaDeNino,
   findActivaByContract,
   findMatriculaVivaByContract,
 } from "./application/matricula";
 export type { MatriculaActual } from "./application/matricula";
+export type { MatriculaIntakeItem } from "./infrastructure/enrollment-repository";
 export { matricularHandler, rosterHandler, cambioAcademicoHandler } from "./api/handlers";

@@ -15,9 +15,11 @@ import {
   insertEnrollment,
   lockClassroom,
   matriculaActualDeNino,
+  matriculasParaIntake,
   rosterSalon,
   type EnrollmentHistoryItem,
   type MatriculaActual,
+  type MatriculaIntakeItem,
   type RosterItem,
 } from "../infrastructure/enrollment-repository";
 
@@ -211,6 +213,11 @@ export async function cancelarMatriculaDeContratoTx(
 
 export async function obtenerRoster(classroomId: string): Promise<RosterItem[]> {
   return rosterSalon(classroomId);
+}
+
+/** Todas las matrículas con contrato, niño y apoderado (consulta "Kids" de LGS). */
+export async function listarMatriculasIntake(): Promise<MatriculaIntakeItem[]> {
+  return matriculasParaIntake();
 }
 
 export async function historialDeNino(childPersonId: string): Promise<EnrollmentHistoryItem[]> {

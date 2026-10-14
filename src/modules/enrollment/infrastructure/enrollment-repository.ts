@@ -210,6 +210,84 @@ export async function rosterSalon(classroomId: string): Promise<RosterItem[]> {
   );
 }
 
+/** Matrícula con contrato, niño y apoderado — para la consulta "Kids" de LGS. */
+export interface MatriculaIntakeItem {
+  enrollmentId: string;
+  classroomId: string;
+  matriculaEstado: string;
+  externalRef: string | null;
+  contratoEstado: string;
+  contratoNumero: number;
+  inicio: string;
+  finalContrato: string;
+  nino: {
+    nombres: string;
+    apellidos: string;
+    docNumero: string;
+    fechaNacimiento: string | null;
+    username: string | null;
+  };
+  apoderado: {
+    nombres: string;
+    apellidos: string;
+    docNumero: string;
+    email: string | null;
+    telefono: string | null;
+    parentesco: string | null;
+  } | null;
+}
+
+/**
+ * TODAS las matrículas (cualquier estado) con su contrato, niño y apoderado.
+ * Apoderado = el de la tutela del niño; si no tiene, el titular del contrato.
+ */
+export async function matriculasParaIntake(): Promise<MatriculaIntakeItem[]> {
+  const rows = await queryRows<Record<string, unknown>>(
+    `SELECT e.id AS "enrollmentId", e.classroom_id AS "classroomId", e.estado AS "matriculaEstado",
+            c.external_ref AS "externalRef", c.estado AS "contratoEstado", c.numero AS "contratoNumero",
+            to_char(c.inicio, 'YYYY-MM-DD') AS inicio, to_char(c.final_contrato, 'YYYY-MM-DD') AS "finalContrato",
+            n.nombres, n.apellidos, n.doc_numero AS "docNumero",
+            to_char(n.fecha_nacimiento, 'YYYY-MM-DD') AS "fechaNacimiento", u.username,
+            ap.nombres AS "apNombres", ap.apellidos AS "apApellidos", ap.doc_numero AS "apDoc",
+            ap.email AS "apEmail", ap.telefono AS "apTelefono", g.parentesco
+       FROM enrollment_enrollment e
+       JOIN contracts_contract c ON c.id = e.contract_id
+       JOIN people_person n ON n.id = e.child_person_id
+       LEFT JOIN identity_user u ON u.id = n.user_id
+       LEFT JOIN LATERAL (
+         SELECT apoderado_id, parentesco FROM people_guardianship
+          WHERE nino_id = n.id ORDER BY id LIMIT 1
+       ) g ON true
+       LEFT JOIN people_person ap ON ap.id = COALESCE(g.apoderado_id, c.titular_id)
+      ORDER BY n.apellidos, n.nombres`,
+  );
+  return rows.map((r) => ({
+    enrollmentId: String(r["enrollmentId"]),
+    classroomId: String(r["classroomId"]),
+    matriculaEstado: String(r["matriculaEstado"]),
+    externalRef: (r["externalRef"] as string | null) ?? null,
+    contratoEstado: String(r["contratoEstado"]),
+    contratoNumero: Number(r["contratoNumero"]),
+    inicio: String(r["inicio"]),
+    finalContrato: String(r["finalContrato"]),
+    nino: {
+      nombres: String(r["nombres"]),
+      apellidos: String(r["apellidos"]),
+      docNumero: String(r["docNumero"]),
+      fechaNacimiento: (r["fechaNacimiento"] as string | null) ?? null,
+      username: (r["username"] as string | null) ?? null,
+    },
+    apoderado: r["apDoc"] == null ? null : {
+      nombres: String(r["apNombres"] ?? ""),
+      apellidos: String(r["apApellidos"] ?? ""),
+      docNumero: String(r["apDoc"]),
+      email: (r["apEmail"] as string | null) ?? null,
+      telefono: (r["apTelefono"] as string | null) ?? null,
+      parentesco: (r["parentesco"] as string | null) ?? null,
+    },
+  }));
+}
+
 export interface EnrollmentHistoryItem extends EnrollmentRecord {
   salon: string;
   motivoCierre: string | null;

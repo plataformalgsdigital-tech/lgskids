@@ -14,8 +14,10 @@ export type {
   CursoDisponible,
   SalonDisponible,
 } from "./application/disponibilidad";
+export type { CampaniaRoster, CursoRoster, SalonRoster } from "./application/roster";
 export {
   disponibilidadHandler,
+  rosterIntakeHandler,
   reservarIntakeHandler,
   aprobarIntakeHandler,
   suspenderIntakeHandler,

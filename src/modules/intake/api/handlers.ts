@@ -8,6 +8,7 @@ import {
 } from "@/modules/contracts";
 import { handlerWithServiceAuth, json } from "@/platform/http/handler";
 import { disponibilidad } from "../application/disponibilidad";
+import { roster } from "../application/roster";
 
 /** Usuario de sistema (migración 20260819000003) — actor de auditoría del intake. */
 const SYSTEM_ACTOR = "11111111-1111-4111-8111-111111111111";
@@ -63,6 +64,13 @@ export const disponibilidadHandler = handlerWithServiceAuth(async (request) => {
     }),
   );
 });
+
+/**
+ * GET /api/kids-intake/roster — todas las campañas, cursos y salones con las
+ * matrículas de cada salón (contrato, niño, apoderado). Solo lectura; lo usa la
+ * consulta "Aprobación › Kids" de LGS.
+ */
+export const rosterIntakeHandler = handlerWithServiceAuth(async () => json(await roster()));
 
 /** POST /api/kids-intake/reservations — crea la reserva del beneficiario. */
 export const reservarIntakeHandler = handlerWithServiceAuth(async (request) => {
