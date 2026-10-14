@@ -33,16 +33,46 @@ const nombreVisible = (me: Me): string =>
 
 // El orden y el permiso PADRE de cada sección los define el módulo access
 // (SECCIONES_MENU), que es la única fuente de la jerarquía.
-const SECCIONES = ["Tablero", "Académica", "Operación", "Administración", "Guía"] as const;
+const SECCIONES = [
+  "Tablero",
+  "Académica",
+  "Operación",
+  "Servicio",
+  "Administración",
+  "Guía",
+] as const;
 
 /** Permiso padre por sección: sin él, la sección no se dibuja. */
 const PERMISO_SECCION: Record<(typeof SECCIONES)[number], string> = {
   Tablero: "panel.tablero",
   Académica: "seccion.academica",
   Operación: "seccion.operacion",
+  Servicio: "seccion.servicio",
   Administración: "seccion.administracion",
   Guía: "seccion.guia",
 };
+
+/** Secciones que la persona dejó PLEGADAS: se recuerdan en este navegador. */
+const CLAVE_PLEGADAS = "lgs-menu-plegadas";
+
+function leerPlegadas(): string[] {
+  try {
+    const crudo = typeof window === "undefined" ? null : localStorage.getItem(CLAVE_PLEGADAS);
+    const valor: unknown = crudo === null ? [] : JSON.parse(crudo);
+    return Array.isArray(valor) ? valor.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function guardarPlegadas(plegadas: string[]): void {
+  try {
+    localStorage.setItem(CLAVE_PLEGADAS, JSON.stringify(plegadas));
+  } catch {
+    // Sin almacenamiento (ventana privada, bloqueado): el menú pliega igual,
+    // solo que no se recuerda al recargar.
+  }
+}
 
 const MENU: {
   seccion: (typeof SECCIONES)[number];
@@ -119,6 +149,15 @@ const MENU: {
     color: "var(--lgs-purpura)",
     href: "/panel/reservas",
     permisoMenu: "menu.reservas",
+  },
+  // ── Servicio (atención a las familias) ────────────────────
+  {
+    seccion: "Servicio",
+    permiso: "personas.ver",
+    etiqueta: "Usuarios sin perfil creado",
+    color: "var(--lgs-magenta)",
+    href: "/panel/servicio/sin-perfil",
+    permisoMenu: "menu.sin_perfil",
   },
   // ── Administración ─────────────────────────────────────────
   {
@@ -222,6 +261,31 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   // se recarga para volver a comprobar la sesión.
   useReinicioAlVolver();
   const [busqueda, setBusqueda] = useState("");
+  // El segundo nivel del menú se pliega por sección. Al LLEGAR a una página de
+  // una sección plegada, esa sección se abre: si no, no se vería dónde está uno.
+  const seccionActual = MENU.find(
+    (item) => item.href !== undefined && pathname.startsWith(item.href),
+  )?.seccion;
+  const [plegadas, setPlegadas] = useState<string[]>(() =>
+    leerPlegadas().filter((s) => s !== seccionActual),
+  );
+  const [rutaVista, setRutaVista] = useState(pathname);
+  if (pathname !== rutaVista) {
+    setRutaVista(pathname);
+    if (seccionActual !== undefined && plegadas.includes(seccionActual)) {
+      setPlegadas(plegadas.filter((s) => s !== seccionActual));
+    }
+  }
+
+  function alternarSeccion(seccion: string) {
+    setPlegadas((prev) => {
+      const nuevas = prev.includes(seccion)
+        ? prev.filter((s) => s !== seccion)
+        : [...prev, seccion];
+      guardarPlegadas(nuevas);
+      return nuevas;
+    });
+  }
 
   function buscar(event: FormEvent) {
     event.preventDefault();
@@ -365,51 +429,86 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           if (!permisos.has(PERMISO_SECCION[seccion])) return null;
           const items = opciones.filter((o) => o.seccion === seccion);
           if (items.length === 0) return null;
+          // El Tablero es un ítem suelto: no tiene encabezado que plegar.
+          const plegable = seccion !== "Tablero";
+          const plegada = plegable && plegadas.includes(seccion);
           return (
             <div key={seccion} style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              {seccion !== "Tablero" && (
-                <span
+              {plegable && (
+                <button
+                  type="button"
+                  onClick={() => alternarSeccion(seccion)}
+                  aria-expanded={!plegada}
+                  title={plegada ? `Mostrar ${seccion}` : `Plegar ${seccion}`}
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    font: "inherit",
                     fontSize: "0.68rem",
                     fontWeight: 800,
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
                     color: "var(--texto-suave)",
                     padding: "0.5rem 0.25rem 0.1rem",
+                    textAlign: "left",
                   }}
                 >
-                  {seccion}
-                </span>
-              )}
-              {items.map((item) => {
-                const activo = item.href !== undefined && pathname.startsWith(item.href);
-                const estilo = {
-                  padding: "0.55rem 0.75rem",
-                  borderRadius: "0.6rem",
-                  borderLeft: `4px solid ${item.color}`,
-                  background: activo ? "#e8f1fd" : "white",
-                  fontWeight: 600,
-                  fontSize: "0.92rem",
-                  color: "inherit",
-                  display: "block",
-                } as const;
-                return item.href !== undefined ? (
-                  <Link key={item.etiqueta} href={item.href} style={estilo}>
-                    {item.etiqueta}
-                  </Link>
-                ) : (
-                  <div
-                    key={item.etiqueta}
-                    style={{ ...estilo, opacity: 0.55 }}
-                    title="Disponible próximamente"
+                  <span>
+                    {seccion}
+                    {plegada && (
+                      <span style={{ fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
+                        {" "}
+                        ({items.length})
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    aria-hidden
+                    style={{
+                      fontSize: "0.8rem",
+                      transition: "transform 0.15s",
+                      transform: plegada ? "rotate(-90deg)" : "none",
+                    }}
                   >
-                    {item.etiqueta}{" "}
-                    <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)" }}>
-                      (pronto)
-                    </span>
-                  </div>
-                );
-              })}
+                    ▾
+                  </span>
+                </button>
+              )}
+              {!plegada &&
+                items.map((item) => {
+                  const activo = item.href !== undefined && pathname.startsWith(item.href);
+                  const estilo = {
+                    padding: "0.55rem 0.75rem",
+                    borderRadius: "0.6rem",
+                    borderLeft: `4px solid ${item.color}`,
+                    background: activo ? "#e8f1fd" : "white",
+                    fontWeight: 600,
+                    fontSize: "0.92rem",
+                    color: "inherit",
+                    display: "block",
+                  } as const;
+                  return item.href !== undefined ? (
+                    <Link key={item.etiqueta} href={item.href} style={estilo}>
+                      {item.etiqueta}
+                    </Link>
+                  ) : (
+                    <div
+                      key={item.etiqueta}
+                      style={{ ...estilo, opacity: 0.55 }}
+                      title="Disponible próximamente"
+                    >
+                      {item.etiqueta}{" "}
+                      <span style={{ fontSize: "0.68rem", color: "var(--texto-suave)" }}>
+                        (pronto)
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
           );
         })}

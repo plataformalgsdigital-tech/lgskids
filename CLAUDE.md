@@ -1434,6 +1434,10 @@ solo servía para completar la ficha.
   como árbol padre→hijos: **Tablero** (suelto, primero) · **Académica** (Calendario,
   Mantenimiento Académico) · **Operación** (Kids, Contratos, **Gestión de
   Reservas** —antes "Reservas (LGS)", renombrado 2026-10-07—) ·
+  **Servicio** (2026-10-14: **Usuarios sin perfil creado**, `/panel/servicio/sin-perfil`
+  → `GET /api/contracts/ninos/sin-perfil` → `ninosSinPerfil`: niños con contrato
+  APROBADO sin `perfil_completado_en`, con el estado de su último enlace y los
+  botones "Con Welcome" / "Sin Welcome", que usan la MISMA ruta de la ficha) ·
   **Administración** (Usuarios y roles, Reportes, Auditoría, Guías, Aviso de login,
   **Mantenimiento** — cargas masivas, hoy el catálogo Curso por CSV —, **Mensajes**) ·
   **Guía** (Mis clases, Mis salones, Mis niños).
@@ -1450,6 +1454,11 @@ solo servía para completar la ficha.
   Mantenimiento, 2026-09-30) lo crea y lo concede la migración
   `20260930000000_menu_mantenimiento_admin` con la misma regla del seed (a quien
   tenga `catalogo.gestionar`), que corre sola en el trabajo `migrar`.
+- **Las secciones se PLIEGAN** (2026-10-14): el encabezado de cada una es un botón;
+  lo plegado se recuerda en el navegador (`lgs-menu-plegadas`, solo comodidad) y la
+  sección de la página en que se está se abre sola al llegar. `seccion.servicio` y
+  `menu.sin_perfil` los concede la migración `20261014000000_menu_servicio` a quien
+  tenga `personas.ver`.
 - Al entrar al panel se aterriza en **/panel/tablero**.
 - Consultas del tablero en `reporting/application/tablero.ts`: `resumenTablero`,
   `salonesSinGuia`, `clasesDeHoy`, `sesionesSinMarcar`. "Hoy" se resuelve con

@@ -11,7 +11,7 @@ import {
   type WelcomeDisponible,
 } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
-import { execute, queryOne } from "@/platform/db/query";
+import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
@@ -485,6 +485,116 @@ export async function agendarWelcomeNino(input: {
     ip: input.ip ?? null,
   });
   return welcomeDeNino(input.childPersonId);
+}
+
+/** Un niño con cuenta que todavía no creó su perfil (Servicio › Usuarios sin perfil). */
+export interface NinoSinPerfil {
+  childPersonId: string;
+  nombre: string;
+  documento: string;
+  pais: string;
+  username: string | null;
+  contractId: string;
+  numero: number;
+  externalRef: string | null;
+  campania: string | null;
+  curso: string | null;
+  salon: string | null;
+  inicioCurso: string | null;
+  apoderado: string | null;
+  /** El último enlace emitido: nunca, vigente sin usar, o revocado. */
+  enlace: { estado: EstadoEnlacePerfil; creadoEn: string; exigeWelcome: boolean } | null;
+  /** ¿Tiene ya un Welcome agendado (por coordinación)? */
+  tieneWelcome: boolean;
+}
+
+/** Tope de filas: la lista es de trabajo, no un reporte. */
+const MAX_SIN_PERFIL = 500;
+
+/**
+ * Niños con contrato APROBADO —tienen cuenta— que todavía no crearon su perfil:
+ * a quiénes hay que mandarles (o reenviarles) el enlace. El equivalente de
+ * "Usuarios sin perfil creado" de MOSAICO. El perfil está creado cuando
+ * `people_person.perfil_completado_en` tiene fecha, que es lo que marca
+ * `completarPerfilNino`.
+ */
+export async function ninosSinPerfil(filtros: {
+  countryScope: string[] | null;
+  campaignId?: string | null;
+  buscar?: string | null;
+}): Promise<NinoSinPerfil[]> {
+  const values: unknown[] = [filtros.countryScope];
+  let extra = "";
+  if (filtros.campaignId != null && filtros.campaignId !== "") {
+    values.push(filtros.campaignId);
+    extra += ` AND ca.id = $${String(values.length)}`;
+  }
+  const buscar = filtros.buscar?.trim() ?? "";
+  if (buscar !== "") {
+    values.push(`%${buscar}%`);
+    const i = `$${String(values.length)}`;
+    extra += ` AND (b.nombres || ' ' || b.apellidos ILIKE ${i} OR b.doc_numero ILIKE ${i}
+                    OR u.username ILIKE ${i} OR c.external_ref ILIKE ${i})`;
+  }
+  values.push(MAX_SIN_PERFIL);
+  const filas = await queryRows<
+    Omit<NinoSinPerfil, "enlace"> & {
+      enlaceCreadoEn: string | null;
+      enlaceUsadoEn: string | null;
+      enlaceRevocadoEn: string | null;
+      enlaceExigeWelcome: boolean | null;
+    }
+  >(
+    `SELECT * FROM (
+       SELECT DISTINCT ON (b.id)
+              b.id AS "childPersonId", b.nombres || ' ' || b.apellidos AS nombre,
+              b.doc_numero AS documento, b.country_code AS pais, u.username,
+              c.id AS "contractId", c.numero, c.external_ref AS "externalRef",
+              ca.nombre AS campania, co.tipo::text AS curso, cl.nombre AS salon,
+              co.inicio::text AS "inicioCurso",
+              (SELECT a.nombres || ' ' || a.apellidos
+                 FROM people_guardianship g JOIN people_person a ON a.id = g.apoderado_id
+                WHERE g.nino_id = b.id ORDER BY a.nombres LIMIT 1) AS apoderado,
+              ep.creado_en AS "enlaceCreadoEn", ep.usado_en AS "enlaceUsadoEn",
+              ep.revocado_en AS "enlaceRevocadoEn", ep.exige_welcome AS "enlaceExigeWelcome",
+              EXISTS (SELECT 1 FROM scheduling_welcome_reserva r
+                       WHERE r.child_person_id = b.id AND r.estado = 'ACTIVA') AS "tieneWelcome"
+         FROM contracts_contract c
+         JOIN people_person b ON b.id = c.beneficiario_id
+         LEFT JOIN identity_user u ON u.id = b.user_id
+         LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado = 'ACTIVA'
+         LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
+         LEFT JOIN catalog_course co ON co.id = cl.course_id
+         LEFT JOIN catalog_campaign ca ON ca.id = co.campaign_id
+         LEFT JOIN LATERAL (
+              SELECT creado_en, usado_en, revocado_en, exige_welcome
+                FROM contracts_enlace_perfil
+               WHERE child_person_id = b.id
+               ORDER BY creado_en DESC LIMIT 1) ep ON true
+        WHERE c.estado = 'APROBADO'
+          AND b.user_id IS NOT NULL
+          AND b.perfil_completado_en IS NULL
+          AND ($1::text[] IS NULL OR c.country_code = ANY($1::text[]))
+          ${extra}
+        ORDER BY b.id, c.created_at DESC
+     ) x
+     ORDER BY x.campania NULLS LAST, x.salon NULLS LAST, x.nombre
+     LIMIT $${String(values.length)}`,
+    values,
+  );
+  return filas.map(
+    ({ enlaceCreadoEn, enlaceUsadoEn, enlaceRevocadoEn, enlaceExigeWelcome, ...f }) => ({
+      ...f,
+      enlace:
+        enlaceCreadoEn === null
+          ? null
+          : {
+              estado: estadoEnlacePerfil({ usadoEn: enlaceUsadoEn, revocadoEn: enlaceRevocadoEn }),
+              creadoEn: enlaceCreadoEn,
+              exigeWelcome: enlaceExigeWelcome !== false,
+            },
+    }),
+  );
 }
 
 export interface EstadoPerfilNino {

@@ -42,11 +42,13 @@ export {
   estadoPerfilNino,
   opcionesWelcomeNino,
   agendarWelcomeNino,
+  ninosSinPerfil,
 } from "./application/perfil-nino";
 export type {
   FichaPerfil,
   DatosPerfil,
   EstadoPerfilNino,
+  NinoSinPerfil,
   EnvioEnlacePerfil,
 } from "./application/perfil-nino";
 export { buscarEstudiantes } from "./application/estudiantes";

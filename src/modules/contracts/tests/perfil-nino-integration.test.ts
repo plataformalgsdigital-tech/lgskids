@@ -12,6 +12,7 @@ import {
   completarPerfilNino,
   estadoPerfilNino,
   fichaPorEnlacePerfil,
+  ninosSinPerfil,
   reenviarEnlacePerfil,
   type DatosPerfil,
 } from "../application/perfil-nino";
@@ -194,6 +195,17 @@ describe.runIf(RUN)("creación de perfil del niño (integración)", () => {
     await expect(completarPerfilNino(viejo, datos())).rejects.toBeInstanceOf(ConflictError);
   });
 
+  it("Servicio › sin perfil: aparece con su enlace vigente, filtrado por campaña", async () => {
+    const lista = await ninosSinPerfil({ countryScope: null, campaignId: campaniaId });
+    const yo = lista.find((n) => n.childPersonId === childPersonId);
+    expect(yo?.enlace?.estado).toBe("VIGENTE");
+    expect(yo?.salon).toBe(`Perfil Jr ${marca}`);
+    expect(yo?.apoderado).toBe(`Mamá Perfil${marca}`);
+    // Fuera de su país no se ve.
+    const ajeno = await ninosSinPerfil({ countryScope: ["CL"], buscar: `NP-${marca}` });
+    expect(ajeno).toHaveLength(0);
+  });
+
   it("la clave pide 8 caracteres con letras y números, y el Welcome es obligatorio", async () => {
     const t = tokenDelUltimo();
     await expect(
@@ -228,6 +240,9 @@ describe.runIf(RUN)("creación de perfil del niño (integración)", () => {
 
     await expect(completarPerfilNino(t, datos())).rejects.toBeInstanceOf(ConflictError);
     expect((await fichaPorEnlacePerfil(t)).estado).toBe("USADO");
+    // Y sale de la lista de Servicio.
+    const lista = await ninosSinPerfil({ countryScope: null, campaignId: campaniaId });
+    expect(lista.map((n) => n.childPersonId)).not.toContain(childPersonId);
     // Con el perfil hecho, ya no hay enlace que reenviar.
     await expect(
       reenviarEnlacePerfil({ actorUserId: actor, childPersonId, countryScope: null }),

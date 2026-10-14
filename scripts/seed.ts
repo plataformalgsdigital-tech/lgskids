@@ -85,6 +85,8 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.MENU_MIS_NINOS]: "Mis niños",
   [PERMISOS.SECCION_ACADEMICA]: "Sección Académica (menú)",
   [PERMISOS.SECCION_OPERACION]: "Sección Operación (menú)",
+  [PERMISOS.SECCION_SERVICIO]: "Sección Servicio (menú)",
+  [PERMISOS.MENU_SIN_PERFIL]: "Usuarios sin perfil creado",
   [PERMISOS.SECCION_ADMINISTRACION]: "Sección Administración (menú)",
   [PERMISOS.SECCION_GUIA]: "Sección Guía (menú)",
   [PERMISOS.PANEL_ADMINISTRACION]: "Panel de administración",
@@ -188,6 +190,9 @@ async function main(): Promise<void> {
       ["mensajes.enviar", ["contratos.gestionar"]],
       ["mensajes.plantillas", ["catalogo.gestionar"]],
       ["menu.mensajes", ["contratos.gestionar", "catalogo.gestionar"]],
+      // También los concede la migración 20261014000000_menu_servicio.
+      ["seccion.servicio", ["personas.ver"]],
+      ["menu.sin_perfil", ["personas.ver"]],
       ["menu.mis_clases", ["panel.guia"]],
       ["menu.mis_salones", ["panel.guia"]],
       ["menu.mis_ninos", ["panel.guia"]],
