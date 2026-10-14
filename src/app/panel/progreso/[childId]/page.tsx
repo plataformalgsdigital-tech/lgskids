@@ -157,8 +157,9 @@ export default function ProgresoPage() {
       </div>
 
       <p style={{ marginTop: "1.5rem" }}>
-        <Link href="/panel/calendario" style={{ fontSize: "0.9rem" }}>
-          ← Volver a salones
+        {/* `childId` es el id de la persona: el mismo de su ficha en Kids. */}
+        <Link href={`/panel/personas/${params.childId}`} style={{ fontSize: "0.9rem" }}>
+          ← Volver a la ficha del alumno
         </Link>
       </p>
     </main>
