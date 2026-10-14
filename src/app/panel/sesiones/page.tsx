@@ -39,12 +39,14 @@ const TARJETAS: Tarjeta[] = [
     desc: "Suspender una sesión con motivo y regenerar el salón. Hoy se hace desde el calendario.",
     emoji: "⛔",
     color: "var(--lgs-magenta)",
+    href: "/panel/sesiones/suspensiones",
   },
   {
     titulo: "Feriados",
     desc: "Calendario de feriados por país y los extra curados que solo suman.",
     emoji: "📅",
     color: "var(--lgs-amarillo)",
+    href: "/panel/sesiones/feriados",
   },
 ];
 

@@ -150,7 +150,32 @@ const MENU: {
     href: "/panel/reservas",
     permisoMenu: "menu.reservas",
   },
-  // ── Servicio (atención a las familias) ────────────────────
+  // ── Servicio (atención a las familias). Las que aún no tienen pantalla
+  //    abren la página "en construcción" (`servicio/[opcion]`). ──────────
+  {
+    seccion: "Servicio",
+    permiso: "personas.ver",
+    etiqueta: "Welcome",
+    color: "var(--lgs-verde)",
+    href: "/panel/servicio/welcome",
+    permisoMenu: "menu.servicio_welcome",
+  },
+  {
+    seccion: "Servicio",
+    permiso: "personas.ver",
+    etiqueta: "Asistencia",
+    color: "var(--lgs-azul)",
+    href: "/panel/servicio/asistencia",
+    permisoMenu: "menu.servicio_asistencia",
+  },
+  {
+    seccion: "Servicio",
+    permiso: "personas.ver",
+    etiqueta: "Sesiones",
+    color: "var(--lgs-cian)",
+    href: "/panel/servicio/sesiones",
+    permisoMenu: "menu.servicio_sesiones",
+  },
   {
     seccion: "Servicio",
     permiso: "personas.ver",
@@ -158,6 +183,22 @@ const MENU: {
     color: "var(--lgs-magenta)",
     href: "/panel/servicio/sin-perfil",
     permisoMenu: "menu.sin_perfil",
+  },
+  {
+    seccion: "Servicio",
+    permiso: "personas.ver",
+    etiqueta: "Casos de atención",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/servicio/casos-atencion",
+    permisoMenu: "menu.servicio_casos",
+  },
+  {
+    seccion: "Servicio",
+    permiso: "personas.ver",
+    etiqueta: "Reactivados",
+    color: "var(--lgs-purpura)",
+    href: "/panel/servicio/reactivados",
+    permisoMenu: "menu.servicio_reactivados",
   },
   // ── Administración ─────────────────────────────────────────
   {
@@ -458,15 +499,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
                     textAlign: "left",
                   }}
                 >
-                  <span>
-                    {seccion}
-                    {plegada && (
-                      <span style={{ fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
-                        {" "}
-                        ({items.length})
-                      </span>
-                    )}
-                  </span>
+                  <span>{seccion}</span>
                   <span
                     aria-hidden
                     style={{

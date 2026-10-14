@@ -1434,7 +1434,12 @@ solo servía para completar la ficha.
   como árbol padre→hijos: **Tablero** (suelto, primero) · **Académica** (Calendario,
   Mantenimiento Académico) · **Operación** (Kids, Contratos, **Gestión de
   Reservas** —antes "Reservas (LGS)", renombrado 2026-10-07—) ·
-  **Servicio** (2026-10-14: **Usuarios sin perfil creado**, `/panel/servicio/sin-perfil`
+  **Servicio** (2026-10-14: Welcome, Asistencia, Sesiones, Usuarios sin perfil creado,
+  Casos de atención y Reactivados. Todas salvo "sin perfil" abren por ahora la página
+  **EN CONSTRUCCIÓN** —`src/ui/EnConstruccion.tsx`, vía `servicio/[opcion]`, que es
+  también la de Sesiones › Suspensiones y Feriados—; al construir una, se le crea su
+  carpeta y se saca de `OPCIONES`. Cada una con su `menu.servicio_*`, migración
+  `20261014100000`. **Usuarios sin perfil creado**, `/panel/servicio/sin-perfil`
   → `GET /api/contracts/ninos/sin-perfil` → `ninosSinPerfil`: niños con contrato
   APROBADO sin `perfil_completado_en`, con el estado de su último enlace y los
   botones "Con Welcome" / "Sin Welcome", que usan la MISMA ruta de la ficha) ·
