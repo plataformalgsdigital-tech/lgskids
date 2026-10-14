@@ -79,6 +79,7 @@ const NOMBRES_PERMISO: Record<string, string> = {
   [PERMISOS.MENU_MENSAJES]: "Mensajes",
   [PERMISOS.MENSAJES_ENVIAR]: "Enviar mensajes de WhatsApp",
   [PERMISOS.MENSAJES_PLANTILLAS]: "Gestionar plantillas de mensajes",
+  [PERMISOS.SESIONES_SOLICITAR_REPETICION]: "Solicitar repetir sesión",
   [PERMISOS.CASOS_VER]: "Ver casos de atención",
   [PERMISOS.CASOS_GESTIONAR]: "Gestionar casos de atención",
   [PERMISOS.MENU_GUIAS]: "Guías",

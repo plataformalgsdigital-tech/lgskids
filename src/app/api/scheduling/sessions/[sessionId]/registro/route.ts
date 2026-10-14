@@ -17,9 +17,11 @@ bootstrapIdentity();
  * Registro de la sesión: cerrarla y pedir repetirla.
  *
  * Quién puede qué:
- *  - CERRAR y SOLICITAR: el guía del salón (o coordinación). Se acota con
+ *  - CERRAR: el guía del salón (o coordinación). Se acota con
  *    `verificarAccesoGuia`, el mismo guardia que ya usa la asistencia — así un
  *    guía no cierra sesiones de salones ajenos.
+ *  - SOLICITAR repetición: además, `sesiones.solicitar_repeticion` (2026-10-14:
+ *    por decisión del negocio, por ahora solo superadmin).
  *  - REABRIR: solo coordinación (`salones.gestionar`).
  */
 
@@ -39,7 +41,11 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_VER);
   const sessionId = await sessionIdDe(context);
-  return json({ repeticiones: await repeticionesDeSesion(sessionId) });
+  return json({
+    repeticiones: await repeticionesDeSesion(sessionId),
+    // El botón "Solicitar repetir sesión" solo se muestra a quien lo puede usar.
+    puedeSolicitarRepeticion: profile.hasPermission(PERMISOS.SESIONES_SOLICITAR_REPETICION),
+  });
 });
 
 const cuerpoSchema = z.discriminatedUnion("accion", [
@@ -92,6 +98,8 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
     profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
     return json(await reabrirSesion({ actorUserId: auth.userId, sessionId, ip }));
   }
+  // Pedir la repetición tiene permiso propio (por ahora, solo superadmin).
+  profile.requirePermission(PERMISOS.SESIONES_SOLICITAR_REPETICION);
   return json(
     await solicitarRepeticion({
       actorUserId: auth.userId,

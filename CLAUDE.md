@@ -1581,6 +1581,13 @@ solo servía para completar la ficha.
   mismo en el reporte. Cerrar fija `guia_user_id` si estaba vacío — el salón puede
   cambiar de guía y el histórico debe recordar quién la dictó. `hora_real` es TIME
   (hora de pared) y `cerrada_en` es el instante: dos cosas distintas, dos columnas.
+- **"Solicitar repetir sesión" tiene permiso propio (2026-10-14)**:
+  `sesiones.solicitar_repeticion`, que el POST de `…/sessions/[sessionId]/registro`
+  exige además de lo de siempre y que el GET devuelve como `puedeSolicitarRepeticion`
+  (sin él, el botón no se pinta; una solicitud ya hecha se sigue viendo). **Por
+  decisión del negocio, por ahora SOLO superadmin**: la migración
+  `20261014500000_permiso_solicitar_repeticion` se lo concede solo a ese rol y la
+  matriz del seed lo excluye del admin. Se abre a otro rol marcándolo en Roles.
 - **Refuerzos (2026-09-08)**: el guía SOLICITA repetir una sesión desde el modal;
   coordinación autoriza en **/panel/sesiones/refuerzos** (`salones.gestionar`).
   Autorizar crea una **clase EXTRA** llamando a `crearEvento` —el mismo camino de

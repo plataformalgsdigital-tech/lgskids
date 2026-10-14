@@ -30,6 +30,12 @@ export const PERMISOS = {
   /** WhatsApp a los apoderados: Gestión y el botón de credenciales de la ficha. */
   MENSAJES_ENVIAR: "mensajes.enviar",
   MENSAJES_PLANTILLAS: "mensajes.plantillas",
+  /**
+   * "Solicitar repetir sesión" del modal de la sesión (2026-10-14). Por decisión
+   * del negocio, por ahora SOLO superadmin: la migración se lo da solo a ese rol
+   * y la matriz del seed no se lo da al admin. Se otorga a otro rol en el panel.
+   */
+  SESIONES_SOLICITAR_REPETICION: "sesiones.solicitar_repeticion",
   /** Servicio › Casos de atención: ver la bandeja y los casos. */
   CASOS_VER: "casos.ver",
   /** Asignar, contactar, anotar, cerrar y abrir casos desde la bandeja. */
@@ -131,7 +137,8 @@ export function requisitoParaGestionarCuenta(rolesDelOtro: readonly string[]): R
 /** Matriz rol → permisos que el seed materializa. */
 export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
   superadmin: Object.values(PERMISOS),
-  admin: Object.values(PERMISOS),
+  // Todo, salvo lo que el negocio reservó por ahora al superadmin.
+  admin: Object.values(PERMISOS).filter((p) => p !== PERMISOS.SESIONES_SOLICITAR_REPETICION),
   coordinador: [
     PERMISOS.USUARIOS_GESTIONAR,
     PERMISOS.AUDITORIA_VER,

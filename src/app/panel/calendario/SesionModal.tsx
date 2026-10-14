@@ -237,6 +237,7 @@ export function SesionModal({
   // Casos de atención reportados en esta sesión (el ⚠ de la lista).
   const [casosSesion, setCasosSesion] = useState<{ childPersonId: string; codigo: string }[]>([]);
   const [reportando, setReportando] = useState(false);
+  const [puedeSolicitarRepeticion, setPuedeSolicitarRepeticion] = useState(false);
   const casoDe = (childPersonId: string) =>
     casosSesion.find((c) => c.childPersonId === childPersonId) ?? null;
 
@@ -261,7 +262,12 @@ export function SesionModal({
         );
       }
       if (rr.ok) {
-        setRepeticiones(((await rr.json()) as { repeticiones: Repeticion[] }).repeticiones);
+        const d = (await rr.json()) as {
+          repeticiones: Repeticion[];
+          puedeSolicitarRepeticion?: boolean;
+        };
+        setRepeticiones(d.repeticiones);
+        setPuedeSolicitarRepeticion(d.puedeSolicitarRepeticion === true);
       }
       if (rm.ok) {
         const d = (await rm.json()) as {
@@ -826,17 +832,21 @@ export function SesionModal({
                 ↩ Reabrir
               </button>
             )}
-            <button
-              type="button"
-              style={boton}
-              disabled={ocupado || pendiente !== null}
-              onClick={() => {
-                setPidiendoRepeticion((v) => !v);
-                void cargarReferencia();
-              }}
-            >
-              🔁 {pendiente !== null ? "Repetición solicitada" : "Solicitar repetir sesión"}
-            </button>
+            {/* Permiso propio (`sesiones.solicitar_repeticion`, por ahora solo
+                superadmin). Una solicitud ya hecha se sigue viendo para todos. */}
+            {(puedeSolicitarRepeticion || pendiente !== null) && (
+              <button
+                type="button"
+                style={boton}
+                disabled={ocupado || pendiente !== null}
+                onClick={() => {
+                  setPidiendoRepeticion((v) => !v);
+                  void cargarReferencia();
+                }}
+              >
+                🔁 {pendiente !== null ? "Repetición solicitada" : "Solicitar repetir sesión"}
+              </button>
+            )}
             <button
               type="button"
               style={{ ...boton, background: abriendoMision ? "#eef2ff" : "white" }}
