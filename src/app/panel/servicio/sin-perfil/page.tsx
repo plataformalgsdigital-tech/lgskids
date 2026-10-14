@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { descargarCsv } from "@/ui/csv";
 import { numeroContrato } from "@/ui/numero-contrato";
 
 /**
@@ -78,6 +79,47 @@ function estadoEnlace(n: Nino): { texto: string; color: string } {
     return { texto: `Enviado el ${fecha}${tipo}, sin usar`, color: "#b57a00" };
   }
   return { texto: `Revocado (${fecha})`, color: "var(--texto-suave)" };
+}
+
+/** Lo que está en pantalla (con sus filtros), sin enlaces ni tokens: no existen en claro. */
+function exportar(ninos: Nino[]) {
+  descargarCsv(
+    `sin-perfil-${new Date().toISOString().slice(0, 10)}`,
+    [
+      "nino",
+      "documento",
+      "usuario",
+      "pais",
+      "contrato",
+      "campania",
+      "curso",
+      "salon",
+      "inicio_curso",
+      "apoderado",
+      "enlace",
+      "enlace_enviado",
+      "welcome_agendado",
+    ],
+    ninos.map((n) => [
+      n.nombre,
+      n.documento,
+      n.username,
+      n.pais,
+      numeroContrato({ externalRef: n.externalRef, numero: n.numero }).numero,
+      n.campania,
+      n.curso,
+      n.salon,
+      n.inicioCurso,
+      n.apoderado,
+      n.enlace === null
+        ? "Nunca enviado"
+        : n.enlace.estado === "VIGENTE"
+          ? `Enviado sin usar${n.enlace.exigeWelcome ? "" : " (sin Welcome)"}`
+          : "Revocado",
+      n.enlace?.creadoEn.slice(0, 10) ?? "",
+      n.tieneWelcome,
+    ]),
+  );
 }
 
 export default function SinPerfilPage() {
@@ -169,7 +211,32 @@ export default function SinPerfilPage() {
 
   return (
     <main style={{ padding: "2rem", maxWidth: "80rem", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "1.6rem" }}>Usuarios sin perfil creado</h1>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <h1 style={{ fontSize: "1.6rem" }}>Usuarios sin perfil creado</h1>
+        <button
+          type="button"
+          onClick={() => exportar(visibles)}
+          disabled={visibles.length === 0}
+          style={{
+            padding: "0.55rem 1rem",
+            borderRadius: "0.6rem",
+            border: "1px solid #e3e7f0",
+            background: "white",
+            fontWeight: 700,
+            cursor: visibles.length > 0 ? "pointer" : "default",
+          }}
+        >
+          ⬇ Descargar CSV
+        </button>
+      </div>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem", marginTop: "0.3rem" }}>
         Niños con contrato aprobado —ya tienen usuario— que todavía no crearon su perfil. El enlace
         le llega al apoderado por WhatsApp. Si el curso del niño ya empezó, se sugiere el enlace{" "}

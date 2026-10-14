@@ -12,10 +12,6 @@ const OPCIONES: Record<string, { titulo: string; descripcion: string }> = {
     descripcion:
       "Los Welcome programados y los niños agendados en cada uno, para hacerles seguimiento.",
   },
-  asistencia: {
-    titulo: "Asistencia",
-    descripcion: "Seguimiento de la asistencia de los niños: ausencias seguidas y justificaciones.",
-  },
   sesiones: {
     titulo: "Sesiones",
     descripcion:

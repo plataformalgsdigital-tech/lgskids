@@ -10,6 +10,12 @@
 export { listaDeSesion, marcarAsistencia, verificarAccesoGuia } from "./application/asistencia";
 export type { ListaDeSesion, FilaLista, EstadoAsistencia } from "./application/asistencia";
 export {
+  inasistencias,
+  DIAS_MAX_INASISTENCIAS,
+  MAX_INASISTENCIAS,
+} from "./application/inasistencias";
+export type { Inasistencia, FiltrosInasistencias } from "./application/inasistencias";
+export {
   asistenciaDeNinoHandler,
   listaDeSesionHandler,
   marcarAsistenciaHandler,

@@ -1,0 +1,152 @@
+import { queryRows } from "@/platform/db/query";
+import { ValidationError } from "@/platform/errors";
+
+/**
+ * Servicio › Asistencia (2026-10-14): los niños que NO asistieron a sus
+ * sesiones en un rango de fechas —por defecto, el día anterior—, para que el
+ * equipo de servicio llame a las familias.
+ *
+ * "No asistió" = la marca de la sesión es AUSENTE o JUSTIFICADO (la pantalla
+ * filtra por cuál). Una sesión SIN marca no entra: no se sabe si el niño faltó
+ * o el guía olvidó pasar lista, y eso lo muestra el Tablero ("sesiones sin
+ * marcar"), no esta lista.
+ *
+ * La fecha es la LOCAL del salón (`scheduling_session.fecha`), no la del
+ * servidor (regla 3): "ayer" en Chile y en Colombia es el mismo día de pared.
+ */
+
+/** Rango máximo de una consulta: es una lista de trabajo, no un histórico. */
+export const DIAS_MAX_INASISTENCIAS = 93;
+/** Tope de filas devueltas (y exportadas). */
+export const MAX_INASISTENCIAS = 2000;
+
+export interface Inasistencia {
+  attendanceId: string;
+  sessionId: string;
+  fecha: string;
+  /** Hora de pared del salón, HH:MM. */
+  hora: string;
+  tipoSesion: string;
+  estado: "AUSENTE" | "JUSTIFICADO";
+  justificacion: string | null;
+  childPersonId: string;
+  nombre: string;
+  documento: string;
+  username: string | null;
+  pais: string;
+  campania: string | null;
+  curso: string | null;
+  salon: string;
+  guia: string | null;
+  apoderado: string | null;
+  telefono: string | null;
+}
+
+export interface FiltrosInasistencias {
+  countryScope: string[] | null;
+  desde: string;
+  hasta: string;
+  /** Documento, nombre, apellido o usuario del niño (por palabras). */
+  buscar?: string | null;
+  campaignId?: string | null;
+  curso?: string | null;
+  classroomId?: string | null;
+  /** Sin valor: las dos (ausente y justificada). */
+  estado?: "AUSENTE" | "JUSTIFICADO" | null;
+}
+
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** La columna en minúsculas y sin tildes (la misma forma que el buscador de Kids). */
+const SIN_TILDES = (col: string) =>
+  `translate(lower(${col}), 'áéíóúàèìòùäëïöüâêîôûñ', 'aeiouaeiouaeiouaeioun')`;
+
+export async function inasistencias(f: FiltrosInasistencias): Promise<Inasistencia[]> {
+  if (!FECHA.test(f.desde) || !FECHA.test(f.hasta)) {
+    throw new ValidationError("Las fechas deben ser YYYY-MM-DD.");
+  }
+  if (f.desde > f.hasta) {
+    throw new ValidationError("La fecha inicial no puede ser posterior a la final.");
+  }
+  const dias = (Date.parse(f.hasta) - Date.parse(f.desde)) / 86_400_000;
+  if (dias > DIAS_MAX_INASISTENCIAS) {
+    throw new ValidationError(
+      `El rango es de hasta ${String(DIAS_MAX_INASISTENCIAS)} días; acótalo o filtra por campaña.`,
+    );
+  }
+
+  const values: unknown[] = [f.desde, f.hasta, f.countryScope];
+  const condiciones: string[] = [];
+  const agregar = (sql: (n: string) => string, valor: unknown) => {
+    values.push(valor);
+    condiciones.push(sql(`$${String(values.length)}`));
+  };
+  if (f.estado != null) agregar((n) => `a.estado = ${n}::attendance_estado`, f.estado);
+  if (f.campaignId != null && f.campaignId !== "") agregar((n) => `ca.id = ${n}`, f.campaignId);
+  if (f.curso != null && f.curso !== "") agregar((n) => `co.tipo::text = ${n}`, f.curso);
+  if (f.classroomId != null && f.classroomId !== "") {
+    agregar((n) => `cl.id = ${n}`, f.classroomId);
+  }
+  // Por palabras, como el buscador de Kids: "acevedo elysa" = "elysa acevedo",
+  // sin tildes ni mayúsculas, y el documento sin puntos ni guiones.
+  const palabras = (f.buscar ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((p) => p !== "")
+    .slice(0, 5);
+  for (const palabra of palabras) {
+    values.push(`%${palabra}%`);
+    const t = `$${String(values.length)}`;
+    const doc = palabra.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    let porDoc = "";
+    if (doc !== "") {
+      values.push(`%${doc}%`);
+      porDoc = `OR upper(regexp_replace(b.doc_numero, '[^0-9A-Za-z]', '', 'g')) LIKE $${String(values.length)}`;
+    }
+    condiciones.push(
+      `(${SIN_TILDES("b.nombres")} LIKE ${t} OR ${SIN_TILDES("b.apellidos")} LIKE ${t}
+        OR lower(u.username) LIKE ${t} ${porDoc})`,
+    );
+  }
+  values.push(MAX_INASISTENCIAS);
+
+  return queryRows<Inasistencia>(
+    `SELECT a.id AS "attendanceId", s.id AS "sessionId", s.fecha::text AS fecha,
+            to_char(s.starts_at AT TIME ZONE cl.timezone, 'HH24:MI') AS hora,
+            s.tipo::text AS "tipoSesion", a.estado::text AS estado, a.justificacion,
+            b.id AS "childPersonId", b.nombres || ' ' || b.apellidos AS nombre,
+            b.doc_numero AS documento, u.username, b.country_code AS pais,
+            ca.nombre AS campania, co.tipo::text AS curso, cl.nombre AS salon,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+                     NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
+                     gu.username) AS guia,
+            ap.nombre AS apoderado, COALESCE(ap.telefono, b.telefono) AS telefono
+       FROM attendance_attendance a
+       JOIN scheduling_session s ON s.id = a.session_id
+       JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+       LEFT JOIN catalog_course co ON co.id = cl.course_id
+       LEFT JOIN catalog_campaign ca ON ca.id = co.campaign_id
+       JOIN people_person b ON b.id = a.child_person_id
+       LEFT JOIN identity_user u ON u.id = b.user_id
+       -- Guía EFECTIVO: el de la sesión (reemplazo o quien la cerró), si no el del salón.
+       LEFT JOIN identity_user gu ON gu.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+       LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
+       LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
+       -- El apoderado con teléfono, que es a quien llama servicio.
+       LEFT JOIN LATERAL (
+            SELECT p.nombres || ' ' || p.apellidos AS nombre, p.telefono
+              FROM people_guardianship g JOIN people_person p ON p.id = g.apoderado_id
+             WHERE g.nino_id = b.id
+             ORDER BY (p.telefono IS NULL OR p.telefono = ''), p.nombres
+             LIMIT 1) ap ON true
+      WHERE a.estado IN ('AUSENTE', 'JUSTIFICADO')
+        AND s.fecha BETWEEN $1::date AND $2::date
+        AND ($3::text[] IS NULL OR b.country_code = ANY($3::text[]))
+        ${condiciones.map((c) => `AND ${c}`).join("\n        ")}
+      ORDER BY s.fecha DESC, s.starts_at, cl.nombre, b.apellidos, b.nombres
+      LIMIT $${String(values.length)}`,
+    values,
+  );
+}

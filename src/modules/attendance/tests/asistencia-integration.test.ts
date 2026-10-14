@@ -8,6 +8,7 @@ import { crearNino } from "@/modules/people";
 import { aprobarContrato, crearContrato } from "@/modules/contracts";
 import { registrarIntento } from "@/modules/assessment";
 import { listaDeSesion, marcarAsistencia } from "../application/asistencia";
+import { inasistencias } from "../application/inasistencias";
 
 /**
  * INTEGRACIÓN Fase 8: lista derivada con aviso de feriado del país del niño,
@@ -187,6 +188,29 @@ describe.runIf(RUN)("asistencia y cuestionarios (integración)", () => {
       [sessionId],
     );
     expect(total?.total).toBe("1");
+  });
+
+  it("Servicio › Asistencia: lista la inasistencia con sus filtros y el alcance por país", async () => {
+    const base = { countryScope: null, desde: "2026-08-07", hasta: "2026-08-07" };
+    const todas = await inasistencias({ ...base, classroomId });
+    expect(todas.map((f) => f.childPersonId)).toEqual([ninoId]);
+    expect(todas[0]?.estado).toBe("JUSTIFICADO");
+    expect(todas[0]?.hora).toBe("18:00"); // pared del salón (Santiago), no UTC
+    expect(todas[0]?.apoderado).toBe(`Luisa Att${sufijo}`);
+    // Por palabras, sin importar el orden ni las tildes; y por documento sin guiones.
+    expect(await inasistencias({ ...base, buscar: `att${sufijo} sára` })).toHaveLength(1);
+    expect(await inasistencias({ ...base, buscar: `AT${sufijo}` })).toHaveLength(1);
+    expect(await inasistencias({ ...base, classroomId, estado: "AUSENTE" })).toHaveLength(0);
+    expect(await inasistencias({ ...base, classroomId, curso: "YOUNGSTER" })).toHaveLength(0);
+    expect(await inasistencias({ ...base, campaignId, curso: "JUNIOR" })).toHaveLength(1);
+    // Otra fecha, u otro país, no la trae.
+    expect(
+      await inasistencias({ ...base, desde: "2026-08-08", hasta: "2026-08-08", classroomId }),
+    ).toHaveLength(0);
+    expect(await inasistencias({ ...base, countryScope: ["CL"], classroomId })).toHaveLength(0);
+    await expect(
+      inasistencias({ ...base, desde: "2026-08-08", hasta: "2026-08-07" }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("un niño ajeno al salón es rechazado", async () => {

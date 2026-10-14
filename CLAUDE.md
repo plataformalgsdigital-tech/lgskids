@@ -1435,7 +1435,15 @@ solo servía para completar la ficha.
   Mantenimiento Académico) · **Operación** (Kids, Contratos, **Gestión de
   Reservas** —antes "Reservas (LGS)", renombrado 2026-10-07—) ·
   **Servicio** (2026-10-14: Welcome, Asistencia, Sesiones, Usuarios sin perfil creado,
-  Casos de atención y Reactivados. Todas salvo "sin perfil" abren por ahora la página
+  Casos de atención y Reactivados. **Asistencia** (`/panel/servicio/asistencia` →
+  `GET /api/attendance/inasistencias` → `inasistencias`, exige `personas.ver` Y
+  `asistencia.ver`) lista a los niños con marca AUSENTE o JUSTIFICADO entre dos
+  fechas LOCALES del salón —abre en el día anterior—, con filtros de usuario (por
+  palabras, documento sin guiones), campaña, curso, salón y estado, y el apoderado
+  con teléfono; una sesión SIN marca no entra (eso es "sesiones sin marcar" del
+  Tablero). Rango máx. 93 días y 2.000 filas. **Toda consulta de Servicio descarga
+  CSV** con `src/ui/csv.ts` (`;`, BOM y celdas que empiezan por `=`/`@` neutralizadas
+  contra inyección de fórmulas). Las demás, salvo "sin perfil", abren por ahora la página
   **EN CONSTRUCCIÓN** —`src/ui/EnConstruccion.tsx`, vía `servicio/[opcion]`, que es
   también la de Sesiones › Suspensiones y Feriados—; al construir una, se le crea su
   carpeta y se saca de `OPCIONES`. Cada una con su `menu.servicio_*`, migración
@@ -1459,6 +1467,11 @@ solo servía para completar la ficha.
   Mantenimiento, 2026-09-30) lo crea y lo concede la migración
   `20260930000000_menu_mantenimiento_admin` con la misma regla del seed (a quien
   tenga `catalogo.gestionar`), que corre sola en el trabajo `migrar`.
+- **El menú vive en `src/app/panel/menu.ts`** (fuera del layout) y `menu.test.ts`
+  comprueba que coincide con `SECCIONES_MENU`: mismas secciones con el mismo permiso
+  padre, cada ítem con permiso funcional Y de menú (salvo Tablero y lo de
+  superadmin), cada casilla de Roles con su ítem, todo permiso en el catálogo y cada
+  `href` con su página. Un ítem nuevo que olvide su permiso pone la prueba en rojo.
 - **Las secciones se PLIEGAN** (2026-10-14): el encabezado de cada una es un botón;
   lo plegado se recuerda en el navegador (`lgs-menu-plegadas`, solo comodidad) y la
   sección de la página en que se está se abre sola al llegar. `seccion.servicio` y
