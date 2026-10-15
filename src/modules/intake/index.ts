@@ -25,5 +25,6 @@ export {
   pausarIntakeHandler,
   finPausaIntakeHandler,
   extenderIntakeHandler,
+  apoderadoIntakeHandler,
   estadoAcademicoIntakeHandler,
 } from "./api/handlers";

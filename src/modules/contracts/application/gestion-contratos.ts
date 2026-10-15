@@ -21,6 +21,9 @@ import {
   insertPerson,
   linkUser,
   setPersonEstado,
+  reemplazarApoderado,
+  actualizarDatosPersona,
+  personaCompartida,
   type PersonInput,
 } from "@/modules/people";
 import { queryOne } from "@/platform/db/query";
@@ -429,6 +432,85 @@ export async function aprobarReservaPorExternalRef(input: {
     contractId: contrato.id,
     ip: input.ip ?? null,
   });
+}
+
+/**
+ * CAMBIO DE APODERADO desde LGS (Modificar beneficiario Kids): el niño queda con
+ * ESE apoderado y su parentesco. Si el documento ya existe en KIDS se reutiliza la
+ * persona: se le actualizan correo/teléfono y, solo si no está ligada a nadie más
+ * (otro niño, contrato o cuenta), también los nombres — así un dato de relleno en
+ * LGS no renombra a un apoderado real compartido por hermanos.
+ */
+export async function cambiarApoderadoPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  titularEsApoderado: boolean;
+  apoderado: PersonInput | null;
+  parentesco: string | null;
+  ip?: string | null;
+}): Promise<{ aplicado: boolean; apoderadoId: string; nombresConservados: boolean }> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  if (!input.titularEsApoderado && input.apoderado === null) {
+    throw new ValidationError("Faltan los datos del apoderado (o marque titular = apoderado).");
+  }
+  const ninoId = contrato.beneficiarioId;
+  let nombresConservados = false;
+
+  const apoderadoId = await withTransaction(async (tx) => {
+    if (input.titularEsApoderado) {
+      await reemplazarApoderado(ninoId, contrato.titularId, input.parentesco, tx);
+      return contrato.titularId;
+    }
+    const ap = input.apoderado as PersonInput;
+    const existente = await findPersonByDoc(
+      ap.countryCode,
+      ap.docTipo.trim().toUpperCase(),
+      ap.docNumero.trim(),
+      tx,
+    );
+    let id: string;
+    if (existente === null) {
+      id = await insertPerson(ap, tx);
+    } else {
+      if (existente.id === ninoId) {
+        throw new ValidationError("El documento del apoderado es el del propio niño.");
+      }
+      id = existente.id;
+      nombresConservados = await personaCompartida(id, ninoId, tx);
+      await actualizarDatosPersona(
+        id,
+        {
+          nombres: ap.nombres,
+          apellidos: ap.apellidos,
+          email: ap.email ?? null,
+          telefono: ap.telefono ?? null,
+        },
+        nombresConservados,
+        tx,
+      );
+    }
+    await reemplazarApoderado(ninoId, id, input.parentesco, tx);
+    return id;
+  });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.apoderado_cambiado_lgs",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: {
+      titularEsApoderado: input.titularEsApoderado,
+      apoderadoId,
+      doc: input.apoderado?.docNumero ?? null,
+      parentesco: input.parentesco,
+      nombresConservados,
+    },
+    ip: input.ip ?? null,
+  });
+  return { aplicado: true, apoderadoId, nombresConservados };
 }
 
 /** Tope de pausas por contrato — la MISMA regla que LGS (máximo 2 OnHold). */

@@ -59,6 +59,82 @@ export async function insertPerson(input: PersonInput, client?: Queryable): Prom
   return id;
 }
 
+/**
+ * ¿La persona está ligada a algo más que a `exceptoNinoId`? (apoderada de otro
+ * niño, titular de algún contrato, o con cuenta propia). Si lo está, sus nombres
+ * no se pisan desde una edición del apoderado de un niño.
+ */
+export async function personaCompartida(
+  personId: string,
+  exceptoNinoId: string,
+  client?: Queryable,
+): Promise<boolean> {
+  const row = await queryOne<{ n: string }>(
+    `SELECT (
+       (SELECT count(*) FROM people_guardianship WHERE apoderado_id = $1 AND nino_id <> $2)
+     + (SELECT count(*) FROM contracts_contract WHERE titular_id = $1)
+     + (SELECT count(*) FROM people_person WHERE id = $1 AND user_id IS NOT NULL)
+     )::text AS n`,
+    [personId, exceptoNinoId],
+    client,
+  );
+  return Number(row?.n ?? 0) > 0;
+}
+
+/**
+ * Actualiza datos de una persona. `soloContacto` = solo correo y teléfono (los
+ * nombres se conservan). Los valores vacíos no borran lo que había.
+ */
+export async function actualizarDatosPersona(
+  personId: string,
+  datos: { nombres?: string; apellidos?: string; email?: string | null; telefono?: string | null },
+  soloContacto: boolean,
+  client?: Queryable,
+): Promise<void> {
+  await execute(
+    `UPDATE people_person
+        SET nombres   = CASE WHEN $2 OR NULLIF(TRIM($3), '') IS NULL THEN nombres ELSE TRIM($3) END,
+            apellidos = CASE WHEN $2 OR NULLIF(TRIM($4), '') IS NULL THEN apellidos ELSE TRIM($4) END,
+            email     = COALESCE(NULLIF(TRIM($5), ''), email),
+            telefono  = COALESCE(NULLIF(TRIM($6), ''), telefono),
+            updated_at = now()
+      WHERE id = $1`,
+    [
+      personId,
+      soloContacto,
+      datos.nombres ?? null,
+      datos.apellidos ?? null,
+      datos.email ?? null,
+      datos.telefono ?? null,
+    ],
+    client,
+  );
+}
+
+/**
+ * Deja a `apoderadoId` como EL apoderado del niño (con su parentesco): quita
+ * las otras tutelas del niño. LGS maneja un apoderado por niño.
+ */
+export async function reemplazarApoderado(
+  ninoId: string,
+  apoderadoId: string,
+  parentesco: string | null,
+  client?: Queryable,
+): Promise<void> {
+  await execute(
+    `DELETE FROM people_guardianship WHERE nino_id = $1 AND apoderado_id <> $2`,
+    [ninoId, apoderadoId],
+    client,
+  );
+  await execute(
+    `INSERT INTO people_guardianship (id, nino_id, apoderado_id, parentesco)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (nino_id, apoderado_id) DO UPDATE SET parentesco = EXCLUDED.parentesco`,
+    [newId(), ninoId, apoderadoId, parentesco],
+    client,
+  );
+}
+
 export interface NinoListItem {
   id: string;
   nombres: string;

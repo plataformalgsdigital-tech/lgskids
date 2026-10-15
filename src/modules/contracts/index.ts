@@ -20,6 +20,7 @@ export {
   procesarFinesDePausa,
   extenderContrato,
   extenderPorExternalRef,
+  cambiarApoderadoPorExternalRef,
   reactivar,
   inactivarContrato,
   procesarVencimientos,

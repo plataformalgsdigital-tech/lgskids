@@ -28,6 +28,9 @@ export {
   findPersonByDoc,
   insertPerson,
   insertGuardianship,
+  reemplazarApoderado,
+  actualizarDatosPersona,
+  personaCompartida,
   linkUser,
   setPersonEstado,
 } from "./infrastructure/person-repository";

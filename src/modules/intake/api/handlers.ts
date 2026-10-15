@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   aprobarReservaPorExternalRef,
+  cambiarApoderadoPorExternalRef,
   crearReservaBeneficiario,
   extenderPorExternalRef,
   fichaAcademicaPorRef,
@@ -178,6 +179,33 @@ export const finPausaIntakeHandler = handlerWithServiceAuth(async (request, cont
       actorUserId: SYSTEM_ACTOR,
       externalRef,
       dias: body.dias,
+      ip: ip(request),
+    }),
+  );
+});
+
+/**
+ * POST /api/kids-intake/reservations/[externalRef]/apoderado — el apoderado del
+ * niño se cambió en LGS (Modificar beneficiario Kids). Body
+ * { titularEsApoderado, apoderado?, parentesco? }.
+ */
+export const apoderadoIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  const body = z
+    .object({
+      titularEsApoderado: z.boolean().default(false),
+      apoderado: personaSchema.nullish(),
+      parentesco: z.string().max(40).nullish(),
+    })
+    .parse(await request.json());
+  return json(
+    await cambiarApoderadoPorExternalRef({
+      actorUserId: SYSTEM_ACTOR,
+      externalRef,
+      titularEsApoderado: body.titularEsApoderado,
+      apoderado: body.apoderado ?? null,
+      parentesco: body.parentesco ?? null,
       ip: ip(request),
     }),
   );
