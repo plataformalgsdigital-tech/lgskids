@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { resumenHorario, type SlotResumen } from "@/ui/horario";
 
 /**
  * ACADEMIC CHANGE. Cada opción llama al camino que YA existe y cuida sus
@@ -28,6 +29,8 @@ interface Salon {
   cupo: number;
   ocupados: number;
   guia: string | null;
+  pais: string;
+  horario: SlotResumen[];
   sugerencia: { levelId: string; nivel: string; lecciones: number } | null;
 }
 interface Opciones {
@@ -50,6 +53,19 @@ type Opcion = "CURSO" | "AJUSTE";
 type Movimiento = "SALON" | "PROMOVER" | "DEGRADAR";
 
 const CURSO_UI: Record<string, string> = { JUNIOR: "Junior (6–9)", YOUNGSTER: "Youngster (10–13)" };
+/** País del salón: el horario es la hora de PARED de ese país. */
+const PAIS_CORTO: Record<string, string> = {
+  CL: "Chile",
+  CO: "Colombia",
+  EC: "Ecuador",
+  PE: "Perú",
+};
+
+/** "MAR-JUE 17:00-18:00 (Chile)", o "—" si no se conoce el salón. */
+function horarioDe(s: Salon | null | undefined): string {
+  if (s === null || s === undefined) return "—";
+  return `${resumenHorario(s.horario)} (${PAIS_CORTO[s.pais] ?? s.pais})`;
+}
 
 const boton: CSSProperties = {
   padding: "0.5rem 1rem",
@@ -392,7 +408,8 @@ export function AcademicChangeModal(props: {
                     <option value="">— Elige el salón —</option>
                     {salonesElegibles.map((s) => (
                       <option key={s.id} value={s.id} disabled={s.ocupados >= s.cupo}>
-                        {s.campania} · {s.nombre} · {String(s.ocupados)}/{String(s.cupo)}
+                        {s.campania} · {s.nombre} · {horarioDe(s)} · {String(s.ocupados)}/
+                        {String(s.cupo)}
                         {s.ocupados >= s.cupo ? " (sin cupo)" : ""}
                         {s.sugerencia !== null &&
                           ` · va en ${s.sugerencia.nivel}${s.sugerencia.lecciones > 0 ? ` (${String(s.sugerencia.lecciones)} lecc.)` : ""}`}
@@ -527,6 +544,11 @@ export function AcademicChangeModal(props: {
                     "Salón",
                     actual.salon ?? "—",
                     opcion === "AJUSTE" ? (actual.salon ?? "—") : (salon?.nombre ?? "—"),
+                  ],
+                  [
+                    "Horario",
+                    horarioDe(salonActual),
+                    horarioDe(opcion === "AJUSTE" ? salonActual : salon),
                   ],
                   ...(conUbicacion
                     ? [

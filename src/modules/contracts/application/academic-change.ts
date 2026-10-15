@@ -6,6 +6,7 @@ import {
   listSalonesCandidatos,
   type NivelDeCurso,
   type PosicionActual,
+  type SalonCandidato,
 } from "../infrastructure/academico-repository";
 
 /**
@@ -31,6 +32,8 @@ export interface OpcionesAcademicas {
     cupo: number;
     ocupados: number;
     guia: string | null;
+    pais: string;
+    horario: SalonCandidato["horario"];
     /** En qué punto va el salón, ya traducido a ubicación de progresión. */
     sugerencia: { levelId: string; nivel: string; lecciones: number } | null;
   }[];
@@ -75,6 +78,8 @@ export async function opcionesAcademicas(contractId: string): Promise<OpcionesAc
         cupo: s.cupo,
         ocupados: s.ocupados,
         guia: s.guia,
+        pais: s.pais,
+        horario: s.horario,
         sugerencia:
           nivel === undefined
             ? null

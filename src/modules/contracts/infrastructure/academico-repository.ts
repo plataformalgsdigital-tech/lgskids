@@ -44,6 +44,10 @@ export interface SalonCandidato {
   cupo: number;
   ocupados: number;
   guia: string | null;
+  /** País del salón (su calendario de feriados): CL o el grupo Col/Ecu/Perú. */
+  pais: string;
+  /** Sus bloques regulares, en la hora de PARED del salón. */
+  horario: { tipo: string; diaSemana: number; horaLocal: string; duracionMin: number }[];
   /** Punto del programa en que va el salón: su última clase ya empezada. */
   puntoNivel: string | null;
   puntoPos: number | null;
@@ -63,6 +67,12 @@ export async function listSalonesCandidatos(): Promise<SalonCandidato[]> {
             (SELECT count(*)::int FROM enrollment_enrollment e
               WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA')) AS ocupados,
             COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''), g.username) AS guia,
+            cl.holiday_country AS pais,
+            COALESCE((SELECT json_agg(json_build_object(
+                        'tipo', sl.tipo, 'diaSemana', sl.dia_semana,
+                        'horaLocal', sl.hora_local, 'duracionMin', sl.duracion_min)
+                        ORDER BY sl.dia_semana, sl.hora_local)
+                        FROM scheduling_slot sl WHERE sl.classroom_id = cl.id), '[]'::json) AS horario,
             pt.nivel AS "puntoNivel", pt.pos::int AS "puntoPos", pt.total::int AS "puntoTotal"
        FROM scheduling_classroom cl
        JOIN catalog_course co ON co.id = cl.course_id

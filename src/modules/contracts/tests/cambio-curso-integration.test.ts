@@ -13,6 +13,7 @@ import {
   crearContrato,
   fichaContrato,
 } from "../application/gestion-contratos";
+import { opcionesAcademicas } from "../application/academic-change";
 
 /**
  * CAMBIO DE CURSO desde la ficha del contrato.
@@ -123,6 +124,15 @@ describe.runIf(RUN)("cambio de curso (integración)", () => {
     }
     await execute(`DELETE FROM catalog_campaign WHERE id = $1`, [campaniaId]);
     await closePool();
+  });
+
+  it("Academic Change ofrece cada salón con su horario y su país", async () => {
+    const op = await opcionesAcademicas(contractId);
+    const jr = op.salones.find((s) => s.id === salonJunior);
+    expect(jr?.pais).toBe("CO");
+    expect(jr?.horario).toEqual([
+      { tipo: "SESION", diaSemana: 2, horaLocal: "17:00", duracionMin: 60 },
+    ]);
   });
 
   it("exige el salón del curso nuevo cuando el niño está matriculado", async () => {

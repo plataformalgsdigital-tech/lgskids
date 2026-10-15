@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/ui/api-fetch";
+import { resumenHorario, type SlotResumen } from "@/ui/horario";
 import { numeroContrato } from "@/ui/numero-contrato";
 import { ColisionesCampania } from "./ColisionesCampania";
 
@@ -33,13 +34,6 @@ interface Detalle {
   finalVenta: string;
   estado: Estado;
   courses: Curso[];
-}
-
-interface SlotResumen {
-  tipo: string;
-  diaSemana: number;
-  horaLocal: string;
-  duracionMin: number;
 }
 
 interface Salon {
@@ -79,8 +73,6 @@ const ESTADO_CAMPANIA: Record<Estado, { texto: string; color: string; fondo: str
   ACTIVA: { texto: "Activa", color: "#1b5e20", fondo: "#e8f5e9" },
   CERRADA: { texto: "Inactiva", color: "#5a6172", fondo: "#eceff1" },
 };
-
-const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 /** Lo que devuelve el PREVIO del fin del programa (no escribe nada). */
 interface Impacto {
@@ -379,36 +371,6 @@ function ConfirmarFechas(props: {
       </div>
     </div>
   );
-}
-
-/** "17:00" + 60 min → "18:00" (reloj de pared, sin zona). */
-function horaFin(inicio: string, dur: number): string {
-  const [h, m] = inicio.split(":").map(Number);
-  const t = (h ?? 0) * 60 + (m ?? 0) + dur;
-  return `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
-}
-
-/** Agrupa por hora los días: "LUN-MIÉ 17:00-18:00 · SÁB 09:00-11:00 (Club)". */
-function resumenHorario(horario: SlotResumen[]): string {
-  if (horario.length === 0) return "—";
-  const porClave = new Map<string, { dias: number[]; dur: number; tipo: string }>();
-  for (const s of horario) {
-    const clave = `${s.horaLocal}|${s.tipo}`;
-    const g = porClave.get(clave) ?? { dias: [], dur: s.duracionMin, tipo: s.tipo };
-    g.dias.push(s.diaSemana);
-    porClave.set(clave, g);
-  }
-  return [...porClave.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([clave, g]) => {
-      const hora = clave.split("|")[0]!;
-      const etiquetas = g.dias
-        .sort((a, b) => a - b)
-        .map((d) => DIAS_CORTO[d]?.toUpperCase() ?? "?")
-        .join("-");
-      return `${etiquetas} ${hora}-${horaFin(hora, g.dur)}${g.tipo === "CLUB" ? " (Club)" : ""}`;
-    })
-    .join(" · ");
 }
 
 /** Quita el prefijo del tipo del nombre del salón ("JUNIOR Salón 01" → "Salón 01"). */

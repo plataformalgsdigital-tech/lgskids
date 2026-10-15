@@ -217,6 +217,11 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   (`/api/contracts/[id]/curso` con `ubicacion`); 2) **Ajuste**: otro nivel y/o
   lección en el mismo curso y salón (`POST /api/progression/children/[id]/ubicacion`),
   con **"Alinear con el salón"**. Siempre elegir → resumen antes/después → confirmar.
+  Cada salón destino se ofrece con su **horario y su país** ("MAR-JUE 17:00-18:00
+  (Chile)", hora de PARED del salón) y el resumen compara el horario de antes y el
+  de después (2026-10-15); el formato vive en `src/ui/horario.ts` (`resumenHorario`),
+  el mismo de la columna Horario de la ficha de campaña. No hay restricción por
+  país: un niño de Chile puede ir a un salón de Colombia (horario y feriados del salón).
   El modal NO escribe por su cuenta: cada opción usa el camino que ya cuida sus
   invariantes (reglas 4 y 5). Permiso `matriculas.gestionar` (cambiar de curso,
   además `contratos.gestionar`).
