@@ -76,6 +76,24 @@ del salón, nunca de una acción del estudiante.
   que siguen con el MISMO ENLACE (el nombre se corrige a menudo; el enlace no). Una
   columna que viene VACÍA sí borra: es lo que dice el archivo. Pruebas:
   `importacion-curso.test.ts` e `importacion-curso-integration.test.ts`.
+  **Codificación (2026-10-14)**: el Excel en español guarda "CSV (delimitado por
+  comas)" en ANSI (Windows-1252) y la pantalla lo leía como UTF-8, así que cada
+  tilde llegaba como "�" ("Evaluaci�n", "don�t"). `decodificarCsv` (`src/ui/csv.ts`)
+  prueba UTF-8 ESTRICTO y, si no lo es, decodifica Windows-1252 A MANO —el
+  `TextDecoder("windows-1252")` de Node es Latin-1 y pierde ’ “ ” –—; y un "�" que
+  ya venga dentro del archivo se rechaza antes de validar. **Sobrantes**: el previo
+  lista las lecciones GUARDADAS de los niveles del archivo que el archivo ya no trae
+  (`sobrantes`): la carga no las borra y siguen corriendo la lección de las
+  sesiones (así quedó una "Leccion 1" vacía en Junior·Rookie); se borran en
+  Referencia curricular. **Corrección en producción (2026-10-14)**, con respaldo en
+  `respaldo-catalogo-2026-10-14.json` (Descargas) y auditoría
+  `catalog.curso_referencia_corregida|eliminada` sin actor: se borró esa fila, se
+  quitaron los datos de EJEMPLO de Junior·Rookie·Leccion 0 (`wordwall.net/x`,
+  `materials/g1.pdf`…), se corrigieron "Evalucion" y las tildes, y **Ultimate
+  Stage**, que venía numerado desde la Leccion 26, empieza en la 1 en los dos cursos.
+  OJO: volver a subir el archivo VIEJO crearía de nuevo esas lecciones con su
+  nombre anterior (la clave es curso·nivel·unidad·lección); el previo las mostraría
+  como "Nueva" y las corregidas como sobrantes.
   **Separador autodetectado** (`detectarSeparador`
   cuenta `,` vs `;` SOLO en el encabezado: el Excel en español exporta con `;`) y
   `ULTIMATE STAGE` se acepta como `ULTIMATE`. Columnas obligatorias: **curso,

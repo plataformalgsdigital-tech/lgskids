@@ -189,6 +189,20 @@ export interface FilaValidada {
 export interface ValidacionImportacion {
   filas: FilaValidada[];
   resumen: { crear: number; actualizar: number; sinCambios: number; errores: number };
+  /**
+   * Lecciones GUARDADAS de los niveles que trae el archivo y que el archivo ya
+   * no tiene. La carga no las borra (lo que el CSV no trae, no se toca), así
+   * que siguen ocupando un puesto en la secuencia y corren la lección de las
+   * sesiones. Así quedó una "Leccion 1" vacía en Junior·Rookie (2026-10-14).
+   */
+  sobrantes: {
+    id: string;
+    curso: string;
+    nivel: string;
+    unidad: string | null;
+    leccion: string;
+    orden: number;
+  }[];
 }
 
 /** Como `normalizar`, pero lo que no vino queda `undefined`: no se toca. */
@@ -278,7 +292,34 @@ export async function validarImportacionCurso(
 ): Promise<ValidacionImportacion> {
   const plan = await planificar(filas);
   const validadas = plan.map((p) => p.fila);
-  return { filas: validadas, resumen: resumir(validadas) };
+  return { filas: validadas, resumen: resumir(validadas), sobrantes: await sobrantes(plan) };
+}
+
+async function sobrantes(
+  plan: { datos: FilaCsvCurso | null }[],
+): Promise<ValidacionImportacion["sobrantes"]> {
+  const enArchivo = new Set<string>();
+  const niveles = new Map<string, { curso: string; nivel: string }>();
+  for (const { datos } of plan) {
+    if (datos === null) continue;
+    enArchivo.add(claveLeccion(datos));
+    niveles.set(`${datos.curso}|${datos.nivel}`, { curso: datos.curso, nivel: datos.nivel });
+  }
+  const salida: ValidacionImportacion["sobrantes"] = [];
+  for (const filtro of niveles.values()) {
+    for (const r of await listCursoReferencia(filtro)) {
+      if (enArchivo.has(claveLeccion(r))) continue;
+      salida.push({
+        id: r.id,
+        curso: r.curso,
+        nivel: r.nivel,
+        unidad: r.unidad,
+        leccion: r.leccion,
+        orden: r.orden,
+      });
+    }
+  }
+  return salida;
 }
 
 /**

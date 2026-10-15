@@ -88,6 +88,14 @@ describe.runIf(RUN)("carga del catálogo Curso por CSV (integración)", () => {
     expect(despues?.video).toBe("https://v/1");
   });
 
+  it("AVISA de las lecciones guardadas del nivel que el archivo ya no trae", async () => {
+    const v = await validarImportacionCurso([fila(3, { contenido: "Tres" })]);
+    const propias = v.sobrantes.filter((s) => s.leccion.startsWith(`Prueba ${marca}`));
+    expect(propias.map((s) => s.leccion)).toEqual([leccion(1)]);
+    // Solo avisa: validar no borra nada.
+    expect(await leer(1)).not.toBeNull();
+  });
+
   it("es TODO o NADA: con una fila mala no se escribe ninguna", async () => {
     const filas = [fila(2, { contenido: "Dos" }), fila(2, { contenido: "Dos repetida" })];
     const v = await validarImportacionCurso(filas);

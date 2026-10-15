@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { decodificarCsv } from "@/ui/csv";
 
 /**
  * CARGA DEL CATÁLOGO CURSO POR CSV, en tres pasos:
@@ -31,6 +32,8 @@ const OPCIONALES = [
 ];
 
 const BOM = String.fromCharCode(0xfeff);
+/** El carácter con que queda una tilde mal leída ("Evaluaci�n"). */
+const REEMPLAZO = String.fromCharCode(0xfffd);
 /** El Excel en español guarda con BOM; la cabecera no debe arrastrarlo. */
 const sinBom = (t: string) => (t.startsWith(BOM) ? t.slice(1) : t);
 
@@ -75,6 +78,15 @@ interface FilaValidada {
   cambios: string[];
   avisos: string[];
   error: string | null;
+}
+/** Lección guardada de un nivel del archivo que el archivo ya no trae. */
+interface Sobrante {
+  id: string;
+  curso: string;
+  nivel: string;
+  unidad: string | null;
+  leccion: string;
+  orden: number;
 }
 interface Resumen {
   crear: number;
@@ -239,11 +251,13 @@ const boton = (activo: boolean, fondo: string): CSSProperties => ({
 
 export default function CargaCatalogoCursoPage() {
   const [archivo, setArchivo] = useState("");
+  const [ansi, setAnsi] = useState(false);
   const [errFormato, setErrFormato] = useState<string | null>(null);
   const [envio, setEnvio] = useState<FilaEnvio[]>([]);
   const [columnas, setColumnas] = useState<string[]>([]);
   const [filas, setFilas] = useState<FilaValidada[] | null>(null);
   const [resumen, setResumen] = useState<Resumen | null>(null);
+  const [sobrantes, setSobrantes] = useState<Sobrante[]>([]);
   const [validando, setValidando] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -254,6 +268,7 @@ export default function CargaCatalogoCursoPage() {
     setEnvio([]);
     setFilas(null);
     setResumen(null);
+    setSobrantes([]);
     setConfirmar(false);
   }
 
@@ -280,8 +295,13 @@ export default function CargaCatalogoCursoPage() {
         setErrFormato(await mensajeDeError(res, "No se pudo validar el archivo."));
         return;
       }
-      const data = (await res.json()) as { filas: FilaValidada[]; resumen: Resumen };
+      const data = (await res.json()) as {
+        filas: FilaValidada[];
+        resumen: Resumen;
+        sobrantes?: Sobrante[];
+      };
       const todas = [...data.filas, ...leido.malas].sort((a, b) => a.linea - b.linea);
+      setSobrantes(data.sobrantes ?? []);
       setEnvio(leido.envio);
       setFilas(todas);
       setResumen({ ...data.resumen, errores: data.resumen.errores + leido.malas.length });
@@ -299,9 +319,19 @@ export default function CargaCatalogoCursoPage() {
     e.target.value = ""; // para poder volver a elegir el MISMO archivo ya corregido
     if (!file) return;
     setArchivo(file.name);
-    const reader = new FileReader();
-    reader.onload = () => void validar(String(reader.result ?? ""));
-    reader.readAsText(file, "utf-8");
+    void file.arrayBuffer().then((bytes) => {
+      const { texto, ansi } = decodificarCsv(bytes);
+      setAnsi(ansi);
+      // Un "�" DENTRO del archivo es una tilde que ya se perdió antes (por
+      // ejemplo, al guardar una copia mal leída): cargarlo la escribiría así.
+      if (texto.includes(REEMPLAZO)) {
+        setErrFormato(
+          "El archivo tiene caracteres dañados (�) en lugar de tildes o apóstrofos. Corrígelos en el archivo antes de cargarlo.",
+        );
+        return;
+      }
+      void validar(texto);
+    });
   }
 
   async function cargar() {
@@ -414,6 +444,7 @@ export default function CargaCatalogoCursoPage() {
           <span style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
             {archivo}
             {validando && " — validando…"}
+            {ansi && " — guardado por Excel en ANSI: se leyó con sus tildes"}
           </span>
         )}
       </section>
@@ -469,6 +500,32 @@ export default function CargaCatalogoCursoPage() {
               La carga es <strong>todo o nada</strong>: corrige las filas con error en el archivo y
               vuelve a elegirlo.
             </p>
+          )}
+          {sobrantes.length > 0 && (
+            <div
+              role="note"
+              style={{
+                marginTop: "0.75rem",
+                padding: "0.7rem 0.9rem",
+                borderRadius: "0.6rem",
+                background: "#fff8e1",
+                border: "1px solid #f0c36d",
+                fontSize: "0.85rem",
+              }}
+            >
+              <strong>⚠ {sobrantes.length} lección(es) guardada(s) que este archivo no trae</strong>{" "}
+              — la carga NO las borra, y mientras sigan ahí ocupan un puesto en la secuencia del
+              curso y corren la lección que muestran las sesiones. Si sobran, bórralas en{" "}
+              <Link href="/panel/mantenimiento-cursos/referencia">Referencia curricular</Link>.
+              <ul style={{ margin: "0.4rem 0 0", paddingLeft: "1.2rem" }}>
+                {sobrantes.map((s) => (
+                  <li key={s.id}>
+                    {s.curso} · {s.nivel} · {s.unidad ?? "sin unidad"} · {s.leccion} (orden{" "}
+                    {s.orden})
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {resumen.errores === 0 && porEscribir === 0 && (
             <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem", marginTop: "0.6rem" }}>

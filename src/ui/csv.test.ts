@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { celdaCsv, textoCsv } from "./csv";
+import { celdaCsv, decodificarCsv, textoCsv } from "./csv";
 
 describe("CSV del panel", () => {
   it("separa con ; , empieza con BOM y escapa comillas y separadores", () => {
@@ -16,5 +16,19 @@ describe("CSV del panel", () => {
     expect(celdaCsv(-5)).toBe("-5");
     expect(celdaCsv(null)).toBe("");
     expect(celdaCsv(true)).toBe("sí");
+  });
+
+  it("lee el CSV en UTF-8 y, si no lo es, como el ANSI del Excel en español", () => {
+    const utf8 = new TextEncoder().encode("Evaluación;don’t");
+    expect(decodificarCsv(utf8)).toEqual({ texto: "Evaluación;don’t", ansi: false });
+    // "Evaluación;don’t" guardado por Excel en Windows-1252: ó = 0xF3, ’ = 0x92.
+    const ansi = Uint8Array.from([
+      ...new TextEncoder().encode("Evaluaci"),
+      0xf3,
+      ...new TextEncoder().encode("n;don"),
+      0x92,
+      0x74,
+    ]);
+    expect(decodificarCsv(ansi)).toEqual({ texto: "Evaluación;don’t", ansi: true });
   });
 });
