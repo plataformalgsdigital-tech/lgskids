@@ -11,6 +11,17 @@ import {
 } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
+import {
+  COLOR_NEUTRO,
+  SIN_FILTROS,
+  coloresPorCampania,
+  filtrarSesiones,
+  opcionesDeFiltros,
+  type AgendaSesion,
+  type FiltrosAgenda,
+} from "./agenda-comun";
+import { AgendaDia } from "./AgendaDia";
+import { FiltrosCalendario } from "./FiltrosCalendario";
 import { SesionModal } from "./SesionModal";
 import { NuevoEventoModal, type EventoEditable, type SalonOpcion } from "./NuevoEventoModal";
 import { WelcomeModal } from "./WelcomeModal";
@@ -87,21 +98,6 @@ interface WelcomeCal {
   nivel: string;
 }
 
-interface AgendaSesion {
-  id: string;
-  fecha: string;
-  horaLocal: string;
-  tipo: string;
-  numero: number;
-  classroomId: string;
-  salon: string;
-  cursoTipo: string;
-  campania: string;
-  cupo: number;
-  ocupados: number;
-  guia: string | null;
-}
-
 const MESES = [
   "enero",
   "febrero",
@@ -128,8 +124,10 @@ function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-const CELDA_ALTO = "6.5rem";
-const MAX_VISIBLE = 2;
+// Celdas grandes, como el calendario de LGS: cada evento es una tarjeta de
+// tres líneas (hora y salón · advisor · inscritos y asistencia).
+const CELDA_ALTO = "12rem";
+const MAX_VISIBLE = 3;
 
 /** "2026-07-08" → "miércoles, 8 de julio de 2026". */
 function fechaBonita(iso: string): string {
@@ -139,10 +137,33 @@ function fechaBonita(iso: string): string {
   return `${dias[f.getDay()]}, ${dd} de ${MESES[(mm ?? 1) - 1]} de ${yy}`;
 }
 
-/** Calendario mensual con las sesiones de TODOS los salones. */
-function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
+/**
+ * Calendario con las sesiones de TODOS los salones, en dos vistas que
+ * comparten datos y filtros: el MES (celdas con tarjetas) y la AGENDA de un
+ * día (por hora, como la de LGS).
+ */
+function CalendarioSalones({
+  salones,
+  modo,
+  onModo,
+}: {
+  salones: SalonOpcion[];
+  modo: "mes" | "dia";
+  onModo: (modo: "mes" | "dia") => void;
+}) {
   const [y, setY] = useState<number>(() => new Date().getFullYear());
   const [m, setM] = useState<number>(() => new Date().getMonth()); // 0-based
+  const [hoy] = useState(() => fechaLocal(new Date()));
+  const [dia, setDia] = useState(hoy);
+  const [filtros, setFiltros] = useState<FiltrosAgenda>(SIN_FILTROS);
+
+  /** La Agenda usa los datos del MES del día: moverse de mes los recarga. */
+  function irADia(fecha: string) {
+    const [yy, mm] = fecha.split("-").map(Number);
+    setDia(fecha);
+    setY(yy ?? y);
+    setM((mm ?? m + 1) - 1);
+  }
   const [sesiones, setSesiones] = useState<AgendaSesion[] | null>(null);
   // Eventos administrativos: se pintan en NARANJA, mezclados con las sesiones.
   const [eventosAdmin, setEventosAdmin] = useState<EventoAdmin[]>([]);
@@ -227,9 +248,40 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
     void cargar();
   }, [y, m, campaniaId, recarga]);
 
+  // FILTROS. Curso, Salón y Hora son de una sesión de salón: con alguno puesto,
+  // los Welcome y los eventos administrativos (que no son de un salón) se
+  // ocultan. Con Advisor quedan los Welcome de ese guía.
+  const sesionesFiltradas = useMemo(
+    () => filtrarSesiones(sesiones ?? [], filtros),
+    [sesiones, filtros],
+  );
+  const soloSalon = filtros.curso !== "" || filtros.salon !== "" || filtros.hora !== "";
+  const welcomesFiltrados = useMemo(
+    () => (soloSalon ? [] : welcomes.filter((w) => filtros.guia === "" || w.guia === filtros.guia)),
+    [welcomes, soloSalon, filtros.guia],
+  );
+  const adminsFiltrados = useMemo(
+    () => (soloSalon || filtros.guia !== "" ? [] : eventosAdmin),
+    [soloSalon, filtros.guia, eventosAdmin],
+  );
+  const opciones = useMemo(() => opcionesDeFiltros(sesiones ?? []), [sesiones]);
+  // Un color por campaña: la lista completa da colores estables al cambiar de mes.
+  const colores = useMemo(
+    () =>
+      coloresPorCampania([
+        ...campanias.map((c) => c.nombre),
+        ...(sesiones ?? []).map((s) => s.campania),
+      ]),
+    [campanias, sesiones],
+  );
+  const campaniasDelMes = useMemo(
+    () => [...new Set(sesionesFiltradas.map((s) => s.campania))].sort(),
+    [sesionesFiltradas],
+  );
+
   const welcomePorDia = useMemo(() => {
     const mapa = new Map<string, WelcomeCal[]>();
-    for (const w of welcomes) {
+    for (const w of welcomesFiltrados) {
       // Como el evento administrativo: la casilla sale del reloj de quien mira.
       const dia = fechaLocal(w.startsAt);
       const lista = mapa.get(dia) ?? [];
@@ -237,11 +289,11 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
       mapa.set(dia, lista);
     }
     return mapa;
-  }, [welcomes]);
+  }, [welcomesFiltrados]);
 
   const adminPorDia = useMemo(() => {
     const mapa = new Map<string, EventoAdmin[]>();
-    for (const e of eventosAdmin) {
+    for (const e of adminsFiltrados) {
       // Por el DÍA LOCAL del instante: la hora se pinta en el reloj de quien
       // mira, así que la casilla tiene que salir del mismo reloj.
       const dia = fechaLocal(e.startsAt);
@@ -250,17 +302,17 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
       mapa.set(dia, lista);
     }
     return mapa;
-  }, [eventosAdmin]);
+  }, [adminsFiltrados]);
 
   const porDia = useMemo(() => {
     const mapa = new Map<string, AgendaSesion[]>();
-    for (const s of sesiones ?? []) {
+    for (const s of sesionesFiltradas) {
       const lista = mapa.get(s.fecha) ?? [];
       lista.push(s);
       mapa.set(s.fecha, lista);
     }
     return mapa;
-  }, [sesiones]);
+  }, [sesionesFiltradas]);
 
   const diasMes = new Date(y, m + 1, 0).getDate();
   const offset = (new Date(y, m, 1).getDay() + 6) % 7; // lunes primero
@@ -285,230 +337,311 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
 
   return (
     <div style={{ marginTop: "1rem" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "0.75rem",
-          flexWrap: "wrap",
-          marginBottom: "0.75rem",
-        }}
-      >
-        <h2 style={{ fontSize: "1.2rem", margin: 0, textTransform: "capitalize" }}>
-          {MESES[m]} {y}
-        </h2>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <select
-            value={campaniaId}
-            onChange={(e) => setCampaniaId(e.target.value)}
-            style={{ ...inputStyle, padding: "0.4rem 0.6rem" }}
-          >
-            <option value="">Todas las campañas</option>
-            {campanias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => mover(-1)}
-            aria-label="Mes anterior"
-            style={{ ...inputStyle, cursor: "pointer" }}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={() => mover(1)}
-            aria-label="Mes siguiente"
-            style={{ ...inputStyle, cursor: "pointer" }}
-          >
-            ›
-          </button>
-        </div>
-      </div>
+      <FiltrosCalendario
+        campanias={campanias}
+        campaniaId={campaniaId}
+        onCampania={setCampaniaId}
+        filtros={filtros}
+        onFiltros={setFiltros}
+        opciones={opciones}
+      />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px" }}>
-        {DOW.map((d) => (
+      {modo === "dia" && (
+        <AgendaDia
+          fecha={dia}
+          onFecha={irADia}
+          hoy={hoy}
+          sesiones={(porDia.get(dia) ?? [])
+            .slice()
+            .sort((a, b) => a.horaLocal.localeCompare(b.horaLocal))}
+          welcomes={welcomePorDia.get(dia) ?? []}
+          admins={adminPorDia.get(dia) ?? []}
+          colores={colores}
+          cargando={sesiones === null}
+          onSesion={setSesionAbierta}
+          onWelcome={setWelcomeAbierto}
+          onAdmin={puedeEditarEventos ? (id) => void abrirEdicionAdmin(id) : null}
+        />
+      )}
+
+      {modo === "mes" && (
+        <>
           <div
-            key={d}
             style={{
-              padding: "0.4rem",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              color: "var(--texto-suave)",
-              textAlign: "center",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+              marginBottom: "0.75rem",
             }}
           >
-            {d}
-          </div>
-        ))}
-        {celdas.map((dia, i) => {
-          if (dia === null) {
-            return (
-              <div
-                key={`v${i}`}
-                style={{ height: CELDA_ALTO, background: "#fafbfe", borderRadius: "0.4rem" }}
-              />
-            );
-          }
-          const fecha = `${y}-${pad2(m + 1)}-${pad2(dia)}`;
-          const delDia = (porDia.get(fecha) ?? []).sort((a, b) =>
-            a.horaLocal.localeCompare(b.horaLocal),
-          );
-          const adminDelDia = adminPorDia.get(fecha) ?? [];
-          const welcomeDelDia = welcomePorDia.get(fecha) ?? [];
-          // Los administrativos y los Welcome van PRIMERO y no compiten por el
-          // cupo visible: son pocos, así que no deben quedar bajo "+N más".
-          const visibles = delDia.slice(
-            0,
-            Math.max(0, MAX_VISIBLE - adminDelDia.length - welcomeDelDia.length),
-          );
-          const ocultos = delDia.length - visibles.length;
-          return (
-            <div
-              key={fecha}
-              style={{
-                height: CELDA_ALTO,
-                border: "1px solid #edf0f6",
-                borderRadius: "0.4rem",
-                padding: "0.3rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.2rem",
-                overflow: "hidden",
-              }}
-            >
+            <h2 style={{ fontSize: "1.2rem", margin: 0, textTransform: "capitalize" }}>
+              {MESES[m]} {y}
+            </h2>
+            {/* Leyenda: el color de cada campaña del mes. */}
+            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", flex: "1 1 auto" }}>
+              {campaniasDelMes.map((c) => {
+                const color = colores.get(c) ?? COLOR_NEUTRO;
+                return (
+                  <span
+                    key={c}
+                    style={{
+                      background: color.bg,
+                      color: color.fg,
+                      borderLeft: `4px solid ${color.borde}`,
+                      padding: "0.1rem 0.5rem",
+                      borderRadius: "0.4rem",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {c}
+                  </span>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
               <button
                 type="button"
-                onClick={() => delDia.length > 0 && setDiaAbierto(fecha)}
-                title={delDia.length > 0 ? "Ver sesiones del día" : undefined}
+                onClick={() => mover(-1)}
+                aria-label="Mes anterior"
+                style={{ ...inputStyle, cursor: "pointer" }}
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={() => mover(1)}
+                aria-label="Mes siguiente"
+                style={{ ...inputStyle, cursor: "pointer" }}
+              >
+                ›
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px" }}>
+            {DOW.map((d) => (
+              <div
+                key={d}
                 style={{
-                  alignSelf: "flex-start",
-                  border: "none",
-                  background: "transparent",
-                  padding: 0,
+                  padding: "0.4rem",
                   fontSize: "0.78rem",
                   fontWeight: 700,
                   color: "var(--texto-suave)",
-                  cursor: delDia.length > 0 ? "pointer" : "default",
+                  textAlign: "center",
                 }}
               >
-                {dia}
-              </button>
-              {adminDelDia.map((e) => (
-                <button
-                  type="button"
-                  key={e.id}
-                  // Solo quien puede crearlos los abre para editar; el guía lo ve y punto.
-                  disabled={!puedeEditarEventos}
-                  onClick={() => void abrirEdicionAdmin(e.id)}
-                  title={`${e.titulo ?? "Evento administrativo"} · ${String(e.guias)} guías${e.observaciones !== null ? ` · ${e.observaciones}` : ""}${puedeEditarEventos ? " · clic para editar" : ""}`}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    font: "inherit",
-                    cursor: puedeEditarEventos ? "pointer" : "default",
-                    background: "#fff3e0",
-                    color: "#e65100",
-                    border: "1px solid #ffcc80",
-                    borderRadius: "0.35rem",
-                    padding: "0.15rem 0.35rem",
-                    fontSize: "0.68rem",
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  🏛️ {horaLocal(e.startsAt)} {e.titulo ?? "Administrativo"}
-                </button>
-              ))}
-              {welcomeDelDia.map((w) => (
-                <button
-                  type="button"
-                  key={w.id}
-                  onClick={() => setWelcomeAbierto(w.id)}
-                  title={`Welcome · ${w.guia} · ${String(w.inscritos)}/${String(w.limiteUsuarios)} niños · ${w.nivel}`}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    font: "inherit",
-                    cursor: "pointer",
-                    background: "#e8f5e9",
-                    color: "#1b5e20",
-                    border: "1px solid #a5d6a7",
-                    borderRadius: "0.35rem",
-                    padding: "0.15rem 0.35rem",
-                    fontSize: "0.68rem",
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  👋 {horaLocal(w.startsAt)} Welcome {w.inscritos}/{w.limiteUsuarios}
-                </button>
-              ))}
-              {visibles.map((s) => {
-                const color = COLOR_CURSO[s.cursoTipo] ?? { bg: "#eceff1", fg: "#37474f" };
+                {d}
+              </div>
+            ))}
+            {celdas.map((nDia, i) => {
+              if (nDia === null) {
                 return (
-                  <button
-                    type="button"
-                    key={s.id}
-                    onClick={() => setSesionAbierta(s.id)}
-                    title={`${s.horaLocal} · ${s.cursoTipo} · ${s.salon} · ${s.ocupados}/${s.cupo}`}
+                  <div
+                    key={`v${i}`}
+                    style={{ minHeight: CELDA_ALTO, background: "#fafbfe", borderRadius: "0.4rem" }}
+                  />
+                );
+              }
+              const fecha = `${y}-${pad2(m + 1)}-${pad2(nDia)}`;
+              const delDia = (porDia.get(fecha) ?? []).sort((a, b) =>
+                a.horaLocal.localeCompare(b.horaLocal),
+              );
+              const adminDelDia = adminPorDia.get(fecha) ?? [];
+              const welcomeDelDia = welcomePorDia.get(fecha) ?? [];
+              // Los administrativos y los Welcome van PRIMERO y no compiten por el
+              // cupo visible: son pocos, así que no deben quedar bajo "+N más".
+              const visibles = delDia.slice(
+                0,
+                Math.max(0, MAX_VISIBLE - adminDelDia.length - welcomeDelDia.length),
+              );
+              const ocultos = delDia.length - visibles.length;
+              return (
+                <div
+                  key={fecha}
+                  style={{
+                    minHeight: CELDA_ALTO,
+                    border: "1px solid #edf0f6",
+                    borderRadius: "0.4rem",
+                    padding: "0.3rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.25rem",
+                    overflow: "hidden",
+                    background: fecha === hoy ? "#f5f9ff" : "white",
+                  }}
+                >
+                  <div
                     style={{
-                      width: "100%",
-                      textAlign: "left",
-                      border: "none",
-                      font: "inherit",
-                      cursor: "pointer",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => delDia.length > 0 && setDiaAbierto(fecha)}
+                      title={delDia.length > 0 ? "Ver sesiones del día" : undefined}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        fontSize: "0.85rem",
+                        fontWeight: 800,
+                        color: fecha === hoy ? "var(--lgs-azul)" : "var(--texto-suave)",
+                        cursor: delDia.length > 0 ? "pointer" : "default",
+                      }}
+                    >
+                      {nDia}
+                    </button>
+                    {/* Total del día, como en LGS: abre la Agenda de ese día. */}
+                    {delDia.length + adminDelDia.length + welcomeDelDia.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          irADia(fecha);
+                          onModo("dia");
+                        }}
+                        title="Ver la agenda del día"
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          padding: 0,
+                          fontSize: "0.72rem",
+                          color: "var(--texto-suave)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {delDia.length + adminDelDia.length + welcomeDelDia.length}
+                      </button>
+                    )}
+                  </div>
+                  {adminDelDia.map((e) => (
+                    <button
+                      type="button"
+                      key={e.id}
+                      // Solo quien puede crearlos los abre para editar; el guía lo ve y punto.
+                      disabled={!puedeEditarEventos}
+                      onClick={() => void abrirEdicionAdmin(e.id)}
+                      title={`${e.titulo ?? "Evento administrativo"} · ${String(e.guias)} guías${e.observaciones !== null ? ` · ${e.observaciones}` : ""}${puedeEditarEventos ? " · clic para editar" : ""}`}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        font: "inherit",
+                        cursor: puedeEditarEventos ? "pointer" : "default",
+                        background: "#fff3e0",
+                        color: "#e65100",
+                        border: "1px solid #ffcc80",
+                        borderRadius: "0.35rem",
+                        padding: "0.15rem 0.35rem",
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      🏛️ {horaLocal(e.startsAt)} {e.titulo ?? "Administrativo"}
+                    </button>
+                  ))}
+                  {welcomeDelDia.map((w) => (
+                    <button
+                      type="button"
+                      key={w.id}
+                      onClick={() => setWelcomeAbierto(w.id)}
+                      title={`Welcome · ${w.guia} · ${String(w.inscritos)}/${String(w.limiteUsuarios)} niños · ${w.nivel}`}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        font: "inherit",
+                        cursor: "pointer",
+                        background: "#e8f5e9",
+                        color: "#1b5e20",
+                        border: "1px solid #a5d6a7",
+                        borderRadius: "0.35rem",
+                        padding: "0.15rem 0.35rem",
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      👋 {horaLocal(w.startsAt)} Welcome {w.inscritos}/{w.limiteUsuarios}
+                    </button>
+                  ))}
+                  {visibles.map((s) => {
+                    // El color es de la CAMPAÑA (leyenda arriba); el curso va en el texto.
+                    const color = colores.get(s.campania) ?? COLOR_NEUTRO;
+                    const linea: CSSProperties = {
                       display: "block",
-                      background: color.bg,
-                      color: color.fg,
-                      borderRadius: "0.35rem",
-                      padding: "0.15rem 0.35rem",
-                      fontSize: "0.72rem",
-                      fontWeight: 600,
-                      textDecoration: "none",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                    }}
-                  >
-                    {s.horaLocal} {s.tipo === "CLUB" ? "Club " : ""}
-                    {s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"} · {s.salon}
-                  </button>
-                );
-              })}
-              {ocultos > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setDiaAbierto(fecha)}
-                  style={{
-                    alignSelf: "flex-start",
-                    border: "none",
-                    background: "transparent",
-                    padding: 0,
-                    fontSize: "0.7rem",
-                    fontWeight: 700,
-                    color: "var(--lgs-azul)",
-                    cursor: "pointer",
-                  }}
-                >
-                  +{ocultos} más
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                    };
+                    return (
+                      <button
+                        type="button"
+                        key={s.id}
+                        onClick={() => setSesionAbierta(s.id)}
+                        title={`${s.campania} · ${s.horaLocal} · ${s.cursoTipo} · ${s.salon} · ${s.guia ?? "sin guía"} · ${s.ocupados}/${s.cupo}`}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          border: "none",
+                          borderLeft: `3px solid ${color.borde}`,
+                          font: "inherit",
+                          cursor: "pointer",
+                          display: "block",
+                          background: color.bg,
+                          color: color.fg,
+                          borderRadius: "0.35rem",
+                          padding: "0.15rem 0.35rem",
+                          fontSize: "0.72rem",
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        <span style={{ ...linea, fontWeight: 800 }}>
+                          {s.horaLocal}{" "}
+                          {s.tipo === "CLUB" ? "Club " : s.tipo === "TALLER" ? "Taller " : ""}
+                          {s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"} · {s.salon}
+                        </span>
+                        <span style={{ ...linea, opacity: 0.85 }}>{s.guia ?? "Sin guía"}</span>
+                        <span style={{ ...linea, opacity: 0.85 }}>
+                          👥 {s.ocupados}/{s.cupo} · ✓ {s.asistieron}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {ocultos > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDiaAbierto(fecha)}
+                      style={{
+                        alignSelf: "flex-start",
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        fontSize: "0.7rem",
+                        fontWeight: 700,
+                        color: "var(--lgs-azul)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      +{ocultos} más
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-      {sesiones === null && (
-        <p style={{ marginTop: "0.75rem", color: "var(--texto-suave)" }}>Cargando agenda…</p>
+          {sesiones === null && (
+            <p style={{ marginTop: "0.75rem", color: "var(--texto-suave)" }}>Cargando agenda…</p>
+          )}
+        </>
       )}
 
       {diaAbierto !== null && (
@@ -550,14 +683,27 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
               <h3 style={{ margin: 0, fontSize: "1.05rem", textTransform: "capitalize" }}>
                 {fechaBonita(diaAbierto)}
               </h3>
-              <button
-                type="button"
-                onClick={() => setDiaAbierto(null)}
-                aria-label="Cerrar"
-                style={{ ...inputStyle, cursor: "pointer", padding: "0.3rem 0.6rem" }}
-              >
-                ✕
-              </button>
+              <div style={{ display: "flex", gap: "0.4rem" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    irADia(diaAbierto);
+                    setDiaAbierto(null);
+                    onModo("dia");
+                  }}
+                  style={{ ...inputStyle, cursor: "pointer", padding: "0.3rem 0.6rem" }}
+                >
+                  📋 Ver en Agenda
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiaAbierto(null)}
+                  aria-label="Cerrar"
+                  style={{ ...inputStyle, cursor: "pointer", padding: "0.3rem 0.6rem" }}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <p style={{ margin: "0 0 0.75rem", color: "var(--texto-suave)", fontSize: "0.85rem" }}>
               {(porDia.get(diaAbierto) ?? []).length} sesiones
@@ -568,6 +714,8 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
                 .sort((a, b) => a.horaLocal.localeCompare(b.horaLocal))
                 .map((s) => {
                   const color = COLOR_CURSO[s.cursoTipo] ?? { bg: "#eceff1", fg: "#37474f" };
+                  // Cada CAMPAÑA con su color: la caja entera y su chip.
+                  const cc = colores.get(s.campania) ?? COLOR_NEUTRO;
                   return (
                     <button
                       type="button"
@@ -585,10 +733,13 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
                         justifyContent: "space-between",
                         gap: "0.6rem",
                         padding: "0.55rem 0.75rem",
-                        border: "1px solid #edf0f6",
+                        background: cc.bg,
+                        border: `1px solid ${cc.borde}55`,
+                        borderLeft: `5px solid ${cc.borde}`,
                         borderRadius: "0.6rem",
                         textDecoration: "none",
                         color: "inherit",
+                        textAlign: "left",
                       }}
                     >
                       <span>
@@ -596,8 +747,8 @@ function CalendarioSalones({ salones }: { salones: SalonOpcion[] }) {
                             todas, así que sin ella la fila no dice a cuál va. */}
                         <span
                           style={{
-                            background: "#eef2ff",
-                            color: "#3730a3",
+                            background: "white",
+                            color: cc.fg,
                             padding: "0.1rem 0.45rem",
                             borderRadius: "0.5rem",
                             fontSize: "0.72rem",
@@ -715,7 +866,7 @@ export default function SalonesPage() {
   ]);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [vista, setVista] = useState<"calendario" | "lista">("calendario");
+  const [vista, setVista] = useState<"calendario" | "agenda" | "lista">("calendario");
   // Crear eventos tiene permiso PROPIO: no basta con ver el calendario.
   const [puedeCrearEventos, setPuedeCrearEventos] = useState(false);
   // Crear salones es de coordinación: el guía no debe ver el botón.
@@ -828,7 +979,11 @@ export default function SalonesPage() {
   }
 
   return (
-    <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
+    // El calendario y la Agenda usan el ancho disponible: las celdas del mes
+    // llevan tarjetas de tres líneas.
+    <main
+      style={{ padding: "2rem", maxWidth: vista === "lista" ? "64rem" : "96rem", margin: "0 auto" }}
+    >
       <div
         style={{
           display: "flex",
@@ -848,7 +1003,7 @@ export default function SalonesPage() {
               overflow: "hidden",
             }}
           >
-            {(["calendario", "lista"] as const).map((v) => (
+            {(["calendario", "agenda", "lista"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setVista(v)}
@@ -861,7 +1016,11 @@ export default function SalonesPage() {
                   cursor: "pointer",
                 }}
               >
-                {v === "calendario" ? "📅 Calendario" : "Lista de salones"}
+                {v === "calendario"
+                  ? "📅 Calendario"
+                  : v === "agenda"
+                    ? "📋 Agenda"
+                    : "Lista de salones"}
               </button>
             ))}
           </div>
@@ -917,8 +1076,15 @@ export default function SalonesPage() {
       </div>
 
       {/* La llave cambia al crear un evento: así el mes se vuelve a cargar. */}
-      {vista === "calendario" && (
-        <CalendarioSalones key={versionCalendario} salones={salones ?? []} />
+      {/* Mes y Agenda son el MISMO componente: cambiar de vista conserva los
+          filtros y los datos cargados. */}
+      {vista !== "lista" && (
+        <CalendarioSalones
+          key={versionCalendario}
+          salones={salones ?? []}
+          modo={vista === "agenda" ? "dia" : "mes"}
+          onModo={(m) => setVista(m === "dia" ? "agenda" : "calendario")}
+        />
       )}
 
       {vista === "lista" && mostrarForm && (

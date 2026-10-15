@@ -502,6 +502,16 @@ export interface AgendaItem {
   cupo: number;
   ocupados: number;
   guia: string | null;
+  /** El guía EFECTIVO de la sesión (para filtrar por advisor). */
+  guiaUserId: string | null;
+  /** El INSTANTE: con él se muestra la hora de Chile y la de Colombia. */
+  startsAt: string;
+  /** País del salón (su calendario de feriados). */
+  pais: string;
+  meetingUrl: string | null;
+  /** Niños marcados PRESENTE. */
+  asistieron: number;
+  cerrada: boolean;
 }
 
 /**
@@ -529,9 +539,13 @@ export async function agendaSesiones(
             s.tipo::text AS tipo, s.numero,
             cl.id AS "classroomId", cl.nombre AS salon, cl.cupo,
             cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
-            ${NOMBRE_GUIA} AS guia,
+            ${NOMBRE_GUIA} AS guia, gu.id AS "guiaUserId",
+            s.starts_at AS "startsAt", cl.holiday_country AS pais,
+            cl.meeting_url AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
             (SELECT count(*) FROM enrollment_enrollment e
-              WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA'))::int AS ocupados
+              WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA'))::int AS ocupados,
+            (SELECT count(*) FROM attendance_attendance a
+              WHERE a.session_id = s.id AND a.estado = 'PRESENTE')::int AS asistieron
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course cu ON cu.id = cl.course_id

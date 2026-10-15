@@ -1546,6 +1546,26 @@ solo servía para completar la ficha.
 
 - `/panel/salones` se renombró a **/panel/calendario**; `next.config.ts` mantiene
   redirecciones permanentes, incluidas las de detalle y sesión.
+- **Calendario · Agenda · Lista (2026-10-15, como la Agenda de LGS)**: el mes y la
+  **Agenda** del día son el MISMO componente (`CalendarioSalones` con `modo`), así que
+  comparten datos y filtros. Filtros **Campaña** (va al servidor), **Curso, Salón,
+  Advisor y Hora** (en pantalla, cada uno con "Todos"; `FiltrosCalendario.tsx` y
+  `agenda-comun.ts`). La Hora es la de PARED del salón, la que se ve en las celdas.
+  Con Curso/Salón/Hora puestos se ocultan Welcome y administrativos (no son de un
+  salón); con Advisor quedan los Welcome de ese guía. Las celdas del mes son más
+  grandes (tarjetas de tres líneas: hora y salón · advisor · inscritos y asistieron,
+  con el total del día que abre su Agenda) y cada **campaña tiene su color**
+  (`coloresPorCampania`, por su puesto en la lista ordenada: dos campañas no lo
+  comparten), también en el detalle del día. La **Agenda** (`AgendaDia.tsx`) agrupa
+  por hora, con contadores (total, sesiones, clubs, talleres, Welcome,
+  administrativos), tarjetas con tipo, campaña, advisor, inscritos, asistieron, Zoom
+  y la hora de Chile y de Colombia, y descarga CSV. `agendaSesiones` ganó
+  `guiaUserId` (efectivo), `startsAt`, `pais`, `meetingUrl`, `asistieron` y `cerrada`.
+- **La ventana del evento dice la hora de Chile Y la de Colombia/Ecuador/Perú**
+  (`src/ui/hora-paises.ts`, `referenciaHoraria`, desde el INSTANTE con la base IANA:
+  el desfase cambia en el año), con la del país del salón en negrita. Antes salía
+  una sola hora, la del navegador: una sesión de las 17:00 de un salón chileno se
+  leía "15:00" desde Colombia sin decir de qué país era. El Welcome también la muestra.
 - Un evento abre **MODAL** (`calendario/SesionModal.tsx`), no una página. El nombre
   del guía SIEMPRE se ve; "Cambiar guía" y "Suspender" solo con `salones.gestionar`.
   **Encabezado (2026-10-02)**: a la izquierda `CAMPAÑA · CURSO · Salón NN`, a la

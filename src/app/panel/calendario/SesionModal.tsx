@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ZONA_CHILE, referenciaHoraria } from "@/ui/hora-paises";
 import { ReportarCasoModal } from "../servicio/casos-atencion/ReportarCasoModal";
 import { CancelacionSesion } from "./CancelacionSesion";
 import type { EventoEditable } from "./NuevoEventoModal";
@@ -18,6 +19,28 @@ import type { EventoEditable } from "./NuevoEventoModal";
  * (`POST /api/attendance/sessions/[id]`), que es el que dispara la progresión.
  * No se abre un segundo camino de escritura (regla 4).
  */
+
+/**
+ * La hora de la sesión en Chile Y en Colombia/Ecuador/Perú, con la del país
+ * del salón en negrita. Antes salía una sola hora, la del navegador de quien
+ * miraba: una sesión de las 17:00 de un salón chileno se leía "15:00" desde
+ * Colombia, sin decir de qué país era esa hora.
+ */
+function HoraDosPaises({ startsAt, timezone }: { startsAt: string; timezone: string }) {
+  const { chile, colombia } = referenciaHoraria(startsAt);
+  const esChile = timezone === ZONA_CHILE;
+  return (
+    <span>
+      🕐 <strong>Hora:</strong>{" "}
+      <span style={{ fontWeight: esChile ? 800 : 400 }}>{chile} Chile</span> ·{" "}
+      <span style={{ fontWeight: esChile ? 400 : 800 }}>{colombia} Colombia/Ecuador/Perú</span>
+      <span style={{ color: "var(--texto-suave)", fontSize: "0.78rem" }}>
+        {" "}
+        (en negrita, la del salón)
+      </span>
+    </span>
+  );
+}
 
 type EstadoAsistencia = "PRESENTE" | "AUSENTE" | "JUSTIFICADO";
 
@@ -706,13 +729,7 @@ export function SesionModal({
                     year: "numeric",
                   })}
                 </span>
-                <span>
-                  🕐 <strong>Hora:</strong>{" "}
-                  {new Date(sesion.startsAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
+                <HoraDosPaises startsAt={sesion.startsAt} timezone={sesion.timezone} />
                 <span>
                   👥 <strong>Cupo:</strong> {sesion.cupo} · <strong>Inscritos:</strong>{" "}
                   {lista.length}

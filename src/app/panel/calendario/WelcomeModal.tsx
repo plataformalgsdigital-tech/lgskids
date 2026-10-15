@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { horaLocal } from "@/ui/fecha-local";
+import { referenciaHoraria } from "@/ui/hora-paises";
 import type { EventoEditable } from "./NuevoEventoModal";
 
 /**
@@ -227,6 +228,10 @@ export function WelcomeModal({
                 {fila(
                   "Cuándo",
                   `${new Date(welcome.startsAt).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${horaLocal(welcome.startsAt)} (tu hora) · ${String(welcome.duracionMin)} min`,
+                )}
+                {fila(
+                  "Hora por país",
+                  `${referenciaHoraria(welcome.startsAt).chile} Chile · ${referenciaHoraria(welcome.startsAt).colombia} Colombia/Ecuador/Perú`,
                 )}
                 {fila("Guía", welcome.guia)}
                 {fila("Campaña", welcome.campania ?? "Todas")}

@@ -126,6 +126,11 @@ describe.runIf(RUN)("cambio de guía (integración)", () => {
     for (const s of dia) {
       expect(s.guia).toBe("Ana Titular");
       expect(s.campania).toContain("IT Guia");
+      // Lo que usan la Agenda y los filtros: guía, instante, país y asistencia.
+      expect(s.guiaUserId).toBe(titular);
+      expect(s.startsAt).toBeTruthy();
+      expect(s.pais).toMatch(/^[A-Z]{2}$/);
+      expect(s.asistieron).toBe(0);
     }
 
     const salones = (await listarSalones(courseId)).filter((s) => s.id === classroomId);
