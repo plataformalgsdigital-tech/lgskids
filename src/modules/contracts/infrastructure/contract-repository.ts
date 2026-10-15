@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { condicionesPorPalabras } from "@/platform/db/busqueda";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
 import { SQL_CONTRATO_VENCIDO } from "../domain/vigencia";
@@ -449,11 +450,36 @@ export async function listContracts(params: {
   matriculaEstado?: string;
   inicioDesde?: string;
   finalHasta?: string;
+  /**
+   * Texto libre POR PALABRAS: nombre o documento del beneficiario o del
+   * titular, usuario del niño, N° de LGS (sin sufijo trae a los hermanos) o
+   * N° interno exacto. La misma regla que el buscador de Kids.
+   */
+  buscar?: string;
   limit: number;
   offset: number;
 }): Promise<ContractListItem[]> {
   const where: string[] = [];
   const values: unknown[] = [];
+  if (params.buscar !== undefined && params.buscar.trim() !== "") {
+    condicionesPorPalabras(
+      params.buscar,
+      {
+        columnas: [
+          "b.nombres",
+          "b.apellidos",
+          "t.nombres",
+          "t.apellidos",
+          "u.username",
+          "c.external_ref",
+        ],
+        exactas: ["c.numero::text"],
+        documentos: ["b.doc_numero", "t.doc_numero"],
+      },
+      where,
+      values,
+    );
+  }
   if (params.matriculaEstado !== undefined) {
     values.push(params.matriculaEstado);
     where.push(`e.estado = $${values.length}::enrollment_estado`);

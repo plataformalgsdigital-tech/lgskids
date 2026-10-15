@@ -1110,11 +1110,13 @@ export async function listarContratos(params: {
   matriculaEstado?: string;
   inicioDesde?: string;
   finalHasta?: string;
+  buscar?: string;
   limit?: number;
   offset?: number;
 }): Promise<ContractListItem[]> {
   return listContracts({
     countryScope: params.countryScope,
+    ...(params.buscar !== undefined && { buscar: params.buscar }),
     ...(params.matriculaEstado !== undefined && { matriculaEstado: params.matriculaEstado }),
     ...(params.estado !== undefined && { estado: params.estado }),
     ...(params.pais !== undefined && { pais: params.pais }),

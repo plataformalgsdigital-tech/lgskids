@@ -159,6 +159,11 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   distinguen por el sufijo `#documento`—, y cada tarjeta actúa sobre SU contrato
   (aprobar, matricular, cambiar salón, cambiar curso, pausar/reactivar,
   inactivar).
+  **Buscar (2026-10-15)**: la lista tiene un campo "Buscar" (`GET /api/contracts?buscar=`)
+  que busca POR PALABRAS en el nombre y el documento del niño Y del titular, el
+  usuario, el N° de LGS (sin sufijo trae a los hermanos) y el N° interno exacto. La
+  regla es la del buscador de Kids, que pasó a `src/platform/db/busqueda.ts`
+  (`condicionesPorPalabras`): `contracts` no puede importar de `people` (ciclo).
   **CAMBIO DE CURSO** (`POST /api/contracts/[id]/curso` → `cambiarCursoContrato`):
   cambia `tipo_curso` del contrato **Y** mueve la matrícula en UNA transacción —de
   quedar en cursos distintos, el siguiente cambio de salón lo rechazaría

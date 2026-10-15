@@ -106,6 +106,8 @@ const listarSchema = z.object({
   matriculaEstado: z.enum(["ACTIVA", "RESERVADA"]).optional(),
   inicioDesde: ISO_DATE_OPT,
   finalHasta: ISO_DATE_OPT,
+  /** Nombre, documento, usuario o N° de contrato (por palabras). */
+  buscar: z.string().max(80).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -144,6 +146,7 @@ export const listarContratosHandler = handlerWithAuth(async (request, auth) => {
     ...(query.matriculaEstado !== undefined && { matriculaEstado: query.matriculaEstado }),
     ...(query.inicioDesde !== undefined && { inicioDesde: query.inicioDesde }),
     ...(query.finalHasta !== undefined && { finalHasta: query.finalHasta }),
+    ...(query.buscar !== undefined && { buscar: query.buscar }),
     limit: query.limit,
     offset: query.offset,
   });

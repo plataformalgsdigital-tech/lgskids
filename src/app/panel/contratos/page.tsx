@@ -108,9 +108,19 @@ export default function ContratosPage() {
   const [fSalonId, setFSalonId] = useState("");
   const [fInicioDesde, setFInicioDesde] = useState("");
   const [fFinalHasta, setFFinalHasta] = useState("");
+  // Lo que se escribe y lo que se consulta: se espera a que deje de escribir
+  // para no pedir la lista en cada tecla.
+  const [fBuscar, setFBuscar] = useState("");
+  const [buscar, setBuscar] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setBuscar(fBuscar.trim()), 400);
+    return () => clearTimeout(t);
+  }, [fBuscar]);
 
   const cargarContratos = useCallback(async () => {
     const p = new URLSearchParams();
+    if (buscar) p.set("buscar", buscar);
     if (fEstado) p.set("estado", fEstado);
     if (fPais) p.set("pais", fPais);
     if (fTipoCurso) p.set("tipoCurso", fTipoCurso);
@@ -124,7 +134,7 @@ export default function ContratosPage() {
       const data: { contratos: Contrato[] } = await res.json();
       setContratos(data.contratos);
     }
-  }, [fEstado, fPais, fTipoCurso, fCampaniaId, fSalonId, fInicioDesde, fFinalHasta]);
+  }, [buscar, fEstado, fPais, fTipoCurso, fCampaniaId, fSalonId, fInicioDesde, fFinalHasta]);
 
   useEffect(() => {
     async function run() {
@@ -272,6 +282,19 @@ export default function ContratosPage() {
           alignItems: "flex-end",
         }}
       >
+        <label
+          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 100%" }}
+        >
+          <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Buscar</span>
+          <input
+            type="search"
+            value={fBuscar}
+            onChange={(e) => setFBuscar(e.target.value)}
+            placeholder="Nombre del niño o del titular, ID (documento), usuario o N° de contrato"
+            maxLength={80}
+            style={inputStyle}
+          />
+        </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Contrato (estado)</span>
           <select value={fEstado} onChange={(e) => setFEstado(e.target.value)} style={inputStyle}>
@@ -358,7 +381,8 @@ export default function ContratosPage() {
             style={inputStyle}
           />
         </label>
-        {(fEstado ||
+        {(fBuscar ||
+          fEstado ||
           fPais ||
           fTipoCurso ||
           fCampaniaId ||
@@ -367,6 +391,7 @@ export default function ContratosPage() {
           fFinalHasta) && (
           <button
             onClick={() => {
+              setFBuscar("");
               setFEstado("");
               setFPais("");
               setFTipoCurso("");

@@ -7,7 +7,11 @@ import { crearSalon, welcomeDeNino } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
-import { aprobarContrato, crearReservaBeneficiario } from "../application/gestion-contratos";
+import {
+  aprobarContrato,
+  crearReservaBeneficiario,
+  listarContratos,
+} from "../application/gestion-contratos";
 import {
   completarPerfilNino,
   fichaPorEnlacePerfil,
@@ -157,6 +161,21 @@ describe.runIf(RUN)("hermanos y perfil sin Welcome (integración)", () => {
     // El documento se encuentra escrito con guiones o sin ellos.
     const porDoc = await listarNinos({ countryScope: null, buscar: `HB${marca}`, limit: 50 });
     expect(porDoc.map((n) => n.nombres)).toEqual(["Beto"]);
+  });
+
+  it("Contratos busca igual: por N° de LGS, por el TITULAR y por el documento del niño", async () => {
+    const nombres = (cs: { beneficiario: string }[]) =>
+      cs.map((c) => c.beneficiario.split(" ")[0]).sort();
+    const porContrato = await listarContratos({ countryScope: null, buscar: base });
+    expect(nombres(porContrato)).toEqual(["Ana", "Beto"]);
+    // El nombre del titular trae los contratos de sus dos hijos, sin tildes.
+    const porTitular = await listarContratos({
+      countryScope: null,
+      buscar: `mama hermanos${marca}`,
+    });
+    expect(nombres(porTitular)).toEqual(["Ana", "Beto"]);
+    const porDoc = await listarContratos({ countryScope: null, buscar: `HA${marca}` });
+    expect(nombres(porDoc)).toEqual(["Ana"]);
   });
 
   it("aprobar sin WhatsApp no manda el enlace de perfil", async () => {

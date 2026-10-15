@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { condicionesPorPalabras } from "@/platform/db/busqueda";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
 import type { PersonInput, PersonListItem, PersonRecord } from "../application/ports";
@@ -99,25 +100,6 @@ const ES_NINO = `(EXISTS (SELECT 1 FROM people_guardianship g WHERE g.nino_id = 
  * tiene matrícula viva — su campaña, curso y salón.
  * Alcance por país (ADR-0009) + filtros de la sección Kids.
  */
-/** La columna en minúsculas y sin tildes, para comparar con lo que se escribe. */
-const SIN_TILDES = (col: string) =>
-  `translate(lower(${col}), 'áéíóúàèìòùäëïöüâêîôûñ', 'aeiouaeiouaeiouaeioun')`;
-
-/**
- * Las palabras de una búsqueda, en minúsculas y sin tildes, más su forma de
- * DOCUMENTO (solo letras y números, en mayúsculas). Hasta 5: más es ruido.
- */
-function palabrasDeBusqueda(texto: string): { texto: string; doc: string }[] {
-  return texto
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((p) => p !== "")
-    .slice(0, 5)
-    .map((p) => ({ texto: p, doc: p.toUpperCase().replace(/[^A-Z0-9]/g, "") }));
-}
-
 export async function listNinos(params: {
   countryScope: string[] | null;
   id?: string;
@@ -148,21 +130,16 @@ export async function listNinos(params: {
     // Así "elysa acevedo" y "acevedo elysa" encuentran a la misma niña, y el N°
     // de LGS sin sufijo trae a TODOS los hermanos de ese contrato. Sin tildes ni
     // mayúsculas, y el documento sin puntos ni guiones.
-    for (const palabra of palabrasDeBusqueda(params.buscar)) {
-      values.push(`%${palabra.texto}%`);
-      const t = String(values.length);
-      values.push(palabra.texto);
-      const exacto = String(values.length);
-      values.push(palabra.doc === "" ? null : `%${palabra.doc}%`);
-      const d = String(values.length);
-      where.push(
-        `(${SIN_TILDES("p.nombres")} LIKE $${t} OR ${SIN_TILDES("p.apellidos")} LIKE $${t}
-          OR lower(u.username) LIKE $${t} OR lower(c.external_ref) LIKE $${t}
-          OR c.numero::text = $${exacto}
-          OR ($${d}::text IS NOT NULL
-              AND regexp_replace(upper(p.doc_numero), '[^A-Z0-9]', '', 'g') LIKE $${d}))`,
-      );
-    }
+    condicionesPorPalabras(
+      params.buscar,
+      {
+        columnas: ["p.nombres", "p.apellidos", "u.username", "c.external_ref"],
+        exactas: ["c.numero::text"],
+        documentos: ["p.doc_numero"],
+      },
+      where,
+      values,
+    );
   }
   if (params.estado !== undefined) {
     values.push(params.estado);
