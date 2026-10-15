@@ -230,7 +230,7 @@ export default function DetalleNinoPage() {
                     ? (CURSO_UI[progreso.curso.tipo] ?? progreso.curso.tipo)
                     : cursoLabel(nino.curso)}
                 </strong>{" "}
-                · Nivel:{" "}
+                · Salón: <strong>{nino.salon ?? "sin matrícula"}</strong> · Nivel:{" "}
                 <strong>{ubic.egresado ? "🎓 Egresado" : (ubic.nivelActual?.nombre ?? "—")}</strong>{" "}
                 · Lección:{" "}
                 <strong>
