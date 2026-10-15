@@ -41,6 +41,30 @@ export function fechaUtcHoy(ahora: Date = new Date()): string {
   return ahora.toISOString().slice(0, 10);
 }
 
+/** Días entre dos DATE (YYYY-MM-DD), calendario puro (puede ser negativo). */
+export function diasEntreFechas(desde: string, hasta: string): number {
+  const [dy, dm, dd] = desde.split("-").map(Number);
+  const [hy, hm, hd] = hasta.split("-").map(Number);
+  const a = Date.UTC(dy ?? 0, (dm ?? 1) - 1, dd ?? 1);
+  const b = Date.UTC(hy ?? 0, (hm ?? 1) - 1, hd ?? 1);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/**
+ * Días que DEVUELVE una pausa al reactivarla — la MISMA regla que LGS: solo
+ * los días realmente pausados. Si se reactiva antes del fin programado, cuenta
+ * hasta hoy; si ya pasó (o lo cierra el worker), hasta el fin programado.
+ * Sin fin programado (pausas antiguas, suspensiones): hasta hoy.
+ */
+export function diasDePausa(
+  desde: string,
+  hastaProgramado: string | null,
+  hoyUtc: string = fechaUtcHoy(),
+): number {
+  const fin = hastaProgramado !== null && hastaProgramado < hoyUtc ? hastaProgramado : hoyUtc;
+  return Math.max(diasEntreFechas(desde, fin), 0);
+}
+
 /**
  * ¿Está vencido? `finalContrato` y `hoyUtc` en formato YYYY-MM-DD.
  * Vencido ⇔ hoyUtc >= finalContrato + DIAS_GRACIA_VENCIMIENTO días.

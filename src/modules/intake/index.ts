@@ -22,5 +22,7 @@ export {
   aprobarIntakeHandler,
   suspenderIntakeHandler,
   reactivarIntakeHandler,
+  pausarIntakeHandler,
+  finPausaIntakeHandler,
   estadoAcademicoIntakeHandler,
 } from "./api/handlers";

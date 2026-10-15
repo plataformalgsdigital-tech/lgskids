@@ -225,19 +225,28 @@ export const aprobarContratoHandler = handlerWithAuth(async (request, auth, cont
 
 const motivoSchema = z.object({ motivo: z.string().min(5).max(300) });
 
-/** POST /api/contracts/[id]/onhold */
+/** OnHold: lo mismo que pide LGS — fecha de inicio, fecha de fin y motivo. */
+const onholdSchema = z.object({
+  desde: z.string().regex(ISO_DATE),
+  hasta: z.string().regex(ISO_DATE),
+  motivo: z.string().min(5).max(300),
+});
+
+/** POST /api/contracts/[id]/onhold — si el contrato viene de LGS, LGS queda igual. */
 export const onholdHandler = handlerWithAuth(async (request, auth, context) => {
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
-  const body = motivoSchema.parse(await request.json());
-  await ponerEnPausa({
+  const body = onholdSchema.parse(await request.json());
+  const resultado = await ponerEnPausa({
     actorUserId: auth.userId,
     contractId,
+    desde: body.desde,
+    hasta: body.hasta,
     motivo: body.motivo,
     ip: ip(request),
   });
-  return json({ ok: true });
+  return json({ ok: true, ...resultado });
 });
 
 /** POST /api/contracts/[id]/reactivate — extiende final_contrato por los días pausados. */

@@ -15,6 +15,9 @@ export {
   suspenderPorExternalRef,
   reactivarPorExternalRef,
   ponerEnPausa,
+  pausarPorExternalRef,
+  finPausaPorExternalRef,
+  procesarFinesDePausa,
   reactivar,
   inactivarContrato,
   procesarVencimientos,
@@ -28,6 +31,7 @@ export {
 export type { FichaContrato } from "./application/gestion-contratos";
 export {
   contratoVencido,
+  diasDePausa,
   fechaUtcHoy,
   finalDeContrato,
   DIAS_GRACIA_VENCIMIENTO,

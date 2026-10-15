@@ -168,6 +168,13 @@ export default function FichaContratoPage() {
     salonId: string;
     motivo: string;
   } | null>(null);
+  /** OnHold abierto sobre una tarjeta: lo mismo que pide LGS (inicio, fin, motivo). */
+  const [pausa, setPausa] = useState<{
+    contratoId: string;
+    desde: string;
+    hasta: string;
+    motivo: string;
+  } | null>(null);
 
   const cargar = useCallback(async () => {
     const res = await apiFetch(`/api/contracts/${params.id}`);
@@ -218,6 +225,7 @@ export default function FichaContratoPage() {
       const data: {
         credenciales?: Credenciales | null;
         diasExtendidos?: number;
+        lgs?: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR";
         error?: { message: string };
       } = await res.json();
       if (!res.ok) {
@@ -225,8 +233,16 @@ export default function FichaContratoPage() {
         return false;
       }
       if (data.credenciales != null) setCredenciales(data.credenciales);
+      const enLgs =
+        data.lgs === "SINCRONIZADO"
+          ? " LGS quedó igual."
+          : data.lgs === "SIN_CONFIGURAR"
+            ? " ⚠ La sincronización con LGS no está configurada: revísalo también en LGS."
+            : "";
       if (data.diasExtendidos !== undefined) {
-        setAviso(`Reactivado: el contrato se extendió ${String(data.diasExtendidos)} días.`);
+        setAviso(`Reactivado: el contrato se extendió ${String(data.diasExtendidos)} días.${enLgs}`);
+      } else if (ruta === "onhold") {
+        setAviso(`OnHold activado.${enLgs}`);
       }
       await cargar();
       return true;
@@ -621,18 +637,32 @@ export default function FichaContratoPage() {
                       style={boton}
                       disabled={ocupado}
                       onClick={() => {
-                        const m = pedirMotivo("Motivo de la pausa (obligatorio):");
-                        if (m !== null) void accion(c.id, "onhold", { motivo: m });
+                        setForm(null);
+                        setPausa({
+                          contratoId: c.id,
+                          desde: new Date().toISOString().slice(0, 10),
+                          hasta: "",
+                          motivo: "",
+                        });
                       }}
                     >
-                      ⏸ Pausar
+                      ⏸ Pausar (OnHold)
                     </button>
                   )}
                   {c.estado === "ONHOLD" && (
                     <button
                       style={boton}
                       disabled={ocupado}
-                      onClick={() => void accion(c.id, "reactivate")}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "¿Reactivar al niño? El contrato se extiende por los días realmente pausados" +
+                              (c.externalRef !== null ? " y LGS se actualiza igual." : "."),
+                          )
+                        ) {
+                          void accion(c.id, "reactivate");
+                        }
+                      }}
                     >
                       ▶ Reactivar
                     </button>
@@ -649,6 +679,91 @@ export default function FichaContratoPage() {
                       ✖ Inactivar
                     </button>
                   )}
+                </div>
+              )}
+
+              {pausa !== null && pausa.contratoId === c.id && (
+                <div
+                  style={{
+                    borderTop: "1px solid #edf0f6",
+                    padding: "0.8rem 1rem",
+                    background: "#f3f7fd",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <strong style={{ fontSize: "0.88rem" }}>⏸ Activar OnHold</strong>
+                  <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>
+                      Fecha inicio OnHold *{" "}
+                      <input
+                        type="date"
+                        value={pausa.desde}
+                        onChange={(ev) => setPausa({ ...pausa, desde: ev.target.value })}
+                        style={select}
+                      />
+                    </label>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>
+                      Fecha fin OnHold *{" "}
+                      <input
+                        type="date"
+                        value={pausa.hasta}
+                        min={pausa.desde}
+                        onChange={(ev) => setPausa({ ...pausa, hasta: ev.target.value })}
+                        style={select}
+                      />
+                    </label>
+                  </div>
+                  <textarea
+                    value={pausa.motivo}
+                    onChange={(ev) => setPausa({ ...pausa, motivo: ev.target.value })}
+                    placeholder="Motivo del OnHold (obligatorio): vacaciones, salud, viaje…"
+                    rows={2}
+                    style={{ ...select, width: "100%" }}
+                  />
+                  {pausa.desde !== "" && pausa.hasta !== "" && pausa.hasta > pausa.desde && (
+                    <p style={{ margin: 0, fontSize: "0.8rem", color: "#0d47a1" }}>
+                      Duración:{" "}
+                      {Math.round(
+                        (Date.parse(pausa.hasta) - Date.parse(pausa.desde)) / 86_400_000,
+                      )}{" "}
+                      días
+                    </p>
+                  )}
+                  <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                    El niño queda en pausa y sin acceso hasta la fecha fin. Al terminar (o al
+                    reactivarlo antes) el contrato se extiende por los días realmente pausados.
+                    Máximo 2 OnHold por contrato.
+                    {c.externalRef !== null &&
+                      " Este contrato viene de LGS: el beneficiario queda en OnHold también en LGS."}
+                  </p>
+                  <div style={{ display: "flex", gap: "0.4rem" }}>
+                    <button
+                      style={{ ...boton, borderColor: "var(--lgs-azul)" }}
+                      disabled={
+                        ocupado ||
+                        pausa.desde === "" ||
+                        pausa.hasta === "" ||
+                        pausa.hasta <= pausa.desde ||
+                        pausa.motivo.trim().length < 5
+                      }
+                      onClick={() => {
+                        void accion(c.id, "onhold", {
+                          desde: pausa.desde,
+                          hasta: pausa.hasta,
+                          motivo: pausa.motivo.trim(),
+                        }).then((ok) => {
+                          if (ok) setPausa(null);
+                        });
+                      }}
+                    >
+                      Activar OnHold
+                    </button>
+                    <button style={boton} onClick={() => setPausa(null)} disabled={ocupado}>
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
               )}
 

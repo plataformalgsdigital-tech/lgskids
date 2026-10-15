@@ -81,6 +81,14 @@ const envSchema = z.object({
    */
   LGS_INTAKE_API_KEY: z.string().min(16).optional(),
 
+  /**
+   * URL base de LGS (ej. https://lgs-plataforma.com) para el camino de VUELTA:
+   * KIDS avisa a LGS cuando un OnHold se abre o se cierra aquí. Usa la misma
+   * clave LGS_INTAKE_API_KEY en `x-api-key`. Sin URL, no se avisa (contratos
+   * que solo viven en KIDS, desarrollo).
+   */
+  LGS_API_URL: z.url().optional(),
+
   /** Carpeta del adaptador local de archivos (desarrollo). */
   STORAGE_DIR: z.string().default(".storage"),
 

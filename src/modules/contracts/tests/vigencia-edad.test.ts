@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "@/platform/errors";
 import { edadEnFecha, validarEdadParaTipo } from "../domain/edad";
-import { contratoVencido, finalDeContrato } from "../domain/vigencia";
+import { contratoVencido, diasDePausa, finalDeContrato } from "../domain/vigencia";
+
+describe("diasDePausa — misma regla que LGS: solo los días realmente pausados", () => {
+  it("reactivado ANTES del fin programado: cuenta hasta hoy", () => {
+    expect(diasDePausa("2026-10-01", "2026-10-31", "2026-10-11")).toBe(10);
+  });
+
+  it("fin programado ya cumplido (o worker): cuenta hasta el fin programado", () => {
+    expect(diasDePausa("2026-10-01", "2026-10-31", "2026-10-31")).toBe(30);
+    expect(diasDePausa("2026-10-01", "2026-10-31", "2026-11-15")).toBe(30);
+  });
+
+  it("sin fin programado (pausas antiguas): hasta hoy; nunca negativo", () => {
+    expect(diasDePausa("2026-10-01", null, "2026-10-08")).toBe(7);
+    expect(diasDePausa("2026-10-20", "2026-10-30", "2026-10-14")).toBe(0);
+  });
+});
 
 describe("finalDeContrato — inicio + 12 meses", () => {
   it("un año exacto después del inicio", () => {

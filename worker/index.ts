@@ -7,7 +7,7 @@
  *
  * Uso local:  pnpm worker:dev
  */
-import { procesarVencimientos } from "../src/modules/contracts";
+import { procesarFinesDePausa, procesarVencimientos } from "../src/modules/contracts";
 import { sessionService } from "../src/modules/identity";
 import { notificarPremiosPendientes, procesarOutbox } from "../src/modules/notifications";
 import { recalculoGlobal } from "../src/modules/progression";
@@ -44,6 +44,16 @@ const tasks: ScheduledTask[] = [
     run: async () => {
       const procesados = await procesarVencimientos();
       logger.info("Barrido de contratos vencidos", { procesados });
+    },
+  },
+  {
+    // OnHold con fin programado ya cumplido → se reactiva devolviendo los días
+    // (igual que el cron de LGS) y se avisa a LGS. Idempotente.
+    name: "contracts.fin_onhold",
+    everyMinutes: 60,
+    run: async () => {
+      const cerradas = await procesarFinesDePausa();
+      if (cerradas > 0) logger.info("OnHold cumplidos reactivados", { cerradas });
     },
   },
   {

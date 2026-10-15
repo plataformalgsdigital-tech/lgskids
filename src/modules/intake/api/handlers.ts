@@ -3,6 +3,8 @@ import {
   aprobarReservaPorExternalRef,
   crearReservaBeneficiario,
   fichaAcademicaPorRef,
+  finPausaPorExternalRef,
+  pausarPorExternalRef,
   reactivarPorExternalRef,
   suspenderPorExternalRef,
 } from "@/modules/contracts";
@@ -125,6 +127,56 @@ export const suspenderIntakeHandler = handlerWithServiceAuth(async (request, con
       actorUserId: SYSTEM_ACTOR,
       externalRef,
       motivo: body.motivo ?? "",
+      ip: ip(request),
+    }),
+  );
+});
+
+/**
+ * POST /api/kids-intake/reservations/[externalRef]/onhold — OnHold abierto en
+ * LGS: la misma pausa aquí (inicio, fin programado, motivo; bloquea el login).
+ * Body { desde, hasta, motivo, activadoPor? }. Idempotente (`aplicado: false`
+ * si el contrato no está APROBADO). Rechaza (4xx) si rompe una regla — LGS
+ * entonces no pausa.
+ */
+export const pausarIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  const body = z
+    .object({
+      desde: z.string().regex(ISO_DATE),
+      hasta: z.string().regex(ISO_DATE),
+      motivo: z.string().max(400).default(""),
+      activadoPor: z.string().max(120).nullish(),
+    })
+    .parse(await request.json());
+  return json(
+    await pausarPorExternalRef({
+      actorUserId: SYSTEM_ACTOR,
+      externalRef,
+      desde: body.desde,
+      hasta: body.hasta,
+      motivo: body.motivo,
+      activadoPor: body.activadoPor ?? null,
+      ip: ip(request),
+    }),
+  );
+});
+
+/**
+ * POST /api/kids-intake/reservations/[externalRef]/onhold/end — fin del OnHold
+ * en LGS: cierra la pausa extendiendo el fin con los MISMOS días que LGS.
+ * Body { dias }. Idempotente (`aplicado: false` sin pausa OnHold abierta).
+ */
+export const finPausaIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  const body = z.object({ dias: z.number().int().min(0).max(3650) }).parse(await request.json());
+  return json(
+    await finPausaPorExternalRef({
+      actorUserId: SYSTEM_ACTOR,
+      externalRef,
+      dias: body.dias,
       ip: ip(request),
     }),
   );

@@ -123,7 +123,13 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
   });
 
   it("OnHold y reactivar: los días pausados EXTIENDEN final_contrato", async () => {
-    await ponerEnPausa({ actorUserId: ACTOR, contractId, motivo: "viaje familiar" });
+    await ponerEnPausa({
+      actorUserId: ACTOR,
+      contractId,
+      desde: new Date().toISOString().slice(0, 10),
+      hasta: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+      motivo: "viaje familiar",
+    });
 
     // Un contrato EN PAUSA no vence aunque su fin original ya haya pasado: el
     // fin se extiende al reactivar. Antes el barrido lo desactivaba igual.

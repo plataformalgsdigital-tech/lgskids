@@ -31,11 +31,15 @@ import { enviarCreacionPerfilSinFallar, type EnvioEnlacePerfil } from "./perfil-
 import { estadoAcademico, type EstadoAcademico } from "../domain/academico";
 import { validarEdadParaTipo } from "../domain/edad";
 import { parseExternalRef, validarExternalRef } from "../domain/external-ref";
-import { contratoVencido, fechaUtcHoy, finalDeContrato } from "../domain/vigencia";
+import { contratoVencido, diasDePausa, fechaUtcHoy, finalDeContrato } from "../domain/vigencia";
+import { avisarOnholdALgs, lgsSyncConfigurado } from "../infrastructure/lgs-sync";
 import {
   beneficiarioTieneOtrosContratosVivos,
   cerrarOnhold,
+  contarPausas,
+  externalRefDe,
   extenderFinalContrato,
+  findPausasVencidas,
   findContractById,
   findContractByExternalRef,
   findContractItem,
@@ -45,22 +49,12 @@ import {
   insertContract,
   insertOnhold,
   listContracts,
-  motivoOnhold,
   searchContracts,
   setContractEstado,
   setContractTipoCurso,
   type ContractListItem,
   type ContractRecord,
 } from "../infrastructure/contract-repository";
-
-/** Días entre dos DATE (YYYY-MM-DD), calendario puro. */
-function diasEntre(desde: string, hasta: string): number {
-  const [dy, dm, dd] = desde.split("-").map(Number);
-  const [hy, hm, hd] = hasta.split("-").map(Number);
-  const a = Date.UTC(dy ?? 0, (dm ?? 1) - 1, dd ?? 1);
-  const b = Date.UTC(hy ?? 0, (hm ?? 1) - 1, hd ?? 1);
-  return Math.round((b - a) / 86_400_000);
-}
 
 /**
  * Crea un contrato en estado PENDIENTE. Valida: titular activo, país del
@@ -424,33 +418,275 @@ export async function aprobarReservaPorExternalRef(input: {
   });
 }
 
-/** Pausa (OnHold) un contrato APROBADO. Motivo obligatorio, auditado. */
+/** Tope de pausas por contrato — la MISMA regla que LGS (máximo 2 OnHold). */
+const MAX_PAUSAS = 2;
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Nombre de usuario de quien actúa (para el historial de la pausa). */
+async function usernameDe(userId: string): Promise<string | null> {
+  const row = await queryOne<{ username: string }>(
+    `SELECT username FROM identity_user WHERE id = $1`,
+    [userId],
+  );
+  return row?.username ?? null;
+}
+
+/**
+ * Abre la pausa en KIDS: contrato → ONHOLD, registro con inicio + fin
+ * programado + motivo, y login del niño BLOQUEADO (igual que LGS) salvo que
+ * tenga otro contrato vivo. Valida lo mismo que LGS.
+ */
+async function abrirPausa(
+  contrato: ContractRecord,
+  datos: { desde: string; hasta: string; motivo: string; activadoPor: string | null },
+  origen: "KIDS" | "LGS",
+): Promise<void> {
+  const motivo = datos.motivo.trim();
+  if (motivo.length < 5) {
+    throw new ValidationError("El motivo es obligatorio (mínimo 5 caracteres).");
+  }
+  if (!FECHA_ISO.test(datos.desde) || !FECHA_ISO.test(datos.hasta)) {
+    throw new ValidationError("La fecha de inicio y la fecha de fin del OnHold son obligatorias.");
+  }
+  if (datos.hasta <= datos.desde) {
+    throw new ValidationError("La fecha fin del OnHold debe ser posterior a la fecha de inicio.");
+  }
+  if (contrato.estado !== "APROBADO") {
+    throw new ConflictError(`Solo se pausa un contrato APROBADO (está ${contrato.estado}).`);
+  }
+  if ((await contarPausas(contrato.id)) >= MAX_PAUSAS) {
+    throw new ValidationError(
+      `No se puede activar OnHold: el contrato ya alcanzó el máximo de ${String(MAX_PAUSAS)} OnHolds.`,
+    );
+  }
+  const beneficiario = await findPersonById(contrato.beneficiarioId);
+  await withTransaction(async (tx) => {
+    await setContractEstado(contrato.id, "ONHOLD", tx);
+    await insertOnhold(contrato.id, datos.desde, motivo, tx, {
+      hastaProgramado: datos.hasta,
+      tipo: "ONHOLD",
+      origen,
+      activadoPor: datos.activadoPor,
+    });
+    const tieneOtros = await beneficiarioTieneOtrosContratosVivos(
+      contrato.beneficiarioId,
+      contrato.id,
+      tx,
+    );
+    if (!tieneOtros && beneficiario?.userId) await inactivarUsuarioTx(tx, beneficiario.userId);
+  });
+}
+
+/**
+ * Pausa (OnHold) un contrato APROBADO desde el panel de KIDS. Pide lo mismo
+ * que LGS: fecha de inicio, fecha de fin y motivo. Si el contrato viene de LGS,
+ * LGS se actualiza PRIMERO (valida sus reglas: tope de 2, extensión manual
+ * previa); si LGS lo rechaza o no responde, no se pausa en ningún lado.
+ */
 export async function ponerEnPausa(input: {
   actorUserId: string;
   contractId: string;
+  desde: string;
+  hasta: string;
   motivo: string;
   ip?: string | null;
-}): Promise<void> {
-  if (input.motivo.trim().length < 5) {
-    throw new ValidationError("El motivo es obligatorio (mínimo 5 caracteres).");
-  }
+}): Promise<{ lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR" }> {
   const contrato = await findContractById(input.contractId);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
   if (contrato.estado !== "APROBADO") {
     throw new ConflictError(`Solo se pausa un contrato APROBADO (está ${contrato.estado}).`);
   }
-  await withTransaction(async (tx) => {
-    await setContractEstado(contrato.id, "ONHOLD", tx);
-    await insertOnhold(contrato.id, fechaUtcHoy(), input.motivo.trim(), tx);
-  });
+  // Todo lo que abrirPausa valida, ANTES de tocar LGS.
+  if (input.motivo.trim().length < 5) {
+    throw new ValidationError("El motivo es obligatorio (mínimo 5 caracteres).");
+  }
+  if (!FECHA_ISO.test(input.desde) || !FECHA_ISO.test(input.hasta)) {
+    throw new ValidationError("La fecha de inicio y la fecha de fin del OnHold son obligatorias.");
+  }
+  if (input.hasta <= input.desde) {
+    throw new ValidationError("La fecha fin del OnHold debe ser posterior a la fecha de inicio.");
+  }
+  if ((await contarPausas(contrato.id)) >= MAX_PAUSAS) {
+    throw new ValidationError(
+      `No se puede activar OnHold: el contrato ya alcanzó el máximo de ${String(MAX_PAUSAS)} OnHolds.`,
+    );
+  }
+  const activadoPor = await usernameDe(input.actorUserId);
+  const externalRef = await externalRefDe(contrato.id);
+
+  let lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR" = "NO_APLICA";
+  if (externalRef !== null) {
+    if (!lgsSyncConfigurado()) {
+      lgs = "SIN_CONFIGURAR";
+    } else {
+      const r = await avisarOnholdALgs({
+        accion: "activar",
+        externalRef,
+        desde: input.desde,
+        hasta: input.hasta,
+        motivo: input.motivo.trim(),
+        activadoPor,
+      });
+      lgs = r.aplicado === false ? "NO_APLICA" : "SINCRONIZADO";
+    }
+  }
+
+  try {
+    await abrirPausa(
+      contrato,
+      { desde: input.desde, hasta: input.hasta, motivo: input.motivo, activadoPor },
+      "KIDS",
+    );
+  } catch (error) {
+    // LGS ya quedó en OnHold: se deshace allá (0 días) para no dejarlos distintos.
+    if (lgs === "SINCRONIZADO" && externalRef !== null) {
+      await avisarOnholdALgs({ accion: "reactivar", externalRef, dias: 0 }).catch((e: unknown) =>
+        logger.error("No se pudo deshacer el OnHold en LGS", { externalRef, error: String(e) }),
+      );
+    }
+    throw error;
+  }
   await registrarAuditoria({
     actorUserId: input.actorUserId,
     accion: "contracts.onhold",
     entidad: "contracts_contract",
     entidadId: contrato.id,
-    payload: { motivo: input.motivo.trim() },
+    payload: { desde: input.desde, hasta: input.hasta, motivo: input.motivo.trim(), lgs },
     ip: input.ip ?? null,
   });
+  return { lgs };
+}
+
+/**
+ * OnHold abierto en LGS (beneficiario Kids): la misma pausa aquí, sin avisar
+ * de vuelta. Idempotente: si el contrato no está APROBADO (reserva pendiente,
+ * ya en pausa, inactivo) responde `aplicado: false` y LGS sigue con lo suyo.
+ */
+export async function pausarPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  desde: string;
+  hasta: string;
+  motivo: string;
+  activadoPor: string | null;
+  ip?: string | null;
+}): Promise<{ aplicado: boolean; estado: string }> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  if (contrato.estado !== "APROBADO") return { aplicado: false, estado: contrato.estado };
+  await abrirPausa(
+    contrato,
+    {
+      desde: input.desde,
+      hasta: input.hasta,
+      motivo: input.motivo.trim() || "OnHold en LGS",
+      activadoPor: input.activadoPor,
+    },
+    "LGS",
+  );
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.onhold_lgs",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: { desde: input.desde, hasta: input.hasta, motivo: input.motivo, activadoPor: input.activadoPor },
+    ip: input.ip ?? null,
+  });
+  return { aplicado: true, estado: "ONHOLD" };
+}
+
+/**
+ * Cierra una pausa extendiendo `final_contrato` por `dias` y reactivando el
+ * contrato y el login. Es el núcleo de las tres salidas: manual en KIDS, fin
+ * de OnHold en LGS y fin programado (worker).
+ */
+async function cerrarPausa(
+  contrato: ContractRecord,
+  pausaId: string,
+  dias: number,
+): Promise<void> {
+  const beneficiario = await findPersonById(contrato.beneficiarioId);
+  await withTransaction(async (tx) => {
+    await cerrarOnhold(pausaId, fechaUtcHoy(), dias, tx);
+    if (dias > 0) await extenderFinalContrato(contrato.id, dias, tx);
+    await setContractEstado(contrato.id, "APROBADO", tx);
+    if (beneficiario?.userId) await reactivarUsuarioTx(tx, beneficiario.userId);
+  });
+}
+
+/**
+ * Fin de OnHold en LGS (manual o por su cron): cierra la pausa con los MISMOS
+ * días que extendió LGS, para que la fecha final quede igual en los dos lados.
+ * Idempotente: sin pausa OnHold abierta responde `aplicado: false`.
+ */
+export async function finPausaPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  dias: number;
+  ip?: string | null;
+}): Promise<{ aplicado: boolean; estado: string; nuevoFinal?: string }> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  if (contrato.estado !== "ONHOLD") return { aplicado: false, estado: contrato.estado };
+  const pausa = await findOnholdAbierto(contrato.id);
+  if (pausa === null || pausa.tipo !== "ONHOLD") return { aplicado: false, estado: "ONHOLD" };
+  const dias = Math.max(Math.round(input.dias), 0);
+  await cerrarPausa(contrato, pausa.id, dias);
+  const actualizado = await findContractById(contrato.id);
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.reactivado_lgs_onhold",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: { diasExtendidos: dias, nuevoFinal: actualizado?.finalContrato },
+    ip: input.ip ?? null,
+  });
+  return {
+    aplicado: true,
+    estado: "APROBADO",
+    ...(actualizado !== null && { nuevoFinal: actualizado.finalContrato }),
+  };
+}
+
+/**
+ * Tarea del worker: cierra las pausas cuyo FIN PROGRAMADO ya llegó (como el
+ * cron de LGS). Devuelve los días hasta el fin programado y avisa a LGS; si
+ * LGS no responde se cierra igual aquí (su propio cron lo cierra allá) y queda
+ * en el log. Idempotente.
+ */
+export async function procesarFinesDePausa(): Promise<number> {
+  const hoy = fechaUtcHoy();
+  const vencidas = await findPausasVencidas(hoy, 200);
+  for (const pausa of vencidas) {
+    const contrato = await findContractById(pausa.contractId);
+    if (contrato === null || contrato.estado !== "ONHOLD") continue;
+    const dias = diasDePausa(pausa.desde, pausa.hastaProgramado, hoy);
+    const externalRef = await externalRefDe(contrato.id);
+    if (externalRef !== null && lgsSyncConfigurado()) {
+      try {
+        await avisarOnholdALgs({ accion: "reactivar", externalRef, dias });
+      } catch (error) {
+        logger.warn("Fin de OnHold: LGS no confirmó (se cierra igual en KIDS)", {
+          contratoId: contrato.id,
+          error: String(error),
+        });
+      }
+    }
+    await cerrarPausa(contrato, pausa.id, dias);
+    await registrarAuditoria({
+      actorUserId: null,
+      accion: "contracts.reactivado_automatico",
+      entidad: "contracts_contract",
+      entidadId: contrato.id,
+      payload: { diasExtendidos: dias, hastaProgramado: pausa.hastaProgramado },
+      ip: null,
+    });
+  }
+  return vencidas.length;
 }
 
 /** Prefijo del motivo de las pausas que abre LGS: solo esas las cierra LGS. */
@@ -478,7 +714,11 @@ export async function suspenderPorExternalRef(input: {
   const beneficiario = await findPersonById(contrato.beneficiarioId);
   await withTransaction(async (tx) => {
     await setContractEstado(contrato.id, "ONHOLD", tx);
-    await insertOnhold(contrato.id, fechaUtcHoy(), motivo, tx);
+    await insertOnhold(contrato.id, fechaUtcHoy(), motivo, tx, {
+      tipo: "SUSPENSION",
+      origen: "LGS",
+      activadoPor: "LGS",
+    });
     const tieneOtros = await beneficiarioTieneOtrosContratosVivos(
       contrato.beneficiarioId,
       contrato.id,
@@ -514,12 +754,14 @@ export async function reactivarPorExternalRef(input: {
   }
   if (contrato.estado !== "ONHOLD") return { aplicado: false, estado: contrato.estado };
   const pausa = await findOnholdAbierto(contrato.id);
-  const motivoPausa = pausa === null ? null : await motivoOnhold(pausa.id);
-  if (pausa === null || !(motivoPausa ?? "").startsWith(PREFIJO_PAUSA_LGS)) {
+  // Solo la SUSPENSIÓN (inactivación en LGS; las antiguas, con prefijo "LGS: ",
+  // las marcó la migración 20261014700000). Un OnHold —venga de KIDS o de
+  // LGS— se cierra devolviendo días, por su propio camino.
+  if (pausa === null || pausa.tipo !== "SUSPENSION") {
     return {
       aplicado: false,
       estado: "ONHOLD",
-      motivo: "La pausa la abrió KIDS: se reactiva desde KIDS.",
+      motivo: "Es un OnHold (no una suspensión): se cierra con el fin del OnHold.",
     };
   }
   const beneficiario = await findPersonById(contrato.beneficiarioId);
@@ -540,15 +782,18 @@ export async function reactivarPorExternalRef(input: {
 }
 
 /**
- * REACTIVA un contrato en pausa: extiende `final_contrato` por los días
- * pausados (el niño NO pierde días — sección 2.4), con registro en el
- * historial de la pausa.
+ * REACTIVA un contrato en pausa desde el panel: extiende `final_contrato` por
+ * los días REALMENTE pausados (misma regla que LGS: hasta hoy, o hasta el fin
+ * programado si ya pasó) y reactiva el login. Si es un OnHold de un contrato
+ * que viene de LGS, LGS se reactiva PRIMERO con esos mismos días — así la
+ * fecha final queda igual en los dos lados. Una SUSPENSIÓN (inactivación en
+ * LGS) no devuelve días.
  */
 export async function reactivar(input: {
   actorUserId: string;
   contractId: string;
   ip?: string | null;
-}): Promise<{ diasExtendidos: number; nuevoFinal: string }> {
+}): Promise<{ diasExtendidos: number; nuevoFinal: string; lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR" }> {
   const contrato = await findContractById(input.contractId);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
   if (contrato.estado !== "ONHOLD") {
@@ -560,21 +805,20 @@ export async function reactivar(input: {
       "El contrato está ONHOLD pero no tiene pausa abierta (inconsistencia).",
     );
   }
-  const hoy = fechaUtcHoy();
-  const dias = Math.max(diasEntre(pausa.desde, hoy), 0);
-  const beneficiario = await findPersonById(contrato.beneficiarioId);
+  const dias = pausa.tipo === "SUSPENSION" ? 0 : diasDePausa(pausa.desde, pausa.hastaProgramado);
 
-  await withTransaction(async (tx) => {
-    await cerrarOnhold(pausa.id, hoy, dias, tx);
-    if (dias > 0) {
-      await extenderFinalContrato(contrato.id, dias, tx);
+  let lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR" = "NO_APLICA";
+  const externalRef = pausa.tipo === "ONHOLD" ? await externalRefDe(contrato.id) : null;
+  if (externalRef !== null) {
+    if (!lgsSyncConfigurado()) {
+      lgs = "SIN_CONFIGURAR";
+    } else {
+      const r = await avisarOnholdALgs({ accion: "reactivar", externalRef, dias });
+      lgs = r.aplicado === false ? "NO_APLICA" : "SINCRONIZADO";
     }
-    await setContractEstado(contrato.id, "APROBADO", tx);
-    // Una pausa que abrió LGS apagó la cuenta del niño; si se reactiva desde
-    // KIDS, la cuenta vuelve con el contrato. En una pausa propia ya está
-    // ACTIVA y esto no cambia nada.
-    if (beneficiario?.userId) await reactivarUsuarioTx(tx, beneficiario.userId);
-  });
+  }
+
+  await cerrarPausa(contrato, pausa.id, dias);
 
   const actualizado = await findContractById(contrato.id);
   await registrarAuditoria({
@@ -582,10 +826,14 @@ export async function reactivar(input: {
     accion: "contracts.reactivado",
     entidad: "contracts_contract",
     entidadId: contrato.id,
-    payload: { diasExtendidos: dias, nuevoFinal: actualizado?.finalContrato },
+    payload: { diasExtendidos: dias, nuevoFinal: actualizado?.finalContrato, lgs },
     ip: input.ip ?? null,
   });
-  return { diasExtendidos: dias, nuevoFinal: actualizado?.finalContrato ?? contrato.finalContrato };
+  return {
+    diasExtendidos: dias,
+    nuevoFinal: actualizado?.finalContrato ?? contrato.finalContrato,
+    lgs,
+  };
 }
 
 /**

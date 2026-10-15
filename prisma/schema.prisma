@@ -436,11 +436,19 @@ model ContractHold {
   // Días que se sumaron a final_contrato al reactivar (historial).
   diasExtendidos Int?     @map("dias_extendidos")
   motivo         String
+  // Fin PROGRAMADO (lo mismo que pide LGS): al llegar, el worker la cierra.
+  hastaProgramado DateTime? @map("hasta_programado") @db.Date
+  // ONHOLD = pausa (devuelve días) · SUSPENSION = inactivado en LGS (no devuelve).
+  tipo            String    @default("ONHOLD")
+  // Dónde se abrió: KIDS o LGS (la otra plataforma se sincroniza).
+  origen          String    @default("KIDS")
+  activadoPor     String?   @map("activado_por")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
   @@index([contractId])
+  @@index([hastaProgramado], map: "contracts_onhold_abiertas_programadas_idx")
   @@map("contracts_onhold")
 }
 

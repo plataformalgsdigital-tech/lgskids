@@ -221,6 +221,8 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
     await ponerEnPausa({
       actorUserId: ACTOR,
       contractId: contrato?.id ?? "",
+      desde: new Date().toISOString().slice(0, 10),
+      hasta: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
       motivo: "viaje familiar",
     });
     expect(await fichaAcademicaPorRef(externalRef)).toMatchObject({

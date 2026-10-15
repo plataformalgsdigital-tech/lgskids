@@ -106,22 +106,72 @@ export async function extenderFinalContrato(
   );
 }
 
+/** ONHOLD = pausa (devuelve días) · SUSPENSION = inactivado en LGS (no devuelve). */
+export type TipoPausa = "ONHOLD" | "SUSPENSION";
+export type OrigenPausa = "KIDS" | "LGS";
+
 export interface OnholdRecord {
   id: string;
   desde: string;
   hasta: string | null;
+  hastaProgramado: string | null;
+  tipo: TipoPausa;
+  origen: OrigenPausa;
 }
+
+const SELECT_ONHOLD = `SELECT id, desde::text AS desde, hasta::text AS hasta,
+  hasta_programado::text AS "hastaProgramado", tipo, origen
+  FROM contracts_onhold`;
 
 export async function findOnholdAbierto(
   contractId: string,
   client?: Queryable,
 ): Promise<OnholdRecord | null> {
   return queryOne<OnholdRecord>(
-    `SELECT id, desde::text AS desde, hasta::text AS hasta
-       FROM contracts_onhold WHERE contract_id = $1 AND hasta IS NULL`,
+    `${SELECT_ONHOLD} WHERE contract_id = $1 AND hasta IS NULL`,
     [contractId],
     client,
   );
+}
+
+/** Cuántas PAUSAS (OnHold, no suspensiones) ha tenido el contrato — tope de 2, igual que LGS. */
+export async function contarPausas(contractId: string, client?: Queryable): Promise<number> {
+  const row = await queryOne<{ n: string }>(
+    `SELECT count(*)::text AS n FROM contracts_onhold WHERE contract_id = $1 AND tipo = 'ONHOLD'`,
+    [contractId],
+    client,
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Pausas abiertas cuyo fin programado ya llegó (para el worker). */
+export async function findPausasVencidas(
+  hoy: string,
+  limit: number,
+): Promise<(OnholdRecord & { contractId: string })[]> {
+  return queryRows<OnholdRecord & { contractId: string }>(
+    `SELECT h.id, h.desde::text AS desde, h.hasta::text AS hasta,
+            h.hasta_programado::text AS "hastaProgramado", h.tipo, h.origen,
+            h.contract_id AS "contractId"
+       FROM contracts_onhold h
+       JOIN contracts_contract c ON c.id = h.contract_id
+      WHERE h.hasta IS NULL AND h.tipo = 'ONHOLD'
+        AND h.hasta_programado IS NOT NULL AND h.hasta_programado <= $1::date
+        AND c.estado = 'ONHOLD'
+      ORDER BY h.hasta_programado
+      LIMIT $2`,
+    [hoy, limit],
+  );
+}
+
+/** N° de contrato LGS ("contrato#documento") o null si el contrato nació en KIDS. */
+export async function externalRefDe(contractId: string, client?: Queryable): Promise<string | null> {
+  const row = await queryOne<{ ref: string | null }>(
+    `SELECT external_ref AS ref FROM contracts_contract WHERE id = $1`,
+    [contractId],
+    client,
+  );
+  return row?.ref ?? null;
 }
 
 /** Motivo de una pausa (para saber si la abrió LGS: prefijo "LGS: "). */
@@ -139,11 +189,27 @@ export async function insertOnhold(
   desde: string,
   motivo: string,
   client?: Queryable,
+  extra: {
+    hastaProgramado?: string | null;
+    tipo?: TipoPausa;
+    origen?: OrigenPausa;
+    activadoPor?: string | null;
+  } = {},
 ): Promise<void> {
   await execute(
-    `INSERT INTO contracts_onhold (id, contract_id, desde, motivo)
-     VALUES ($1, $2, $3::date, $4)`,
-    [newId(), contractId, desde, motivo],
+    `INSERT INTO contracts_onhold
+       (id, contract_id, desde, motivo, hasta_programado, tipo, origen, activado_por)
+     VALUES ($1, $2, $3::date, $4, $5::date, $6, $7, $8)`,
+    [
+      newId(),
+      contractId,
+      desde,
+      motivo,
+      extra.hastaProgramado ?? null,
+      extra.tipo ?? "ONHOLD",
+      extra.origen ?? "KIDS",
+      extra.activadoPor ?? null,
+    ],
     client,
   );
 }
