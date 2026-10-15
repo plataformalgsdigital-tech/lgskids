@@ -591,7 +591,12 @@ export async function pausarPorExternalRef(input: {
     accion: "contracts.onhold_lgs",
     entidad: "contracts_contract",
     entidadId: contrato.id,
-    payload: { desde: input.desde, hasta: input.hasta, motivo: input.motivo, activadoPor: input.activadoPor },
+    payload: {
+      desde: input.desde,
+      hasta: input.hasta,
+      motivo: input.motivo,
+      activadoPor: input.activadoPor,
+    },
     ip: input.ip ?? null,
   });
   return { aplicado: true, estado: "ONHOLD" };
@@ -602,11 +607,7 @@ export async function pausarPorExternalRef(input: {
  * contrato y el login. Es el núcleo de las tres salidas: manual en KIDS, fin
  * de OnHold en LGS y fin programado (worker).
  */
-async function cerrarPausa(
-  contrato: ContractRecord,
-  pausaId: string,
-  dias: number,
-): Promise<void> {
+async function cerrarPausa(contrato: ContractRecord, pausaId: string, dias: number): Promise<void> {
   const beneficiario = await findPersonById(contrato.beneficiarioId);
   await withTransaction(async (tx) => {
     await cerrarOnhold(pausaId, fechaUtcHoy(), dias, tx);
@@ -793,7 +794,11 @@ export async function reactivar(input: {
   actorUserId: string;
   contractId: string;
   ip?: string | null;
-}): Promise<{ diasExtendidos: number; nuevoFinal: string; lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR" }> {
+}): Promise<{
+  diasExtendidos: number;
+  nuevoFinal: string;
+  lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR";
+}> {
   const contrato = await findContractById(input.contractId);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
   if (contrato.estado !== "ONHOLD") {

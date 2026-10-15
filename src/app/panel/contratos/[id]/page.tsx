@@ -240,7 +240,9 @@ export default function FichaContratoPage() {
             ? " ⚠ La sincronización con LGS no está configurada: revísalo también en LGS."
             : "";
       if (data.diasExtendidos !== undefined) {
-        setAviso(`Reactivado: el contrato se extendió ${String(data.diasExtendidos)} días.${enLgs}`);
+        setAviso(
+          `Reactivado: el contrato se extendió ${String(data.diasExtendidos)} días.${enLgs}`,
+        );
       } else if (ruta === "onhold") {
         setAviso(`OnHold activado.${enLgs}`);
       }
@@ -725,9 +727,7 @@ export default function FichaContratoPage() {
                   {pausa.desde !== "" && pausa.hasta !== "" && pausa.hasta > pausa.desde && (
                     <p style={{ margin: 0, fontSize: "0.8rem", color: "#0d47a1" }}>
                       Duración:{" "}
-                      {Math.round(
-                        (Date.parse(pausa.hasta) - Date.parse(pausa.desde)) / 86_400_000,
-                      )}{" "}
+                      {Math.round((Date.parse(pausa.hasta) - Date.parse(pausa.desde)) / 86_400_000)}{" "}
                       días
                     </p>
                   )}

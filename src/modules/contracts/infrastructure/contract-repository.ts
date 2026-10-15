@@ -165,7 +165,10 @@ export async function findPausasVencidas(
 }
 
 /** N° de contrato LGS ("contrato#documento") o null si el contrato nació en KIDS. */
-export async function externalRefDe(contractId: string, client?: Queryable): Promise<string | null> {
+export async function externalRefDe(
+  contractId: string,
+  client?: Queryable,
+): Promise<string | null> {
   const row = await queryOne<{ ref: string | null }>(
     `SELECT external_ref AS ref FROM contracts_contract WHERE id = $1`,
     [contractId],
