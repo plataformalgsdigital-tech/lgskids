@@ -597,7 +597,7 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
   gana selector de Tipo (previo cuadrado con tablero para PNG transparentes).
   **Descargar (2026-10-15)**: "⬇ Descargar" baja la imagen que se está viendo y
   "⬇ Descargar todas (ZIP)" baja TODO el arte vigente (`GET
-  /api/catalog/imagen-curso/asignadas` → `arteAsignado`, `catalogo.ver`; recorre las
+/api/catalog/imagen-curso/asignadas` → `arteAsignado`, `catalogo.ver`; recorre las
   mismas claves que se suben, sin el aviso de login) en carpetas por tipo y curso.
   El ZIP se arma en el navegador SIN compresión (`src/ui/zip.ts`: las imágenes ya
   vienen comprimidas, y así no hay dependencia nueva). En
