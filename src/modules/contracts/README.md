@@ -30,6 +30,20 @@ inactivado en LGS, no devuelve) y `origen` (`KIDS` | `LGS`), y guarda
 | LGS (ficha del kid)             | entra por `POST /api/kids-intake/reservations/{ref}/onhold` y `/onhold/end` (`pausarPorExternalRef` / `finPausaPorExternalRef`), sin eco de vuelta       |
 | Fin programado                  | worker `contracts.fin_onhold` (cada hora) cierra y avisa a LGS; el cron de LGS hace lo mismo allá. El primero manda los días y el otro queda idempotente |
 
-Al cerrar desde la otra plataforma se usan los **mismos días** que ella extendió,
-para que la fecha final quede igual en los dos lados. Requiere `LGS_API_URL` +
-`LGS_INTAKE_API_KEY` (la misma clave en ambos sentidos).
+## Extensión manual de vigencia sincronizada con LGS (2026-10-15)
+
+Igual que en LGS: **nueva fecha final** (posterior a la actual) y **motivo**. Corre
+`final_contrato` N días, queda en `contracts_extension` y **reactiva** al niño si
+el contrato estaba INACTIVO o suspendido desde LGS (un OnHold vigente se respeta:
+solo corre la fecha). Como en LGS, un contrato con extensión manual **ya no admite
+OnHold** (`exigirPuedePausar`).
+
+| Dónde se hace                  | Qué pasa en la otra plataforma                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Panel KIDS › Extender vigencia | LGS **primero** vía `POST {LGS_API_URL}/api/kids-sync/extension`; si rechaza o no responde, no se extiende en ningún lado |
+| LGS (ficha del kid)            | entra por `POST /api/kids-intake/reservations/{ref}/extend` (`extenderPorExternalRef`), mismos días, sin eco              |
+
+En OnHold y en extensión, la plataforma que recibe el cambio usa los **mismos
+días** que extendió la otra, para que la fecha final quede igual en los dos
+lados. Requiere `LGS_API_URL` + `LGS_INTAKE_API_KEY` (la misma clave en ambos
+sentidos).

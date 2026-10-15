@@ -50,6 +50,12 @@ export function diasEntreFechas(desde: string, hasta: string): number {
   return Math.round((b - a) / 86_400_000);
 }
 
+/** `fecha` (YYYY-MM-DD) + `dias` días, calendario puro. */
+export function sumarDias(fecha: string, dias: number): string {
+  const [y, m, d] = fecha.split("-").map(Number);
+  return new Date(Date.UTC(y ?? 0, (m ?? 1) - 1, (d ?? 1) + dias)).toISOString().slice(0, 10);
+}
+
 /**
  * Días que DEVUELVE una pausa al reactivarla — la MISMA regla que LGS: solo
  * los días realmente pausados. Si se reactiva antes del fin programado, cuenta

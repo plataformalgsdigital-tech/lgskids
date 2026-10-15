@@ -175,6 +175,13 @@ export default function FichaContratoPage() {
     hasta: string;
     motivo: string;
   } | null>(null);
+  /** Extensión manual abierta sobre una tarjeta: lo mismo que pide LGS (nueva fecha final, motivo). */
+  const [extension, setExtension] = useState<{
+    contratoId: string;
+    finalActual: string;
+    nuevaFecha: string;
+    motivo: string;
+  } | null>(null);
 
   const cargar = useCallback(async () => {
     const res = await apiFetch(`/api/contracts/${params.id}`);
@@ -225,6 +232,10 @@ export default function FichaContratoPage() {
       const data: {
         credenciales?: Credenciales | null;
         diasExtendidos?: number;
+        dias?: number;
+        nuevoFinal?: string;
+        reactivado?: boolean;
+        requiereMatricula?: boolean;
         lgs?: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR";
         error?: { message: string };
       } = await res.json();
@@ -245,6 +256,13 @@ export default function FichaContratoPage() {
         );
       } else if (ruta === "onhold") {
         setAviso(`OnHold activado.${enLgs}`);
+      } else if (ruta === "extend") {
+        setAviso(
+          `Vigencia extendida ${String(data.dias ?? 0)} días (nuevo fin ${data.nuevoFinal ?? "—"}).` +
+            (data.reactivado === true ? " El niño quedó reactivado." : "") +
+            (data.requiereMatricula === true ? " ⚠ No tiene salón: matricúlalo." : "") +
+            enLgs,
+        );
       }
       await cargar();
       return true;
@@ -640,6 +658,7 @@ export default function FichaContratoPage() {
                       disabled={ocupado}
                       onClick={() => {
                         setForm(null);
+                        setExtension(null);
                         setPausa({
                           contratoId: c.id,
                           desde: new Date().toISOString().slice(0, 10),
@@ -649,6 +668,24 @@ export default function FichaContratoPage() {
                       }}
                     >
                       ⏸ Pausar (OnHold)
+                    </button>
+                  )}
+                  {c.estado !== "PENDIENTE" && (
+                    <button
+                      style={boton}
+                      disabled={ocupado}
+                      onClick={() => {
+                        setForm(null);
+                        setPausa(null);
+                        setExtension({
+                          contratoId: c.id,
+                          finalActual: c.finalContrato,
+                          nuevaFecha: "",
+                          motivo: "",
+                        });
+                      }}
+                    >
+                      📅 Extender vigencia
                     </button>
                   )}
                   {c.estado === "ONHOLD" && (
@@ -681,6 +718,79 @@ export default function FichaContratoPage() {
                       ✖ Inactivar
                     </button>
                   )}
+                </div>
+              )}
+
+              {extension !== null && extension.contratoId === c.id && (
+                <div
+                  style={{
+                    borderTop: "1px solid #edf0f6",
+                    padding: "0.8rem 1rem",
+                    background: "#f1f8f2",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <strong style={{ fontSize: "0.88rem" }}>📅 Extender vigencia</strong>
+                  <p style={{ margin: 0, fontSize: "0.82rem" }}>
+                    Vigencia actual: <strong>{extension.finalActual}</strong>
+                  </p>
+                  <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>
+                    Nueva fecha final *{" "}
+                    <input
+                      type="date"
+                      value={extension.nuevaFecha}
+                      min={extension.finalActual}
+                      onChange={(ev) => setExtension({ ...extension, nuevaFecha: ev.target.value })}
+                      style={select}
+                    />
+                  </label>
+                  <textarea
+                    value={extension.motivo}
+                    onChange={(ev) => setExtension({ ...extension, motivo: ev.target.value })}
+                    placeholder="Motivo de la extensión (obligatorio)"
+                    rows={2}
+                    style={{ ...select, width: "100%" }}
+                  />
+                  {extension.nuevaFecha > extension.finalActual && (
+                    <p style={{ margin: 0, fontSize: "0.8rem", color: "#1b5e20" }}>
+                      Días extendidos:{" "}
+                      {Math.round(
+                        (Date.parse(extension.nuevaFecha) - Date.parse(extension.finalActual)) /
+                          86_400_000,
+                      )}
+                    </p>
+                  )}
+                  <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                    Corre la fecha final del contrato. Si el niño estaba inactivo o suspendido,
+                    queda reactivado. Un contrato con extensión manual ya no admite OnHold.
+                    {c.externalRef !== null &&
+                      " Este contrato viene de LGS: el beneficiario se extiende igual en LGS."}
+                  </p>
+                  <div style={{ display: "flex", gap: "0.4rem" }}>
+                    <button
+                      style={{ ...boton, borderColor: "var(--lgs-verde)" }}
+                      disabled={
+                        ocupado ||
+                        extension.nuevaFecha <= extension.finalActual ||
+                        extension.motivo.trim().length < 5
+                      }
+                      onClick={() => {
+                        void accion(c.id, "extend", {
+                          nuevaFecha: extension.nuevaFecha,
+                          motivo: extension.motivo.trim(),
+                        }).then((ok) => {
+                          if (ok) setExtension(null);
+                        });
+                      }}
+                    >
+                      Confirmar extensión
+                    </button>
+                    <button style={boton} onClick={() => setExtension(null)} disabled={ocupado}>
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
               )}
 

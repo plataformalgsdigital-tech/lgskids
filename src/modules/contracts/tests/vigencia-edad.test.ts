@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "@/platform/errors";
 import { edadEnFecha, validarEdadParaTipo } from "../domain/edad";
-import { contratoVencido, diasDePausa, finalDeContrato } from "../domain/vigencia";
+import { contratoVencido, diasDePausa, finalDeContrato, sumarDias } from "../domain/vigencia";
+
+describe("sumarDias — la extensión corre la fecha final", () => {
+  it("suma días cruzando mes y año", () => {
+    expect(sumarDias("2027-08-28", 47)).toBe("2027-10-14");
+    expect(sumarDias("2026-12-20", 15)).toBe("2027-01-04");
+    expect(sumarDias("2028-02-28", 1)).toBe("2028-02-29");
+  });
+});
 
 describe("diasDePausa — misma regla que LGS: solo los días realmente pausados", () => {
   it("reactivado ANTES del fin programado: cuenta hasta hoy", () => {

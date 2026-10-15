@@ -31,12 +31,25 @@ import { enviarCreacionPerfilSinFallar, type EnvioEnlacePerfil } from "./perfil-
 import { estadoAcademico, type EstadoAcademico } from "../domain/academico";
 import { validarEdadParaTipo } from "../domain/edad";
 import { parseExternalRef, validarExternalRef } from "../domain/external-ref";
-import { contratoVencido, diasDePausa, fechaUtcHoy, finalDeContrato } from "../domain/vigencia";
-import { avisarOnholdALgs, lgsSyncConfigurado } from "../infrastructure/lgs-sync";
+import {
+  contratoVencido,
+  diasDePausa,
+  diasEntreFechas,
+  fechaUtcHoy,
+  finalDeContrato,
+  sumarDias,
+} from "../domain/vigencia";
+import {
+  avisarExtensionALgs,
+  avisarOnholdALgs,
+  lgsSyncConfigurado,
+} from "../infrastructure/lgs-sync";
 import {
   beneficiarioTieneOtrosContratosVivos,
   cerrarOnhold,
+  contarExtensiones,
   contarPausas,
+  insertExtension,
   externalRefDe,
   extenderFinalContrato,
   findPausasVencidas,
@@ -422,6 +435,23 @@ export async function aprobarReservaPorExternalRef(input: {
 const MAX_PAUSAS = 2;
 const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Reglas de LGS para abrir un OnHold: máximo 2 por contrato y ninguno si el
+ * contrato ya tuvo una extensión manual (OnHold y extensión no se combinan).
+ */
+async function exigirPuedePausar(contractId: string): Promise<void> {
+  if ((await contarPausas(contractId)) >= MAX_PAUSAS) {
+    throw new ValidationError(
+      `No se puede activar OnHold: el contrato ya alcanzó el máximo de ${String(MAX_PAUSAS)} OnHolds.`,
+    );
+  }
+  if ((await contarExtensiones(contractId)) > 0) {
+    throw new ValidationError(
+      "No se puede activar OnHold: el contrato ya tuvo una extensión manual.",
+    );
+  }
+}
+
 /** Nombre de usuario de quien actúa (para el historial de la pausa). */
 async function usernameDe(userId: string): Promise<string | null> {
   const row = await queryOne<{ username: string }>(
@@ -454,11 +484,7 @@ async function abrirPausa(
   if (contrato.estado !== "APROBADO") {
     throw new ConflictError(`Solo se pausa un contrato APROBADO (está ${contrato.estado}).`);
   }
-  if ((await contarPausas(contrato.id)) >= MAX_PAUSAS) {
-    throw new ValidationError(
-      `No se puede activar OnHold: el contrato ya alcanzó el máximo de ${String(MAX_PAUSAS)} OnHolds.`,
-    );
-  }
+  await exigirPuedePausar(contrato.id);
   const beneficiario = await findPersonById(contrato.beneficiarioId);
   await withTransaction(async (tx) => {
     await setContractEstado(contrato.id, "ONHOLD", tx);
@@ -506,11 +532,7 @@ export async function ponerEnPausa(input: {
   if (input.hasta <= input.desde) {
     throw new ValidationError("La fecha fin del OnHold debe ser posterior a la fecha de inicio.");
   }
-  if ((await contarPausas(contrato.id)) >= MAX_PAUSAS) {
-    throw new ValidationError(
-      `No se puede activar OnHold: el contrato ya alcanzó el máximo de ${String(MAX_PAUSAS)} OnHolds.`,
-    );
-  }
+  await exigirPuedePausar(contrato.id);
   const activadoPor = await usernameDe(input.actorUserId);
   const externalRef = await externalRefDe(contrato.id);
 
@@ -651,6 +673,152 @@ export async function finPausaPorExternalRef(input: {
     estado: "APROBADO",
     ...(actualizado !== null && { nuevoFinal: actualizado.finalContrato }),
   };
+}
+
+/**
+ * Aplica una extensión MANUAL de vigencia en KIDS — lo mismo que hace LGS:
+ * corre `final_contrato` N días, la deja en el historial y REACTIVA al niño si
+ * estaba fuera (contrato INACTIVO, o suspendido desde LGS). Un OnHold vigente
+ * se respeta: solo se corre la fecha y sigue en pausa.
+ */
+async function aplicarExtension(
+  contrato: ContractRecord,
+  datos: { dias: number; motivo: string; origen: "KIDS" | "LGS"; ejecutadoPor: string | null },
+): Promise<{ nuevoFinal: string; reactivado: boolean; requiereMatricula: boolean }> {
+  const beneficiario = await findPersonById(contrato.beneficiarioId);
+  const pausa = contrato.estado === "ONHOLD" ? await findOnholdAbierto(contrato.id) : null;
+  const nuevoFinal = sumarDias(contrato.finalContrato, datos.dias);
+  let reactivado = false;
+  await withTransaction(async (tx) => {
+    await extenderFinalContrato(contrato.id, datos.dias, tx);
+    await insertExtension(tx, {
+      contractId: contrato.id,
+      dias: datos.dias,
+      finalAnterior: contrato.finalContrato,
+      finalNuevo: nuevoFinal,
+      motivo: datos.motivo,
+      origen: datos.origen,
+      ejecutadoPor: datos.ejecutadoPor,
+    });
+    if (contrato.estado === "INACTIVO") {
+      // Vencido o inactivado: vuelve, igual que en LGS (la matrícula se canceló
+      // al inactivar, así que puede quedar pendiente de salón).
+      await setContractEstado(contrato.id, "APROBADO", tx);
+      if (beneficiario !== null && beneficiario.estado !== "ACTIVA") {
+        await setPersonEstado(beneficiario.id, "ACTIVA", tx);
+      }
+      if (beneficiario?.userId) await reactivarUsuarioTx(tx, beneficiario.userId);
+      reactivado = true;
+    } else if (pausa?.tipo === "SUSPENSION") {
+      await cerrarOnhold(pausa.id, fechaUtcHoy(), 0, tx);
+      await setContractEstado(contrato.id, "APROBADO", tx);
+      if (beneficiario?.userId) await reactivarUsuarioTx(tx, beneficiario.userId);
+      reactivado = true;
+    }
+  });
+  const requiereMatricula = reactivado && (await findMatriculaVivaByContract(contrato.id)) === null;
+  return { nuevoFinal, reactivado, requiereMatricula };
+}
+
+/**
+ * EXTENSIÓN MANUAL desde el panel de KIDS. Pide lo mismo que LGS: nueva fecha
+ * final (posterior a la actual) y motivo. Si el contrato viene de LGS, LGS se
+ * extiende PRIMERO con los mismos días; si LGS lo rechaza o no responde, no se
+ * extiende en ningún lado.
+ */
+export async function extenderContrato(input: {
+  actorUserId: string;
+  contractId: string;
+  nuevaFecha: string;
+  motivo: string;
+  ip?: string | null;
+}): Promise<{
+  dias: number;
+  nuevoFinal: string;
+  reactivado: boolean;
+  requiereMatricula: boolean;
+  lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR";
+}> {
+  const motivo = input.motivo.trim();
+  if (motivo.length < 5) {
+    throw new ValidationError("El motivo es obligatorio (mínimo 5 caracteres).");
+  }
+  if (!FECHA_ISO.test(input.nuevaFecha)) {
+    throw new ValidationError("La nueva fecha final es obligatoria.");
+  }
+  const contrato = await findContractById(input.contractId);
+  if (contrato === null) throw new NotFoundError("El contrato no existe.");
+  const dias = diasEntreFechas(contrato.finalContrato, input.nuevaFecha);
+  if (dias <= 0) {
+    throw new ValidationError(
+      `La nueva fecha debe ser posterior a la vigencia actual (${contrato.finalContrato}).`,
+    );
+  }
+  const ejecutadoPor = await usernameDe(input.actorUserId);
+  const externalRef = await externalRefDe(contrato.id);
+
+  let lgs: "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR" = "NO_APLICA";
+  if (externalRef !== null) {
+    if (!lgsSyncConfigurado()) {
+      lgs = "SIN_CONFIGURAR";
+    } else {
+      const r = await avisarExtensionALgs({ externalRef, dias, motivo, ejecutadoPor });
+      lgs = r.aplicado === false ? "NO_APLICA" : "SINCRONIZADO";
+    }
+  }
+
+  const r = await aplicarExtension(contrato, { dias, motivo, origen: "KIDS", ejecutadoPor });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.extendido",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: { dias, finalAnterior: contrato.finalContrato, nuevoFinal: r.nuevoFinal, motivo, lgs },
+    ip: input.ip ?? null,
+  });
+  return { dias, ...r, lgs };
+}
+
+/**
+ * Extensión hecha en LGS (beneficiario Kids): la misma aquí, con los MISMOS
+ * días y sin avisar de vuelta.
+ */
+export async function extenderPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  dias: number;
+  motivo: string;
+  ejecutadoPor: string | null;
+  ip?: string | null;
+}): Promise<{
+  aplicado: boolean;
+  nuevoFinal: string;
+  reactivado: boolean;
+  requiereMatricula: boolean;
+}> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  const dias = Math.round(input.dias);
+  if (dias <= 0) throw new ValidationError("Los días de extensión deben ser mayores que 0.");
+  const motivo =
+    input.motivo.trim().length >= 5 ? input.motivo.trim() : "Extensión registrada en LGS";
+  const r = await aplicarExtension(contrato, {
+    dias,
+    motivo,
+    origen: "LGS",
+    ejecutadoPor: input.ejecutadoPor,
+  });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.extendido_lgs",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: { dias, finalAnterior: contrato.finalContrato, nuevoFinal: r.nuevoFinal, motivo },
+    ip: input.ip ?? null,
+  });
+  return { aplicado: true, ...r };
 }
 
 /**

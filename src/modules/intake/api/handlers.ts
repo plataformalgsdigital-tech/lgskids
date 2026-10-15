@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   aprobarReservaPorExternalRef,
   crearReservaBeneficiario,
+  extenderPorExternalRef,
   fichaAcademicaPorRef,
   finPausaPorExternalRef,
   pausarPorExternalRef,
@@ -177,6 +178,33 @@ export const finPausaIntakeHandler = handlerWithServiceAuth(async (request, cont
       actorUserId: SYSTEM_ACTOR,
       externalRef,
       dias: body.dias,
+      ip: ip(request),
+    }),
+  );
+});
+
+/**
+ * POST /api/kids-intake/reservations/[externalRef]/extend — extensión manual de
+ * vigencia hecha en LGS: corre el fin con los MISMOS días (y reactiva al niño si
+ * estaba fuera, como LGS). Body { dias, motivo?, ejecutadoPor? }.
+ */
+export const extenderIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  const body = z
+    .object({
+      dias: z.number().int().min(1).max(3650),
+      motivo: z.string().max(400).default(""),
+      ejecutadoPor: z.string().max(120).nullish(),
+    })
+    .parse(await request.json());
+  return json(
+    await extenderPorExternalRef({
+      actorUserId: SYSTEM_ACTOR,
+      externalRef,
+      dias: body.dias,
+      motivo: body.motivo,
+      ejecutadoPor: body.ejecutadoPor ?? null,
       ip: ip(request),
     }),
   );

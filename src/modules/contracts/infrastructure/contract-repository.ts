@@ -164,6 +164,46 @@ export async function findPausasVencidas(
   );
 }
 
+/** Cuántas extensiones MANUALES tuvo el contrato (con una, ya no admite OnHold — regla de LGS). */
+export async function contarExtensiones(contractId: string, client?: Queryable): Promise<number> {
+  const row = await queryOne<{ n: string }>(
+    `SELECT count(*)::text AS n FROM contracts_extension WHERE contract_id = $1`,
+    [contractId],
+    client,
+  );
+  return Number(row?.n ?? 0);
+}
+
+export async function insertExtension(
+  tx: Queryable,
+  input: {
+    contractId: string;
+    dias: number;
+    finalAnterior: string;
+    finalNuevo: string;
+    motivo: string;
+    origen: OrigenPausa;
+    ejecutadoPor: string | null;
+  },
+): Promise<void> {
+  await execute(
+    `INSERT INTO contracts_extension
+       (id, contract_id, dias, final_anterior, final_nuevo, motivo, origen, ejecutado_por)
+     VALUES ($1, $2, $3, $4::date, $5::date, $6, $7, $8)`,
+    [
+      newId(),
+      input.contractId,
+      input.dias,
+      input.finalAnterior,
+      input.finalNuevo,
+      input.motivo,
+      input.origen,
+      input.ejecutadoPor,
+    ],
+    tx,
+  );
+}
+
 /** N° de contrato LGS ("contrato#documento") o null si el contrato nació en KIDS. */
 export async function externalRefDe(
   contractId: string,

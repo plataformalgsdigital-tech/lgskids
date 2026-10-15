@@ -18,6 +18,8 @@ export {
   pausarPorExternalRef,
   finPausaPorExternalRef,
   procesarFinesDePausa,
+  extenderContrato,
+  extenderPorExternalRef,
   reactivar,
   inactivarContrato,
   procesarVencimientos,
@@ -71,6 +73,7 @@ export {
   opcionesAcademicasHandler,
   aprobarContratoHandler,
   onholdHandler,
+  extenderHandler,
   reactivarHandler,
   inactivarHandler,
 } from "./api/handlers";

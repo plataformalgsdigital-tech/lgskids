@@ -9,6 +9,7 @@ import {
   cambiarCursoContrato,
   crearContrato,
   crearReservaBeneficiario,
+  extenderContrato,
   fichaContrato,
   inactivarContrato,
   listarContratos,
@@ -247,6 +248,29 @@ export const onholdHandler = handlerWithAuth(async (request, auth, context) => {
     ip: ip(request),
   });
   return json({ ok: true, ...resultado });
+});
+
+/** Extensión manual: lo mismo que pide LGS — nueva fecha final y motivo. */
+const extensionSchema = z.object({
+  nuevaFecha: z.string().regex(ISO_DATE),
+  motivo: z.string().min(5).max(300),
+});
+
+/** POST /api/contracts/[id]/extend — si el contrato viene de LGS, LGS queda igual. */
+export const extenderHandler = handlerWithAuth(async (request, auth, context) => {
+  const contractId = await contractIdFromContext(context);
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  const body = extensionSchema.parse(await request.json());
+  return json(
+    await extenderContrato({
+      actorUserId: auth.userId,
+      contractId,
+      nuevaFecha: body.nuevaFecha,
+      motivo: body.motivo,
+      ip: ip(request),
+    }),
+  );
 });
 
 /** POST /api/contracts/[id]/reactivate — extiende final_contrato por los días pausados. */
