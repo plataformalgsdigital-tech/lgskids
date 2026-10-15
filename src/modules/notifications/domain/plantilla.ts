@@ -17,6 +17,7 @@ export const MARCADORES = [
   "plataforma",
   "enlace",
   "fecha",
+  "video",
 ] as const;
 
 export type Marcador = (typeof MARCADORES)[number];
@@ -34,6 +35,7 @@ export const DESCRIPCION_MARCADOR: Record<Marcador, string> = {
   plataforma: "País",
   enlace: "Enlace de creación de perfil (solo el envío automático y la ficha)",
   fecha: "Fecha de la sesión (solo el aviso de inasistencia de Servicio)",
+  video: "Enlace del video de bienvenida (solo Servicio › Welcome)",
 };
 
 /**
@@ -86,3 +88,5 @@ export const SLUG_CREACION_PERFIL = "creacion-perfil-kids";
 export const SLUG_CREACION_PERFIL_SIN_WELCOME = "creacion-perfil-kids-sin-welcome";
 /** La que propone Servicio › Asistencia al escribirle a la familia de un ausente. */
 export const SLUG_INASISTENCIA = "inasistencia-kids";
+/** El video de bienvenida, a quien faltó a sus Welcome (Servicio › Welcome). */
+export const SLUG_VIDEO_WELCOME = "video-welcome-kids";

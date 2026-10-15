@@ -10,6 +10,7 @@ import {
   SLUG_CREDENCIALES,
   SLUG_INASISTENCIA,
   SLUG_RE,
+  SLUG_VIDEO_WELCOME,
   marcadoresDe,
   rellenarParaHistorial,
   rellenarPlantilla,
@@ -815,6 +816,66 @@ export async function enviarMensajeInasistencia(input: {
     },
     ip: input.ip ?? null,
   });
+  return resultado.ok
+    ? { ok: true, destinatario: destinatario.whatsapp }
+    : { ok: false, destinatario: destinatario.whatsapp, error: resultado.error ?? "desconocido" };
+}
+
+// —— Video de bienvenida (Servicio › Welcome) ——————————————————————————————
+
+/**
+ * Manda AHORA al apoderado el video de bienvenida (plantilla `video-welcome-kids`
+ * con `{{video}}`). Como MOSAICO, va siempre al APODERADO. Sin datos secretos:
+ * queda tal cual en el historial. Quien llama decide a quién (los candidatos) y
+ * guarda su propio registro del envío; aquí solo se envía.
+ */
+export async function enviarVideoWelcome(input: {
+  actorUserId: string;
+  childPersonId: string;
+  enlace: string;
+}): Promise<{ ok: boolean; destinatario: string | null; error?: string }> {
+  const f = await queryOne<FilaPlantilla>(`${SELECT_PLANTILLA} WHERE slug = $1`, [
+    SLUG_VIDEO_WELCOME,
+  ]);
+  if (f === null || !f.activo) {
+    return {
+      ok: false,
+      destinatario: null,
+      error: `Falta la plantilla "${SLUG_VIDEO_WELCOME}" en Administración › Mensajes.`,
+    };
+  }
+  const { fila, destinatario } = await destinatarioDe(input.childPersonId, null, null);
+  if (destinatario.whatsapp === null) {
+    return {
+      ok: false,
+      destinatario: destinatario.telefono,
+      error: `No hay a qué número enviarlo: ${destinatario.problema ?? "sin teléfono"}.`,
+    };
+  }
+  const mensaje = rellenarPlantilla(f.contenido, { ...contextoDe(fila), video: input.enlace });
+  const resultado = await getSender().enviar({
+    canal: "WHATSAPP",
+    destinatario: destinatario.whatsapp,
+    mensaje,
+  });
+  await execute(
+    `INSERT INTO notifications_outbox
+       (id, canal, destinatario, mensaje, payload, estado, intentos, ultimo_error, enviada_en,
+        plantilla_slug, child_person_id, enviado_por)
+     VALUES ($1, 'WHATSAPP', $2, $3, $4, $5::notifications_estado, 1, $6,
+             CASE WHEN $5 = 'ENVIADA' THEN now() END, $7, $8, $9)`,
+    [
+      newId(),
+      destinatario.whatsapp,
+      mensaje,
+      JSON.stringify({ videoWelcome: true }),
+      resultado.ok ? "ENVIADA" : "FALLIDA",
+      resultado.ok ? null : (resultado.error ?? "desconocido"),
+      SLUG_VIDEO_WELCOME,
+      input.childPersonId,
+      input.actorUserId,
+    ],
+  );
   return resultado.ok
     ? { ok: true, destinatario: destinatario.whatsapp }
     : { ok: false, destinatario: destinatario.whatsapp, error: resultado.error ?? "desconocido" };

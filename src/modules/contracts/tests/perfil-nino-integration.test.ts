@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { crearCampania } from "@/modules/catalog";
 import { setSenderForTests, type MensajeSaliente } from "@/modules/notifications";
-import { crearSalon, crearWelcome, welcomeDeNino } from "@/modules/scheduling";
+import { crearSalon, crearWelcome, pendientesWelcome, welcomeDeNino } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
@@ -206,6 +206,12 @@ describe.runIf(RUN)("creación de perfil del niño (integración)", () => {
     expect(ajeno).toHaveLength(0);
   });
 
+  it("Servicio › Welcome › Pendientes de agendar: matriculado sin Welcome, porque no creó su perfil", async () => {
+    const pend = await pendientesWelcome({ countryScope: null, buscar: `NP-${marca}` });
+    expect(pend.map((p) => p.childPersonId)).toEqual([childPersonId]);
+    expect(pend[0]?.motivo).toBe("SIN_PERFIL");
+  });
+
   it("la clave pide 8 caracteres con letras y números, y el Welcome es obligatorio", async () => {
     const t = tokenDelUltimo();
     await expect(
@@ -240,9 +246,10 @@ describe.runIf(RUN)("creación de perfil del niño (integración)", () => {
 
     await expect(completarPerfilNino(t, datos())).rejects.toBeInstanceOf(ConflictError);
     expect((await fichaPorEnlacePerfil(t)).estado).toBe("USADO");
-    // Y sale de la lista de Servicio.
+    // Y sale de la lista de Servicio, y de los pendientes de agendar Welcome.
     const lista = await ninosSinPerfil({ countryScope: null, campaignId: campaniaId });
     expect(lista.map((n) => n.childPersonId)).not.toContain(childPersonId);
+    expect(await pendientesWelcome({ countryScope: null, buscar: `NP-${marca}` })).toHaveLength(0);
     // Con el perfil hecho, ya no hay enlace que reenviar.
     await expect(
       reenviarEnlacePerfil({ actorUserId: actor, childPersonId, countryScope: null }),

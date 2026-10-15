@@ -156,8 +156,28 @@ export {
   SQL_SESION_CANCELADA,
 } from "./application/cancelacion";
 export type { Cancelacion, FilaCancelacion, EstadoCancelacion } from "./application/cancelacion";
-export { sesionesServicio, agendadosWelcome } from "./application/servicio";
-export type { SesionServicio, EstadoSesionServicio, AgendadoWelcome } from "./application/servicio";
+export { sesionesServicio } from "./application/servicio";
+export type { SesionServicio, EstadoSesionServicio } from "./application/servicio";
+export {
+  agendadosWelcome,
+  reagendamientosWelcome,
+  pendientesWelcome,
+  candidatosVideoWelcome,
+  videoWelcome,
+  guardarVideoWelcome,
+  enviarVideosWelcome,
+  MAX_VIDEOS_POR_TANDA,
+} from "./application/servicio-welcome";
+export type {
+  AgendadoWelcome,
+  EstadoWelcome,
+  InasistenteWelcome,
+  PendienteWelcome,
+  MotivoPendiente,
+  CandidatoVideo,
+  ResultadoVideo,
+} from "./application/servicio-welcome";
+export { MAX_INTENTOS_WELCOME } from "./application/welcome";
 export { colisionesDeCampania } from "./application/colisiones";
 export type { Colision } from "./application/colisiones";
 export {

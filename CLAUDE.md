@@ -1459,11 +1459,7 @@ solo servía para completar la ficha.
   `menu.servicio_justificacion`, funcional `asistencia.gestionar`) es la MISMA pantalla
   (`ConsultaAsistencia` con `modo="justificacion"`): las faltas AUSENTES de la última
   semana, con "Anexar y justificar", y el filtro "Ya justificadas" con su 📎 soporte.
-  **Welcome** (`/panel/servicio/welcome` → `GET /api/scheduling/servicio/welcome` →
-  `agendadosWelcome`, `salones.ver` + `personas.ver`): niños agendados (reserva ACTIVA) con
-  asistió / no asistió / sin pasar lista; fechas en el reloj de quien mira (`zona`), y
-  campaña/curso/salón de la MATRÍCULA del niño, no los filtros del Welcome. Abre en
-  −7…+14 días. **Sesiones** (`/panel/servicio/sesiones` → `GET
+  **Welcome**: ver "Servicio › Welcome (como MOSAICO)". **Sesiones** (`/panel/servicio/sesiones` → `GET
 /api/scheduling/servicio/sesiones` → `sesionesServicio`, mismos permisos, alcance por
   país del SALÓN): REALIZADA (cerrada), NO_REALIZADA (pasó sin registrar; avisa si tiene
   lista pasada), CANCELADA (ver "Cancelación de sesión por el guía"), SUSPENDIDA (sale de
@@ -1821,6 +1817,48 @@ para niños de varios salones, países y campañas. Migración `20261009000000_w
   "Perfil y Welcome"; `GET|POST /api/contracts/ninos/[id]/welcome`,
   `matriculas.gestionar`): la MISMA regla y la MISMA reserva con bloqueo que el
   enlace, con `agendado_por` = quien lo hizo. Auditoría `scheduling.welcome_agendado`.
+
+## Servicio › Welcome (como MOSAICO, 2026-10-14)
+
+El proceso de Servicio › Welcome Session de MOSAICO, ajustado a KIDS. Migración
+`20261014600000_welcome_servicio`; consultas en `scheduling/application/servicio-welcome.ts`;
+`GET /api/scheduling/servicio/welcome?vista=eventos|reagendamientos|pendientes|video`
+(`salones.ver` + `personas.ver`, alcance por país del niño). Cuatro pestañas en
+`/panel/servicio/welcome`, todas con CSV y los filtros comunes de Servicio:
+
+- **La reserva perdida NO se borra** (regla de MOSAICO): al reagendar, si el Welcome
+  que tenía YA TERMINÓ queda **REAGENDADA** (sigue en la lista de su Welcome, con su
+  asistencia, y el guía la puede marcar); si todavía no ocurre, se CANCELA. Antes se
+  cancelaba siempre y se perdía que el niño había faltado. `RESERVA_VIGENTE` =
+  ACTIVA + REAGENDADA en inscritos, detalle y pasar lista.
+- **Tope de 2 Welcome por niño** (`MAX_INTENTOS_WELCOME`, en `reservarWelcomeTx`, la
+  MISMA reserva del enlace de perfil y de la ficha): cuentan los que ya PASARON más el
+  nuevo; cambiar uno que aún no ocurre no gasta intento (en MOSAICO "Reagendar otra
+  vez" fallaba justo por eso). Quien ya asistió a uno no recibe otro.
+- **Eventos Welcome**: estado por reserva ASISTIO · ASISTIO_OTRA · VIDEO · PENDIENTE
+  (decide la fecha, no la marca) · NO_ASISTIO, y "Sesiones" = total del niño SIN
+  depender del filtro de fechas (en MOSAICO sí dependía). Abre en −7…+14 días.
+- **Gestión de Reagendamientos**: los que faltaron (terminó, no asistieron, no fueron a
+  ningún otro, sin video), agrupados por el Welcome perdido; "Reagendado al…" se
+  DERIVA (hay una ACTIVA futura). "Solo sin reagendar" marcado por defecto. Reagendar
+  usa la ruta de la ficha (`/api/contracts/ninos/[id]/welcome`, `matriculas.gestionar`);
+  con 2 perdidos el botón cede al video.
+- **Pendientes de agendar**: matrícula ACTIVA sin ningún Welcome, con motivo DERIVADO —
+  SOLO_PERFIL (se mandó el enlace sin Welcome), SIN_PERFIL (no creó su perfil) o
+  SIN_REGISTRO—, de lo más antiguo a lo nuevo.
+- **Video Welcome**: quien faltó a sus 2 sin asistir a ninguno y sin otro por delante.
+  El video es un **ENLACE** configurable (`platform_config.welcome_video_url`,
+  `PUT …/welcome/video`, `catalogo.gestionar`) —MOSAICO sube un mp4 de hasta 300 MB a
+  su almacenamiento; por una ruta de Node no conviene—. Se envía al APODERADO con la
+  plantilla `video-welcome-kids` (marcador nuevo `{{video}}`) en tandas de 60
+  (`POST …/welcome/video`, `mensajes.enviar` + `personas.ver`; el servidor recalcula
+  los candidatos). Cada envío queda en `scheduling_welcome_video_envio` (ok o error) y
+  uno que falla no frena a los demás. Un envío bueno cuenta como Welcome hecho: sale
+  de Reagendamientos y queda "Recibió el video".
+- **Lo que NO aplica de MOSAICO**: "promover desde WELCOME" (allá el alumno vive en un
+  curso puente; aquí ya está matriculado en su salón).
+- Pruebas: `welcome-integration.test.ts` (perdido → REAGENDADA → tope → video) y
+  `perfil-nino-integration.test.ts` (pendientes).
 
 ## Editar eventos del calendario (2026-10-13)
 

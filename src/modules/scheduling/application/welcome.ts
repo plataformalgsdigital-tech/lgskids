@@ -42,8 +42,18 @@ function sqlElegible(pNivel: string): string {
       AND (w.en_marcha OR w.starts_at < (nco.inicio::timestamp AT TIME ZONE ncl.timezone))`;
 }
 
+/**
+ * Una reserva "cuenta" en su Welcome si está ACTIVA o REAGENDADA: la de un
+ * Welcome ya pasado al que el niño faltó y se le reagendó sigue en esa lista,
+ * con su asistencia (MOSAICO: la sesión perdida no se borra).
+ */
+export const RESERVA_VIGENTE = `('ACTIVA', 'REAGENDADA')`;
+
+/** Máximo de Welcome que se le agendan a un niño (MOSAICO: 2). */
+export const MAX_INTENTOS_WELCOME = 2;
+
 const INSCRITOS = `(SELECT count(*) FROM scheduling_welcome_reserva r
-                     WHERE r.welcome_id = w.id AND r.estado = 'ACTIVA')::int`;
+                     WHERE r.welcome_id = w.id AND r.estado IN ${RESERVA_VIGENTE})::int`;
 
 export interface WelcomeResumen {
   id: string;
@@ -335,7 +345,7 @@ export async function detalleWelcome(
           ORDER BY e.created_at DESC LIMIT 1) m ON true
        LEFT JOIN scheduling_classroom cl ON cl.id = m.classroom_id
        LEFT JOIN catalog_course co ON co.id = cl.course_id
-      WHERE r.welcome_id = $1 AND r.estado = 'ACTIVA'
+      WHERE r.welcome_id = $1 AND r.estado IN ${RESERVA_VIGENTE}
       ORDER BY p.apellidos, p.nombres`,
     [id],
   );
@@ -394,7 +404,7 @@ export async function marcarAsistenciaWelcome(input: {
             SET asistio = $3::boolean,
                 marcado_en = CASE WHEN $3::boolean IS NULL THEN NULL ELSE now() END,
                 marcado_por = CASE WHEN $3::boolean IS NULL THEN NULL ELSE $4::uuid END
-          WHERE welcome_id = $1 AND child_person_id = $2 AND estado = 'ACTIVA'`,
+          WHERE welcome_id = $1 AND child_person_id = $2 AND estado IN ${RESERVA_VIGENTE}`,
         [input.id, m.childPersonId, m.asistio, input.actorUserId],
         tx,
       );
@@ -471,22 +481,49 @@ export async function reservarWelcomeTx(
   );
   if (w === null) throw new ConflictError("Ese Welcome no está disponible para este niño.");
 
-  const actual = await queryOne<{ id: string; welcomeId: string }>(
-    `SELECT id, welcome_id AS "welcomeId" FROM scheduling_welcome_reserva
-      WHERE child_person_id = $1 AND estado = 'ACTIVA' FOR UPDATE`,
+  const actual = await queryOne<{ id: string; welcomeId: string; yaPaso: boolean }>(
+    `SELECT r.id, r.welcome_id AS "welcomeId",
+            (sw.starts_at + make_interval(mins => sw.duracion_min) <= now()) AS "yaPaso"
+       FROM scheduling_welcome_reserva r JOIN scheduling_welcome sw ON sw.id = r.welcome_id
+      WHERE r.child_person_id = $1 AND r.estado = 'ACTIVA' FOR UPDATE OF r`,
     [input.childPersonId],
     tx,
   );
   if (actual !== null && actual.welcomeId === input.welcomeId) {
     return { reservaId: actual.id, startsAt: w.startsAt };
   }
+  // Quien ya asistió a un Welcome no necesita otro.
+  const historia = await queryOne<{ asistio: boolean; intentos: number }>(
+    `SELECT COALESCE(bool_or(r.asistio), false) AS asistio,
+            count(*) FILTER (WHERE sw.starts_at + make_interval(mins => sw.duracion_min) <= now())::int
+              AS intentos
+       FROM scheduling_welcome_reserva r JOIN scheduling_welcome sw ON sw.id = r.welcome_id
+      WHERE r.child_person_id = $1 AND r.estado IN ${RESERVA_VIGENTE}`,
+    [input.childPersonId],
+    tx,
+  );
+  if (historia?.asistio === true) {
+    throw new ConflictError("El niño ya asistió a su Welcome: no hace falta agendarle otro.");
+  }
+  // Tope de MOSAICO: 2 Welcome por niño. Cuentan los que ya PASARON (a los que
+  // faltó) más el que se agenda ahora; cambiar uno que todavía no ocurre no
+  // gasta un intento (en MOSAICO "Reagendar otra vez" fallaba justo por eso).
+  if ((historia?.intentos ?? 0) + 1 > MAX_INTENTOS_WELCOME) {
+    throw new ConflictError(
+      `El niño ya usó sus ${String(MAX_INTENTOS_WELCOME)} Welcome: corresponde enviarle el video de bienvenida.`,
+    );
+  }
   if (cuposLibres(w.limite, w.inscritos) === 0) {
     throw new ConflictError("Ese Welcome se llenó: elige otro horario.");
   }
   if (actual !== null) {
+    // Si el Welcome que tenía YA PASÓ (faltó), queda REAGENDADA: sigue en su
+    // lista y cuenta como intento. Si todavía no ocurre, se cancela.
     await execute(
-      `UPDATE scheduling_welcome_reserva SET estado = 'CANCELADA', cancelada_en = now()
-        WHERE id = $1`,
+      actual.yaPaso
+        ? `UPDATE scheduling_welcome_reserva SET estado = 'REAGENDADA' WHERE id = $1`
+        : `UPDATE scheduling_welcome_reserva SET estado = 'CANCELADA', cancelada_en = now()
+            WHERE id = $1`,
       [actual.id],
       tx,
     );

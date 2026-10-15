@@ -17,6 +17,7 @@ export {
   enviarEnlacePerfil,
   vistaInasistencia,
   enviarMensajeInasistencia,
+  enviarVideoWelcome,
 } from "./application/mensajes";
 export type { VistaInasistencia } from "./application/mensajes";
 export { setSenderForTests } from "./infrastructure/senders";

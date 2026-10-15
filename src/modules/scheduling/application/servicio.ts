@@ -9,11 +9,11 @@ import { SQL_SESION_CANCELADA } from "./cancelacion";
  * Las dos son listas de trabajo: rango acotado y tope de filas.
  */
 
-const DIAS_MAX = 93;
+export const DIAS_MAX = 93;
 const MAX_FILAS = 2000;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
-function validarRango(desde: string, hasta: string): void {
+export function validarRango(desde: string, hasta: string): void {
   if (!FECHA.test(desde) || !FECHA.test(hasta)) {
     throw new ValidationError("Las fechas deben ser YYYY-MM-DD.");
   }
@@ -149,135 +149,6 @@ export async function sesionesServicio(f: {
      ${porEstado}
      ORDER BY x.fecha DESC, x.orden, x.salon
      LIMIT $${String(values.length)}`,
-    values,
-  );
-}
-
-// —— Welcome ————————————————————————————————————————————————————————————
-
-export interface AgendadoWelcome {
-  reservaId: string;
-  welcomeId: string;
-  startsAt: string;
-  duracionMin: number;
-  guia: string;
-  nivel: string;
-  childPersonId: string;
-  nombre: string;
-  documento: string;
-  username: string | null;
-  pais: string;
-  campania: string | null;
-  curso: string | null;
-  salon: string | null;
-  apoderado: string | null;
-  telefono: string | null;
-  /** NULL = sin pasar lista; distinto de "no asistió". */
-  asistio: boolean | null;
-  /** Quién lo agendó: NULL = el propio niño desde su enlace de perfil. */
-  agendadoPor: string | null;
-}
-
-/**
- * Los niños agendados en los Welcome de un rango de días. Las fechas son las del
- * reloj de quien consulta (`zona`): el Welcome es un instante, cada quien lo ve
- * en su hora, y así el día del filtro cuadra con la hora que se muestra.
- */
-export async function agendadosWelcome(f: {
-  countryScope: string[] | null;
-  desde: string;
-  hasta: string;
-  zona: string;
-  buscar?: string | null;
-  campaignId?: string | null;
-  curso?: string | null;
-  classroomId?: string | null;
-  /** SI = asistieron, NO = no asistieron, SIN_MARCAR = sin pasar lista. */
-  asistencia?: "SI" | "NO" | "SIN_MARCAR" | null;
-}): Promise<AgendadoWelcome[]> {
-  validarRango(f.desde, f.hasta);
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: f.zona });
-  } catch {
-    throw new ValidationError("Zona horaria inválida.");
-  }
-  const values: unknown[] = [f.desde, f.hasta, f.zona, f.countryScope];
-  const cond: string[] = [];
-  const agregar = (sql: (n: string) => string, valor: unknown) => {
-    values.push(valor);
-    cond.push(sql(`$${String(values.length)}`));
-  };
-  // Campaña, curso y salón son los de la MATRÍCULA del niño, no los filtros con
-  // que se creó el Welcome (que suelen ser "todos").
-  if (f.campaignId != null && f.campaignId !== "")
-    agregar((n) => `m.campaign_id = ${n}`, f.campaignId);
-  if (f.curso != null && f.curso !== "") agregar((n) => `m.curso = ${n}`, f.curso);
-  if (f.classroomId != null && f.classroomId !== "") {
-    agregar((n) => `m.classroom_id = ${n}`, f.classroomId);
-  }
-  if (f.asistencia === "SI") cond.push("r.asistio = true");
-  if (f.asistencia === "NO") cond.push("r.asistio = false");
-  if (f.asistencia === "SIN_MARCAR") cond.push("r.asistio IS NULL");
-  const palabras = (f.buscar ?? "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((p) => p !== "")
-    .slice(0, 5);
-  const sinTildes = (col: string) =>
-    `translate(lower(${col}), 'áéíóúàèìòùäëïöüâêîôûñ', 'aeiouaeiouaeiouaeioun')`;
-  for (const palabra of palabras) {
-    values.push(`%${palabra}%`);
-    const t = `$${String(values.length)}`;
-    const doc = palabra.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    let porDoc = "";
-    if (doc !== "") {
-      values.push(`%${doc}%`);
-      porDoc = `OR upper(regexp_replace(b.doc_numero, '[^0-9A-Za-z]', '', 'g')) LIKE $${String(values.length)}`;
-    }
-    cond.push(`(${sinTildes("b.nombres")} LIKE ${t} OR ${sinTildes("b.apellidos")} LIKE ${t}
-       OR lower(u.username) LIKE ${t} ${porDoc})`);
-  }
-  values.push(MAX_FILAS);
-
-  return queryRows<AgendadoWelcome>(
-    `SELECT r.id AS "reservaId", w.id AS "welcomeId", w.starts_at AS "startsAt",
-            w.duracion_min AS "duracionMin", ${NOMBRE_GUIA} AS guia, w.nivel,
-            b.id AS "childPersonId", b.nombres || ' ' || b.apellidos AS nombre,
-            b.doc_numero AS documento, u.username, b.country_code AS pais,
-            m.campania, m.curso, m.salon, ap.nombre AS apoderado,
-            COALESCE(ap.telefono, b.telefono) AS telefono, r.asistio,
-            CASE WHEN r.agendado_por IS NULL THEN NULL
-                 ELSE (SELECT username FROM identity_user WHERE id = r.agendado_por) END
-              AS "agendadoPor"
-       FROM scheduling_welcome_reserva r
-       JOIN scheduling_welcome w ON w.id = r.welcome_id
-       JOIN people_person b ON b.id = r.child_person_id
-       LEFT JOIN identity_user u ON u.id = b.user_id
-       JOIN identity_user gu ON gu.id = w.guia_user_id
-       ${JOIN_NOMBRE_GUIA}
-       LEFT JOIN LATERAL (
-            SELECT ca.id AS campaign_id, ca.nombre AS campania, co.tipo::text AS curso,
-                   cl.id AS classroom_id, cl.nombre AS salon
-              FROM enrollment_enrollment e
-              JOIN scheduling_classroom cl ON cl.id = e.classroom_id
-              JOIN catalog_course co ON co.id = cl.course_id
-              JOIN catalog_campaign ca ON ca.id = co.campaign_id
-             WHERE e.child_person_id = b.id AND e.estado IN ('ACTIVA', 'RESERVADA')
-             ORDER BY e.created_at DESC LIMIT 1) m ON true
-       LEFT JOIN LATERAL (
-            SELECT p.nombres || ' ' || p.apellidos AS nombre, p.telefono
-              FROM people_guardianship g JOIN people_person p ON p.id = g.apoderado_id
-             WHERE g.nino_id = b.id
-             ORDER BY (p.telefono IS NULL OR p.telefono = ''), p.nombres
-             LIMIT 1) ap ON true
-      WHERE r.estado = 'ACTIVA'
-        AND (w.starts_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
-        AND ($4::text[] IS NULL OR b.country_code = ANY($4::text[]))
-        ${cond.map((c) => `AND ${c}`).join("\n        ")}
-      ORDER BY w.starts_at DESC, b.apellidos, b.nombres
-      LIMIT $${String(values.length)}`,
     values,
   );
 }

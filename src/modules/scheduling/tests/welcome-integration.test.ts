@@ -16,7 +16,15 @@ import {
   marcarAsistenciaEventoAdmin,
 } from "../application/crear-evento";
 import { crearSalon } from "../application/gestion-salones";
-import { agendadosWelcome } from "../application/servicio";
+import {
+  agendadosWelcome,
+  candidatosVideoWelcome,
+  enviarVideosWelcome,
+  guardarVideoWelcome,
+  reagendamientosWelcome,
+  videoWelcome,
+} from "../application/servicio-welcome";
+import { setSenderForTests, type MensajeSaliente } from "@/modules/notifications";
 import {
   crearWelcome,
   detalleWelcome,
@@ -138,6 +146,10 @@ describe.runIf(RUN)("Welcome (integración)", () => {
 
   afterAll(async () => {
     await execute(`DELETE FROM scheduling_welcome WHERE id = ANY($1)`, [welcomes]);
+    await execute(
+      `DELETE FROM people_guardianship WHERE nino_id = ANY($1) OR apoderado_id = ANY($1)`,
+      [ninos],
+    );
     await execute(`DELETE FROM people_person WHERE id = ANY($1)`, [ninos]);
     for (const cl of [junior, youngster]) {
       await execute(`DELETE FROM scheduling_session WHERE classroom_id = $1`, [cl]);
@@ -426,15 +438,103 @@ describe.runIf(RUN)("Welcome (integración)", () => {
         buscar: `welcome${marca}`,
       };
       const todos = await agendadosWelcome(base);
-      expect(todos.find((a) => a.childPersonId === c)?.asistio).toBe(true);
+      expect(todos.find((a) => a.childPersonId === c)?.estado).toBe("ASISTIO");
       expect(
-        (await agendadosWelcome({ ...base, asistencia: "SI" })).map((a) => a.childPersonId),
+        (await agendadosWelcome({ ...base, estado: "ASISTIO" })).map((a) => a.childPersonId),
       ).toContain(c);
       expect(
-        (await agendadosWelcome({ ...base, asistencia: "NO" })).map((a) => a.childPersonId),
+        (await agendadosWelcome({ ...base, estado: "NO_ASISTIO" })).map((a) => a.childPersonId),
       ).not.toContain(c);
       // El niño es de Chile: quien solo ve Colombia no lo ve.
       expect(await agendadosWelcome({ ...base, countryScope: ["CO"] })).toHaveLength(0);
+    },
+  );
+
+  it(
+    "como MOSAICO: el Welcome perdido no se borra, se reagenda, tope de 2 y luego el video",
+    { timeout: 30_000 },
+    async () => {
+      // Un niño con apoderado (el video va al apoderado).
+      const d = randomUUID();
+      const apoderado = randomUUID();
+      await execute(
+        `INSERT INTO people_person (id, nombres, apellidos, doc_tipo, doc_numero, country_code, updated_at)
+         VALUES ($1, 'Niño', $2, 'TI', $3, 'CL', now()),
+                ($4, 'Mamá', $2, 'CC', $5, 'CL', now())`,
+        [d, `Welcome${marca}`, `W${marca}-4`, apoderado, `W${marca}-A`],
+      );
+      await execute(`UPDATE people_person SET telefono = '912345678' WHERE id = $1`, [apoderado]);
+      await execute(
+        `INSERT INTO people_guardianship (id, nino_id, apoderado_id, parentesco)
+         VALUES ($1, $2, $3, 'MADRE')`,
+        [randomUUID(), d, apoderado],
+      );
+      ninos.push(d, apoderado);
+      const pasar = (welcomeId: string) =>
+        execute(
+          `UPDATE scheduling_welcome SET starts_at = now() - interval '2 days',
+                  fecha = (now() - interval '2 days')::date WHERE id = $1`,
+          [welcomeId],
+        );
+      const base = { countryScope: null, zona: "America/Santiago", buscar: `W${marca}-4` };
+
+      // Faltó al primero: sale en Reagendamientos, sin reagendar.
+      const w1 = await nuevo({ fecha: dias(16) });
+      await reservar(w1, d, junior);
+      await pasar(w1);
+      let faltas = await reagendamientosWelcome(base);
+      expect(faltas.map((x) => x.welcomeId)).toEqual([w1]);
+      expect(faltas[0]?.reagendadoA).toBeNull();
+      expect((await agendadosWelcome(base))[0]?.estado).toBe("NO_ASISTIO");
+
+      // Se le reagenda: la reserva perdida NO se borra (REAGENDADA) y el nuevo se ve.
+      const w2 = await nuevo({ fecha: dias(17) });
+      await reservar(w2, d, junior);
+      expect((await detalleWelcome(w1)).inscritos.map((i) => i.childPersonId)).toContain(d);
+      faltas = await reagendamientosWelcome(base);
+      expect(faltas[0]?.reagendadoA).not.toBeNull();
+      expect(await reagendamientosWelcome({ ...base, soloSinReagendar: true })).toHaveLength(0);
+
+      // Faltó también al segundo: el tope de 2 no deja un tercero; toca el video.
+      await pasar(w2);
+      const w3 = await nuevo({ fecha: dias(18) });
+      await expect(reservar(w3, d, junior)).rejects.toBeInstanceOf(ConflictError);
+      const candidatos = await candidatosVideoWelcome(base);
+      expect(candidatos.map((x) => x.childPersonId)).toEqual([d]);
+      expect(candidatos[0]?.perdidos).toBe(2);
+
+      // Sin enlace configurado no se envía; con enlace, sale al apoderado.
+      const enviados: MensajeSaliente[] = [];
+      setSenderForTests({
+        enviar: (m) => {
+          enviados.push(m);
+          return Promise.resolve({ ok: true });
+        },
+      });
+      const previo = await videoWelcome();
+      try {
+        await guardarVideoWelcome({ actorUserId: actor, enlace: "https://youtu.be/bienvenida" });
+        const [r] = await enviarVideosWelcome({
+          actorUserId: actor,
+          childPersonIds: [d],
+          countryScope: null,
+        });
+        expect(r?.ok).toBe(true);
+        expect(enviados.at(-1)?.destinatario).toBe("56912345678");
+        expect(enviados.at(-1)?.mensaje).toContain("https://youtu.be/bienvenida");
+        // Cuenta como Welcome hecho: sale de Reagendamientos y queda "VIDEO".
+        expect(await reagendamientosWelcome(base)).toHaveLength(0);
+        expect((await agendadosWelcome(base)).every((a) => a.estado === "VIDEO")).toBe(true);
+        expect((await candidatosVideoWelcome(base))[0]?.envios).toBe(1);
+      } finally {
+        setSenderForTests(null);
+        await execute(`DELETE FROM notifications_outbox WHERE child_person_id = $1`, [d]);
+        if (previo.enlace !== null) {
+          await guardarVideoWelcome({ actorUserId: actor, enlace: previo.enlace });
+        } else {
+          await execute(`DELETE FROM platform_config WHERE clave = 'welcome_video_url'`, []);
+        }
+      }
     },
   );
 });
