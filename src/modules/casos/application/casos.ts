@@ -358,7 +358,7 @@ export async function reportesDeSesion(
 
 // —— Gestionar ———————————————————————————————————————————————————————————
 
-/** Servicio ASIGNA el caso a un área (o un área lo deriva a Finanzas). */
+/** Servicio ASIGNA el caso a un área (o Servicio Académico lo escala a Dirección). */
 export async function asignarCaso(input: {
   actorUserId: string;
   casoId: string;
@@ -641,13 +641,7 @@ export interface FilaCaso {
 }
 
 /** Las bandejas de Servicio › Casos de atención. */
-export const VISTAS = [
-  "SIN_ASIGNAR",
-  "ACADEMICO",
-  "COORDINACION",
-  "FINANZAS",
-  "HISTORICO",
-] as const;
+export const VISTAS = ["SIN_ASIGNAR", "ACADEMICO", "DIRECCION", "HISTORICO"] as const;
 export type Vista = (typeof VISTAS)[number];
 
 export interface FiltrosBandeja {
@@ -777,7 +771,7 @@ export async function bandejaCasos(f: FiltrosBandeja): Promise<{
   );
   return {
     casos,
-    conteos: fila ?? { SIN_ASIGNAR: 0, ACADEMICO: 0, COORDINACION: 0, FINANZAS: 0, HISTORICO: 0 },
+    conteos: fila ?? { SIN_ASIGNAR: 0, ACADEMICO: 0, DIRECCION: 0, HISTORICO: 0 },
   };
 }
 

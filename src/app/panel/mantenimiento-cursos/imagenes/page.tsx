@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { armarZip, descargarBytes } from "@/ui/zip";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 type Tipo = "banner" | "premio" | "unidad" | "insignia" | "mapa" | "vobo";
@@ -90,6 +91,8 @@ export default function ImagenesCursoPage() {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  /** false = quieto; true o "3/40" = descargando todas. */
+  const [descargando, setDescargando] = useState<boolean | string>(false);
 
   const def = TIPOS.find((t) => t.valor === tipo) ?? TIPOS[0]!;
   const usaCurso = tipo !== "vobo";
@@ -173,6 +176,96 @@ export default function ImagenesCursoPage() {
     }
   }
 
+  /** Nombre del archivo descargado: dice qué es y de dónde, sin abrirlo. */
+  function nombreArte(a: {
+    tipo: string;
+    curso: string | null;
+    nivel: string | null;
+    parada: number | null;
+    mime: string;
+  }): string {
+    const ext = a.mime === "image/png" ? "png" : a.mime === "image/jpeg" ? "jpg" : "webp";
+    const partes = [
+      a.tipo === "unidad" ? "lamina" : a.tipo,
+      a.curso,
+      a.nivel,
+      a.parada === null ? null : etiquetaParada(a.parada).replace(" ", "-"),
+    ].filter((p): p is string => p !== null);
+    return `${partes.join("_")}.${ext}`;
+  }
+
+  /** La imagen que se está viendo, con un nombre que dice cuál es. */
+  async function descargarActual() {
+    if (actualUrl === null) return;
+    setMsg(null);
+    const res = await apiFetch(actualUrl);
+    if (!res.ok) {
+      setMsg("No se pudo descargar la imagen.");
+      return;
+    }
+    const blob = await res.blob();
+    const datos = new Uint8Array(await blob.arrayBuffer());
+    descargarBytes(
+      nombreArte({
+        tipo,
+        curso: usaCurso ? curso : null,
+        nivel: usaNivel ? nivel : null,
+        parada: usaUnidad ? unidad : null,
+        mime: blob.type,
+      }),
+      datos,
+      blob.type,
+    );
+  }
+
+  /**
+   * TODAS las imágenes asignadas en un ZIP, en carpetas por tipo y curso. Se
+   * bajan de a una por la misma ruta autenticada que las muestra.
+   */
+  async function descargarTodas() {
+    setDescargando(true);
+    setMsg(null);
+    try {
+      const res = await apiFetch("/api/catalog/imagen-curso/asignadas");
+      if (!res.ok) {
+        setMsg("No se pudo obtener la lista de imágenes.");
+        return;
+      }
+      const { imagenes } = (await res.json()) as {
+        imagenes: {
+          tipo: string;
+          curso: string | null;
+          nivel: string | null;
+          parada: number | null;
+          mime: string;
+          url: string;
+        }[];
+      };
+      if (imagenes.length === 0) {
+        setMsg("Todavía no hay imágenes asignadas.");
+        return;
+      }
+      const archivos: { nombre: string; datos: Uint8Array }[] = [];
+      for (const [i, img] of imagenes.entries()) {
+        setDescargando(`${String(i + 1)}/${String(imagenes.length)}`);
+        const r = await apiFetch(img.url);
+        if (!r.ok) continue;
+        const carpeta = TIPOS.find((t) => t.valor === img.tipo)?.etiqueta ?? img.tipo;
+        archivos.push({
+          nombre: `${carpeta}/${img.curso ?? "global"}/${nombreArte(img)}`,
+          datos: new Uint8Array(await r.arrayBuffer()),
+        });
+      }
+      const hoy = new Date().toISOString().slice(0, 10);
+      descargarBytes(`imagenes-curso-${hoy}.zip`, armarZip(archivos), "application/zip");
+      setMsg(`✔ ${String(archivos.length)} imagen(es) descargadas en un ZIP.`);
+    } catch {
+      setMsg("Error de conexión al descargar.");
+    } finally {
+      setDescargando(false);
+    }
+  }
+
   const muestraUrl = previo ?? actualUrl;
   // Tablero de ajedrez para PNGs transparentes (premio/vobo).
   const checker = "repeating-conic-gradient(#e9edf5 0% 25%, #ffffff 0% 50%) 50% / 18px 18px";
@@ -182,7 +275,38 @@ export default function ImagenesCursoPage() {
       <Link href="/panel/mantenimiento-cursos" style={{ fontSize: "0.9rem" }}>
         ← Mantenimiento Académico
       </Link>
-      <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Imágenes de curso</h1>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "0.75rem",
+          flexWrap: "wrap",
+          marginTop: "0.5rem",
+        }}
+      >
+        <h1 style={{ fontSize: "1.5rem", margin: 0 }}>Imágenes de curso</h1>
+        <button
+          type="button"
+          onClick={() => void descargarTodas()}
+          disabled={descargando !== false}
+          title="Todas las imágenes asignadas (banners, láminas, insignias, premios, mapas y VoBo), en carpetas por tipo y curso"
+          style={{
+            padding: "0.5rem 1.1rem",
+            borderRadius: "0.6rem",
+            border: "1.5px solid #d8dce6",
+            background: "white",
+            fontWeight: 700,
+            cursor: descargando !== false ? "wait" : "pointer",
+          }}
+        >
+          {descargando === false
+            ? "⬇ Descargar todas (ZIP)"
+            : typeof descargando === "string"
+              ? `Descargando ${descargando}…`
+              : "Preparando…"}
+        </button>
+      </div>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
         Arte curricular del panel del alumno: <strong>banners/mapas de nivel</strong>, las{" "}
         <strong>láminas</strong> e <strong>insignias</strong> de cada parada,{" "}
@@ -260,9 +384,28 @@ export default function ImagenesCursoPage() {
 
       {/* Previo (cómo se verá) */}
       <div style={{ marginTop: "1.25rem" }}>
-        <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--texto-suave)" }}>
-          {previo !== null ? "PREVIO (a subir)" : "IMAGEN ACTUAL"}
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--texto-suave)" }}>
+            {previo !== null ? "PREVIO (a subir)" : "IMAGEN ACTUAL"}
+          </p>
+          {previo === null && actualUrl !== null && (
+            <button
+              type="button"
+              onClick={() => void descargarActual()}
+              style={{
+                padding: "0.25rem 0.7rem",
+                borderRadius: "0.5rem",
+                border: "1.5px solid #d8dce6",
+                background: "white",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+              }}
+            >
+              ⬇ Descargar
+            </button>
+          )}
+        </div>
         <div
           style={{
             marginTop: "0.4rem",

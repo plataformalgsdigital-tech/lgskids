@@ -26,6 +26,7 @@ export {
   cursoReferenciaDeleteHandler,
   imagenCursoSubirHandler,
   imagenCursoInfoHandler,
+  imagenesAsignadasHandler,
   imagenCursoServeHandler,
   avisoLoginPublicoHandler,
   avisoLoginImagenHandler,

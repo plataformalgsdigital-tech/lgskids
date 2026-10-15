@@ -5,6 +5,7 @@ import { descargarArchivo } from "@/modules/files";
 import { handler, handlerWithAuth, json } from "@/platform/http/handler";
 import { NotFoundError, ValidationError } from "@/platform/errors";
 import {
+  arteAsignado,
   arteId,
   descargarImagenCurso,
   subirArte,
@@ -397,6 +398,19 @@ export const imagenCursoInfoHandler = handlerWithAuth(async (request, auth) => {
     unidadParam(q.get("unidad")),
   );
   return json({ id, url: id !== null ? `/api/catalog/imagen-curso/${id}` : null });
+});
+
+/**
+ * GET /api/catalog/imagen-curso/asignadas — todo el arte vigente, con su URL,
+ * para descargarlo de una vez desde Imágenes de curso.
+ */
+export const imagenesAsignadasHandler = handlerWithAuth(async (_request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CATALOGO_VER);
+  const arte = await arteAsignado();
+  return json({
+    imagenes: arte.map((a) => ({ ...a, url: `/api/catalog/imagen-curso/${a.id}` })),
+  });
 });
 
 /** GET /api/catalog/imagen-curso/[id] — sirve la imagen (autenticado; arte curricular). */

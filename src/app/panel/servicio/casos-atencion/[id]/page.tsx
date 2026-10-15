@@ -194,8 +194,9 @@ export default function CasoPage() {
     externalRef: caso.externalRef,
     numero: caso.contratoNumero,
   }).numero;
-  // La misma regla del dominio: sin área, a cualquiera; desde un área, solo a Finanzas.
-  const puedeDerivar = caso.area !== "FINANZAS";
+  // La misma regla del dominio: sin área, a cualquiera; desde un área, solo se
+  // escala a Dirección, que es la última.
+  const puedeDerivar = caso.area !== voc.escalaA;
 
   return (
     <main
@@ -257,7 +258,9 @@ export default function CasoPage() {
           <div style={{ display: "flex", gap: "0.5rem" }}>
             {puedeDerivar && (
               <button type="button" style={boton} onClick={() => setModal("asignar")}>
-                {caso.area === null ? "Asignar a un área" : "Derivar a Finanzas"}
+                {caso.area === null
+                  ? "Asignar a un área"
+                  : `Escalar a ${etiqueta(voc.areas, voc.escalaA)}`}
               </button>
             )}
             <button

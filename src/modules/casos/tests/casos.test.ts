@@ -23,7 +23,7 @@ describe("casos de atención: reglas", () => {
     }
   });
 
-  it("asignar: sin área a cualquiera; desde un área, solo a Finanzas; cerrado, nada", () => {
+  it("asignar: sin área a cualquiera; Servicio Académico escala a Dirección; cerrado, nada", () => {
     expect(
       problemaTransicion(
         { estado: "EN_GESTION", area: null },
@@ -32,20 +32,27 @@ describe("casos de atención: reglas", () => {
     ).toBeNull();
     expect(
       problemaTransicion(
-        { estado: "REMITIDO_ACADEMICO", area: "ACADEMICO" },
-        { tipo: "ASIGNAR", area: "COORDINACION" },
-      ),
-    ).not.toBeNull();
-    expect(
-      problemaTransicion(
-        { estado: "REMITIDO_COORDINACION", area: "COORDINACION" },
-        { tipo: "ASIGNAR", area: "FINANZAS" },
+        { estado: "EN_GESTION", area: null },
+        { tipo: "ASIGNAR", area: "DIRECCION" },
       ),
     ).toBeNull();
     expect(
       problemaTransicion(
-        { estado: "REMITIDO_FINANZAS", area: "FINANZAS" },
-        { tipo: "ASIGNAR", area: "FINANZAS" },
+        { estado: "REMITIDO_ACADEMICO", area: "ACADEMICO" },
+        { tipo: "ASIGNAR", area: "DIRECCION" },
+      ),
+    ).toBeNull();
+    // Dirección es la última: no se devuelve a Servicio Académico.
+    expect(
+      problemaTransicion(
+        { estado: "REMITIDO_DIRECCION", area: "DIRECCION" },
+        { tipo: "ASIGNAR", area: "ACADEMICO" },
+      ),
+    ).not.toBeNull();
+    expect(
+      problemaTransicion(
+        { estado: "REMITIDO_DIRECCION", area: "DIRECCION" },
+        { tipo: "ASIGNAR", area: "DIRECCION" },
       ),
     ).not.toBeNull();
     expect(
@@ -84,7 +91,7 @@ describe("casos de atención: reglas", () => {
     expect(
       problemaTransicion(
         { estado: "EN_GESTION", area: null },
-        { tipo: "CERRAR", estado: "REMITIDO_FINANZAS" },
+        { tipo: "CERRAR", estado: "REMITIDO_DIRECCION" },
       ),
     ).not.toBeNull();
     expect(problemaCierre("RESUELTO", null)).not.toBeNull();

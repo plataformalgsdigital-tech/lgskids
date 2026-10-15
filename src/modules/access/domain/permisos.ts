@@ -245,6 +245,7 @@ export const SECCIONES_MENU: {
       { etiqueta: "Calendario", permiso: PERMISOS.MENU_CALENDARIO },
       { etiqueta: "Sesiones", permiso: PERMISOS.MENU_SESIONES },
       { etiqueta: "Mantenimiento Académico", permiso: PERMISOS.MENU_MANTENIMIENTO },
+      { etiqueta: "Guías", permiso: PERMISOS.MENU_GUIAS },
     ],
   },
   {
@@ -279,7 +280,6 @@ export const SECCIONES_MENU: {
       { etiqueta: "Usuarios y roles", permiso: PERMISOS.MENU_USUARIOS },
       { etiqueta: "Reportes", permiso: PERMISOS.MENU_REPORTES },
       { etiqueta: "Auditoría", permiso: PERMISOS.MENU_AUDITORIA },
-      { etiqueta: "Guías", permiso: PERMISOS.MENU_GUIAS },
       { etiqueta: "Aviso de login", permiso: PERMISOS.MENU_AVISO_LOGIN },
       { etiqueta: "Mantenimiento", permiso: PERMISOS.MENU_MANTENIMIENTO_ADMIN },
       { etiqueta: "Mensajes", permiso: PERMISOS.MENU_MENSAJES },

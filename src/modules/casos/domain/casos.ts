@@ -8,8 +8,9 @@
  * conclusión.
  *
  * Diferencias deliberadas con MOSAICO:
- *  - Áreas de KIDS: no hay Nivelación (aquí son los REFUERZOS, un estado de
- *    cierre) y Finanzas es la de LGS, que es quien cobra.
+ *  - Áreas de KIDS (2026-10-15, decisión del negocio): SOLO Servicio Académico
+ *    y Dirección. No hay Nivelación (aquí son los REFUERZOS, un estado de
+ *    cierre) ni Finanzas (cobra LGS); "Coordinación" pasó a llamarse Dirección.
  *  - "Abierto" significa UNA sola cosa en todas partes: no estar en un estado
  *    que cierra (`cierraElCaso`). En MOSAICO unas consultas miraban solo
  *    EN_GESTION y otras los estados de cierre, y un caso asignado salía
@@ -32,19 +33,17 @@ export const ETIQUETA_TEMA: Record<Tema, string> = {
 };
 
 /** A qué equipo le toca el caso. NULL = recién abierto, sin asignar. */
-export const AREAS = ["ACADEMICO", "COORDINACION", "FINANZAS"] as const;
+export const AREAS = ["ACADEMICO", "DIRECCION"] as const;
 export type Area = (typeof AREAS)[number];
 export const ETIQUETA_AREA: Record<Area, string> = {
   ACADEMICO: "Servicio Académico",
-  COORDINACION: "Coordinación Académica",
-  FINANZAS: "Finanzas (LGS)",
+  DIRECCION: "Dirección",
 };
 
 export const ESTADOS = [
   "EN_GESTION",
   "REMITIDO_ACADEMICO",
-  "REMITIDO_COORDINACION",
-  "REMITIDO_FINANZAS",
+  "REMITIDO_DIRECCION",
   "RESUELTO",
   "SALON_CAMBIADO",
   "CURSO_CAMBIADO",
@@ -56,8 +55,7 @@ export type Estado = (typeof ESTADOS)[number];
 export const ETIQUETA_ESTADO: Record<Estado, string> = {
   EN_GESTION: "En gestión",
   REMITIDO_ACADEMICO: "Servicio Académico",
-  REMITIDO_COORDINACION: "Coordinación Académica",
-  REMITIDO_FINANZAS: "Finanzas (LGS)",
+  REMITIDO_DIRECCION: "Dirección",
   RESUELTO: "Cerrado",
   SALON_CAMBIADO: "Salón cambiado",
   CURSO_CAMBIADO: "Curso cambiado",
@@ -83,20 +81,23 @@ export function cierraElCaso(estado: Estado): boolean {
 /** El estado con que queda un caso al asignarlo a un área. */
 export const ESTADO_AL_ASIGNAR: Record<Area, Estado> = {
   ACADEMICO: "REMITIDO_ACADEMICO",
-  COORDINACION: "REMITIDO_COORDINACION",
-  FINANZAS: "REMITIDO_FINANZAS",
+  DIRECCION: "REMITIDO_DIRECCION",
 };
 
 /**
  * Con qué puede cerrar cada área (y "sin área", lo que cierra Servicio desde la
- * bandeja). Coordinación puede además derivar a Finanzas, como en MOSAICO.
+ * bandeja). Servicio Académico puede además ESCALAR a Dirección (como en
+ * MOSAICO Coordinación derivaba a Finanzas); Dirección cierra, y suma la pausa
+ * que antes cerraba Finanzas.
  */
 export const CIERRES_POR_AREA: Record<Area | "SIN_AREA", readonly Estado[]> = {
   SIN_AREA: ["RESUELTO", "SIN_CONTACTO"],
   ACADEMICO: ["RESUELTO", "SALON_CAMBIADO", "PAUSA_ACTIVADA", "REFUERZO_AGENDADO", "SIN_CONTACTO"],
-  COORDINACION: ["RESUELTO", "CURSO_CAMBIADO", "REFUERZO_AGENDADO", "SIN_CONTACTO"],
-  FINANZAS: ["RESUELTO", "PAUSA_ACTIVADA", "SIN_CONTACTO"],
+  DIRECCION: ["RESUELTO", "CURSO_CAMBIADO", "PAUSA_ACTIVADA", "REFUERZO_AGENDADO", "SIN_CONTACTO"],
 };
+
+/** El área a la que se escala desde otra; Dirección es la última. */
+export const AREA_DE_ESCALAMIENTO: Area = "DIRECCION";
 
 /** Un caso cerrado es de solo lectura (como en MOSAICO): no hay "reabrir". */
 export type Transicion = { tipo: "ASIGNAR"; area: Area } | { tipo: "CERRAR"; estado: Estado };
@@ -116,9 +117,9 @@ export function problemaTransicion(
   }
   if (t.tipo === "ASIGNAR") {
     if (actual.area === t.area) return `El caso ya está en ${ETIQUETA_AREA[t.area]}.`;
-    // Desde un área solo se deriva a Finanzas (Coordinación → Finanzas).
-    if (actual.area !== null && t.area !== "FINANZAS") {
-      return "Un caso asignado solo se puede derivar a Finanzas; para otra área, ciérralo o reasígnalo desde Servicio.";
+    // Desde un área solo se escala a Dirección (Servicio Académico → Dirección).
+    if (actual.area !== null && t.area !== AREA_DE_ESCALAMIENTO) {
+      return "Un caso asignado solo se puede escalar a Dirección; para otra área, ciérralo.";
     }
     return null;
   }

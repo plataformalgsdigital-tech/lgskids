@@ -177,6 +177,56 @@ export async function voboId(): Promise<string | null> {
   return arteId("vobo");
 }
 
+export interface ArteAsignado {
+  tipo: ArteTipo;
+  curso: string | null;
+  nivel: string | null;
+  parada: number | null;
+  id: string;
+  mime: string;
+}
+
+/**
+ * TODO el arte curricular vigente (la última subida de cada casilla), para
+ * descargarlo de una vez desde Mantenimiento Académico. Recorre las mismas
+ * claves que se pueden subir; el aviso de login no es curricular y no entra.
+ */
+export async function arteAsignado(): Promise<ArteAsignado[]> {
+  const claves: Omit<ArteAsignado, "id" | "mime">[] = [
+    { tipo: "vobo", curso: null, nivel: null, parada: null },
+  ];
+  for (const curso of CURSOS) {
+    claves.push({ tipo: "mapa", curso, nivel: null, parada: null });
+    for (const nivel of [NIVEL_TODOS, ...NIVELES_CODIGO]) {
+      claves.push({ tipo: "banner", curso, nivel, parada: null });
+      if (nivel === NIVEL_TODOS) continue;
+      claves.push({ tipo: "premio", curso, nivel, parada: null });
+      for (const parada of PARADAS) {
+        claves.push({ tipo: "unidad", curso, nivel, parada });
+        claves.push({ tipo: "insignia", curso, nivel, parada });
+      }
+    }
+  }
+  const vigentes = await Promise.all(
+    claves.map(async (c) => {
+      const [archivo] = await listarArchivos({
+        entidad: ENTIDAD_POR_TIPO[c.tipo],
+        entidadId: entidadIdArte(
+          c.tipo,
+          c.curso ?? undefined,
+          c.nivel ?? undefined,
+          c.parada ?? undefined,
+        ),
+        limit: 1,
+      });
+      return archivo !== undefined && MIMES_ARTE.has(archivo.mime)
+        ? { ...c, id: archivo.id, mime: archivo.mime }
+        : null;
+    }),
+  );
+  return vigentes.filter((a): a is ArteAsignado => a !== null);
+}
+
 /**
  * Sirve arte por id, y SOLO imágenes.
  *

@@ -19,6 +19,8 @@ export interface VocabularioCasos {
   estados: (Opcion & { cierra: boolean })[];
   areas: Opcion[];
   cierresPorArea: Record<string, string[]>;
+  /** El área a la que se escala desde otra (la última de la cadena). */
+  escalaA: string;
   canales: string[];
   resultados: Opcion[];
 }
@@ -28,6 +30,7 @@ const VACIO: VocabularioCasos = {
   estados: [],
   areas: [],
   cierresPorArea: {},
+  escalaA: "",
   canales: [],
   resultados: [],
 };

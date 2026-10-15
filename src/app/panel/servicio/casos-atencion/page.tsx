@@ -27,7 +27,7 @@ import { ReportarCasoModal } from "./ReportarCasoModal";
  * Fechas opcionales (sin ellas, todo lo abierto); CSV de lo que está a la vista.
  */
 
-type Vista = "SIN_ASIGNAR" | "ACADEMICO" | "COORDINACION" | "FINANZAS" | "HISTORICO";
+type Vista = "SIN_ASIGNAR" | "ACADEMICO" | "DIRECCION" | "HISTORICO";
 
 interface Fila {
   id: string;
@@ -61,8 +61,7 @@ interface Fila {
 const VISTAS: { valor: Vista; texto: string }[] = [
   { valor: "SIN_ASIGNAR", texto: "Sin asignar" },
   { valor: "ACADEMICO", texto: "Servicio Académico" },
-  { valor: "COORDINACION", texto: "Coordinación" },
-  { valor: "FINANZAS", texto: "Finanzas (LGS)" },
+  { valor: "DIRECCION", texto: "Dirección" },
   { valor: "HISTORICO", texto: "Histórico" },
 ];
 

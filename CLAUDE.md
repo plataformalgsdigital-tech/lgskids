@@ -594,7 +594,13 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
   ejecutarlo fuera de su caja, con la sesión de quien abriera el enlace. **`subirArte` acota a JPG/PNG/WebP**
   (2026-09-11): antes no restringía nada y `files` ya acepta audio, así que un mp3 guardado
   como banner no fallaba al subirse sino al pintarse. UI `/panel/mantenimiento-cursos/imagenes`
-  gana selector de Tipo (previo cuadrado con tablero para PNG transparentes). En
+  gana selector de Tipo (previo cuadrado con tablero para PNG transparentes).
+  **Descargar (2026-10-15)**: "⬇ Descargar" baja la imagen que se está viendo y
+  "⬇ Descargar todas (ZIP)" baja TODO el arte vigente (`GET
+  /api/catalog/imagen-curso/asignadas` → `arteAsignado`, `catalogo.ver`; recorre las
+  mismas claves que se suben, sin el aviso de login) en carpetas por tipo y curso.
+  El ZIP se arma en el navegador SIN compresión (`src/ui/zip.ts`: las imágenes ya
+  vienen comprimidas, y así no hay dependencia nueva). En
   "¿Cómo voy?" el premio de cada nivel se muestra como imagen (respaldo emoji),
   sombreado→a color al completar.
 - **Pantalla "Avance" + hotspots (2026-08-26, Fase B)**: migración
@@ -1464,7 +1470,9 @@ solo servía para completar la ficha.
 
 - El menú lateral se declara UNA vez en `SECCIONES_MENU` (`access/domain/permisos.ts`)
   como árbol padre→hijos: **Tablero** (suelto, primero) · **Académica** (Calendario,
-  Mantenimiento Académico) · **Operación** (Kids, Contratos, **Gestión de
+  Sesiones, Mantenimiento Académico y **Guías** —desde 2026-10-15; estaba en
+  Administración: la migración `20261015200000` da `seccion.academica` a quien tiene
+  `menu.guias`—) · **Operación** (Kids, Contratos, **Gestión de
   Reservas** —antes "Reservas (LGS)", renombrado 2026-10-07—) ·
   **Servicio** (2026-10-14: Welcome, Asistencia, Sesiones, Usuarios sin perfil creado,
   Casos de atención y Reactivados. **Asistencia** (`/panel/servicio/asistencia` →
@@ -1507,7 +1515,7 @@ solo servía para completar la ficha.
   → `GET /api/contracts/ninos/sin-perfil` → `ninosSinPerfil`: niños con contrato
   APROBADO sin `perfil_completado_en`, con el estado de su último enlace y los
   botones "Con Welcome" / "Sin Welcome", que usan la MISMA ruta de la ficha) ·
-  **Administración** (Usuarios y roles, Reportes, Auditoría, Guías, Aviso de login,
+  **Administración** (Usuarios y roles, Reportes, Auditoría, Aviso de login,
   **Mantenimiento** — cargas masivas, hoy el catálogo Curso por CSV —, **Mensajes**) ·
   **Guía** (Mis clases, Mis salones, Mis niños).
 - **Cada ítem exige DOS permisos**: el funcional (lo que la pantalla hace) y el de
@@ -1947,10 +1955,14 @@ Servicio lo ASIGNA a un área, el área contacta a la familia, registra el acuer
 CIERRA con su conclusión.
 
 - **Reglas puras en `casos/domain/casos.ts`** (con pruebas): tipos (Asistencia,
-  Conducta, Desempeño, Salud, Pago, Otro), estados, ÁREAS de KIDS (Servicio Académico,
-  Coordinación Académica, Finanzas de LGS — no hay Nivelación: aquí es el estado de
-  cierre "Refuerzo agendado"), `CIERRES_POR_AREA`, `problemaTransicion` (desde un área
-  solo se deriva a Finanzas; cerrado = solo lectura, no se reabre), `problemaCierre`
+  Conducta, Desempeño, Salud, Pago, Otro), estados, ÁREAS de KIDS: **solo Servicio
+  Académico y Dirección** (2026-10-15, decisión del negocio: "Coordinación" se
+  renombró Dirección —también el valor guardado, `DIRECCION`/`REMITIDO_DIRECCION`,
+  migración `20261015100000_casos_direccion`— y Finanzas se quitó; no hay
+  Nivelación: aquí es el estado de cierre "Refuerzo agendado"), `CIERRES_POR_AREA`
+  (Dirección suma la pausa que cerraba Finanzas), `problemaTransicion` (desde un
+  área solo se ESCALA a Dirección, `AREA_DE_ESCALAMIENTO`, que el vocabulario sirve
+  como `escalaA`; cerrado = solo lectura, no se reabre), `problemaCierre`
   (acuerdo obligatorio salvo "Sin poder contactar"; la fecha de compromiso es
   opcional), `reincidencia` por reglas (MOSAICO usaba IA) y el código
   `CA-<contrato>-NN` por CONTRATO (N° de LGS sin el sufijo, o `K<numero>`), con
@@ -1973,8 +1985,7 @@ CIERRA con su conclusión.
   ("+ Adicionar caso": campaña → curso → salón → niño, opcionalmente a nombre de un
   guía), `casos.gestionar`.
 - **Bandeja** `/panel/servicio/casos-atencion` (`GET /api/casos?vista=` →
-  `bandejaCasos`): Sin asignar · Servicio Académico · Coordinación · Finanzas ·
-  Histórico, con conteos, filtros comunes de Servicio + tipo y origen, fechas
+  `bandejaCasos`): Sin asignar · Servicio Académico · Dirección · Histórico, con conteos, filtros comunes de Servicio + tipo y origen, fechas
   opcionales (apertura; en el histórico, cierre), "Asignar" (`GestionarCasoModal`: a un
   área con comentario, o cerrar con conclusión, acuerdo, "no continúa" y firma) y CSV.
   **Caso** `/panel/servicio/casos-atencion/[id]` (`GET|POST /api/casos/[id]`): KPIs,

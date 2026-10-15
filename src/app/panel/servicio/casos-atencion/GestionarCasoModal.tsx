@@ -66,9 +66,9 @@ export function GestionarCasoModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCerrar]);
 
-  // Desde un área solo se deriva a Finanzas; sin área, a cualquiera.
+  // Sin área, a cualquiera; desde un área, solo se escala a Dirección.
   const areasPosibles = voc.areas.filter((a) =>
-    caso.area === null ? true : a.valor === "FINANZAS" && caso.area !== "FINANZAS",
+    caso.area === null ? true : a.valor === voc.escalaA && caso.area !== voc.escalaA,
   );
   const sinContacto = estado === "SIN_CONTACTO";
   const listo =

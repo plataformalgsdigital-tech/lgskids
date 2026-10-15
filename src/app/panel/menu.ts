@@ -77,6 +77,16 @@ export const MENU: {
     href: "/panel/mantenimiento-cursos",
     permisoMenu: "menu.mantenimiento",
   },
+  {
+    // En Académica desde 2026-10-15 (estaba en Administración): los guías son
+    // equipo académico. El permiso no cambia.
+    seccion: "Académica",
+    permiso: "usuarios.gestionar",
+    permisoMenu: "menu.guias",
+    etiqueta: "Guías",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/guias",
+  },
   // ── Operación ──────────────────────────────────────────────
   {
     seccion: "Operación",
@@ -170,14 +180,6 @@ export const MENU: {
     color: "var(--lgs-cian)",
     href: "/panel/usuarios",
     permisoMenu: "menu.usuarios",
-  },
-  {
-    seccion: "Administración",
-    permiso: "usuarios.gestionar",
-    permisoMenu: "menu.guias",
-    etiqueta: "Guías",
-    color: "var(--lgs-amarillo)",
-    href: "/panel/guias",
   },
   {
     seccion: "Administración",

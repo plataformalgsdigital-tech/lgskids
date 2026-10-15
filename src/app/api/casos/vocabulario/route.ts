@@ -1,6 +1,7 @@
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import {
   AREAS,
+  AREA_DE_ESCALAMIENTO,
   CANALES,
   CIERRES_POR_AREA,
   ESTADOS,
@@ -42,6 +43,8 @@ export const GET = handlerWithAuth(async (_request, auth) => {
       })),
       areas: AREAS.map((v) => ({ valor: v, etiqueta: ETIQUETA_AREA[v] })),
       cierresPorArea: CIERRES_POR_AREA,
+      // Desde un área solo se escala a esta (hoy, Dirección).
+      escalaA: AREA_DE_ESCALAMIENTO,
       canales: CANALES,
       resultados: RESULTADOS.map((v) => ({ valor: v, etiqueta: ETIQUETA_RESULTADO[v] })),
     },
