@@ -10,6 +10,7 @@ import { AcademicInfo } from "./AcademicInfo";
 import { EnviarCredencialesModal } from "./EnviarCredencialesModal";
 import { CasosNino } from "./CasosNino";
 import { PerfilWelcome } from "./PerfilWelcome";
+import { CURSO_UI, ubicacionActual, type Progreso } from "./ubicacion";
 
 interface Nino {
   id: string;
@@ -114,6 +115,7 @@ export default function DetalleNinoPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [nino, setNino] = useState<Nino | null>(null);
+  const [progreso, setProgreso] = useState<Progreso | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [puedeVerClaves, setPuedeVerClaves] = useState(false);
   const [puedeEnviarMensajes, setPuedeEnviarMensajes] = useState(false);
@@ -158,6 +160,10 @@ export default function DetalleNinoPage() {
       setNino(data.nino ?? null);
       setPuedeVerClaves(data.puedeVerClaves === true);
       setPuedeEnviarMensajes(data.puedeEnviarMensajes === true);
+      // Dónde va (curso, nivel, lección): el MISMO avance que lee Academic Info.
+      // Sin `progresion.ver` la línea simplemente no se muestra.
+      const rp = await apiFetch(`/api/progression/children/${params.id}`);
+      setProgreso(rp.ok ? ((await rp.json()) as Progreso) : null);
     }
     void cargar();
   }, [params.id, router, recarga]);
@@ -181,6 +187,7 @@ export default function DetalleNinoPage() {
   }
 
   const nc = numeroContrato({ externalRef: nino.externalRef, numero: nino.contratoNumero });
+  const ubic = ubicacionActual(progreso);
 
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
@@ -215,6 +222,24 @@ export default function DetalleNinoPage() {
                 {nino.estado}
               </span>
             </p>
+            {progreso !== null && (
+              <p style={{ margin: "0.3rem 0 0", color: "var(--texto-suave)", fontSize: "0.9rem" }}>
+                Curso:{" "}
+                <strong>
+                  {progreso.curso !== null
+                    ? (CURSO_UI[progreso.curso.tipo] ?? progreso.curso.tipo)
+                    : cursoLabel(nino.curso)}
+                </strong>{" "}
+                · Nivel:{" "}
+                <strong>{ubic.egresado ? "🎓 Egresado" : (ubic.nivelActual?.nombre ?? "—")}</strong>{" "}
+                · Lección:{" "}
+                <strong>
+                  {ubic.leccionActual !== null && ubic.nivelActual !== null
+                    ? `${String(ubic.leccionActual)} de ${String(ubic.nivelActual.totalLecciones)}`
+                    : "—"}
+                </strong>
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
             <span style={badge("#ede7f6", "#4527a0")}>BENEFICIARIO</span>

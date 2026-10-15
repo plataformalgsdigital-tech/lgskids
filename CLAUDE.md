@@ -191,6 +191,10 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   clave se ve con "Ver clave" SOLO si quien mira es superadmin (la respuesta trae
   `puedeVerClaves` y `userId`; la ruta de la bóveda lo vuelve a exigir). El guía
   sale por su NOMBRE (`scheduling_guia`), no por el usuario generado.
+  **El encabezado dice dónde va (2026-10-15)**: una línea "Curso · Nivel · Lección"
+  bajo la de ID/Contrato/Programa, leída del MISMO avance que Academic Info
+  (`personas/[id]/ubicacion.ts`, `ubicacionActual`: primer nivel sin completar y la
+  práctica que sigue, "N de 4"); sin `progresion.ver` no se muestra.
   **Dos pestañas (2026-10-03): General Info** (todo lo anterior) y **Academic Info**
   (`personas/[id]/AcademicInfo.tsx`): ubicación (curso, nivel, salón, lección) con
   el botón **Academic Change**, el avance por nivel (completado / convalidado / en

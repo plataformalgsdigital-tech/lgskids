@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { AcademicChangeModal } from "./AcademicChangeModal";
+import { CURSO_UI, ubicacionActual, type Progreso } from "./ubicacion";
 
 /**
  * ACADEMIC INFO de la ficha del niño: dónde está (curso, nivel, salón,
@@ -11,24 +12,6 @@ import { AcademicChangeModal } from "./AcademicChangeModal";
  * función central y la asistencia de las marcas; nada se recalcula aquí.
  */
 
-interface Nivel {
-  levelId: string;
-  codigo: string;
-  nombre: string;
-  orden: number;
-  leccionesCompletadas: number;
-  totalLecciones: number;
-  levelUpAprobado: boolean;
-  estado: "EN_CURSO" | "COMPLETADO" | "PENDIENTE";
-  medalla: boolean;
-  convalidado: boolean;
-}
-interface Progreso {
-  curso: { courseId: string; tipo: string; campania: string } | null;
-  niveles: Nivel[];
-  diploma: boolean;
-  ubicacion: { levelId: string; lecciones: number; motivo: string; actualizada: string } | null;
-}
 type Estado = "PRESENTE" | "AUSENTE" | "JUSTIFICADO";
 interface Fila {
   sessionId: string;
@@ -53,7 +36,6 @@ const NIVEL_UI: Record<string, string> = {
   LEGENDARY: "Legendary",
   ULTIMATE: "Ultimate Stage",
 };
-const CURSO_UI: Record<string, string> = { JUNIOR: "Junior (6–9)", YOUNGSTER: "Youngster (10–13)" };
 const TIPO_UI: Record<string, { texto: string; bg: string; fg: string }> = {
   SESION: { texto: "SESIÓN", bg: "#e3f2fd", fg: "#0d47a1" },
   CLUB: { texto: "CLUB", bg: "#e8f5e9", fg: "#1b5e20" },
@@ -163,14 +145,7 @@ export function AcademicInfo(props: {
     };
   }, [cargar]);
 
-  // Dónde va: el primer nivel sin completar y la lección que le sigue a las
-  // cursadas (la misma regla del panel del niño).
-  const nivelActual = progreso?.niveles.find((n) => n.estado !== "COMPLETADO") ?? null;
-  const leccionActual =
-    nivelActual !== null
-      ? Math.min(nivelActual.leccionesCompletadas + 1, nivelActual.totalLecciones)
-      : null;
-  const egresado = progreso !== null && progreso.niveles.length > 0 && nivelActual === null;
+  const { nivelActual, leccionActual, egresado } = ubicacionActual(progreso);
 
   const guias = useMemo(
     () => [...new Set((filas ?? []).map((x) => x.guia).filter((g): g is string => g !== null))],
