@@ -323,6 +323,13 @@ export const BASE_DE_OPCION: ReadonlyMap<string, readonly string[]> = new Map(
 );
 
 /** Los códigos `op.*`, para el catálogo y la matriz de roles. */
+/**
+ * Tope de permisos que acepta guardar UN rol. Era 100, y con las ~100 opciones
+ * de pantalla cualquier rol lo pasaba: guardar respondía "La entrada no es
+ * válida". `opciones.test.ts` comprueba que el catálogo entero quepa.
+ */
+export const MAX_PERMISOS_POR_ROL = 1000;
+
 export const CODIGOS_OP: readonly OpCode[] = OPCIONES_MENU.map((o) => o.permiso).filter(
   (c): c is OpCode => c.startsWith("op."),
 );

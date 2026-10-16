@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ForbiddenError } from "@/platform/errors";
 import { AccessProfile } from "../application/profile";
-import { CODIGOS_OP, OPCIONES_MENU } from "../domain/opciones";
+import { CODIGOS_OP, MAX_PERMISOS_POR_ROL, OPCIONES_MENU } from "../domain/opciones";
 import { MATRIZ_ROL_PERMISOS, PERMISOS, SECCIONES_MENU } from "../domain/permisos";
 
 const perfil = (permisos: string[]) =>
@@ -33,6 +33,13 @@ describe("opciones de pantalla (tercer nivel del árbol)", () => {
     for (const o of OPCIONES_MENU) expect(menus, o.permiso).toContain(o.menu);
     const codigos = OPCIONES_MENU.map((o) => o.permiso);
     expect(new Set(codigos).size).toBe(codigos.length);
+  });
+
+  it("un rol con TODO marcado se puede guardar (el tope del PUT alcanza)", () => {
+    // Con el tope en 100, quitarle un par de casillas a Servicio respondía
+    // "La entrada no es válida": el rol seguía teniendo más de 100.
+    const todos = new Set<string>([...Object.values(PERMISOS), ...CODIGOS_OP]);
+    expect(todos.size).toBeLessThanOrEqual(MAX_PERMISOS_POR_ROL);
   });
 
   it("su base es un permiso del catálogo, y la reutilizada ya existe", () => {

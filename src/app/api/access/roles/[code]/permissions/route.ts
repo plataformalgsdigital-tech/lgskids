@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  MAX_PERMISOS_POR_ROL,
   PERMISOS,
   actualizarPermisosDeRol,
   getAccessProfile,
@@ -27,7 +28,9 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
   return json(await permisosDeRol(await codeFromContext(context)));
 });
 
-const putSchema = z.object({ permisos: z.array(z.string().min(3)).max(100) });
+const putSchema = z.object({
+  permisos: z.array(z.string().min(3)).max(MAX_PERMISOS_POR_ROL),
+});
 
 /** PUT — reemplaza los permisos del rol por los marcados. */
 export const PUT = handlerWithAuth(async (request, auth, context) => {
