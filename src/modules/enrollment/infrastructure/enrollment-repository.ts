@@ -172,13 +172,22 @@ export async function matriculaActualDeNino(
   return queryOne<MatriculaActual>(
     `SELECT cl.id AS "classroomId", cl.nombre AS salon, ca.nombre AS campania,
             cu.tipo::text AS "tipoCurso",
-            COALESCE(gp.nombres || ' ' || gp.apellidos, gu.username) AS guia,
-            cl.meeting_url AS "meetingUrl", cl.timezone
+            -- El nombre y la sala viven en la ficha del GUÍA (scheduling_guia):
+            -- mirar solo people_person mostraba el usuario generado, y solo el
+            -- salón dejaba al niño sin enlace aunque su guía tuviera sala.
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+                     NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
+                     NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
+                     gu.username) AS guia,
+            COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url) AS "meetingUrl",
+            cl.timezone
        FROM enrollment_enrollment e
        JOIN scheduling_classroom cl ON cl.id = e.classroom_id
        JOIN catalog_course cu ON cu.id = cl.course_id
        JOIN catalog_campaign ca ON ca.id = cu.campaign_id
        LEFT JOIN identity_user gu ON gu.id = cl.guia_user_id
+       LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
+       LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
        LEFT JOIN people_person gp ON gp.user_id = gu.id
       WHERE e.child_person_id = $1 AND e.estado = 'ACTIVA'
       LIMIT 1`,

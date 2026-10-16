@@ -34,6 +34,8 @@ interface Dashboard {
     startsAt: string;
     duracionMin: number;
     guia: string | null;
+    /** Sala del guía de ESA sesión (un reemplazo dicta desde la suya). */
+    meetingUrl: string | null;
   } | null;
   /** El Welcome que agendó al crear su perfil: guía y sala son los DEL EVENTO. */
   welcome?: {
@@ -526,6 +528,9 @@ export default function MiPanelPage() {
   const unidadActual = leccionActual;
 
   const inicioProxima = data.proxima != null ? new Date(data.proxima.startsAt).getTime() : null;
+  // La sala de la PRÓXIMA sesión (su guía, que puede ser un reemplazo) y, si
+  // no la trae, la de la matrícula.
+  const enlaceProxima = data.proxima?.meetingUrl ?? data.matricula?.meetingUrl ?? null;
   const estadoZoomActual =
     inicioProxima !== null && data.proxima != null
       ? estadoZoom({
@@ -1531,7 +1536,7 @@ export default function MiPanelPage() {
                       >
                         LINK DE INGRESO
                       </p>
-                      {data.matricula.meetingUrl !== null && estadoZoomActual !== null ? (
+                      {enlaceProxima !== null && estadoZoomActual !== null ? (
                         <>
                           {/* Rocky pone cara según el estado real del enlace. */}
                           {esJunior && (
@@ -1543,7 +1548,7 @@ export default function MiPanelPage() {
                             />
                           )}
                           <ZoomAccessButton
-                            meetingUrl={data.matricula.meetingUrl}
+                            meetingUrl={enlaceProxima}
                             estado={estadoZoomActual}
                             tieneAcceso={ingreso}
                             onEntrar={entrarZoom}

@@ -45,6 +45,11 @@ describe.runIf(RUN)("cambio de guía (integración)", () => {
     );
   }
 
+  /** Sala de Zoom de cada guía (única: dos guías no comparten sala). */
+  function sala(id: string): string {
+    return `https://us02web.zoom.us/j/9${id.replace(/\D/g, "").slice(0, 10)}`;
+  }
+
   async function guiaDelSalon(): Promise<string | null> {
     const row = await queryOne<{ guia: string | null }>(
       `SELECT guia_user_id AS guia FROM scheduling_classroom WHERE id = $1`,
@@ -70,8 +75,9 @@ describe.runIf(RUN)("cambio de guía (integración)", () => {
       );
       // La ficha del guía: de aquí sale el nombre que ve el panel.
       await execute(
-        `INSERT INTO scheduling_guia (guia_user_id, nombres, apellidos) VALUES ($1, $2, $3)`,
-        [id, nombres, apellidos],
+        `INSERT INTO scheduling_guia (guia_user_id, nombres, apellidos, zoom_url)
+         VALUES ($1, $2, $3, $4)`,
+        [id, nombres, apellidos, sala(id)],
       );
     }
 
@@ -117,6 +123,8 @@ describe.runIf(RUN)("cambio de guía (integración)", () => {
     const detalle = await obtenerDetalleSesion(primera?.id ?? "");
     expect(detalle.guia?.nombre).toBe("Ana Titular");
     expect(detalle.guia?.soloEstaSesion).toBe(false);
+    // El salón nació SIN enlace: la sala es la del guía (antes "Sin enlace configurado").
+    expect(detalle.salon.meetingUrl).toBe(sala(titular));
   });
 
   it("el calendario y la lista de salones también, con su campaña", async () => {
@@ -131,6 +139,7 @@ describe.runIf(RUN)("cambio de guía (integración)", () => {
       expect(s.startsAt).toBeTruthy();
       expect(s.pais).toMatch(/^[A-Z]{2}$/);
       expect(s.asistieron).toBe(0);
+      expect(s.meetingUrl).toBe(sala(titular));
     }
 
     const salones = (await listarSalones(courseId)).filter((s) => s.id === classroomId);
@@ -157,6 +166,8 @@ describe.runIf(RUN)("cambio de guía (integración)", () => {
     const detalle = await obtenerDetalleSesion(futura?.id ?? "");
     expect(detalle.guia?.nombre).toBe("Beto Reemplazo");
     expect(detalle.guia?.soloEstaSesion).toBe(true);
+    // El reemplazo dicta desde SU sala.
+    expect(detalle.salon.meetingUrl).toBe(sala(reemplazo));
   });
 
   it("cambiar el guía en el SALÓN congela las dictadas y se lleva las que faltan", async () => {

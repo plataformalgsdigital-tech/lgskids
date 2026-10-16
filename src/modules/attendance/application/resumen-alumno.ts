@@ -16,6 +16,8 @@ export interface EventoAgenda {
   startsAt: Date;
   duracionMin: number;
   guia: string | null;
+  /** Sala de Zoom del guía de ESA sesión; si no tiene, la del salón. */
+  meetingUrl: string | null;
   /** Lo que se escribió al crearlo a mano; en las generadas viene vacío. */
   observaciones: string | null;
   nivel: string | null;
@@ -103,12 +105,16 @@ export async function comentariosDeGuia(
 ): Promise<ComentarioGuia[]> {
   return queryRows<ComentarioGuia>(
     `SELECT s.id AS "sessionId", s.fecha::text AS fecha, s.tipo::text AS tipo, s.numero,
-            COALESCE(u.username, cl.nombre) AS guia,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
+                     NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
+                     u.username, cl.nombre) AS guia,
             a.comentario_usuario AS comentario
        FROM attendance_attendance a
        JOIN scheduling_session s ON s.id = a.session_id
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        LEFT JOIN identity_user u ON u.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+       LEFT JOIN scheduling_guia gg ON gg.guia_user_id = u.id
+       LEFT JOIN identity_perfil gpf ON gpf.user_id = u.id
       WHERE a.child_person_id = $1
         AND a.comentario_usuario IS NOT NULL
         AND TRIM(a.comentario_usuario) <> ''
@@ -130,7 +136,9 @@ export async function agendaProximas(classroomId: string, dias = 14): Promise<Ev
             s.observaciones, s.nivel, (s.slot_id IS NULL) AS "esEvento",
             COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
                      NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
-                     gu.username) AS guia
+                     gu.username) AS guia,
+            -- La sala del guía de ESA sesión (un reemplazo dicta desde la suya).
+            COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url) AS "meetingUrl"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        -- El guía de la SESIÓN (reemplazo de un día, evento suelto) y, si no

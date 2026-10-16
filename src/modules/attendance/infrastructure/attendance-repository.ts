@@ -73,6 +73,9 @@ const NOMBRE_GUIA = `COALESCE(
               NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
               g.username)`;
 
+/** Sala de Zoom del guía efectivo (`gg`) y, si no tiene, la del salón. */
+const SALA_ZOOM = `COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url)`;
+
 export async function getSessionInfo(sessionId: string): Promise<SessionInfo | null> {
   return queryOne<SessionInfo>(
     `SELECT s.id, s.classroom_id AS "classroomId", cl.course_id AS "courseId",
@@ -85,7 +88,7 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             ${NOMBRE_GUIA} AS guia,
             (s.guia_user_id IS NOT NULL
               AND s.guia_user_id IS DISTINCT FROM cl.guia_user_id) AS "guiaSoloEstaSesion",
-            cl.meeting_url AS "meetingUrl", cl.cupo,
+            ${SALA_ZOOM} AS "meetingUrl", cl.cupo,
             s.cerrada_por AS "cerradaPor", s.cerrada_en::text AS "cerradaEn",
             ca.nombre AS campania, co.tipo::text AS "cursoTipo",
             sec.leccion, sec.nivel AS "leccionNivel", ord.n::int AS "claseNumero",
@@ -155,7 +158,7 @@ export async function historialDeNino(childPersonId: string): Promise<FilaHistor
             s.tipo::text AS tipo, s.fecha::text AS fecha, s.starts_at AS "startsAt",
             COALESCE(s.guia_user_id, cl.guia_user_id) AS "guiaUserId",
             ${NOMBRE_GUIA} AS guia,
-            cl.meeting_url AS "meetingUrl", ord.n::int AS "claseNumero",
+            ${SALA_ZOOM} AS "meetingUrl", ord.n::int AS "claseNumero",
             sec.leccion, sec.nivel AS "leccionNivel",
             a.estado::text AS estado, a.justificacion
        FROM sesiones x

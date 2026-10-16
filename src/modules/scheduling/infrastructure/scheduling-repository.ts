@@ -23,7 +23,7 @@ export const JOIN_NOMBRE_GUIA = `LEFT JOIN scheduling_guia gg ON gg.guia_user_id
        LEFT JOIN people_person gp ON gp.user_id = gu.id`;
 
 /** Columnas de las fichas, para el GROUP BY de una consulta agregada. */
-const GROUP_NOMBRE_GUIA = `gu.username, gg.nombres, gg.apellidos,
+const GROUP_NOMBRE_GUIA = `gu.username, gg.nombres, gg.apellidos, gg.zoom_url,
                gpf.nombres, gpf.apellidos, gp.nombres, gp.apellidos`;
 
 /**
@@ -33,6 +33,14 @@ const GROUP_NOMBRE_GUIA = `gu.username, gg.nombres, gg.apellidos,
  * salón. Mismo COALESCE que usa la estadística mensual del guía.
  */
 const GUIA_EFECTIVO = `COALESCE(s.guia_user_id, cl.guia_user_id)`;
+
+/**
+ * Sala de Zoom: la del GUÍA (`gg`, unido por `JOIN_NOMBRE_GUIA`) y, solo si no
+ * tiene, la del salón. El guía dicta siempre desde su sala; los salones
+ * generados del catálogo nacen sin `meeting_url`, así que leer solo esa decía
+ * "Sin enlace configurado" con el guía con su sala cargada.
+ */
+export const SALA_ZOOM = `COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url)`;
 
 // ============================================================
 // Catálogo de horarios (mantenimiento centralizado por tipo de curso)
@@ -458,7 +466,7 @@ export async function listClassrooms(
     Omit<ClassroomListItem, "horario"> & { horario: SlotResumen[] | null }
   >(
     `SELECT cl.id, cl.course_id AS "courseId", cl.nombre,
-            cl.guia_user_id AS "guiaUserId", cl.cupo, cl.meeting_url AS "meetingUrl",
+            cl.guia_user_id AS "guiaUserId", cl.cupo, ${SALA_ZOOM} AS "meetingUrl",
             cl.timezone, cl.holiday_country AS "holidayCountry", cl.activo,
             cu.tipo::text AS curso, ca.nombre AS campania,
             ca.inicio::text AS "campaniaInicio",
@@ -541,7 +549,7 @@ export async function agendaSesiones(
             cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
             ${NOMBRE_GUIA} AS guia, gu.id AS "guiaUserId",
             s.starts_at AS "startsAt", cl.holiday_country AS pais,
-            cl.meeting_url AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
+            ${SALA_ZOOM} AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
             (SELECT count(*) FROM enrollment_enrollment e
               WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA'))::int AS ocupados,
             (SELECT count(*) FROM attendance_attendance a
@@ -637,7 +645,7 @@ export async function detalleSesion(sessionId: string): Promise<SesionDetalle | 
             to_char(s.starts_at AT TIME ZONE cl.timezone, 'HH24:MI') AS "horaLocal",
             s.numero, s.duracion_min AS "duracionMin",
             cl.id AS "classroomId", cl.nombre AS salon, cl.cupo, cl.timezone,
-            cl.holiday_country AS "holidayCountry", cl.meeting_url AS "meetingUrl",
+            cl.holiday_country AS "holidayCountry", ${SALA_ZOOM} AS "meetingUrl",
             cu.id AS "courseId", cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
             gu.id AS "guiaUserId", ${NOMBRE_GUIA} AS "guiaNombre",
             (s.guia_user_id IS NOT NULL

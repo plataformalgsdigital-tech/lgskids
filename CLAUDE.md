@@ -933,8 +933,13 @@ cerrado`. Iconos en `src/ui/ZoomAccessButton.tsx`: cámara azul + check verde
   (disponible, enlace clicable) / cámara gris + reloj naranja (bloqueado), con
   mensaje por estado. Se compara contra el INSTANTE `starts_at` (UTC), no la
   hora local. El "entrar a tiempo" solo habilita la reconexión (recordada por
-  sesión en `localStorage`; NO penaliza asistencia). Enlace = `meeting_url` del
-  salón. El guía ve "🎥 Ir a Zoom" en la página de asistencia de la sesión
+  sesión en `localStorage`; NO penaliza asistencia). **Enlace = la sala del GUÍA**
+  (`scheduling_guia.zoom_url` del guía EFECTIVO de la sesión, así un reemplazo da
+  la suya) y, solo si no tiene, el `meeting_url` del salón (2026-10-16:
+  `SALA_ZOOM`). Se leía solo el del salón, y como los salones generados del
+  catálogo nacen sin él, el calendario decía "Sin enlace configurado" y el niño no
+  tenía cómo entrar aunque su guía tuviera sala. Con el mismo cambio, el guía del
+  panel del niño y de sus comentarios sale por su NOMBRE, no por el usuario. El guía ve "🎥 Ir a Zoom" en la página de asistencia de la sesión
   (siempre, sin ventana). Pendiente: bitácora server-side de accesos
   (minutos-desde-inicio) para cruzar con el reporte de Zoom.
 

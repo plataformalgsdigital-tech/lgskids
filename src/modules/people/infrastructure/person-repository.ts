@@ -332,7 +332,9 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
             c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
             c.firmado,
             e.estado::text AS "matriculaEstado", cl.nombre AS salon,
-            cl.meeting_url AS "meetingUrl", ca.nombre AS campania,
+            -- La sala es la del GUÍA; la del salón solo si el guía no tiene.
+            COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url) AS "meetingUrl",
+            ca.nombre AS campania,
             COALESCE(cu.tipo::text, c.tipo_curso::text) AS curso,
             -- El nombre del guía vive en SU ficha (scheduling_guia); people_person
             -- solo lo tendría si fuera alumno. Mirar solo esa mostraba el usuario
