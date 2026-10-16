@@ -2156,7 +2156,10 @@ la clave inicial en una alerta y deja "el WhatsApp lo maneja KIDS2026").
 - **Al APROBAR el contrato** (`aprobarContrato`, por los DOS caminos: panel y
   LGS), si el niño no tiene perfil, KIDS le manda al **APODERADO** por WhatsApp
   (plantilla `creacion-perfil-kids`, marcador `{{enlace}}`) el enlace
-  `/crear-perfil/<token>`. Va FUERA de la transacción y **no puede tumbar el alta**
+  `/crear-perfil/<token>`. Su texto es la bienvenida que definió el negocio
+  (migración `20261016200000`, con `{{apoderado}}`, `{{nombre}}` y `{{enlace}}`). LGS
+  NO manda su propio mensaje: al aprobar pide la aprobación a KIDS y el WhatsApp sale
+  de aquí, así que la plantilla vive SOLO en KIDS (una copia en LGS mandaría dos). Va FUERA de la transacción y **no puede tumbar el alta**
   (`enviarCreacionPerfilSinFallar`): lo que falle viaja en `perfil` de la
   respuesta y en la auditoría, y se reenvía desde la ficha.
 - **El enlace** (`contracts_enlace_perfil`, `domain/enlace-perfil.ts`): token de 32
