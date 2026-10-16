@@ -307,6 +307,19 @@ export interface NinoDetalle {
   curso: string | null;
   guia: string | null;
   proximaSesion: string | null;
+  /**
+   * La SIGUIENTE clase del salón (la que está en curso cuenta, hasta que
+   * termine), con el guía y la sala de ESA sesión: si la cubre un reemplazo,
+   * es la suya. Las canceladas sin reemplazo no se dictan y se saltan.
+   */
+  siguienteClase: {
+    startsAt: string;
+    tipo: string;
+    duracionMin: number;
+    timezone: string;
+    guia: string | null;
+    meetingUrl: string | null;
+  } | null;
   apoderados: {
     nombre: string;
     docTipo: string;
@@ -346,6 +359,10 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
               gu.username) AS guia,
             (SELECT min(s.fecha)::text FROM scheduling_session s
               WHERE s.classroom_id = cl.id AND s.fecha >= (now() AT TIME ZONE 'UTC')::date) AS "proximaSesion",
+            CASE WHEN sig.starts_at IS NULL THEN NULL ELSE json_build_object(
+              'startsAt', sig.starts_at, 'tipo', sig.tipo, 'duracionMin', sig.duracion_min,
+              'timezone', cl.timezone, 'guia', sig.guia, 'meetingUrl', sig.url) END
+              AS "siguienteClase",
             COALESCE((SELECT json_agg(json_build_object(
                         'nombre', a.nombres || ' ' || a.apellidos, 'docTipo', a.doc_tipo,
                         'docNumero', a.doc_numero, 'telefono', a.telefono, 'email', a.email,
@@ -367,6 +384,27 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
        LEFT JOIN people_person gp ON gp.user_id = gu.id
        LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
        LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
+       LEFT JOIN LATERAL (
+         SELECT s.starts_at, s.tipo::text AS tipo, s.duracion_min,
+                COALESCE(NULLIF(TRIM(sg.zoom_url), ''), cl.meeting_url) AS url,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', sg.nombres, sg.apellidos)), ''),
+                         NULLIF(TRIM(CONCAT_WS(' ', spf.nombres, spf.apellidos)), ''),
+                         su.username) AS guia
+           FROM scheduling_session s
+           LEFT JOIN identity_user su ON su.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+           LEFT JOIN scheduling_guia sg ON sg.guia_user_id = su.id
+           LEFT JOIN identity_perfil spf ON spf.user_id = su.id
+          WHERE s.classroom_id = cl.id
+            AND s.starts_at + make_interval(mins => s.duracion_min) > now()
+            -- Cancelada sin reemplazo: no se dicta (mismo criterio que
+            -- SQL_SESION_CANCELADA de scheduling, que people no puede importar).
+            AND NOT EXISTS (
+              SELECT 1 FROM scheduling_cancelacion cx
+               WHERE cx.session_id = s.id AND cx.estado = 'APROBADA'
+                 AND cx.reemplazo_guia_user_id IS NULL)
+          ORDER BY s.starts_at
+          LIMIT 1
+       ) sig ON true
       WHERE p.id = $1`,
     [id],
   );

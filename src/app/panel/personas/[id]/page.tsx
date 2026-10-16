@@ -11,6 +11,7 @@ import { AcademicInfo } from "./AcademicInfo";
 import { EnviarCredencialesModal } from "./EnviarCredencialesModal";
 import { CasosNino } from "./CasosNino";
 import { PerfilWelcome } from "./PerfilWelcome";
+import { SiguienteClase, type SiguienteClaseDato } from "./SiguienteClase";
 import { CURSO_UI, ubicacionActual, type Progreso } from "./ubicacion";
 
 interface Nino {
@@ -42,6 +43,7 @@ interface Nino {
   curso: string | null;
   guia: string | null;
   proximaSesion: string | null;
+  siguienteClase: SiguienteClaseDato | null;
   apoderados: {
     nombre: string;
     docTipo: string;
@@ -245,16 +247,22 @@ export default function DetalleNinoPage() {
                 </strong>
               </p>
             )}
+            <div
+              style={{
+                display: "flex",
+                gap: "0.4rem",
+                alignItems: "center",
+                flexWrap: "wrap",
+                marginTop: "0.6rem",
+              }}
+            >
+              <span style={badge("#ede7f6", "#4527a0")}>BENEFICIARIO</span>
+              <span style={badge("#e3f2fd", "#0d47a1")}>
+                {PAIS_NOMBRE[nino.countryCode] ?? nino.countryCode}
+              </span>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
-            <span style={badge("#ede7f6", "#4527a0")}>BENEFICIARIO</span>
-            <span style={badge("#e3f2fd", "#0d47a1")}>
-              {PAIS_NOMBRE[nino.countryCode] ?? nino.countryCode}
-            </span>
-            <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-              Próxima sesión: <strong>{nino.proximaSesion ?? "sin sesión futura"}</strong>
-            </span>
-          </div>
+          {nino.salon !== null && <SiguienteClase clase={nino.siguienteClase} />}
         </div>
       </section>
 

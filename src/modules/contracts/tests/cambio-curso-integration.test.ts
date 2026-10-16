@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { crearCampania } from "@/modules/catalog";
-import { crearNino } from "@/modules/people";
+import { crearNino, obtenerDetalleNino } from "@/modules/people";
 import { crearSalon } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
@@ -133,6 +133,19 @@ describe.runIf(RUN)("cambio de curso (integración)", () => {
     expect(jr?.horario).toEqual([
       { tipo: "SESION", diaSemana: 2, horaLocal: "17:00", duracionMin: 60 },
     ]);
+  });
+
+  it("la ficha del niño trae su SIGUIENTE clase, con la zona del salón", async () => {
+    const ficha = await obtenerDetalleNino(ninoId);
+    const sig = ficha.siguienteClase;
+    expect(sig).not.toBeNull();
+    expect(sig?.timezone).toBe("America/Bogota");
+    expect(sig?.tipo).toBe("SESION");
+    // Termina por delante: la que ya terminó no es la "siguiente".
+    const fin = new Date(sig?.startsAt ?? 0).getTime() + (sig?.duracionMin ?? 0) * 60_000;
+    expect(fin).toBeGreaterThan(Date.now());
+    // Salón sin guía ni enlace propio: no hay sala que copiar.
+    expect(sig?.meetingUrl).toBeNull();
   });
 
   it("exige el salón del curso nuevo cuando el niño está matriculado", async () => {
