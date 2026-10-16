@@ -2196,7 +2196,9 @@ la clave inicial en una alerta y deja "el WhatsApp lo maneja KIDS2026").
   con el curso ya andando (no hay Welcome que agendar: es antes del inicio).
   `contracts_enlace_perfil.exige_welcome`; la ficha tiene DOS botones, "🔗 Enviar
   enlace de perfil" y "🔗 Enviar enlace sin Welcome", y este usa la plantilla
-  `creacion-perfil-kids-sin-welcome`, que no lo menciona. La página no muestra la
+  `creacion-perfil-kids-sin-welcome`, que no lo menciona (texto del negocio desde la
+  migración `20261016300000`: crear perfil y clave, con `{{apoderado}}`, `{{nombre}}`
+  y `{{enlace}}`). La página no muestra la
   elección y `completarPerfilNino` no reserva nada.
 - **Aprobar SIN WhatsApp**: `aprobarContrato({ enviarPerfil: false })` (migraciones;
   el enlace se manda después desde la ficha). Por defecto sí se envía.
