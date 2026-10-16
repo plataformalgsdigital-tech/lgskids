@@ -38,6 +38,7 @@ export const GET = handlerWithAuth(async (request, auth) => {
 export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.EVENTOS_CREAR);
+  profile.requireOpcion("op.calendario.evento_academico");
   const body = welcomeSchema.parse(await request.json());
   const resultado = await crearWelcome({
     actorUserId: auth.userId,

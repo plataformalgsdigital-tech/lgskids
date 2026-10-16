@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { desfaseHoras, horaEnElOtroGrupo, proximoCambioDeDesfase } from "@/ui/husos";
+import { ConOpcion } from "@/ui/ConOpcion";
 
 type TipoCurso = "JUNIOR" | "YOUNGSTER";
 type GrupoPais = "01" | "02";
@@ -105,7 +106,7 @@ const nuevoSlot = (): HorarioSlot => ({
   duracionMin: 60,
 });
 
-export default function HorariosPage() {
+function HorariosPageContenido() {
   const router = useRouter();
   const [horarios, setHorarios] = useState<Horario[] | null>(null);
   const [puedeGestionar, setPuedeGestionar] = useState(false);
@@ -136,7 +137,8 @@ export default function HorariosPage() {
       const res = await fetch("/api/auth/me");
       if (res.ok) {
         const me: { permisos: { code: string }[] } = await res.json();
-        setPuedeGestionar(me.permisos.some((p) => p.code === "salones.gestionar"));
+        // La opción de Roles para editar horarios (incluye `salones.gestionar`).
+        setPuedeGestionar(me.permisos.some((p) => p.code === "op.mant.horarios_editar"));
       }
     }
     void inicial();
@@ -566,5 +568,14 @@ export default function HorariosPage() {
         ))
       )}
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function HorariosPage() {
+  return (
+    <ConOpcion op="op.mant.horarios" volver="/panel/mantenimiento-cursos">
+      <HorariosPageContenido />
+    </ConOpcion>
   );
 }

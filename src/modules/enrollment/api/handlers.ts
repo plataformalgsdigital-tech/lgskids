@@ -16,6 +16,7 @@ const matricularSchema = z.object({
 export const matricularHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MATRICULAS_GESTIONAR);
+  profile.requireOpcion("op.contratos.matricular");
   const body = matricularSchema.parse(await request.json());
   const resultado = await matricular({ actorUserId: auth.userId, ...body, ip: ip(request) });
   return json(resultado, { status: 201 });
@@ -38,6 +39,7 @@ const moverSchema = z.object({
 export const cambioAcademicoHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MATRICULAS_GESTIONAR);
+  profile.requireOpcion("op.contratos.cambiar_salon");
   const params = await context.params;
   const enrollmentId = z.uuid().parse(params["id"]);
   const body = moverSchema.parse(await request.json());

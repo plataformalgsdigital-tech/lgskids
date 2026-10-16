@@ -40,6 +40,7 @@ const cuerpo = z.object({
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.sesiones.eventos_admin_lista");
   const b = cuerpo.parse(await request.json());
   return json(
     await marcarAsistenciaEventoAdmin({

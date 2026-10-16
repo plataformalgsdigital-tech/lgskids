@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { RolesPermisos } from "./RolesPermisos";
 import { Aviso, CajaCredenciales, TIPOS, boton, mensajeDeError, tarjeta } from "./comunes";
+import { SoloSi } from "@/ui/SoloSi";
+import { usePermisos } from "@/ui/permisos";
 
 interface Solicitud {
   id: string;
@@ -20,25 +22,34 @@ const PUERTAS = [
   {
     tipo: "estudiante",
     href: "/panel/usuarios/estudiante",
+    op: "op.usuarios.estudiante",
     descripcion:
       "Desde un contrato en KIDS. La cuenta nace al aprobarlo (rol alumno) y se reactiva al aprobar su renovación.",
   },
   {
     tipo: "administrativo",
     href: "/panel/usuarios/administrativo",
+    op: "op.usuarios.administrativo",
     descripcion:
       "Selecciona un rol de la matriz de permisos y captura sus datos. Usuario y clave se generan solos.",
   },
   {
     tipo: "guia",
     href: "/panel/usuarios/guia",
+    op: "op.usuarios.guia",
     descripcion:
       "Crea la cuenta y su ficha: foto, documento y sala de Zoom. O envíale el enlace para que la complete él.",
   },
 ] as const;
 
 export default function UsuariosPage() {
-  const [pestana, setPestana] = useState<"usuarios" | "roles">("usuarios");
+  const [elegida, setPestana] = useState<"usuarios" | "roles">("usuarios");
+  // Pestañas, tarjetas y acciones: cada una con su opción (Roles › Usuarios y roles).
+  const { puede, listo } = usePermisos();
+  const pestanas = (["usuarios", "roles"] as const).filter((p) =>
+    puede(p === "usuarios" ? "op.usuarios.tab_usuarios" : "op.usuarios.tab_roles"),
+  );
+  const pestana = pestanas.includes(elegida) ? elegida : pestanas[0];
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [credenciales, setCredenciales] = useState<{ username: string; clave: string } | null>(
     null,
@@ -117,16 +128,25 @@ export default function UsuariosPage() {
       <h1 style={{ fontSize: "1.6rem" }}>Usuarios, roles y permisos</h1>
 
       <div style={{ marginTop: "1rem", display: "flex", gap: "0.4rem" }}>
-        <button
-          style={pestanaEstilo(pestana === "usuarios")}
-          onClick={() => setPestana("usuarios")}
-        >
-          👤 Usuarios
-        </button>
-        <button style={pestanaEstilo(pestana === "roles")} onClick={() => setPestana("roles")}>
-          🛡️ Roles y permisos
-        </button>
+        {pestanas.includes("usuarios") && (
+          <button
+            style={pestanaEstilo(pestana === "usuarios")}
+            onClick={() => setPestana("usuarios")}
+          >
+            👤 Usuarios
+          </button>
+        )}
+        {pestanas.includes("roles") && (
+          <button style={pestanaEstilo(pestana === "roles")} onClick={() => setPestana("roles")}>
+            🛡️ Roles y permisos
+          </button>
+        )}
       </div>
+      {listo && pestana === undefined && (
+        <p style={{ marginTop: "1rem", color: "var(--texto-suave)" }}>
+          🔒 Tu rol no tiene habilitada ninguna pestaña de Usuarios y roles.
+        </p>
+      )}
 
       {pestana === "roles" && <RolesPermisos />}
 
@@ -171,18 +191,20 @@ export default function UsuariosPage() {
                 </p>
               </div>
             </div>
-            <Link
-              href="/panel/usuarios/consultar"
-              style={{
-                display: "inline-block",
-                marginTop: "0.9rem",
-                color: "#3f51b5",
-                fontWeight: 600,
-                fontSize: "0.95rem",
-              }}
-            >
-              📋 Consultar / editar / inactivar usuarios por tipo (clave, exportar CSV)
-            </Link>
+            <SoloSi op="op.usuarios.consultar">
+              <Link
+                href="/panel/usuarios/consultar"
+                style={{
+                  display: "inline-block",
+                  marginTop: "0.9rem",
+                  color: "#3f51b5",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                }}
+              >
+                📋 Consultar / editar / inactivar usuarios por tipo (clave, exportar CSV)
+              </Link>
+            </SoloSi>
           </div>
 
           <div
@@ -192,7 +214,7 @@ export default function UsuariosPage() {
               gap: "1rem",
             }}
           >
-            {PUERTAS.map((p) => {
+            {PUERTAS.filter((p) => puede(p.op)).map((p) => {
               const t = TIPOS[p.tipo];
               return (
                 <Link
@@ -267,17 +289,21 @@ export default function UsuariosPage() {
                     </span>
                     <span style={{ display: "flex", gap: "0.4rem" }}>
                       {s.userId !== null && (
-                        <button
-                          style={{ ...boton, borderColor: "var(--lgs-verde)" }}
-                          disabled={ocupado}
-                          onClick={() => void restablecer(s.userId ?? "", s.usuarioIngresado)}
-                        >
-                          🔑 Restablecer
-                        </button>
+                        <SoloSi op="op.usuarios.clave">
+                          <button
+                            style={{ ...boton, borderColor: "var(--lgs-verde)" }}
+                            disabled={ocupado}
+                            onClick={() => void restablecer(s.userId ?? "", s.usuarioIngresado)}
+                          >
+                            🔑 Restablecer
+                          </button>
+                        </SoloSi>
                       )}
-                      <button style={boton} onClick={() => void descartar(s.id)}>
-                        Descartar
-                      </button>
+                      <SoloSi op="op.usuarios.clave">
+                        <button style={boton} onClick={() => void descartar(s.id)}>
+                          Descartar
+                        </button>
+                      </SoloSi>
                     </span>
                   </div>
                 ))}

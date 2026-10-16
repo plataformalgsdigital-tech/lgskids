@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 type Scope = "ISLA" | "MAPA";
@@ -23,7 +25,7 @@ function r1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-export default function EditorMapaPage() {
+function EditorMapaPageContenido() {
   const [curso, setCurso] = useState<Curso>("JUNIOR");
   const [scope, setScope] = useState<Scope>("ISLA");
   const [nivel, setNivel] = useState<string>("ROOKIE");
@@ -330,22 +332,24 @@ export default function EditorMapaPage() {
           flexWrap: "wrap",
         }}
       >
-        <button
-          type="button"
-          onClick={() => void guardar()}
-          disabled={ocupado || imgUrl === null}
-          style={{
-            padding: "0.55rem 1.4rem",
-            borderRadius: "0.6rem",
-            border: "none",
-            background: ocupado || imgUrl === null ? "#9e9e9e" : "var(--lgs-verde)",
-            color: "#1b2a10",
-            fontWeight: 800,
-            cursor: ocupado || imgUrl === null ? "not-allowed" : "pointer",
-          }}
-        >
-          {ocupado ? "Guardando…" : "Guardar posiciones"}
-        </button>
+        <SoloSi op="op.mant.mapa_editar">
+          <button
+            type="button"
+            onClick={() => void guardar()}
+            disabled={ocupado || imgUrl === null}
+            style={{
+              padding: "0.55rem 1.4rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background: ocupado || imgUrl === null ? "#9e9e9e" : "var(--lgs-verde)",
+              color: "#1b2a10",
+              fontWeight: 800,
+              cursor: ocupado || imgUrl === null ? "not-allowed" : "pointer",
+            }}
+          >
+            {ocupado ? "Guardando…" : "Guardar posiciones"}
+          </button>
+        </SoloSi>
         <button
           type="button"
           onClick={limpiar}
@@ -367,5 +371,14 @@ export default function EditorMapaPage() {
         )}
       </div>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function EditorMapaPage() {
+  return (
+    <ConOpcion op="op.mant.mapa" volver="/panel/mantenimiento-cursos">
+      <EditorMapaPageContenido />
+    </ConOpcion>
   );
 }

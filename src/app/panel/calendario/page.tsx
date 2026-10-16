@@ -11,6 +11,7 @@ import {
 } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
+import { usePermisos } from "@/ui/permisos";
 import {
   COLOR_NEUTRO,
   SIN_FILTROS,
@@ -176,9 +177,12 @@ function CalendarioSalones({
   const [diaAbierto, setDiaAbierto] = useState<string | null>(null);
   // Evento abierto en MODAL: antes se navegaba a una página aparte.
   const [sesionAbierta, setSesionAbierta] = useState<string | null>(null);
-  const [puedeGestionarSalones, setPuedeGestionarSalones] = useState(false);
-  // Editar un evento creado en el calendario: lo mismo que crearlo (`eventos.crear`).
-  const [puedeEditarEventos, setPuedeEditarEventos] = useState(false);
+  // Cada acción con su OPCIÓN (Roles › Académica › Calendario), que ya incluye
+  // el permiso funcional: el servidor exige lo mismo.
+  const { puede } = usePermisos();
+  const puedeEditarAcademico = puede("op.calendario.evento_academico");
+  const puedeEditarAdmin = puede("op.calendario.evento_admin");
+  const puedeAgenda = puede("op.calendario.vista_agenda");
   const [editando, setEditando] = useState<EventoEditable | null>(null);
   const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
 
@@ -196,17 +200,6 @@ function CalendarioSalones({
     };
     setEditando({ clase: "admin", ...evento });
   }
-
-  useEffect(() => {
-    async function permisos() {
-      const res = await fetch("/api/auth/me");
-      if (!res.ok) return;
-      const me = (await res.json()) as { permisos: { code: string }[] };
-      setPuedeGestionarSalones(me.permisos.some((p) => p.code === "salones.gestionar"));
-      setPuedeEditarEventos(me.permisos.some((p) => p.code === "eventos.crear"));
-    }
-    void permisos();
-  }, []);
 
   useEffect(() => {
     async function cargarCampanias() {
@@ -360,7 +353,7 @@ function CalendarioSalones({
           cargando={sesiones === null}
           onSesion={setSesionAbierta}
           onWelcome={setWelcomeAbierto}
-          onAdmin={puedeEditarEventos ? (id) => void abrirEdicionAdmin(id) : null}
+          onAdmin={puedeEditarAdmin ? (id) => void abrirEdicionAdmin(id) : null}
         />
       )}
 
@@ -500,11 +493,12 @@ function CalendarioSalones({
                     {delDia.length + adminDelDia.length + welcomeDelDia.length > 0 && (
                       <button
                         type="button"
+                        disabled={!puedeAgenda}
                         onClick={() => {
                           irADia(fecha);
                           onModo("dia");
                         }}
-                        title="Ver la agenda del día"
+                        title={puedeAgenda ? "Ver la agenda del día" : undefined}
                         style={{
                           border: "none",
                           background: "transparent",
@@ -523,14 +517,14 @@ function CalendarioSalones({
                       type="button"
                       key={e.id}
                       // Solo quien puede crearlos los abre para editar; el guía lo ve y punto.
-                      disabled={!puedeEditarEventos}
+                      disabled={!puedeEditarAdmin}
                       onClick={() => void abrirEdicionAdmin(e.id)}
-                      title={`${e.titulo ?? "Evento administrativo"} · ${String(e.guias)} guías${e.observaciones !== null ? ` · ${e.observaciones}` : ""}${puedeEditarEventos ? " · clic para editar" : ""}`}
+                      title={`${e.titulo ?? "Evento administrativo"} · ${String(e.guias)} guías${e.observaciones !== null ? ` · ${e.observaciones}` : ""}${puedeEditarAdmin ? " · clic para editar" : ""}`}
                       style={{
                         width: "100%",
                         textAlign: "left",
                         font: "inherit",
-                        cursor: puedeEditarEventos ? "pointer" : "default",
+                        cursor: puedeEditarAdmin ? "pointer" : "default",
                         background: "#fff3e0",
                         color: "#e65100",
                         border: "1px solid #ffcc80",
@@ -684,17 +678,19 @@ function CalendarioSalones({
                 {fechaBonita(diaAbierto)}
               </h3>
               <div style={{ display: "flex", gap: "0.4rem" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    irADia(diaAbierto);
-                    setDiaAbierto(null);
-                    onModo("dia");
-                  }}
-                  style={{ ...inputStyle, cursor: "pointer", padding: "0.3rem 0.6rem" }}
-                >
-                  📋 Ver en Agenda
-                </button>
+                {puedeAgenda && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      irADia(diaAbierto);
+                      setDiaAbierto(null);
+                      onModo("dia");
+                    }}
+                    style={{ ...inputStyle, cursor: "pointer", padding: "0.3rem 0.6rem" }}
+                  >
+                    📋 Ver en Agenda
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setDiaAbierto(null)}
@@ -801,10 +797,9 @@ function CalendarioSalones({
       {sesionAbierta !== null && (
         <SesionModal
           sessionId={sesionAbierta}
-          puedeGestionarSalones={puedeGestionarSalones}
           onCerrar={() => setSesionAbierta(null)}
           onEditar={
-            puedeEditarEventos
+            puedeEditarAcademico
               ? (ev) => {
                   setSesionAbierta(null);
                   setEditando(ev);
@@ -866,24 +861,26 @@ export default function SalonesPage() {
   ]);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [vista, setVista] = useState<"calendario" | "agenda" | "lista">("calendario");
-  // Crear eventos tiene permiso PROPIO: no basta con ver el calendario.
-  const [puedeCrearEventos, setPuedeCrearEventos] = useState(false);
-  // Crear salones es de coordinación: el guía no debe ver el botón.
-  const [puedeGestionarSalonesPagina, setPuedeGestionarSalonesPagina] = useState(false);
+  const [vistaElegida, setVista] = useState<"calendario" | "agenda" | "lista">("calendario");
+  // Cada vista y cada botón con su OPCIÓN (Roles › Académica › Calendario).
+  const { puede, listo } = usePermisos();
+  const OP_VISTA = {
+    calendario: "op.calendario.vista_mes",
+    agenda: "op.calendario.vista_agenda",
+    lista: "op.calendario.vista_lista",
+  } as const;
+  const vistasPermitidas = (["calendario", "agenda", "lista"] as const).filter((v) =>
+    puede(OP_VISTA[v]),
+  );
+  // Si la vista elegida no está permitida, la primera que sí lo esté.
+  const vista = vistasPermitidas.includes(vistaElegida)
+    ? vistaElegida
+    : (vistasPermitidas[0] ?? vistaElegida);
+  const puedeEventoAcademico = puede("op.calendario.evento_academico");
+  const puedeEventoAdmin = puede("op.calendario.evento_admin");
+  const puedeCrearSalon = puede("op.calendario.salon_crear");
   const [nuevoEvento, setNuevoEvento] = useState<"academico" | "administrativo" | null>(null);
   const [versionCalendario, setVersionCalendario] = useState(0);
-
-  useEffect(() => {
-    async function permisos() {
-      const res = await fetch("/api/auth/me");
-      if (!res.ok) return;
-      const me = (await res.json()) as { permisos: { code: string }[] };
-      setPuedeCrearEventos(me.permisos.some((p) => p.code === "eventos.crear"));
-      setPuedeGestionarSalonesPagina(me.permisos.some((p) => p.code === "salones.gestionar"));
-    }
-    void permisos();
-  }, []);
   const [horariosCat, setHorariosCat] = useState<HorarioCat[]>([]);
 
   const cargarSalones = useCallback(async () => {
@@ -1003,7 +1000,7 @@ export default function SalonesPage() {
               overflow: "hidden",
             }}
           >
-            {(["calendario", "agenda", "lista"] as const).map((v) => (
+            {vistasPermitidas.map((v) => (
               <button
                 key={v}
                 onClick={() => setVista(v)}
@@ -1024,39 +1021,39 @@ export default function SalonesPage() {
               </button>
             ))}
           </div>
-          {puedeCrearEventos && (
-            <>
-              <button
-                onClick={() => setNuevoEvento("academico")}
-                style={{
-                  padding: "0.55rem 1.2rem",
-                  borderRadius: "0.6rem",
-                  border: "none",
-                  background: "var(--lgs-purpura)",
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                + Evento académico
-              </button>
-              <button
-                onClick={() => setNuevoEvento("administrativo")}
-                style={{
-                  padding: "0.55rem 1.2rem",
-                  borderRadius: "0.6rem",
-                  border: "none",
-                  background: "var(--lgs-cian)",
-                  color: "#08343f",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                + Evento administrativo
-              </button>
-            </>
+          {puedeEventoAcademico && (
+            <button
+              onClick={() => setNuevoEvento("academico")}
+              style={{
+                padding: "0.55rem 1.2rem",
+                borderRadius: "0.6rem",
+                border: "none",
+                background: "var(--lgs-purpura)",
+                color: "white",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              + Evento académico
+            </button>
           )}
-          {vista === "lista" && puedeGestionarSalonesPagina && (
+          {puedeEventoAdmin && (
+            <button
+              onClick={() => setNuevoEvento("administrativo")}
+              style={{
+                padding: "0.55rem 1.2rem",
+                borderRadius: "0.6rem",
+                border: "none",
+                background: "var(--lgs-cian)",
+                color: "#08343f",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              + Evento administrativo
+            </button>
+          )}
+          {vista === "lista" && puedeCrearSalon && (
             <button
               onClick={() => setMostrarForm((v) => !v)}
               style={{
@@ -1078,7 +1075,12 @@ export default function SalonesPage() {
       {/* La llave cambia al crear un evento: así el mes se vuelve a cargar. */}
       {/* Mes y Agenda son el MISMO componente: cambiar de vista conserva los
           filtros y los datos cargados. */}
-      {vista !== "lista" && (
+      {listo && vistasPermitidas.length === 0 && (
+        <p style={{ marginTop: "1rem", color: "var(--texto-suave)" }}>
+          🔒 Tu rol no tiene habilitada ninguna vista del calendario.
+        </p>
+      )}
+      {vista !== "lista" && vistasPermitidas.includes(vista) && (
         <CalendarioSalones
           key={versionCalendario}
           salones={salones ?? []}

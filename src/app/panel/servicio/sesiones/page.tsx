@@ -14,6 +14,7 @@ import {
   rotuloServicio,
   type FiltrosBase,
 } from "../FiltrosServicio";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Servicio › Sesiones: qué pasó con las sesiones de un rango de días —por
@@ -151,14 +152,16 @@ export default function ServicioSesionesPage() {
             salón.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={exportar}
-          disabled={filas === null || filas.length === 0}
-          style={botonServicio}
-        >
-          ⬇ Descargar CSV
-        </button>
+        <SoloSi op="op.servicio.sesiones_csv">
+          <button
+            type="button"
+            onClick={exportar}
+            disabled={filas === null || filas.length === 0}
+            style={botonServicio}
+          >
+            ⬇ Descargar CSV
+          </button>
+        </SoloSi>
       </div>
 
       <FiltrosServicio

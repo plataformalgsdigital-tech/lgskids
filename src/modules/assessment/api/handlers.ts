@@ -13,6 +13,7 @@ const registrarSchema = z.object({
 export const registrarIntentoHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.EVALUACIONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.cuestionario");
   const body = registrarSchema.parse(await request.json());
   const resultado = await registrarIntento({
     actorUserId: auth.userId,

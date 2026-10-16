@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { numeroContrato } from "@/ui/numero-contrato";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Contratos: LISTA para buscar, ficha para trabajar.
@@ -245,29 +246,31 @@ export default function ContratosPage() {
     <main style={{ padding: "2rem", maxWidth: "72rem", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: "1.6rem" }}>Contratos</h1>
-        <button
-          onClick={descargarCSV}
-          disabled={descargando || contratos === null || contratos.length === 0}
-          title={
-            contratos !== null && contratos.length > 0
-              ? "Descarga los contratos listados (con los filtros aplicados)"
-              : "No hay contratos para exportar"
-          }
-          style={{
-            padding: "0.55rem 1.2rem",
-            borderRadius: "0.6rem",
-            border: "none",
-            background:
-              descargando || contratos === null || contratos.length === 0
-                ? "#9e9e9e"
-                : "var(--lgs-verde)",
-            color: "#1b2a10",
-            fontWeight: 700,
-            cursor: descargando ? "wait" : "pointer",
-          }}
-        >
-          {descargando ? "Generando…" : "⬇ Descargar CSV"}
-        </button>
+        <SoloSi op="op.contratos.csv">
+          <button
+            onClick={descargarCSV}
+            disabled={descargando || contratos === null || contratos.length === 0}
+            title={
+              contratos !== null && contratos.length > 0
+                ? "Descarga los contratos listados (con los filtros aplicados)"
+                : "No hay contratos para exportar"
+            }
+            style={{
+              padding: "0.55rem 1.2rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background:
+                descargando || contratos === null || contratos.length === 0
+                  ? "#9e9e9e"
+                  : "var(--lgs-verde)",
+              color: "#1b2a10",
+              fontWeight: 700,
+              cursor: descargando ? "wait" : "pointer",
+            }}
+          >
+            {descargando ? "Generando…" : "⬇ Descargar CSV"}
+          </button>
+        </SoloSi>
       </div>
 
       <div

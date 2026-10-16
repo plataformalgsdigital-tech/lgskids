@@ -15,6 +15,7 @@ import {
   rejilla,
   tarjeta,
 } from "../comunes";
+import { ConOpcion } from "@/ui/ConOpcion";
 
 interface Rol {
   code: string;
@@ -35,7 +36,7 @@ const VACIO = {
   docNumero: "",
 };
 
-export default function AltaAdministrativoPage() {
+function AltaAdministrativoPageContenido() {
   const [roles, setRoles] = useState<Rol[]>([]);
   const [datos, setDatos] = useState(VACIO);
   const [error, setError] = useState<string | null>(null);
@@ -227,5 +228,14 @@ export default function AltaAdministrativoPage() {
         </div>
       </form>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function AltaAdministrativoPage() {
+  return (
+    <ConOpcion op="op.usuarios.administrativo" volver="/panel/usuarios">
+      <AltaAdministrativoPageContenido />
+    </ConOpcion>
   );
 }

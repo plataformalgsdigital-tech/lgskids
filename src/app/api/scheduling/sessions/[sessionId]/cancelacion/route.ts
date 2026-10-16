@@ -29,8 +29,8 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
   const sessionId = await sessionIdDe(context);
   return json({
     cancelacion: await cancelacionDeSesion(sessionId),
-    puedeAvisar: profile.hasPermission(PERMISOS.ASISTENCIA_GESTIONAR),
-    puedeResolver: profile.hasPermission(PERMISOS.SALONES_GESTIONAR),
+    puedeAvisar: profile.hasPermission("op.calendario.cancelacion_avisar"),
+    puedeResolver: profile.hasPermission("op.calendario.cancelacion_resolver"),
   });
 });
 
@@ -49,6 +49,7 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
   if (body.directa) {
     // Cancelar es decisión de administración, no del guía.
     profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+    profile.requireOpcion("op.calendario.cancelacion_resolver");
     return json(
       await cancelarPorGuia({
         actorUserId: auth.userId,
@@ -60,6 +61,7 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
       { status: 201 },
     );
   }
+  profile.requireOpcion("op.calendario.cancelacion_avisar");
   return json(
     await avisarCancelacion({
       actorUserId: auth.userId,

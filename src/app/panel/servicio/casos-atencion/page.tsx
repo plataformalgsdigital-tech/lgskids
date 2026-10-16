@@ -96,7 +96,13 @@ export default function CasosAtencionPage() {
   const [origen, setOrigen] = useState("");
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [conteos, setConteos] = useState<Record<Vista, number> | null>(null);
-  const [puedeGestionar, setPuedeGestionar] = useState(false);
+  // Cada acción con su opción (Roles › Servicio › Casos de atención), del servidor.
+  const [puede, setPuede] = useState({
+    adicionar: false,
+    asignar: false,
+    cerrar: false,
+    csv: false,
+  });
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [adicionando, setAdicionando] = useState(false);
@@ -129,11 +135,19 @@ export default function CasosAtencionPage() {
     const d = (await res.json()) as {
       casos: Fila[];
       conteos: Record<Vista, number>;
-      puedeGestionar: boolean;
+      puedeAdicionar: boolean;
+      puedeAsignar: boolean;
+      puedeCerrar: boolean;
+      puedeCsv: boolean;
     };
     setFilas(d.casos);
     setConteos(d.conteos);
-    setPuedeGestionar(d.puedeGestionar);
+    setPuede({
+      adicionar: d.puedeAdicionar,
+      asignar: d.puedeAsignar,
+      cerrar: d.puedeCerrar,
+      csv: d.puedeCsv,
+    });
   }, [filtros, vista, zona, tema, origen]);
 
   useEffect(() => {
@@ -213,7 +227,7 @@ export default function CasosAtencionPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          {puedeGestionar && (
+          {puede.adicionar && (
             <button
               type="button"
               onClick={() => setAdicionando(true)}
@@ -222,14 +236,16 @@ export default function CasosAtencionPage() {
               + Adicionar caso
             </button>
           )}
-          <button
-            type="button"
-            onClick={exportar}
-            disabled={filas === null || filas.length === 0}
-            style={botonServicio}
-          >
-            ⬇ Descargar CSV
-          </button>
+          {puede.csv && (
+            <button
+              type="button"
+              onClick={exportar}
+              disabled={filas === null || filas.length === 0}
+              style={botonServicio}
+            >
+              ⬇ Descargar CSV
+            </button>
+          )}
         </div>
       </div>
 
@@ -380,7 +396,7 @@ export default function CasosAtencionPage() {
                     {f.ultimoMovimiento ?? "—"}
                   </td>
                   <td style={{ ...celdaServicio, whiteSpace: "nowrap" }}>
-                    {vista === "SIN_ASIGNAR" && puedeGestionar ? (
+                    {vista === "SIN_ASIGNAR" && (puede.asignar || puede.cerrar) ? (
                       <button
                         type="button"
                         style={{ ...botonServicio, padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}

@@ -33,6 +33,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   if (body.sessionId != null) {
     profile.requirePermission(PERMISOS.ASISTENCIA_GESTIONAR);
+    profile.requireOpcion("op.calendario.reportar_caso");
     const { guiaUserId } = await exigirReporteDesdeSesion({
       actorUserId: auth.userId,
       sessionId: body.sessionId,
@@ -57,6 +58,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
     );
   }
   profile.requirePermission(PERMISOS.CASOS_GESTIONAR);
+  profile.requireOpcion("op.casos.adicionar");
   return json(
     await reportarCaso({
       actorUserId: auth.userId,

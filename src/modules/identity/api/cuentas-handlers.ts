@@ -68,6 +68,7 @@ const crearSchema = z.object({
 export const usuarioCrearHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.usuarios.administrativo");
   const body = crearSchema.parse(await request.json());
   if (ROLES_CON_ALTA_PROPIA.has(body.roleCode)) {
     throw new ValidationError(
@@ -139,8 +140,13 @@ const actualizarSchema = z.object({
  */
 export const usuarioActualizarHandler = handlerWithAuth(async (request, auth, context) => {
   const userId = await idDe(context);
-  await exigirGestionarCuenta(auth.userId, userId);
+  const actor = await exigirGestionarCuenta(auth.userId, userId);
   const body = actualizarSchema.parse(await request.json());
+  // Cada cambio con su opción (Roles › Usuarios y roles), TODAS antes de
+  // tocar nada: si falta una, no queda la mitad aplicada.
+  if (body.ficha !== undefined) actor.requireOpcion("op.usuarios.editar");
+  if (body.debeCambiarPassword !== undefined) actor.requireOpcion("op.usuarios.clave");
+  if (body.estado !== undefined) actor.requireOpcion("op.usuarios.estado");
   const ip = clientIp(request);
   if (body.ficha !== undefined) {
     await actualizarFichaAdministrativo({
@@ -174,7 +180,7 @@ export const usuarioActualizarHandler = handlerWithAuth(async (request, auth, co
  */
 export const usuarioEliminarHandler = handlerWithAuth(async (request, auth, context) => {
   const userId = await idDe(context);
-  await exigirGestionarCuenta(auth.userId, userId);
+  (await exigirGestionarCuenta(auth.userId, userId)).requireOpcion("op.usuarios.eliminar");
   await eliminarCuenta({ actorUserId: auth.userId, userId, ip: clientIp(request) });
   return json({ ok: true });
 });
@@ -185,7 +191,7 @@ export const usuarioEliminarHandler = handlerWithAuth(async (request, auth, cont
  */
 export const usuarioRestablecerClaveHandler = handlerWithAuth(async (request, auth, context) => {
   const userId = await idDe(context);
-  await exigirGestionarCuenta(auth.userId, userId);
+  (await exigirGestionarCuenta(auth.userId, userId)).requireOpcion("op.usuarios.clave");
   return json(
     await restablecerClave({ actorUserId: auth.userId, userId, ip: clientIp(request) }),
     SIN_CACHE,
@@ -247,6 +253,7 @@ export const solicitudesClaveListarHandler = handlerWithAuth(async (_request, au
 export const solicitudClaveDescartarHandler = handlerWithAuth(async (_request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.usuarios.clave");
   await descartarSolicitudClave({ actorUserId: auth.userId, id: await idDe(context) });
   return json({ ok: true });
 });

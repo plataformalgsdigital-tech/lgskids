@@ -84,6 +84,7 @@ export const crearReservaHandler = handlerWithAuth(async (request, auth) => {
   const body = reservaSchema.parse(await request.json());
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR, body.countryCode);
+  profile.requireOpcion("op.reservas.nueva", body.countryCode);
   const resultado = await crearReservaBeneficiario({
     actorUserId: auth.userId,
     ...body,
@@ -126,7 +127,7 @@ export const buscarEstudiantesHandler = handlerWithAuth(async (request, auth) =>
   return json({
     estudiantes: await buscarEstudiantes({ q, countryScope: auth.countryScope }),
     // Solo deciden qué botones ofrece la pantalla; el servidor lo vuelve a exigir.
-    puedeAprobar: profile.hasPermission(PERMISOS.CONTRATOS_GESTIONAR),
+    puedeAprobar: profile.hasPermission("op.contratos.aprobar"),
     puedeVerClaves: profile.esSuperadmin,
   });
 });
@@ -168,6 +169,16 @@ export const fichaContratoHandler = handlerWithAuth(async (_request, auth, conte
     ),
     // Solo deciden qué botones dibuja la pantalla; el servidor lo vuelve a exigir.
     puedeGestionar: profile.hasPermission(PERMISOS.CONTRATOS_GESTIONAR),
+    // Cada botón de la ficha con su opción (Roles › Operación › Contratos).
+    puede: {
+      aprobar: profile.hasPermission("op.contratos.aprobar"),
+      matricular: profile.hasPermission("op.contratos.matricular"),
+      cambiarSalon: profile.hasPermission("op.contratos.cambiar_salon"),
+      cambiarCurso: profile.hasPermission("op.contratos.cambiar_curso"),
+      onhold: profile.hasPermission("op.contratos.onhold"),
+      extender: profile.hasPermission("op.contratos.extender"),
+      inactivar: profile.hasPermission("op.contratos.inactivar"),
+    },
   });
 });
 
@@ -188,6 +199,7 @@ export const opcionesAcademicasHandler = handlerWithAuth(async (_request, auth, 
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MATRICULAS_GESTIONAR);
+  profile.requireOpcion("op.kids.academic_change");
   return json(await opcionesAcademicas(contractId));
 });
 
@@ -196,6 +208,7 @@ export const cambiarCursoHandler = handlerWithAuth(async (request, auth, context
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  profile.requireOpcion("op.contratos.cambiar_curso");
   const body = cursoSchema.parse(await request.json());
   return json(
     await cambiarCursoContrato({
@@ -217,6 +230,7 @@ export const aprobarContratoHandler = handlerWithAuth(async (request, auth, cont
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  profile.requireOpcion("op.contratos.aprobar");
   const body = aprobarSchema.parse(await request.json().catch(() => ({})));
   const resultado = await aprobarContrato({
     actorUserId: auth.userId,
@@ -241,6 +255,7 @@ export const onholdHandler = handlerWithAuth(async (request, auth, context) => {
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  profile.requireOpcion("op.contratos.onhold");
   const body = onholdSchema.parse(await request.json());
   const resultado = await ponerEnPausa({
     actorUserId: auth.userId,
@@ -264,6 +279,7 @@ export const extenderHandler = handlerWithAuth(async (request, auth, context) =>
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  profile.requireOpcion("op.contratos.extender");
   const body = extensionSchema.parse(await request.json());
   return json(
     await extenderContrato({
@@ -281,6 +297,7 @@ export const reactivarHandler = handlerWithAuth(async (request, auth, context) =
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  profile.requireOpcion("op.contratos.onhold");
   const resultado = await reactivar({ actorUserId: auth.userId, contractId, ip: ip(request) });
   return json(resultado);
 });
@@ -290,6 +307,7 @@ export const inactivarHandler = handlerWithAuth(async (request, auth, context) =
   const contractId = await contractIdFromContext(context);
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  profile.requireOpcion("op.contratos.inactivar");
   const body = motivoSchema.parse(await request.json());
   await inactivarContrato({
     actorUserId: auth.userId,

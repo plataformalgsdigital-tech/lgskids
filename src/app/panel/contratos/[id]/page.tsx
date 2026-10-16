@@ -17,6 +17,26 @@ import { numeroContrato } from "@/ui/numero-contrato";
  * sobre SU contrato, no sobre el de al lado.
  */
 
+/** Qué botón puede usar quien mira: una opción por acción, decidida en el servidor. */
+interface PuedeContrato {
+  aprobar: boolean;
+  matricular: boolean;
+  cambiarSalon: boolean;
+  cambiarCurso: boolean;
+  onhold: boolean;
+  extender: boolean;
+  inactivar: boolean;
+}
+const SIN_PERMISOS: PuedeContrato = {
+  aprobar: false,
+  matricular: false,
+  cambiarSalon: false,
+  cambiarCurso: false,
+  onhold: false,
+  extender: false,
+  inactivar: false,
+};
+
 interface Contrato {
   id: string;
   numero: number;
@@ -154,7 +174,8 @@ export default function FichaContratoPage() {
   const [hermanos, setHermanos] = useState<Contrato[]>([]);
   /** ¿Está cursando? Por contrato, derivado en el servidor. */
   const [academico, setAcademico] = useState<Record<string, Academico>>({});
-  const [puedeGestionar, setPuedeGestionar] = useState(false);
+  /** Cada botón con su opción (Roles › Operación › Contratos), del servidor. */
+  const [puede, setPuede] = useState<PuedeContrato>(SIN_PERMISOS);
   const [salones, setSalones] = useState<SalonOpcion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -192,13 +213,13 @@ export default function FichaContratoPage() {
     const data: {
       contrato: Contrato;
       hermanos: Contrato[];
-      puedeGestionar: boolean;
+      puede?: PuedeContrato;
       academico?: Record<string, Academico>;
     } = await res.json();
     setContrato(data.contrato);
     setHermanos(data.hermanos);
     setAcademico(data.academico ?? {});
-    setPuedeGestionar(data.puedeGestionar);
+    setPuede(data.puede ?? SIN_PERMISOS);
   }, [params.id]);
 
   useEffect(() => {
@@ -582,7 +603,7 @@ export default function FichaContratoPage() {
                 </Dato>
               </div>
 
-              {puedeGestionar && (
+              {Object.values(puede).some(Boolean) && (
                 <div
                   style={{
                     borderTop: "1px solid #edf0f6",
@@ -592,7 +613,7 @@ export default function FichaContratoPage() {
                     flexWrap: "wrap",
                   }}
                 >
-                  {c.estado === "PENDIENTE" && (
+                  {puede.aprobar && c.estado === "PENDIENTE" && (
                     <button
                       style={{ ...boton, borderColor: "var(--lgs-verde)" }}
                       disabled={ocupado}
@@ -601,7 +622,7 @@ export default function FichaContratoPage() {
                       ✔ Aprobar
                     </button>
                   )}
-                  {c.estado === "APROBADO" && c.enrollmentId === null && (
+                  {puede.matricular && c.estado === "APROBADO" && c.enrollmentId === null && (
                     <button
                       style={{ ...boton, borderColor: "var(--lgs-azul)" }}
                       disabled={ocupado}
@@ -618,7 +639,7 @@ export default function FichaContratoPage() {
                       🎓 Matricular
                     </button>
                   )}
-                  {c.estado === "APROBADO" && c.enrollmentId !== null && (
+                  {puede.cambiarSalon && c.estado === "APROBADO" && c.enrollmentId !== null && (
                     <button
                       style={boton}
                       disabled={ocupado}
@@ -635,7 +656,7 @@ export default function FichaContratoPage() {
                       🔀 Cambiar salón
                     </button>
                   )}
-                  {c.estado !== "INACTIVO" && (
+                  {puede.cambiarCurso && c.estado !== "INACTIVO" && (
                     <button
                       style={boton}
                       disabled={ocupado}
@@ -652,7 +673,7 @@ export default function FichaContratoPage() {
                       🎚 Cambiar curso
                     </button>
                   )}
-                  {c.estado === "APROBADO" && (
+                  {puede.onhold && c.estado === "APROBADO" && (
                     <button
                       style={boton}
                       disabled={ocupado}
@@ -670,7 +691,7 @@ export default function FichaContratoPage() {
                       ⏸ Pausar (OnHold)
                     </button>
                   )}
-                  {c.estado !== "PENDIENTE" && (
+                  {puede.extender && c.estado !== "PENDIENTE" && (
                     <button
                       style={boton}
                       disabled={ocupado}
@@ -688,7 +709,7 @@ export default function FichaContratoPage() {
                       📅 Extender vigencia
                     </button>
                   )}
-                  {c.estado === "ONHOLD" && (
+                  {puede.onhold && c.estado === "ONHOLD" && (
                     <button
                       style={boton}
                       disabled={ocupado}
@@ -706,7 +727,7 @@ export default function FichaContratoPage() {
                       ▶ Reactivar
                     </button>
                   )}
-                  {c.estado !== "INACTIVO" && (
+                  {puede.inactivar && c.estado !== "INACTIVO" && (
                     <button
                       style={{ ...boton, color: "#c62828" }}
                       disabled={ocupado}

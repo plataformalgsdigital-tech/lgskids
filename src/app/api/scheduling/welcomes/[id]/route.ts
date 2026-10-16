@@ -22,8 +22,9 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
   }
   return json({
     ...detalle,
-    puedeEliminar: profile.hasPermission(PERMISOS.EVENTOS_CREAR),
-    puedeMarcar: profile.hasPermission(PERMISOS.ASISTENCIA_GESTIONAR),
+    // Las mismas opciones que exigen editar/borrar y pasar lista.
+    puedeEliminar: profile.hasPermission("op.calendario.evento_academico"),
+    puedeMarcar: profile.hasPermission("op.calendario.welcome_asistencia"),
   });
 });
 
@@ -34,6 +35,7 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
 export const PATCH = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.EVENTOS_CREAR);
+  profile.requireOpcion("op.calendario.evento_academico");
   const id = z.uuid().parse((await context.params)["id"]);
   const body = welcomeSchema.parse(await request.json());
   return json(
@@ -51,6 +53,7 @@ export const PATCH = handlerWithAuth(async (request, auth, context) => {
 export const DELETE = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.EVENTOS_CREAR);
+  profile.requireOpcion("op.calendario.evento_academico");
   const id = z.uuid().parse((await context.params)["id"]);
   await eliminarWelcome({
     actorUserId: auth.userId,

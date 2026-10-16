@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
 
 interface Campania {
   id: string;
@@ -306,7 +307,7 @@ function SalonCard(props: {
   );
 }
 
-export default function CampaniasPage() {
+function CampaniasPageContenido() {
   const router = useRouter();
   const [campanias, setCampanias] = useState<Campania[] | null>(null);
   const [puedeGestionar, setPuedeGestionar] = useState(false);
@@ -357,9 +358,11 @@ export default function CampaniasPage() {
       if (res.ok) {
         const me: { permisos: { code: string }[] } = await res.json();
         const codes = new Set(me.permisos.map((p) => p.code));
-        setPuedeGestionar(codes.has("catalogo.gestionar"));
-        setPuedeSalones(codes.has("salones.gestionar"));
-        if (codes.has("salones.gestionar")) {
+        // Las opciones de Roles: crear campaña y crear sus salones (el servidor
+        // exige las mismas). `/api/auth/me` ya las trae con su permiso base.
+        setPuedeGestionar(codes.has("op.mant.campania_crear"));
+        setPuedeSalones(codes.has("op.calendario.salon_crear"));
+        if (codes.has("op.calendario.salon_crear")) {
           const [g, h] = await Promise.all([
             apiFetch("/api/identity/guides"),
             apiFetch("/api/scheduling/horarios?activos=1"),
@@ -957,5 +960,14 @@ export default function CampaniasPage() {
         )}
       </section>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function CampaniasPage() {
+  return (
+    <ConOpcion op="op.mant.campanias" volver="/panel/mantenimiento-cursos">
+      <CampaniasPageContenido />
+    </ConOpcion>
   );
 }

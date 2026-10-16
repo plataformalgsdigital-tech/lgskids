@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 type Estado = "PROCESANDO" | "BORRADOR" | "PUBLICADO" | "ERROR";
@@ -76,7 +78,7 @@ const ESTADO: Record<Estado, { texto: string; fondo: string; color: string }> = 
   ERROR: { texto: "⚠️ Error", fondo: "#fdecec", color: "#c62828" },
 };
 
-export default function VideosLibroPage() {
+function VideosLibroPageContenido() {
   const [curso, setCurso] = useState<Curso>("JUNIOR");
   const [nivel, setNivel] = useState("ROOKIE");
   const [videos, setVideos] = useState<Video[] | null>(null);
@@ -379,23 +381,25 @@ export default function VideosLibroPage() {
         )}
 
         <div style={{ marginTop: "0.9rem", display: "flex", gap: "0.6rem", alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={() => void subir()}
-            disabled={subiendo || archivo === null || !paginaOk}
-            style={{
-              ...boton,
-              border: "none",
-              padding: "0.55rem 1.3rem",
-              fontSize: "0.9rem",
-              background:
-                subiendo || archivo === null || !paginaOk ? "#c9ccd4" : "var(--lgs-verde)",
-              color: "#1b2a10",
-              cursor: subiendo || archivo === null || !paginaOk ? "not-allowed" : "pointer",
-            }}
-          >
-            {subiendo ? "Subiendo…" : "Subir y comprimir"}
-          </button>
+          <SoloSi op="op.mant.videos_subir">
+            <button
+              type="button"
+              onClick={() => void subir()}
+              disabled={subiendo || archivo === null || !paginaOk}
+              style={{
+                ...boton,
+                border: "none",
+                padding: "0.55rem 1.3rem",
+                fontSize: "0.9rem",
+                background:
+                  subiendo || archivo === null || !paginaOk ? "#c9ccd4" : "var(--lgs-verde)",
+                color: "#1b2a10",
+                cursor: subiendo || archivo === null || !paginaOk ? "not-allowed" : "pointer",
+              }}
+            >
+              {subiendo ? "Subiendo…" : "Subir y comprimir"}
+            </button>
+          </SoloSi>
           {limites !== null && (
             <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
               Máx. {mb(limites.tamanoSubida)} y {String(Math.round(limites.duracionMaximaSeg / 60))}{" "}
@@ -511,31 +515,35 @@ export default function VideosLibroPage() {
                     }}
                   >
                     {v.estado === "BORRADOR" && (
-                      <button
-                        type="button"
-                        disabled={ocupado !== null}
-                        onClick={() => void confirmar(v)}
-                        style={{
-                          ...boton,
-                          border: "none",
-                          background: "var(--lgs-verde)",
-                          color: "#1b2a10",
-                        }}
-                      >
-                        {reemplaza !== undefined
-                          ? "Confirmar y reemplazar"
-                          : "Confirmar y publicar"}
-                      </button>
+                      <SoloSi op="op.mant.videos_subir">
+                        <button
+                          type="button"
+                          disabled={ocupado !== null}
+                          onClick={() => void confirmar(v)}
+                          style={{
+                            ...boton,
+                            border: "none",
+                            background: "var(--lgs-verde)",
+                            color: "#1b2a10",
+                          }}
+                        >
+                          {reemplaza !== undefined
+                            ? "Confirmar y reemplazar"
+                            : "Confirmar y publicar"}
+                        </button>
+                      </SoloSi>
                     )}
                     {v.estado !== "PROCESANDO" && (
-                      <button
-                        type="button"
-                        disabled={ocupado !== null}
-                        onClick={() => void borrar(v)}
-                        style={{ ...boton, color: "#c62828" }}
-                      >
-                        Descartar
-                      </button>
+                      <SoloSi op="op.mant.videos_subir">
+                        <button
+                          type="button"
+                          disabled={ocupado !== null}
+                          onClick={() => void borrar(v)}
+                          style={{ ...boton, color: "#c62828" }}
+                        >
+                          Descartar
+                        </button>
+                      </SoloSi>
                     )}
                   </div>
                 </div>
@@ -605,17 +613,21 @@ export default function VideosLibroPage() {
                     >
                       {verPublicado === v.id ? "Ocultar" : "Ver"}
                     </button>
-                    <button type="button" onClick={() => reemplazar(v)} style={boton}>
-                      Reemplazar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={ocupado !== null}
-                      onClick={() => void borrar(v)}
-                      style={{ ...boton, color: "#c62828" }}
-                    >
-                      Borrar
-                    </button>
+                    <SoloSi op="op.mant.videos_subir">
+                      <button type="button" onClick={() => reemplazar(v)} style={boton}>
+                        Reemplazar
+                      </button>
+                    </SoloSi>
+                    <SoloSi op="op.mant.videos_subir">
+                      <button
+                        type="button"
+                        disabled={ocupado !== null}
+                        onClick={() => void borrar(v)}
+                        style={{ ...boton, color: "#c62828" }}
+                      >
+                        Borrar
+                      </button>
+                    </SoloSi>
                   </div>
                 </div>
               ))}
@@ -624,5 +636,14 @@ export default function VideosLibroPage() {
         </section>
       )}
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function VideosLibroPage() {
+  return (
+    <ConOpcion op="op.mant.videos" volver="/panel/mantenimiento-cursos">
+      <VideosLibroPageContenido />
+    </ConOpcion>
   );
 }

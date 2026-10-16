@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { usePermisos } from "@/ui/permisos";
 
 interface Tarjeta {
   titulo: string;
@@ -9,6 +10,8 @@ interface Tarjeta {
   emoji: string;
   color: string;
   href?: string;
+  /** Su opción en Roles: sin ella, la tarjeta no aparece. */
+  op: string;
 }
 
 const TARJETAS: Tarjeta[] = [
@@ -18,6 +21,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📝",
     color: "var(--lgs-purpura)",
     href: "/panel/mantenimiento-cursos/gestion-contenido",
+    op: "op.mant.contenido",
   },
   {
     titulo: "Referencia de cursos",
@@ -25,6 +29,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📚",
     color: "var(--lgs-cian)",
     href: "/panel/mantenimiento-cursos/referencia",
+    op: "op.mant.referencia",
   },
   {
     titulo: "Campañas",
@@ -32,6 +37,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📣",
     color: "var(--lgs-azul)",
     href: "/panel/campanias",
+    op: "op.mant.campanias",
   },
   {
     titulo: "Horarios",
@@ -39,6 +45,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "🕒",
     color: "var(--lgs-amarillo)",
     href: "/panel/horarios",
+    op: "op.mant.horarios",
   },
   {
     titulo: "Subir curso (CSV)",
@@ -46,6 +53,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "⬆️",
     color: "var(--lgs-cian)",
     href: "/panel/mantenimiento/catalogo-curso",
+    op: "op.mant.subir_csv",
   },
   {
     titulo: "Imágenes de curso",
@@ -53,6 +61,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "🖼️",
     color: "var(--lgs-magenta)",
     href: "/panel/mantenimiento-cursos/imagenes",
+    op: "op.mant.imagenes",
   },
   {
     titulo: "Material del alumno",
@@ -60,6 +69,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📖",
     color: "var(--lgs-azul)",
     href: "/panel/mantenimiento-cursos/material",
+    op: "op.mant.material",
   },
   {
     titulo: "Videos del libro",
@@ -67,6 +77,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "🎬",
     color: "var(--lgs-magenta)",
     href: "/panel/mantenimiento-cursos/videos",
+    op: "op.mant.videos",
   },
   {
     titulo: "Enlaces de juegos",
@@ -74,6 +85,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "🎮",
     color: "var(--lgs-verde)",
     href: "/panel/mantenimiento-cursos/juegos",
+    op: "op.mant.juegos",
   },
   {
     titulo: "Editor de mapa (hotspots)",
@@ -81,6 +93,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📍",
     color: "var(--lgs-purpura)",
     href: "/panel/mantenimiento-cursos/mapa",
+    op: "op.mant.mapa",
   },
 ];
 
@@ -97,6 +110,7 @@ const cardBase: CSSProperties = {
 };
 
 export default function MantenimientoCursosPage() {
+  const { puede } = usePermisos();
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
       <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Mantenimiento Académico</h1>
@@ -113,7 +127,7 @@ export default function MantenimientoCursosPage() {
           gap: "1rem",
         }}
       >
-        {TARJETAS.map((t) => {
+        {TARJETAS.filter((t) => puede(t.op)).map((t) => {
           const contenido = (
             <>
               <span

@@ -52,7 +52,8 @@ export const GET = handlerWithAuth(async (request, auth) => {
     inasistencias: filas,
     tope: MAX_INASISTENCIAS,
     // Las acciones de cada línea: la pantalla solo muestra lo que el servidor aceptará.
-    puedeJustificar: profile.hasPermission(PERMISOS.ASISTENCIA_GESTIONAR),
-    puedeEnviar: profile.hasPermission(PERMISOS.MENSAJES_ENVIAR),
+    // Las opciones de la pantalla (Roles › Servicio), que ya incluyen el permiso.
+    puedeJustificar: profile.hasPermission("op.servicio.justificar"),
+    puedeEnviar: profile.hasPermission("op.servicio.whatsapp_inasistencia"),
   });
 });

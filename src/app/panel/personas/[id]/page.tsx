@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { usePermisos } from "@/ui/permisos";
 import { numeroContrato } from "@/ui/numero-contrato";
 import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
 import { AcademicInfo } from "./AcademicInfo";
@@ -119,6 +120,8 @@ export default function DetalleNinoPage() {
   const [error, setError] = useState<string | null>(null);
   const [puedeVerClaves, setPuedeVerClaves] = useState(false);
   const [puedeEnviarMensajes, setPuedeEnviarMensajes] = useState(false);
+  const [puedeEnviarEnlace, setPuedeEnviarEnlace] = useState(false);
+  const { puede } = usePermisos();
   const [enviandoCredenciales, setEnviandoCredenciales] = useState(false);
   const [pestana, setPestana] = useState<"general" | "academic">("general");
   /** Sube cuando Academic Change mueve al niño: la ficha se vuelve a leer. */
@@ -151,6 +154,7 @@ export default function DetalleNinoPage() {
         nino?: Nino;
         puedeVerClaves?: boolean;
         puedeEnviarMensajes?: boolean;
+        puedeEnviarEnlace?: boolean;
         error?: { message: string };
       } = await res.json();
       if (!res.ok) {
@@ -160,6 +164,7 @@ export default function DetalleNinoPage() {
       setNino(data.nino ?? null);
       setPuedeVerClaves(data.puedeVerClaves === true);
       setPuedeEnviarMensajes(data.puedeEnviarMensajes === true);
+      setPuedeEnviarEnlace(data.puedeEnviarEnlace === true);
       // Dónde va (curso, nivel, lección): el MISMO avance que lee Academic Info.
       // Sin `progresion.ver` la línea simplemente no se muestra.
       const rp = await apiFetch(`/api/progression/children/${params.id}`);
@@ -268,28 +273,31 @@ export default function DetalleNinoPage() {
             ["general", "General Info"],
             ["academic", "Academic Info"],
           ] as const
-        ).map(([clave, texto]) => (
-          <button
-            key={clave}
-            type="button"
-            role="tab"
-            aria-selected={pestana === clave}
-            onClick={() => setPestana(clave)}
-            style={{
-              padding: "0.6rem 1.2rem",
-              border: "none",
-              borderBottom: `3px solid ${pestana === clave ? "var(--lgs-azul)" : "transparent"}`,
-              marginBottom: "-2px",
-              background: "transparent",
-              fontWeight: 800,
-              fontSize: "0.95rem",
-              color: pestana === clave ? "var(--lgs-azul)" : "var(--texto-suave)",
-              cursor: "pointer",
-            }}
-          >
-            {texto}
-          </button>
-        ))}
+        )
+          // La pestaña Academic Info es una opción propia (Roles › Operación › Kids).
+          .filter(([clave]) => clave !== "academic" || puede("op.kids.academic_info"))
+          .map(([clave, texto]) => (
+            <button
+              key={clave}
+              type="button"
+              role="tab"
+              aria-selected={pestana === clave}
+              onClick={() => setPestana(clave)}
+              style={{
+                padding: "0.6rem 1.2rem",
+                border: "none",
+                borderBottom: `3px solid ${pestana === clave ? "var(--lgs-azul)" : "transparent"}`,
+                marginBottom: "-2px",
+                background: "transparent",
+                fontWeight: 800,
+                fontSize: "0.95rem",
+                color: pestana === clave ? "var(--lgs-azul)" : "var(--texto-suave)",
+                cursor: "pointer",
+              }}
+            >
+              {texto}
+            </button>
+          ))}
       </div>
 
       {enviandoCredenciales && (
@@ -300,7 +308,7 @@ export default function DetalleNinoPage() {
         />
       )}
 
-      {pestana === "academic" && (
+      {pestana === "academic" && puede("op.kids.academic_info") && (
         <AcademicInfo
           childPersonId={nino.id}
           contractId={nino.contractId}
@@ -417,11 +425,11 @@ export default function DetalleNinoPage() {
           <PerfilWelcome
             childPersonId={nino.id}
             tieneCuenta={nino.userId !== null}
-            puedeEnviar={puedeEnviarMensajes}
+            puedeEnviar={puedeEnviarEnlace}
           />
 
           {/* Casos de atención del niño (se oculta sola sin `casos.ver`). */}
-          <CasosNino childPersonId={nino.id} />
+          {puede("op.kids.casos") && <CasosNino childPersonId={nino.id} />}
 
           {/* Información académica */}
           <section style={{ ...card, marginTop: "1rem" }}>

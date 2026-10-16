@@ -14,6 +14,7 @@ bootstrapIdentity();
 export const GET = handlerWithAuth(async (_request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.colisiones");
   const id = z.uuid().parse((await context.params)["id"]);
   return json({ colisiones: await colisionesDeCampania(id) });
 });

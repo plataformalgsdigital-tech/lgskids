@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { usePermisos } from "@/ui/permisos";
 import { campoServicio, rotuloServicio } from "../FiltrosServicio";
 import { etiqueta, useVocabularioCasos } from "./casos-ui";
 
@@ -45,6 +46,7 @@ export function GestionarCasoModal({
   onHecho: (aviso: string) => void;
 }) {
   const voc = useVocabularioCasos();
+  const { puede } = usePermisos();
   const [modo, setModo] = useState(modoInicial);
   const [area, setArea] = useState("");
   const [comentario, setComentario] = useState("");
@@ -156,7 +158,8 @@ export function GestionarCasoModal({
         {modo === "asignar" ? (
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-              {areasPosibles.map((a) => (
+              {/* Asignar y cerrar son opciones distintas en Roles. */}
+              {(puede("op.casos.asignar") ? areasPosibles : []).map((a) => (
                 <label
                   key={a.valor}
                   style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}
@@ -170,15 +173,17 @@ export function GestionarCasoModal({
                   {a.etiqueta}
                 </label>
               ))}
-              <label style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
-                <input
-                  type="radio"
-                  name="area"
-                  checked={false}
-                  onChange={() => setModo("cerrar")}
-                />
-                Cerrar el caso
-              </label>
+              {puede("op.casos.cerrar") && (
+                <label style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
+                  <input
+                    type="radio"
+                    name="area"
+                    checked={false}
+                    onChange={() => setModo("cerrar")}
+                  />
+                  Cerrar el caso
+                </label>
+              )}
             </div>
             <label>
               <span style={rotuloServicio}>Comentario *</span>

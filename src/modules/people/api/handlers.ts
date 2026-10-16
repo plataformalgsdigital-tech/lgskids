@@ -129,6 +129,8 @@ export const detalleNinoHandler = handlerWithAuth(async (_request, auth, context
     nino: await obtenerDetalleNino(id),
     puedeVerClaves: profile.esSuperadmin,
     // El botón de WhatsApp: la ruta del envío lo vuelve a exigir.
-    puedeEnviarMensajes: profile.hasPermission(PERMISOS.MENSAJES_ENVIAR),
+    // Las opciones de la ficha (Roles › Operación › Kids).
+    puedeEnviarMensajes: profile.hasPermission("op.kids.whatsapp_acceso"),
+    puedeEnviarEnlace: profile.hasPermission("op.kids.enlace_perfil"),
   });
 });

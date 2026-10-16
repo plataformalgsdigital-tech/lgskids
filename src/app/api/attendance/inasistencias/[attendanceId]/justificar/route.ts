@@ -17,6 +17,7 @@ bootstrapIdentity();
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ASISTENCIA_GESTIONAR);
+  profile.requireOpcion("op.servicio.justificar");
   profile.requirePermission(PERMISOS.PERSONAS_VER);
   const attendanceId = z.uuid().parse((await context.params)["attendanceId"]);
 

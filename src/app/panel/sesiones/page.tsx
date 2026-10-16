@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { usePermisos } from "@/ui/permisos";
 
 /**
  * Índice de Sesiones (mismo patrón que Mantenimiento Académico).
@@ -17,6 +18,8 @@ interface Tarjeta {
   emoji: string;
   color: string;
   href?: string;
+  /** Su opción en Roles: sin ella, la tarjeta no aparece. */
+  op: string;
 }
 
 const TARJETAS: Tarjeta[] = [
@@ -26,6 +29,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "🔁",
     color: "var(--lgs-azul)",
     href: "/panel/sesiones/refuerzos",
+    op: "op.sesiones.refuerzos",
   },
   {
     titulo: "Cancelaciones",
@@ -33,6 +37,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📣",
     color: "#6a1b9a",
     href: "/panel/sesiones/cancelaciones",
+    op: "op.sesiones.cancelaciones",
   },
   {
     titulo: "Eventos administrativos",
@@ -40,6 +45,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📋",
     color: "var(--lgs-purpura)",
     href: "/panel/sesiones/eventos-administrativos",
+    op: "op.sesiones.eventos_admin",
   },
   {
     titulo: "Suspensiones",
@@ -47,6 +53,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "⛔",
     color: "var(--lgs-magenta)",
     href: "/panel/sesiones/suspensiones",
+    op: "op.sesiones.suspensiones",
   },
   {
     titulo: "Feriados",
@@ -54,6 +61,7 @@ const TARJETAS: Tarjeta[] = [
     emoji: "📅",
     color: "var(--lgs-amarillo)",
     href: "/panel/sesiones/feriados",
+    op: "op.sesiones.feriados",
   },
 ];
 
@@ -70,6 +78,7 @@ const cardBase: CSSProperties = {
 };
 
 export default function SesionesPage() {
+  const { puede } = usePermisos();
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
       <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Sesiones</h1>
@@ -85,7 +94,7 @@ export default function SesionesPage() {
           gap: "1rem",
         }}
       >
-        {TARJETAS.map((t) => {
+        {TARJETAS.filter((t) => puede(t.op)).map((t) => {
           const contenido = (
             <>
               <span

@@ -59,6 +59,7 @@ export const GET = handlerWithAuth(async (request, auth) => {
 export const PUT = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.juegos_editar");
   const b = guardarSchema.parse(await request.json());
   return json(
     await guardarPosicionesUnidad({

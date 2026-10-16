@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { abrirLibroEnPestana, type CajaLibro } from "@/ui/libro-pestana";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 type Tipo = "interactivo" | "imprimible" | "actividades";
@@ -87,7 +89,7 @@ const boton: CSSProperties = {
   display: "inline-block",
 };
 
-export default function MaterialAlumnoPage() {
+function MaterialAlumnoPageContenido() {
   const [curso, setCurso] = useState<Curso>("JUNIOR");
   const [estado, setEstado] = useState<Estado | null>(null);
   // Celda ocupada ("NIVEL:tipo"): una subida de 30 MB tarda, y el botón no
@@ -345,36 +347,40 @@ export default function MaterialAlumnoPage() {
                                 Ver
                               </a>
                             ))}
-                          <label
-                            style={{
-                              ...boton,
-                              opacity: bloqueada ? 0.5 : 1,
-                              cursor: bloqueada ? "not-allowed" : "pointer",
-                              background: actual === null ? "var(--lgs-verde)" : "white",
-                            }}
-                          >
-                            {actual === null ? "Subir" : "Reemplazar"}
-                            <input
-                              type="file"
-                              accept={c?.accept}
-                              disabled={bloqueada}
-                              style={{ display: "none" }}
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                e.target.value = ""; // permite volver a elegir el mismo archivo
-                                if (f !== undefined) void subir(tipo, fila, f, parada, actual);
+                          <SoloSi op="op.mant.material_subir">
+                            <label
+                              style={{
+                                ...boton,
+                                opacity: bloqueada ? 0.5 : 1,
+                                cursor: bloqueada ? "not-allowed" : "pointer",
+                                background: actual === null ? "var(--lgs-verde)" : "white",
                               }}
-                            />
-                          </label>
-                          {actual !== null && (
-                            <button
-                              type="button"
-                              disabled={bloqueada}
-                              onClick={() => void quitar(tipo, fila, parada, actual)}
-                              style={{ ...boton, color: "#c62828" }}
                             >
-                              Quitar
-                            </button>
+                              {actual === null ? "Subir" : "Reemplazar"}
+                              <input
+                                type="file"
+                                accept={c?.accept}
+                                disabled={bloqueada}
+                                style={{ display: "none" }}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  e.target.value = ""; // permite volver a elegir el mismo archivo
+                                  if (f !== undefined) void subir(tipo, fila, f, parada, actual);
+                                }}
+                              />
+                            </label>
+                          </SoloSi>
+                          {actual !== null && (
+                            <SoloSi op="op.mant.material_subir">
+                              <button
+                                type="button"
+                                disabled={bloqueada}
+                                onClick={() => void quitar(tipo, fila, parada, actual)}
+                                style={{ ...boton, color: "#c62828" }}
+                              >
+                                Quitar
+                              </button>
+                            </SoloSi>
                           )}
                         </>
                       )}
@@ -436,5 +442,14 @@ export default function MaterialAlumnoPage() {
         </table>
       </div>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function MaterialAlumnoPage() {
+  return (
+    <ConOpcion op="op.mant.material" volver="/panel/mantenimiento-cursos">
+      <MaterialAlumnoPageContenido />
+    </ConOpcion>
   );
 }

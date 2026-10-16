@@ -22,6 +22,7 @@ const schema = z.object({
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ASISTENCIA_GESTIONAR);
+  profile.requireOpcion("op.calendario.welcome_asistencia");
   const id = z.uuid().parse((await context.params)["id"]);
   if (
     !profile.hasPermission(PERMISOS.SALONES_GESTIONAR) &&

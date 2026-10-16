@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Sesiones › Cancelaciones: los avisos de los guías que no pueden dictar una
@@ -64,7 +66,7 @@ function horaDelSalon(iso: string, zona: string | null): string {
   });
 }
 
-export default function CancelacionesPage() {
+function CancelacionesPageContenido() {
   const [estado, setEstado] = useState("PENDIENTE");
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [guias, setGuias] = useState<GuiaOpcion[]>([]);
@@ -249,27 +251,31 @@ export default function CancelacionesPage() {
                             ))}
                         </select>
                         <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
-                          <button
-                            type="button"
-                            disabled={ocupado !== null}
-                            onClick={() => void resolver(f, true)}
-                            style={{
-                              ...boton,
-                              border: "none",
-                              background: "#6a1b9a",
-                              color: "white",
-                            }}
-                          >
-                            Aprobar
-                          </button>
-                          <button
-                            type="button"
-                            disabled={ocupado !== null}
-                            onClick={() => void resolver(f, false)}
-                            style={boton}
-                          >
-                            Rechazar
-                          </button>
+                          <SoloSi op="op.calendario.cancelacion_resolver">
+                            <button
+                              type="button"
+                              disabled={ocupado !== null}
+                              onClick={() => void resolver(f, true)}
+                              style={{
+                                ...boton,
+                                border: "none",
+                                background: "#6a1b9a",
+                                color: "white",
+                              }}
+                            >
+                              Aprobar
+                            </button>
+                          </SoloSi>
+                          <SoloSi op="op.calendario.cancelacion_resolver">
+                            <button
+                              type="button"
+                              disabled={ocupado !== null}
+                              onClick={() => void resolver(f, false)}
+                              style={boton}
+                            >
+                              Rechazar
+                            </button>
+                          </SoloSi>
                         </div>
                       </div>
                     ) : (
@@ -283,5 +289,14 @@ export default function CancelacionesPage() {
         </div>
       )}
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function CancelacionesPage() {
+  return (
+    <ConOpcion op="op.sesiones.cancelaciones" volver="/panel/sesiones">
+      <CancelacionesPageContenido />
+    </ConOpcion>
   );
 }

@@ -33,6 +33,7 @@ const putSchema = z.object({ permisos: z.array(z.string().min(3)).max(100) });
 export const PUT = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ROLES_ASIGNAR);
+  profile.requireOpcion("op.usuarios.tab_roles");
   const body = putSchema.parse(await request.json());
   await actualizarPermisosDeRol({
     actorUserId: auth.userId,

@@ -103,7 +103,10 @@ export default function CasoPage() {
   const { id } = useParams<{ id: string }>();
   const voc = useVocabularioCasos();
   const [caso, setCaso] = useState<Caso | null>(null);
+  // Contactos/acuerdo/notas, asignar/escalar y cerrar: cada uno con su opción.
   const [puedeGestionar, setPuedeGestionar] = useState(false);
+  const [puedeAsignar, setPuedeAsignar] = useState(false);
+  const [puedeCerrar, setPuedeCerrar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -132,9 +135,16 @@ export default function CasoPage() {
       setError(c.error?.message ?? "No se pudo cargar el caso.");
       return;
     }
-    const d = (await res.json()) as { caso: Caso; puedeGestionar: boolean };
+    const d = (await res.json()) as {
+      caso: Caso;
+      puedeGestionar: boolean;
+      puedeAsignar?: boolean;
+      puedeCerrar?: boolean;
+    };
     aplicar(d.caso);
     setPuedeGestionar(d.puedeGestionar);
+    setPuedeAsignar(d.puedeAsignar === true);
+    setPuedeCerrar(d.puedeCerrar === true);
   }, [id, aplicar]);
 
   useEffect(() => {
@@ -254,22 +264,24 @@ export default function CasoPage() {
               ` · cerrado por ${caso.cerradoPor ?? "—"} el ${fechaHora(caso.cerradoEn ?? "")}`}
           </p>
         </div>
-        {editable && (
+        {!cerrado && (puedeAsignar || puedeCerrar) && (
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            {puedeDerivar && (
+            {puedeAsignar && puedeDerivar && (
               <button type="button" style={boton} onClick={() => setModal("asignar")}>
                 {caso.area === null
                   ? "Asignar a un área"
                   : `Escalar a ${etiqueta(voc.areas, voc.escalaA)}`}
               </button>
             )}
-            <button
-              type="button"
-              style={{ ...boton, border: "none", background: "var(--lgs-azul)", color: "white" }}
-              onClick={() => setModal("cerrar")}
-            >
-              Cerrar caso
-            </button>
+            {puedeCerrar && (
+              <button
+                type="button"
+                style={{ ...boton, border: "none", background: "var(--lgs-azul)", color: "white" }}
+                onClick={() => setModal("cerrar")}
+              >
+                Cerrar caso
+              </button>
+            )}
           </div>
         )}
       </div>

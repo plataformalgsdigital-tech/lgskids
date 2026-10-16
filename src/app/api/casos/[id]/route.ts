@@ -26,7 +26,10 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
   const id = z.uuid().parse((await context.params)["id"]);
   return json({
     caso: await detalleCaso(id, { actorUserId: auth.userId, countryScope: auth.countryScope }),
-    puedeGestionar: profile.hasPermission(PERMISOS.CASOS_GESTIONAR),
+    // Contactos, acuerdo y notas; asignar/escalar y cerrar, cada uno con su opción.
+    puedeGestionar: profile.hasPermission("op.casos.gestionar"),
+    puedeAsignar: profile.hasPermission("op.casos.asignar"),
+    puedeCerrar: profile.hasPermission("op.casos.cerrar"),
   });
 });
 
@@ -61,6 +64,14 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
   profile.requirePermission(PERMISOS.CASOS_GESTIONAR);
   const casoId = z.uuid().parse((await context.params)["id"]);
   const body = accion.parse(await request.json());
+  // Cada acción con su opción (Roles › Servicio › Casos de atención).
+  profile.requireOpcion(
+    body.accion === "asignar"
+      ? "op.casos.asignar"
+      : body.accion === "cerrar"
+        ? "op.casos.cerrar"
+        : "op.casos.gestionar",
+  );
   const base = { actorUserId: auth.userId, casoId, countryScope: auth.countryScope };
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   switch (body.accion) {

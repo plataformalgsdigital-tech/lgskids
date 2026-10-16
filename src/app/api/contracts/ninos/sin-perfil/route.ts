@@ -30,6 +30,6 @@ export const GET = handlerWithAuth(async (request, auth) => {
       campaignId: q.campaignId ?? null,
       buscar: q.buscar ?? null,
     }),
-    puedeEnviar: profile.hasPermission(PERMISOS.MENSAJES_ENVIAR),
+    puedeEnviar: profile.hasPermission("op.kids.enlace_perfil"),
   });
 });

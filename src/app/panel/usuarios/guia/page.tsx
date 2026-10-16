@@ -16,6 +16,7 @@ import {
   rejilla,
   tarjeta,
 } from "../comunes";
+import { ConOpcion } from "@/ui/ConOpcion";
 
 const VACIO = {
   nombres: "",
@@ -45,7 +46,7 @@ interface RegistroAbierto {
   enlace: string;
 }
 
-export default function AltaGuiaPage() {
+function AltaGuiaPageContenido() {
   const [datos, setDatos] = useState(VACIO);
   const [foto, setFoto] = useState<File | null>(null);
   const previo = useMemo(() => (foto === null ? null : URL.createObjectURL(foto)), [foto]);
@@ -471,5 +472,14 @@ export default function AltaGuiaPage() {
         </div>
       </form>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function AltaGuiaPage() {
+  return (
+    <ConOpcion op="op.usuarios.guia" volver="/panel/usuarios">
+      <AltaGuiaPageContenido />
+    </ConOpcion>
   );
 }

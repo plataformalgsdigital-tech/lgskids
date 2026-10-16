@@ -17,13 +17,14 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
   const childPersonId = z.uuid().parse((await context.params)["childPersonId"]);
   return json({
     ...(await opcionesWelcomeNino(childPersonId, auth.countryScope)),
-    puedeAgendar: profile.hasPermission(PERMISOS.MATRICULAS_GESTIONAR),
+    puedeAgendar: profile.hasPermission("op.kids.agendar_welcome"),
   });
 });
 
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MATRICULAS_GESTIONAR);
+  profile.requireOpcion("op.kids.agendar_welcome");
   const childPersonId = z.uuid().parse((await context.params)["childPersonId"]);
   const body = z.object({ welcomeId: z.uuid() }).parse(await request.json());
   return json({

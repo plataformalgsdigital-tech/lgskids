@@ -16,6 +16,7 @@ import {
   type FiltrosBase,
 } from "../FiltrosServicio";
 import { ESTADO_WELCOME, cuandoWelcome, pastillaWelcome, type EstadoWelcome } from "./welcome-ui";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Eventos Welcome (MOSAICO: "Eventos WELCOME"): cada niño agendado y su estado.
@@ -160,14 +161,16 @@ export function EventosTab({ zona }: { zona: string }) {
             ? ""
             : `${String(filas.length)} agendado(s) · ${String(cuenta("ASISTIO"))} asistieron · ${String(cuenta("NO_ASISTIO"))} no asistieron · ${String(cuenta("PENDIENTE"))} pendientes`}
         </span>
-        <button
-          type="button"
-          onClick={exportar}
-          disabled={filas === null || filas.length === 0}
-          style={botonServicio}
-        >
-          ⬇ Descargar CSV
-        </button>
+        <SoloSi op="op.servicio.welcome_csv">
+          <button
+            type="button"
+            onClick={exportar}
+            disabled={filas === null || filas.length === 0}
+            style={botonServicio}
+          >
+            ⬇ Descargar CSV
+          </button>
+        </SoloSi>
       </div>
       {error !== null && (
         <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>

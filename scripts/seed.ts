@@ -8,7 +8,7 @@
  * Uso:  pnpm seed   (requiere DATABASE_URL y la migración aplicada)
  */
 import { hash } from "@node-rs/argon2";
-import { MATRIZ_ROL_PERMISOS, PERMISOS, ROLES } from "@/modules/access";
+import { MATRIZ_ROL_PERMISOS, OPCIONES_MENU, PERMISOS, ROLES } from "@/modules/access";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
@@ -138,6 +138,18 @@ async function main(): Promise<void> {
          VALUES ($1, $2, $3, now())
          ON CONFLICT (code) DO UPDATE SET nombre = $3, updated_at = now()`,
         [newId(), code, nombre],
+        tx,
+      );
+    }
+    // Las opciones de cada pantalla (`op.*`, tercer nivel del árbol). Las crea
+    // también su migración; aquí, por si el seed corre sobre una base sin ella.
+    for (const o of OPCIONES_MENU) {
+      if (!o.permiso.startsWith("op.")) continue;
+      await execute(
+        `INSERT INTO access_permission (id, code, nombre, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (code) DO UPDATE SET nombre = $3, updated_at = now()`,
+        [newId(), o.permiso, o.etiqueta],
         tx,
       );
     }

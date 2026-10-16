@@ -20,6 +20,7 @@ const ip = (r: Request) => r.headers.get("x-forwarded-for")?.split(",")[0]?.trim
 export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
+  profile.requireOpcion("op.servicio.video_enviar");
   profile.requirePermission(PERMISOS.PERSONAS_VER);
   const body = z
     .object({ childPersonIds: z.array(z.uuid()).min(1).max(MAX_VIDEOS_POR_TANDA) })
@@ -38,6 +39,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
 export const PUT = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.servicio.video_config");
   const body = z.object({ enlace: z.string().min(8).max(500) }).parse(await request.json());
   await guardarVideoWelcome({ actorUserId: auth.userId, enlace: body.enlace, ip: ip(request) });
   return json({ ok: true });

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { resumenHorario, type SlotResumen } from "@/ui/horario";
+import { usePermisos } from "@/ui/permisos";
 
 /**
  * ACADEMIC CHANGE. Cada opción llama al camino que YA existe y cuida sus
@@ -123,6 +124,7 @@ export function AcademicChangeModal(props: {
   const [op, setOp] = useState<Opciones | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [opcion, setOpcion] = useState<Opcion | null>(null);
+  const { puede } = usePermisos();
   const [mov, setMov] = useState<Movimiento>("SALON");
   const [salonId, setSalonId] = useState("");
   const [levelId, setLevelId] = useState("");
@@ -374,9 +376,23 @@ export function AcademicChangeModal(props: {
                 >
                   {(
                     [
-                      ["SALON", "Cambiar de salón (mismo curso)", true],
-                      ["PROMOVER", "Promover a Youngster", actual.tipoCurso === "JUNIOR"],
-                      ["DEGRADAR", "Degradar a Junior", actual.tipoCurso === "YOUNGSTER"],
+                      // Cambiar de salón y de curso son opciones propias (Roles ›
+                      // Operación › Contratos); el servidor exige lo mismo.
+                      [
+                        "SALON",
+                        "Cambiar de salón (mismo curso)",
+                        puede("op.contratos.cambiar_salon"),
+                      ],
+                      [
+                        "PROMOVER",
+                        "Promover a Youngster",
+                        actual.tipoCurso === "JUNIOR" && puede("op.contratos.cambiar_curso"),
+                      ],
+                      [
+                        "DEGRADAR",
+                        "Degradar a Junior",
+                        actual.tipoCurso === "YOUNGSTER" && puede("op.contratos.cambiar_curso"),
+                      ],
                     ] as const
                   ).map(([m, texto, habilitado]) => (
                     <label

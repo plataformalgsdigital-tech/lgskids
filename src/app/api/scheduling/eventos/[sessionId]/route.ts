@@ -26,6 +26,7 @@ const editarSchema = z.object({
 export const PATCH = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.EVENTOS_CREAR);
+  profile.requireOpcion("op.calendario.evento_academico");
   const sessionId = z.uuid().parse((await context.params)["sessionId"]);
   const body = editarSchema.parse(await request.json());
   return json(

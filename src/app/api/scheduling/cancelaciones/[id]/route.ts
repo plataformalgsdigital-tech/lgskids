@@ -13,6 +13,7 @@ bootstrapIdentity();
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.cancelacion_resolver");
   const id = z.uuid().parse((await context.params)["id"]);
   const body = z
     .object({

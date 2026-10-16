@@ -18,6 +18,8 @@ import {
   tarjeta,
   type ConsultaClave,
 } from "../comunes";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 interface Contrato {
   id: string;
@@ -81,7 +83,7 @@ function Dato({ rotulo, children }: { rotulo: string; children: ReactNode }) {
   );
 }
 
-export default function EstudiantePage() {
+function EstudiantePageContenido() {
   const [q, setQ] = useState("");
   const [resultados, setResultados] = useState<Estudiante[] | null>(null);
   const [puedeAprobar, setPuedeAprobar] = useState(false);
@@ -257,13 +259,15 @@ export default function EstudiantePage() {
         )}
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
           {botonAprobar}
-          <button
-            style={boton}
-            disabled={ocupado}
-            onClick={() => e.cuenta !== null && void restablecer(e.cuenta)}
-          >
-            🔑 Restablecer clave
-          </button>
+          <SoloSi op="op.usuarios.clave">
+            <button
+              style={boton}
+              disabled={ocupado}
+              onClick={() => e.cuenta !== null && void restablecer(e.cuenta)}
+            >
+              🔑 Restablecer clave
+            </button>
+          </SoloSi>
           {puedeVerClaves && (
             <button
               style={boton}
@@ -429,5 +433,14 @@ export default function EstudiantePage() {
         ))}
       </div>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function EstudiantePage() {
+  return (
+    <ConOpcion op="op.usuarios.estudiante" volver="/panel/usuarios">
+      <EstudiantePageContenido />
+    </ConOpcion>
   );
 }

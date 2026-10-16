@@ -36,9 +36,11 @@ function ip(request: Request): string | null {
 }
 
 /** El guía solo sobre SUS sesiones; coordinación, sobre cualquiera. */
-async function exigirAcceso(sessionId: string, userId: string) {
+async function exigirAcceso(sessionId: string, userId: string, escribe = false) {
   const profile = await getAccessProfile(userId);
   profile.requirePermission(PERMISOS.ASISTENCIA_GESTIONAR);
+  // Abrir o cerrar una misión es una opción propia (Roles › Calendario).
+  if (escribe) profile.requireOpcion("op.calendario.misiones");
   await verificarAccesoGuia(sessionId, {
     userId,
     puedeGestionarCualquierSalon: profile.hasPermission(PERMISOS.SALONES_GESTIONAR),
@@ -87,7 +89,7 @@ const abrirSchema = z.object({
 /** POST — abre una parada a los niños elegidos de la sesión. */
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const sessionId = await sesionDe(context as Contexto);
-  await exigirAcceso(sessionId, auth.userId);
+  await exigirAcceso(sessionId, auth.userId, true);
   const body = abrirSchema.parse(await request.json());
 
   // Solo niños de ESTA sesión: la lista sale de las matrículas activas, no del
@@ -122,7 +124,7 @@ const cerrarSchema = z.object({
 /** DELETE — cierra una parada que se abrió por error. */
 export const DELETE = handlerWithAuth(async (request, auth, context) => {
   const sessionId = await sesionDe(context as Contexto);
-  await exigirAcceso(sessionId, auth.userId);
+  await exigirAcceso(sessionId, auth.userId, true);
   const body = cerrarSchema.parse(await request.json());
 
   const { lista } = await listaDeSesion(sessionId);

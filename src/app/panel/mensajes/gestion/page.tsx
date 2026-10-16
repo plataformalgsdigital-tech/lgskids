@@ -5,6 +5,8 @@ import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "
 import { apiFetch } from "@/ui/api-fetch";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
 import { AvisoProveedor } from "../AvisoProveedor";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { usePermisos } from "@/ui/permisos";
 
 interface Plantilla {
   id: string;
@@ -91,9 +93,10 @@ const ESTADO: Record<Envio["estado"], { texto: string; fondo: string; color: str
  * de documentos) → revisar → enviar. Igual que en LGS, con dos diferencias: el
  * mensaje va al APODERADO de cada niño y queda un HISTORIAL.
  */
-export default function GestionMensajesPage() {
+function GestionMensajesPageContenido() {
   const [pestania, setPestania] = useState<"enviar" | "historial">("enviar");
   const [proveedor, setProveedor] = useState<string | null>(null);
+  const { puede } = usePermisos();
 
   return (
     <main style={{ padding: "2rem", maxWidth: "76rem", margin: "0 auto" }}>
@@ -117,33 +120,40 @@ export default function GestionMensajesPage() {
             ["enviar", "Enviar"],
             ["historial", "Historial"],
           ] as const
-        ).map(([id, texto]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={pestania === id}
-            onClick={() => setPestania(id)}
-            style={{
-              padding: "0.6rem 1.1rem",
-              border: "none",
-              borderBottom: `3px solid ${pestania === id ? "var(--lgs-azul)" : "transparent"}`,
-              marginBottom: "-2px",
-              background: "none",
-              color: pestania === id ? "var(--lgs-azul-oscuro)" : "var(--texto-suave)",
-              fontWeight: pestania === id ? 700 : 600,
-              fontSize: "0.95rem",
-              cursor: "pointer",
-            }}
-          >
-            {texto}
-          </button>
-        ))}
+        )
+          // El Historial es una opción propia (Roles › Administración › Mensajes).
+          .filter(([id]) => id !== "historial" || puede("op.mensajes.historial"))
+          .map(([id, texto]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={pestania === id}
+              onClick={() => setPestania(id)}
+              style={{
+                padding: "0.6rem 1.1rem",
+                border: "none",
+                borderBottom: `3px solid ${pestania === id ? "var(--lgs-azul)" : "transparent"}`,
+                marginBottom: "-2px",
+                background: "none",
+                color: pestania === id ? "var(--lgs-azul-oscuro)" : "var(--texto-suave)",
+                fontWeight: pestania === id ? 700 : 600,
+                fontSize: "0.95rem",
+                cursor: "pointer",
+              }}
+            >
+              {texto}
+            </button>
+          ))}
       </div>
 
-      {pestania === "enviar" ? (
-        <Enviar onProveedor={setProveedor} onEnviado={() => setPestania("historial")} />
-      ) : (
+      {pestania === "enviar" && (
+        <Enviar
+          onProveedor={setProveedor}
+          onEnviado={() => puede("op.mensajes.historial") && setPestania("historial")}
+        />
+      )}
+      {pestania === "historial" && puede("op.mensajes.historial") && (
         <Historial onProveedor={setProveedor} />
       )}
     </main>
@@ -691,5 +701,14 @@ function Historial({ onProveedor }: { onProveedor: (p: string) => void }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function GestionMensajesPage() {
+  return (
+    <ConOpcion op="op.mensajes.gestion" volver="/panel/mensajes">
+      <GestionMensajesPageContenido />
+    </ConOpcion>
   );
 }

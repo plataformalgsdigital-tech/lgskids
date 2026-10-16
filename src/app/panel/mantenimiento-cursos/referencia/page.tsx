@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
@@ -230,7 +232,7 @@ function QuizEditor(props: { preguntas: Pregunta[]; onChange: (p: Pregunta[]) =>
   );
 }
 
-export default function ReferenciaCursosPage() {
+function ReferenciaCursosPageContenido() {
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [fCurso, setFCurso] = useState<string>("");
   const [fNivel, setFNivel] = useState<string>("");
@@ -369,19 +371,21 @@ export default function ReferenciaCursosPage() {
               ))}
             </select>
           </div>
-          <button
-            type="button"
-            onClick={() => setForm(vacio())}
-            style={{
-              ...btn,
-              width: "100%",
-              marginBottom: "0.6rem",
-              borderColor: "var(--lgs-azul)",
-              color: "var(--lgs-azul-oscuro)",
-            }}
-          >
-            + Nueva lección
-          </button>
+          <SoloSi op="op.mant.lecciones_editar">
+            <button
+              type="button"
+              onClick={() => setForm(vacio())}
+              style={{
+                ...btn,
+                width: "100%",
+                marginBottom: "0.6rem",
+                borderColor: "var(--lgs-azul)",
+                color: "var(--lgs-azul-oscuro)",
+              }}
+            >
+              + Nueva lección
+            </button>
+          </SoloSi>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {filas === null ? (
               <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando…</p>
@@ -421,14 +425,16 @@ export default function ReferenciaCursosPage() {
                       {f.unidad ? ` · ${f.unidad}` : ""}
                     </div>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void eliminar(f)}
-                    style={{ background: "none", border: "none", cursor: "pointer" }}
-                    title="Eliminar"
-                  >
-                    🗑️
-                  </button>
+                  <SoloSi op="op.mant.lecciones_editar">
+                    <button
+                      type="button"
+                      onClick={() => void eliminar(f)}
+                      style={{ background: "none", border: "none", cursor: "pointer" }}
+                      title="Eliminar"
+                    >
+                      🗑️
+                    </button>
+                  </SoloSi>
                 </div>
               ))
             )}
@@ -577,21 +583,23 @@ export default function ReferenciaCursosPage() {
           )}
 
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button
-              type="button"
-              onClick={() => void guardar()}
-              disabled={ocupado || form.leccion.trim() === ""}
-              style={{
-                ...btn,
-                background: "var(--lgs-verde)",
-                color: "#1b2a10",
-                borderColor: "var(--lgs-verde)",
-                padding: "0.55rem 1.4rem",
-                fontSize: "0.9rem",
-              }}
-            >
-              {ocupado ? "Guardando…" : form.id !== null ? "Guardar cambios" : "Crear lección"}
-            </button>
+            <SoloSi op="op.mant.lecciones_editar">
+              <button
+                type="button"
+                onClick={() => void guardar()}
+                disabled={ocupado || form.leccion.trim() === ""}
+                style={{
+                  ...btn,
+                  background: "var(--lgs-verde)",
+                  color: "#1b2a10",
+                  borderColor: "var(--lgs-verde)",
+                  padding: "0.55rem 1.4rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {ocupado ? "Guardando…" : form.id !== null ? "Guardar cambios" : "Crear lección"}
+              </button>
+            </SoloSi>
             {form.id !== null && (
               <button
                 type="button"
@@ -605,5 +613,14 @@ export default function ReferenciaCursosPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function ReferenciaCursosPage() {
+  return (
+    <ConOpcion op="op.mant.referencia" volver="/panel/mantenimiento-cursos">
+      <ReferenciaCursosPageContenido />
+    </ConOpcion>
   );
 }

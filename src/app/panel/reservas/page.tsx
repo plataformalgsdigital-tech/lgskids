@@ -6,6 +6,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
 import { numeroContrato } from "@/ui/numero-contrato";
+import { usePermisos } from "@/ui/permisos";
 
 type TipoCurso = "JUNIOR" | "YOUNGSTER";
 
@@ -183,13 +184,18 @@ type Pestania = "pendientes" | "nueva";
  * esperan aprobación —el cupo ya está tomado— y el asistente para crear una.
  */
 export default function ReservasPage() {
-  const [pestania, setPestania] = useState<Pestania>("pendientes");
+  const [elegida, setPestania] = useState<Pestania>("pendientes");
   const [aviso, setAviso] = useState<string | null>(null);
+  const { puede, listo } = usePermisos();
 
-  const pestanias: { id: Pestania; etiqueta: string }[] = [
-    { id: "pendientes", etiqueta: "Reservas sin aprobar" },
-    { id: "nueva", etiqueta: "Nueva reserva" },
-  ];
+  // Cada pestaña con su opción (Roles › Operación › Gestión de Reservas).
+  const pestanias = (
+    [
+      { id: "pendientes", etiqueta: "Reservas sin aprobar", op: "op.reservas.lista" },
+      { id: "nueva", etiqueta: "Nueva reserva", op: "op.reservas.nueva" },
+    ] as const
+  ).filter((p) => puede(p.op));
+  const pestania = pestanias.some((p) => p.id === elegida) ? elegida : pestanias[0]?.id;
 
   return (
     <main style={{ padding: "2rem", maxWidth: "76rem", margin: "0 auto" }}>
@@ -246,9 +252,13 @@ export default function ReservasPage() {
         </p>
       )}
 
-      {pestania === "pendientes" ? (
-        <ReservasSinAprobar />
-      ) : (
+      {listo && pestania === undefined && (
+        <p style={{ marginTop: "1rem", color: "var(--texto-suave)" }}>
+          🔒 Tu rol no tiene habilitada ninguna pestaña de Gestión de Reservas.
+        </p>
+      )}
+      {pestania === "pendientes" && <ReservasSinAprobar />}
+      {pestania === "nueva" && (
         <NuevaReserva
           onCreada={(texto) => {
             setAviso(texto);

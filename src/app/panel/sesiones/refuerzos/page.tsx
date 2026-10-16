@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
 
 /**
  * Bandeja de REFUERZOS: el guía pide repetir una sesión y coordinación decide.
@@ -72,7 +73,7 @@ function hoyLocal(): string {
   return `${String(d.getFullYear())}-${mes}-${dia}`;
 }
 
-export default function RefuerzosPage() {
+function RefuerzosPageContenido() {
   const [filas, setFilas] = useState<Refuerzo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -619,5 +620,14 @@ export default function RefuerzosPage() {
         </div>
       )}
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function RefuerzosPage() {
+  return (
+    <ConOpcion op="op.sesiones.refuerzos" volver="/panel/sesiones">
+      <RefuerzosPageContenido />
+    </ConOpcion>
   );
 }

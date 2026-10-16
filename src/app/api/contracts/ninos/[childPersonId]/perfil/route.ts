@@ -23,6 +23,7 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
+  profile.requireOpcion("op.kids.enlace_perfil");
   const childPersonId = z.uuid().parse((await context.params)["childPersonId"]);
   // { sinWelcome: true } = el enlace no pide agendar Welcome (curso ya andando).
   const body = z

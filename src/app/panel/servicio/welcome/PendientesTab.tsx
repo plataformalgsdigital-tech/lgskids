@@ -16,6 +16,7 @@ import {
 } from "../FiltrosServicio";
 import { AgendarWelcomeModal } from "./AgendarWelcomeModal";
 import { MOTIVO_PENDIENTE } from "./welcome-ui";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Pendientes de agendar (MOSAICO): niños matriculados que no tienen ningún
@@ -142,14 +143,16 @@ export function PendientesTab() {
         <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
           {filas === null ? "" : `${String(filas.length)} niño(s) sin Welcome`}
         </span>
-        <button
-          type="button"
-          onClick={exportar}
-          disabled={filas === null || filas.length === 0}
-          style={botonServicio}
-        >
-          ⬇ Descargar CSV
-        </button>
+        <SoloSi op="op.servicio.welcome_csv">
+          <button
+            type="button"
+            onClick={exportar}
+            disabled={filas === null || filas.length === 0}
+            style={botonServicio}
+          >
+            ⬇ Descargar CSV
+          </button>
+        </SoloSi>
       </div>
       {error !== null && (
         <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>

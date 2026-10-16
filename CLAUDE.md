@@ -1518,6 +1518,32 @@ solo servía para completar la ficha.
   **Administración** (Usuarios y roles, Reportes, Auditoría, Aviso de login,
   **Mantenimiento** — cargas masivas, hoy el catálogo Curso por CSV —, **Mensajes**) ·
   **Guía** (Mis clases, Mis salones, Mis niños).
+- **TERCER NIVEL: las opciones de cada pantalla (2026-10-15, `access/domain/opciones.ts`)**.
+  El árbol de Roles es sección (`seccion.*`) → opción del menú (`menu.*`) → **vistas,
+  pestañas, tarjetas y acciones** de esa pantalla (`op.*`, ~100: vistas del calendario,
+  crear evento académico/administrativo, cambiar guía, suspender, registrar, misiones,
+  cada tarjeta de Mantenimiento Académico y sus "subir/editar", cada botón de la ficha
+  del contrato, pestañas de Welcome/Reservas/Usuarios, cada acción de Casos, CSV…).
+  Cada opción declara su **BASE** (el permiso funcional que la acción ya exigía) y
+  **solo cuenta con las dos** (`AccessProfile.hasPermission`): marcarla sola no da
+  nada; quitarla deja el permiso funcional pero no esa acción. Dónde se exige:
+  - **acciones** (escriben) → en el SERVIDOR, `profile.requireOpcion("op.x")`
+    (tipado: un código mal escrito no compila), además del permiso de siempre;
+    las que dependen del cuerpo (registro cerrar/reabrir, cancelación avisar/directa,
+    casos asignar/cerrar/gestionar, imagen de curso vs. aviso de login, PATCH de
+    usuario por campo) eligen la opción adentro;
+  - **vistas, pestañas y tarjetas** → en pantalla: `usePermisos()` (`src/ui/permisos.ts`,
+    lee `/api/auth/me`, que ya filtra las `op.*` sin base), `<SoloSi op>` para un
+    botón y `<ConOpcion op>` para una PÁGINA-tarjeta (por enlace directo dice "No
+    tienes acceso"). Varias pantallas reciben banderas `puedeX` del servidor, que
+    ahora salen de las opciones.
+    Un permiso que ya era justo una acción (`sesiones.solicitar_repeticion`,
+    `mensajes.plantillas`) se reutiliza en el árbol. **Una opción nueva exige
+    migración** (la de esta tanda, `20261015300000_opciones_pantalla`, se GENERA desde
+    `opciones.ts` y da cada opción a los roles que tienen su base: nadie perdió nada);
+    `opciones.test.ts` falla si una opción no tiene migración, si su base no existe o
+    si cuelga de un menú inexistente. **Trampa**: `hidden` en un elemento con
+    `display` en su `style` NO lo oculta; por eso se usa `SoloSi`.
 - **Cada ítem exige DOS permisos**: el funcional (lo que la pantalla hace) y el de
   menú (`menu.*`); el grupo se prende con `seccion.*`. Esto no es redundancia: antes
   la visibilidad colgaba del permiso funcional y "Mantenimiento Académico" no se le

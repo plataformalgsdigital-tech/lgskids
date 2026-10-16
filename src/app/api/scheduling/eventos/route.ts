@@ -49,6 +49,7 @@ const crearSchema = z.object({
 export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.EVENTOS_CREAR);
+  profile.requireOpcion("op.calendario.evento_academico");
   const body = crearSchema.parse(await request.json());
   const resultado = await crearEvento({
     actorUserId: auth.userId,

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { armarZip, descargarBytes } from "@/ui/zip";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 type Tipo = "banner" | "premio" | "unidad" | "insignia" | "mapa" | "vobo";
@@ -81,7 +83,7 @@ const input: CSSProperties = {
   fontSize: "0.9rem",
 };
 
-export default function ImagenesCursoPage() {
+function ImagenesCursoPageContenido() {
   const [tipo, setTipo] = useState<Tipo>("banner");
   const [curso, setCurso] = useState<Curso>("JUNIOR");
   const [nivel, setNivel] = useState<string>("ROOKIE");
@@ -484,22 +486,24 @@ export default function ImagenesCursoPage() {
           onChange={onArchivo}
           style={input}
         />
-        <button
-          type="button"
-          onClick={() => void subir()}
-          disabled={ocupado || archivo === null}
-          style={{
-            padding: "0.55rem 1.4rem",
-            borderRadius: "0.6rem",
-            border: "none",
-            background: ocupado || archivo === null ? "#9e9e9e" : "var(--lgs-verde)",
-            color: "#1b2a10",
-            fontWeight: 800,
-            cursor: ocupado || archivo === null ? "not-allowed" : "pointer",
-          }}
-        >
-          {ocupado ? "Subiendo…" : "Guardar imagen"}
-        </button>
+        <SoloSi op="op.mant.imagenes_subir">
+          <button
+            type="button"
+            onClick={() => void subir()}
+            disabled={ocupado || archivo === null}
+            style={{
+              padding: "0.55rem 1.4rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background: ocupado || archivo === null ? "#9e9e9e" : "var(--lgs-verde)",
+              color: "#1b2a10",
+              fontWeight: 800,
+              cursor: ocupado || archivo === null ? "not-allowed" : "pointer",
+            }}
+          >
+            {ocupado ? "Subiendo…" : "Guardar imagen"}
+          </button>
+        </SoloSi>
       </div>
       {msg !== null && (
         <p
@@ -513,5 +517,14 @@ export default function ImagenesCursoPage() {
         </p>
       )}
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function ImagenesCursoPage() {
+  return (
+    <ConOpcion op="op.mant.imagenes" volver="/panel/mantenimiento-cursos">
+      <ImagenesCursoPageContenido />
+    </ConOpcion>
   );
 }

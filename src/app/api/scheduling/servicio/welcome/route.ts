@@ -50,9 +50,9 @@ export const GET = handlerWithAuth(async (request, auth) => {
     classroomId: q.classroomId ?? null,
   };
   const puede = {
-    puedeReagendar: profile.hasPermission(PERMISOS.MATRICULAS_GESTIONAR),
-    puedeEnviar: profile.hasPermission(PERMISOS.MENSAJES_ENVIAR),
-    puedeConfigurarVideo: profile.hasPermission(PERMISOS.CATALOGO_GESTIONAR),
+    puedeReagendar: profile.hasPermission("op.kids.agendar_welcome"),
+    puedeEnviar: profile.hasPermission("op.servicio.video_enviar"),
+    puedeConfigurarVideo: profile.hasPermission("op.servicio.video_config"),
     maxIntentos: MAX_INTENTOS_WELCOME,
     maxPorTanda: MAX_VIDEOS_POR_TANDA,
   };

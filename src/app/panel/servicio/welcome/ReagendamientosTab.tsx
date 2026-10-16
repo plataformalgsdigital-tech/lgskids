@@ -14,6 +14,7 @@ import {
 } from "../FiltrosServicio";
 import { AgendarWelcomeModal } from "./AgendarWelcomeModal";
 import { cuandoWelcome } from "./welcome-ui";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Gestión de Reagendamientos (MOSAICO): los que FALTARON a un Welcome, agrupados
@@ -185,14 +186,16 @@ export function ReagendamientosTab({ zona }: { zona: string }) {
             ? ""
             : `${String(filas.length)} inasistente(s) · ${String(sinReagendar)} sin reagendar · ${String(grupos.length)} sesión(es)`}
         </span>
-        <button
-          type="button"
-          onClick={exportar}
-          disabled={filas === null || filas.length === 0}
-          style={botonServicio}
-        >
-          ⬇ Descargar CSV
-        </button>
+        <SoloSi op="op.servicio.welcome_csv">
+          <button
+            type="button"
+            onClick={exportar}
+            disabled={filas === null || filas.length === 0}
+            style={botonServicio}
+          >
+            ⬇ Descargar CSV
+          </button>
+        </SoloSi>
       </div>
       {error !== null && (
         <p role="alert" style={{ color: "#c62828", fontWeight: 600 }}>

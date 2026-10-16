@@ -19,6 +19,7 @@ const bodySchema = z.object({
 export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ROLES_ASIGNAR);
+  profile.requireOpcion("op.usuarios.roles");
 
   const body = bodySchema.parse(await request.json());
   // `roles.asignar` no alcanza para TODO: la llave maestra solo la da otro
@@ -46,6 +47,7 @@ export const DELETE = handlerWithAuth(async (request, auth) => {
     getAccessProfile(body.userId),
   ]);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.usuarios.roles");
   profile.requirePuedeOtorgarRol(body.roleCode);
   profile.requirePuedeGestionarCuentaDe(otro.roleCodes);
   await quitarRol({

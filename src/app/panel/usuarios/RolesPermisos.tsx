@@ -14,7 +14,15 @@ interface PermisosRol {
   rol: string;
   editable: boolean;
   catalogo: { code: string; nombre: string; asignado: boolean }[];
-  secciones: { etiqueta: string; permiso: string; hijos: string[] }[];
+  secciones: {
+    etiqueta: string;
+    permiso: string;
+    hijos: {
+      etiqueta: string;
+      permiso: string;
+      opciones: { etiqueta: string; permiso: string }[];
+    }[];
+  }[];
 }
 
 /** Pestaña "Roles y permisos": crear roles y marcar sus permisos. */
@@ -226,9 +234,9 @@ export function RolesPermisos() {
                 )}
               </div>
               {(() => {
-                // Casilla reutilizable: el padre manda sobre la sección, los
-                // hijos sobre cada pantalla.
-                const casilla = (code: string, etiqueta: string, sangria: boolean) => {
+                // Casilla reutilizable, en TRES niveles: la sección (0), la
+                // opción del menú (1) y las opciones de su pantalla (2).
+                const casilla = (code: string, etiqueta: string, nivel: 0 | 1 | 2) => {
                   const marcado = permisosRol.editable ? marcados.has(code) : true;
                   return (
                     <label
@@ -237,11 +245,16 @@ export function RolesPermisos() {
                         display: "flex",
                         alignItems: "center",
                         gap: "0.45rem",
-                        padding: sangria ? "0.35rem 0.6rem 0.35rem 2rem" : "0.5rem 0.6rem",
+                        padding:
+                          nivel === 0
+                            ? "0.5rem 0.6rem"
+                            : nivel === 1
+                              ? "0.35rem 0.6rem 0.35rem 2rem"
+                              : "0.2rem 0.6rem 0.2rem 3.8rem",
                         borderRadius: "0.45rem",
                         background: marcado ? "#e8f5e9" : "#fafbfe",
-                        fontSize: "0.85rem",
-                        fontWeight: sangria ? 400 : 700,
+                        fontSize: nivel === 2 ? "0.8rem" : "0.85rem",
+                        fontWeight: nivel === 0 ? 700 : nivel === 1 ? 600 : 400,
                         cursor: permisosRol.editable ? "pointer" : "default",
                       }}
                     >
@@ -275,11 +288,12 @@ export function RolesPermisos() {
                   );
                 };
 
-                const nombreDe = (code: string) =>
-                  permisosRol.catalogo.find((p) => p.code === code)?.nombre ?? code;
                 // Permisos que ya salen en el árbol: el resto va al final.
                 const enArbol = new Set(
-                  permisosRol.secciones.flatMap((s) => [s.permiso, ...s.hijos]),
+                  permisosRol.secciones.flatMap((s) => [
+                    s.permiso,
+                    ...s.hijos.flatMap((h) => [h.permiso, ...h.opciones.map((o) => o.permiso)]),
+                  ]),
                 );
                 const sueltos = permisosRol.catalogo.filter((p) => !enArbol.has(p.code));
 
@@ -301,7 +315,7 @@ export function RolesPermisos() {
                           overflow: "hidden",
                         }}
                       >
-                        {casilla(s.permiso, s.etiqueta, false)}
+                        {casilla(s.permiso, s.etiqueta, 0)}
                         {s.hijos.length > 0 && (
                           <div
                             style={{
@@ -310,7 +324,14 @@ export function RolesPermisos() {
                               borderTop: "1px solid #e3e7f0",
                             }}
                           >
-                            {[...new Set(s.hijos)].map((h) => casilla(h, nombreDe(h), true))}
+                            {s.hijos.map((h) => (
+                              <div key={h.permiso}>
+                                {casilla(h.permiso, h.etiqueta, 1)}
+                                {/* Las opciones de esa pantalla: solo cuentan si el
+                                    rol tiene además el permiso de la acción. */}
+                                {h.opciones.map((o) => casilla(o.permiso, o.etiqueta, 2))}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -336,7 +357,7 @@ export function RolesPermisos() {
                             gap: "0.35rem",
                           }}
                         >
-                          {sueltos.map((p) => casilla(p.code, p.nombre, false))}
+                          {sueltos.map((p) => casilla(p.code, p.nombre, 0))}
                         </div>
                       </div>
                     )}

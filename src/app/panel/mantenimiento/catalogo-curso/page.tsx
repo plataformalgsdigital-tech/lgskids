@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { decodificarCsv } from "@/ui/csv";
+import { ConOpcion } from "@/ui/ConOpcion";
 
 /**
  * CARGA DEL CATÁLOGO CURSO POR CSV, en tres pasos:
@@ -249,7 +250,7 @@ const boton = (activo: boolean, fondo: string): CSSProperties => ({
   cursor: activo ? "pointer" : "not-allowed",
 });
 
-export default function CargaCatalogoCursoPage() {
+function CargaCatalogoCursoPageContenido() {
   const [archivo, setArchivo] = useState("");
   const [ansi, setAnsi] = useState(false);
   const [errFormato, setErrFormato] = useState<string | null>(null);
@@ -687,5 +688,14 @@ function Chip(props: { color: string; children: React.ReactNode }) {
     >
       {props.children}
     </span>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function CargaCatalogoCursoPage() {
+  return (
+    <ConOpcion op="op.admin.carga_csv" volver="/panel/mantenimiento">
+      <CargaCatalogoCursoPageContenido />
+    </ConOpcion>
   );
 }

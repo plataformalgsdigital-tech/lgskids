@@ -25,4 +25,6 @@ export {
   requisitoParaGestionarCuenta,
 } from "./domain/permisos";
 export type { PermisoCode, RoleCode, RequisitoOtorgar } from "./domain/permisos";
+export { OPCIONES_MENU, CODIGOS_OP, BASE_DE_OPCION } from "./domain/opciones";
+export type { OpCode, OpcionCode } from "./domain/opciones";
 export type { RoleAssignment, PermissionGrant } from "./application/ports";

@@ -34,6 +34,7 @@ const datosSchema = z.object({
 export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.usuarios.guia");
   profile.requirePuedeOtorgarRol(ROLES.GUIA);
 
   const form = await request.formData().catch(() => null);

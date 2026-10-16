@@ -64,6 +64,7 @@ const marcarSchema = z.object({
 export const marcarAsistenciaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ASISTENCIA_GESTIONAR);
+  profile.requireOpcion("op.calendario.asistencia");
   const sessionId = await sessionIdFromContext(context);
   await verificarAccesoGuia(sessionId, {
     userId: auth.userId,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePermisos } from "@/ui/permisos";
 import { botonServicio } from "../FiltrosServicio";
 import { EventosTab } from "./EventosTab";
 import { PendientesTab } from "./PendientesTab";
@@ -16,14 +17,22 @@ import { VideoTab } from "./VideoTab";
  */
 
 const PESTANAS = [
-  { valor: "eventos", texto: "Eventos Welcome" },
-  { valor: "reagendamientos", texto: "Gestión de Reagendamientos" },
-  { valor: "pendientes", texto: "Pendientes de agendar" },
-  { valor: "video", texto: "Video Welcome" },
+  { valor: "eventos", texto: "Eventos Welcome", op: "op.servicio.welcome_eventos" },
+  {
+    valor: "reagendamientos",
+    texto: "Gestión de Reagendamientos",
+    op: "op.servicio.welcome_reagendamientos",
+  },
+  { valor: "pendientes", texto: "Pendientes de agendar", op: "op.servicio.welcome_pendientes" },
+  { valor: "video", texto: "Video Welcome", op: "op.servicio.welcome_video" },
 ] as const;
 
 export default function ServicioWelcomePage() {
-  const [pestana, setPestana] = useState<(typeof PESTANAS)[number]["valor"]>("eventos");
+  const [elegida, setPestana] = useState<(typeof PESTANAS)[number]["valor"]>("eventos");
+  // Cada pestaña con su opción (Roles › Servicio › Welcome).
+  const { puede, listo } = usePermisos();
+  const permitidas = PESTANAS.filter((p) => puede(p.op));
+  const pestana = permitidas.some((p) => p.valor === elegida) ? elegida : permitidas[0]?.valor;
   const zona = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   return (
@@ -38,7 +47,7 @@ export default function ServicioWelcomePage() {
         role="tablist"
         style={{ display: "flex", gap: "0.3rem", margin: "1rem 0 0", flexWrap: "wrap" }}
       >
-        {PESTANAS.map((p) => (
+        {permitidas.map((p) => (
           <button
             key={p.valor}
             type="button"
@@ -57,6 +66,11 @@ export default function ServicioWelcomePage() {
           </button>
         ))}
       </div>
+      {listo && pestana === undefined && (
+        <p style={{ marginTop: "1rem", color: "var(--texto-suave)" }}>
+          🔒 Tu rol no tiene habilitada ninguna pestaña de Welcome.
+        </p>
+      )}
       {pestana === "eventos" && <EventosTab zona={zona} />}
       {pestana === "reagendamientos" && <ReagendamientosTab zona={zona} />}
       {pestana === "pendientes" && <PendientesTab />}

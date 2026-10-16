@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { SoloSi } from "@/ui/SoloSi";
 
 interface SesionDetalle {
   sesion: {
@@ -315,13 +316,15 @@ export default function ResumenSesionPage() {
           ) : (
             <p style={{ color: "var(--texto-suave)" }}>Este salón no tiene guía asignado.</p>
           )}
-          <button
-            type="button"
-            onClick={() => setMostrarCambioGuia((v) => !v)}
-            style={{ ...boton, marginTop: "0.5rem" }}
-          >
-            🔀 Cambiar guía
-          </button>
+          <SoloSi op="op.calendario.cambiar_guia">
+            <button
+              type="button"
+              onClick={() => setMostrarCambioGuia((v) => !v)}
+              style={{ ...boton, marginTop: "0.5rem" }}
+            >
+              🔀 Cambiar guía
+            </button>
+          </SoloSi>
           {mostrarCambioGuia && (
             <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
               <select
@@ -378,9 +381,11 @@ export default function ResumenSesionPage() {
         >
           ✔ Gestionar asistencia
         </Link>
-        <button type="button" onClick={() => setMostrarSuspender((v) => !v)} style={boton}>
-          ⏸ Suspender este día
-        </button>
+        <SoloSi op="op.calendario.suspender">
+          <button type="button" onClick={() => setMostrarSuspender((v) => !v)} style={boton}>
+            ⏸ Suspender este día
+          </button>
+        </SoloSi>
       </div>
 
       {mostrarSuspender && (
@@ -405,14 +410,16 @@ export default function ResumenSesionPage() {
               border: "1.5px solid #d8dce6",
             }}
           />
-          <button
-            type="button"
-            disabled={ocupado}
-            onClick={() => void suspender()}
-            style={{ ...boton, borderColor: "#e57373", color: "#c62828" }}
-          >
-            Confirmar suspensión
-          </button>
+          <SoloSi op="op.calendario.suspender">
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void suspender()}
+              style={{ ...boton, borderColor: "#e57373", color: "#c62828" }}
+            >
+              Confirmar suspensión
+            </button>
+          </SoloSi>
         </div>
       )}
 

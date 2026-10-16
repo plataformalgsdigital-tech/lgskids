@@ -21,6 +21,7 @@ const crearSchema = z.object({
 export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.ROLES_ASIGNAR);
+  profile.requireOpcion("op.usuarios.tab_roles");
   const body = crearSchema.parse(await request.json());
   const resultado = await crearRol({
     actorUserId: auth.userId,

@@ -82,6 +82,7 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
   const ip = ipDe(request);
 
   if (body.accion === "cerrar") {
+    profile.requireOpcion("op.calendario.registrar");
     return json(
       await cerrarSesion({
         actorUserId: auth.userId,
@@ -96,6 +97,7 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
   if (body.accion === "reabrir") {
     // Deshacer un cierre es corrección administrativa, no tarea del guía.
     profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+    profile.requireOpcion("op.calendario.reabrir");
     return json(await reabrirSesion({ actorUserId: auth.userId, sessionId, ip }));
   }
   // Pedir la repetición tiene permiso propio (por ahora, solo superadmin).

@@ -75,6 +75,7 @@ const actualizarSchema = z.object({
 export const crearCampaniaHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.campania_crear");
 
   const body = crearSchema.parse(await request.json());
   const campania = await crearCampania({
@@ -105,6 +106,7 @@ export const detalleCampaniaHandler = handlerWithAuth(async (_request, auth, con
 export const eliminarCampaniaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.campania_eliminar");
   const params = await context.params;
   const id = z.uuid().parse(params["id"]);
   return json(
@@ -120,6 +122,7 @@ export const eliminarCampaniaHandler = handlerWithAuth(async (request, auth, con
 export const actualizarCampaniaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.campania_editar");
   const params = await context.params;
   const id = z.uuid().parse(params["id"]);
   const body = actualizarSchema.parse(await request.json());
@@ -213,6 +216,7 @@ export const cursoReferenciaListHandler = handlerWithAuth(async (request, auth) 
 export const cursoReferenciaCrearHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.lecciones_editar");
   const body = cursoCrearSchema.parse(await request.json());
   const r = await crearCursoReferencia({ actorUserId: auth.userId, ...body, ip: ipDe(request) });
   return json(r, { status: 201 });
@@ -239,6 +243,7 @@ const cursoBulkSchema = z.object({
 export const cursoReferenciaValidarHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.admin.carga_csv");
   const body = cursoBulkSchema.parse(await request.json());
   return json(await validarImportacionCurso(body.filas));
 });
@@ -247,6 +252,7 @@ export const cursoReferenciaValidarHandler = handlerWithAuth(async (request, aut
 export const cursoReferenciaBulkHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.admin.carga_csv");
   const body = cursoBulkSchema.parse(await request.json());
   const r = await importarCursoReferencia({
     actorUserId: auth.userId,
@@ -267,6 +273,7 @@ export const cursoReferenciaGetHandler = handlerWithAuth(async (_request, auth, 
 export const cursoReferenciaPutHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.lecciones_editar");
   const id = await idParam(context);
   const body = cursoCrearSchema.parse(await request.json());
   await actualizarCursoReferencia({ actorUserId: auth.userId, id, ...body, ip: ipDe(request) });
@@ -277,6 +284,7 @@ export const cursoReferenciaPutHandler = handlerWithAuth(async (request, auth, c
 export const cursoReferenciaDeleteHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.lecciones_editar");
   const id = await idParam(context);
   await eliminarCursoReferencia({ actorUserId: auth.userId, id, ip: ipDe(request) });
   return json({ ok: true });
@@ -293,6 +301,7 @@ export const referenciaNivelGetHandler = handlerWithAuth(async (_request, auth, 
 export const referenciaNivelPutHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.lecciones_editar");
   const id = await idParam(context);
   const body = refNivelSchema.parse(await request.json());
   await actualizarReferenciaNivel({
@@ -315,6 +324,7 @@ export const referenciaQuizGetHandler = handlerWithAuth(async (_request, auth, c
 export const referenciaQuizPutHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.lecciones_editar");
   const id = await idParam(context);
   const body = refQuizSchema.parse(await request.json());
   await actualizarReferenciaQuiz({
@@ -368,6 +378,9 @@ export const imagenCursoSubirHandler = handlerWithAuth(async (request, auth) => 
     );
   }
   const tipo = tipoArte(typeof form.get("tipo") === "string" ? (form.get("tipo") as string) : null);
+  // La misma ruta sube el arte curricular y la imagen del aviso de login: cada
+  // una con la opción de SU pantalla.
+  profile.requireOpcion(tipo === "aviso_login" ? "op.admin.aviso_login" : "op.mant.imagenes_subir");
   const curso = typeof form.get("curso") === "string" ? (form.get("curso") as string) : undefined;
   const nivel = typeof form.get("nivel") === "string" ? (form.get("nivel") as string) : undefined;
   const unidad = unidadParam(
@@ -490,6 +503,7 @@ export const materialEstadoHandler = handlerWithAuth(async (_request, auth) => {
 export const materialSubirHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.material_subir");
   const form = await request.formData().catch(() => null);
   const archivo = form?.get("archivo");
   if (form === null || !(archivo instanceof File)) {
@@ -520,6 +534,7 @@ export const materialSubirHandler = handlerWithAuth(async (request, auth) => {
 export const materialEliminarHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.material_subir");
   const q = request.nextUrl.searchParams;
   const tipo = q.get("tipo");
   if (!tipoMaterialValido(tipo)) {
@@ -617,6 +632,7 @@ const hotspotsBodySchema = z.object({
 export const hotspotsGuardarHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.mapa_editar");
   const body = hotspotsBodySchema.parse(await request.json());
   const data = await setHotspots({ actorUserId: auth.userId, ...body });
   return json(data);
@@ -675,6 +691,7 @@ const avisoLoginBodySchema = z.object({ activo: z.boolean() });
 export const avisoLoginActivarHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.admin.aviso_login");
   const body = avisoLoginBodySchema.parse(await request.json());
   const aviso = await setAvisoLoginActivo(body.activo, auth.userId);
   return json({ activo: aviso.activo, actualizadoEn: aviso.actualizadoEn });

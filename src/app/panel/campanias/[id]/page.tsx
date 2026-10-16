@@ -6,7 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/ui/api-fetch";
 import { resumenHorario, type SlotResumen } from "@/ui/horario";
 import { numeroContrato } from "@/ui/numero-contrato";
+import { usePermisos } from "@/ui/permisos";
 import { ColisionesCampania } from "./ColisionesCampania";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Estado = "EN_MATRICULA" | "ACTIVA" | "CERRADA";
 
@@ -378,7 +381,7 @@ function etiquetaSalon(nombre: string, tipo: string): string {
   return nombre.replace(new RegExp(`^${tipo}\\s+`, "i"), "");
 }
 
-export default function DetalleCampaniaPage() {
+function DetalleCampaniaPageContenido() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [detalle, setDetalle] = useState<Detalle | null>(null);
@@ -390,6 +393,7 @@ export default function DetalleCampaniaPage() {
   const [agregando, setAgregando] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("TODOS");
   const [pestana, setPestana] = useState<"salones" | "colisiones">("salones");
+  const { puede } = usePermisos();
   /** Salón cuyo botón de cupos se tocó: abre la lista de inscritos. */
   const [inscritosDe, setInscritosDe] = useState<{
     id: string;
@@ -778,43 +782,47 @@ export default function DetalleCampaniaPage() {
             style={campoFecha}
           />
         </label>
-        <button
-          onClick={() => void revisarCambio()}
-          disabled={
-            ocupado ||
-            (nombreEdit.trim() === detalle.nombre &&
-              inicioEdit === detalle.inicio &&
-              ventaEdit === detalle.finalVenta &&
-              !ventanaCambio())
-          }
-          style={{
-            padding: "0.5rem 1.1rem",
-            borderRadius: "0.6rem",
-            border: "1px solid var(--lgs-verde)",
-            background: "var(--lgs-verde)",
-            color: "#1b2a10",
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          Revisar cambio →
-        </button>
-        <button
-          onClick={() => setBorrando(true)}
-          disabled={ocupado}
-          style={{
-            padding: "0.5rem 1.1rem",
-            borderRadius: "0.6rem",
-            border: "1px solid #ef9a9a",
-            background: "white",
-            color: "#c62828",
-            fontWeight: 700,
-            cursor: "pointer",
-            marginLeft: "auto",
-          }}
-        >
-          🗑 Eliminar campaña
-        </button>
+        <SoloSi op="op.mant.campania_editar">
+          <button
+            onClick={() => void revisarCambio()}
+            disabled={
+              ocupado ||
+              (nombreEdit.trim() === detalle.nombre &&
+                inicioEdit === detalle.inicio &&
+                ventaEdit === detalle.finalVenta &&
+                !ventanaCambio())
+            }
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "0.6rem",
+              border: "1px solid var(--lgs-verde)",
+              background: "var(--lgs-verde)",
+              color: "#1b2a10",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Revisar cambio →
+          </button>
+        </SoloSi>
+        <SoloSi op="op.mant.campania_eliminar">
+          <button
+            onClick={() => setBorrando(true)}
+            disabled={ocupado}
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "0.6rem",
+              border: "1px solid #ef9a9a",
+              background: "white",
+              color: "#c62828",
+              fontWeight: 700,
+              cursor: "pointer",
+              marginLeft: "auto",
+            }}
+          >
+            🗑 Eliminar campaña
+          </button>
+        </SoloSi>
         <p
           style={{
             width: "100%",
@@ -889,31 +897,36 @@ export default function DetalleCampaniaPage() {
             ["salones", "Salones"],
             ["colisiones", "Colisiones"],
           ] as const
-        ).map(([clave, texto]) => (
-          <button
-            key={clave}
-            type="button"
-            role="tab"
-            aria-selected={pestana === clave}
-            onClick={() => setPestana(clave)}
-            style={{
-              padding: "0.55rem 1.1rem",
-              border: "none",
-              borderBottom: `3px solid ${pestana === clave ? "var(--lgs-azul)" : "transparent"}`,
-              marginBottom: "-2px",
-              background: "transparent",
-              fontWeight: 800,
-              fontSize: "0.92rem",
-              color: pestana === clave ? "var(--lgs-azul)" : "var(--texto-suave)",
-              cursor: "pointer",
-            }}
-          >
-            {texto}
-          </button>
-        ))}
+        )
+          // Colisiones es una opción propia (Roles › Mantenimiento Académico).
+          .filter(([clave]) => clave !== "colisiones" || puede("op.mant.colisiones"))
+          .map(([clave, texto]) => (
+            <button
+              key={clave}
+              type="button"
+              role="tab"
+              aria-selected={pestana === clave}
+              onClick={() => setPestana(clave)}
+              style={{
+                padding: "0.55rem 1.1rem",
+                border: "none",
+                borderBottom: `3px solid ${pestana === clave ? "var(--lgs-azul)" : "transparent"}`,
+                marginBottom: "-2px",
+                background: "transparent",
+                fontWeight: 800,
+                fontSize: "0.92rem",
+                color: pestana === clave ? "var(--lgs-azul)" : "var(--texto-suave)",
+                cursor: "pointer",
+              }}
+            >
+              {texto}
+            </button>
+          ))}
       </div>
 
-      {pestana === "colisiones" && <ColisionesCampania campaignId={params.id} />}
+      {pestana === "colisiones" && puede("op.mant.colisiones") && (
+        <ColisionesCampania campaignId={params.id} />
+      )}
 
       {pestana === "salones" && (
         <section
@@ -937,42 +950,46 @@ export default function DetalleCampaniaPage() {
               Cursos de {detalle.nombre} ({filas.length} {filas.length === 1 ? "salón" : "salones"})
             </h2>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => void generarSalones()}
-                disabled={ocupado}
-                title="Crea los salones de la campaña a partir del catálogo de horarios (guía pendiente)"
-                style={{
-                  padding: "0.5rem 1rem",
-                  borderRadius: "0.6rem",
-                  border: "1.5px solid var(--lgs-azul)",
-                  background: "white",
-                  color: "var(--lgs-azul-oscuro)",
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  cursor: ocupado ? "wait" : "pointer",
-                }}
-              >
-                {ocupado ? "Generando…" : "⚙️ Generar salones del catálogo"}
-              </button>
+              <SoloSi op="op.mant.campania_salones">
+                <button
+                  type="button"
+                  onClick={() => void generarSalones()}
+                  disabled={ocupado}
+                  title="Crea los salones de la campaña a partir del catálogo de horarios (guía pendiente)"
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "0.6rem",
+                    border: "1.5px solid var(--lgs-azul)",
+                    background: "white",
+                    color: "var(--lgs-azul-oscuro)",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    cursor: ocupado ? "wait" : "pointer",
+                  }}
+                >
+                  {ocupado ? "Generando…" : "⚙️ Generar salones del catálogo"}
+                </button>
+              </SoloSi>
               {/* Antes era un enlace al calendario que no creaba nada: ahora agrega
                 el salón aquí, desde un horario del catálogo. */}
-              <button
-                type="button"
-                onClick={() => setAgregando(true)}
-                style={{
-                  padding: "0.5rem 1rem",
-                  borderRadius: "0.6rem",
-                  border: "none",
-                  background: "var(--lgs-azul)",
-                  color: "white",
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                }}
-              >
-                + Agregar salón
-              </button>
+              <SoloSi op="op.mant.campania_salones">
+                <button
+                  type="button"
+                  onClick={() => setAgregando(true)}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "0.6rem",
+                    border: "none",
+                    background: "var(--lgs-azul)",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  + Agregar salón
+                </button>
+              </SoloSi>
             </div>
           </div>
 
@@ -1113,20 +1130,22 @@ export default function DetalleCampaniaPage() {
                             <Link href={`/panel/calendario/${salon.id}`} title="Editar salón">
                               ✏️
                             </Link>
-                            <button
-                              type="button"
-                              onClick={() => void eliminarSalon(salon)}
-                              disabled={ocupado}
-                              title="Eliminar salón"
-                              style={{
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: "0.95rem",
-                              }}
-                            >
-                              🗑️
-                            </button>
+                            <SoloSi op="op.calendario.salon_editar">
+                              <button
+                                type="button"
+                                onClick={() => void eliminarSalon(salon)}
+                                disabled={ocupado}
+                                title="Eliminar salón"
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                🗑️
+                              </button>
+                            </SoloSi>
                           </span>
                         </td>
                       </tr>
@@ -1624,5 +1643,14 @@ function AgregarSalonModal(props: {
         </div>
       </div>
     </div>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function DetalleCampaniaPage() {
+  return (
+    <ConOpcion op="op.mant.campanias" volver="/panel/campanias">
+      <DetalleCampaniaPageContenido />
+    </ConOpcion>
   );
 }

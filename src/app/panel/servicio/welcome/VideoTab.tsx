@@ -14,6 +14,7 @@ import {
   type FiltrosBase,
 } from "../FiltrosServicio";
 import { cuandoWelcome } from "./welcome-ui";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Video Welcome (MOSAICO): quien faltó a sus 2 Welcome sin asistir a ninguno
@@ -369,14 +370,16 @@ export function VideoTab() {
               </button>
             </>
           )}
-          <button
-            type="button"
-            onClick={exportar}
-            disabled={visibles.length === 0}
-            style={botonServicio}
-          >
-            ⬇ Descargar CSV
-          </button>
+          <SoloSi op="op.servicio.welcome_csv">
+            <button
+              type="button"
+              onClick={exportar}
+              disabled={visibles.length === 0}
+              style={botonServicio}
+            >
+              ⬇ Descargar CSV
+            </button>
+          </SoloSi>
         </div>
       </div>
 

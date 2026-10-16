@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { textoNumeroContrato } from "@/ui/numero-contrato";
+import { SoloSi } from "@/ui/SoloSi";
 
 interface Nino {
   id: string;
@@ -286,27 +287,31 @@ export default function PersonasPage() {
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: "1.6rem" }}>Kids</h1>
-        <button
-          onClick={descargarCSV}
-          disabled={descargando || ninos === null || ninos.length === 0}
-          title={
-            ninos !== null && ninos.length > 0
-              ? "Descarga los niños listados (con los filtros aplicados)"
-              : "No hay niños para exportar"
-          }
-          style={{
-            padding: "0.55rem 1.2rem",
-            borderRadius: "0.6rem",
-            border: "none",
-            background:
-              descargando || ninos === null || ninos.length === 0 ? "#9e9e9e" : "var(--lgs-verde)",
-            color: "#1b2a10",
-            fontWeight: 700,
-            cursor: descargando ? "wait" : "pointer",
-          }}
-        >
-          {descargando ? "Generando…" : "⬇ Descargar CSV"}
-        </button>
+        <SoloSi op="op.kids.csv">
+          <button
+            onClick={descargarCSV}
+            disabled={descargando || ninos === null || ninos.length === 0}
+            title={
+              ninos !== null && ninos.length > 0
+                ? "Descarga los niños listados (con los filtros aplicados)"
+                : "No hay niños para exportar"
+            }
+            style={{
+              padding: "0.55rem 1.2rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background:
+                descargando || ninos === null || ninos.length === 0
+                  ? "#9e9e9e"
+                  : "var(--lgs-verde)",
+              color: "#1b2a10",
+              fontWeight: 700,
+              cursor: descargando ? "wait" : "pointer",
+            }}
+          >
+            {descargando ? "Generando…" : "⬇ Descargar CSV"}
+          </button>
+        </SoloSi>
       </div>
 
       <div

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { usePermisos } from "@/ui/permisos";
 
 /**
  * Administración › Mensajes: WhatsApp a los apoderados con el MISMO servicio
@@ -14,6 +15,7 @@ const TARJETAS = [
     emoji: "📲",
     color: "var(--lgs-verde)",
     href: "/panel/mensajes/gestion",
+    op: "op.mensajes.gestion",
   },
   {
     titulo: "Plantillas",
@@ -21,6 +23,7 @@ const TARJETAS = [
     emoji: "📝",
     color: "var(--lgs-azul)",
     href: "/panel/mensajes/plantillas",
+    op: "menu.mensajes",
   },
 ];
 
@@ -37,6 +40,8 @@ const cardBase: CSSProperties = {
 };
 
 export default function MensajesPage() {
+  // Cada tarjeta con su opción en Roles.
+  const { puede } = usePermisos();
   return (
     <main style={{ padding: "2rem", maxWidth: "64rem", margin: "0 auto" }}>
       <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Mensajes</h1>
@@ -52,7 +57,7 @@ export default function MensajesPage() {
           gap: "1rem",
         }}
       >
-        {TARJETAS.map((t) => (
+        {TARJETAS.filter((t) => puede(t.op)).map((t) => (
           <Link key={t.titulo} href={t.href} style={cardBase}>
             <span
               aria-hidden

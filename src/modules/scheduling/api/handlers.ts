@@ -64,6 +64,7 @@ async function idFromContext(context: {
 export const crearSalonHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.salon_crear");
   const body = crearSchema.parse(await request.json());
   const resultado = await crearSalon({
     actorUserId: auth.userId,
@@ -104,6 +105,7 @@ export const detalleSalonHandler = handlerWithAuth(async (_request, auth, contex
 export const regenerarHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.regenerar");
   const id = await idFromContext(context);
   const resultado = await regenerarSesiones({
     actorUserId: auth.userId,
@@ -122,6 +124,7 @@ const suspenderSchema = z.object({
 export const suspenderHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.suspender");
   const id = await idFromContext(context);
   const body = suspenderSchema.parse(await request.json());
   const resultado = await suspenderDia({
@@ -206,6 +209,7 @@ const cambiarGuiaSchema = z.object({ guiaUserId: z.uuid().nullable() });
 export const cambiarGuiaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.salon_editar");
   const id = await idFromContext(context);
   const body = cambiarGuiaSchema.parse(await request.json());
   const cambio = await cambiarGuia({
@@ -221,6 +225,7 @@ export const cambiarGuiaHandler = handlerWithAuth(async (request, auth, context)
 export const alcanceCambioGuiaHandler = handlerWithAuth(async (_request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.salon_editar");
   const id = await idFromContext(context);
   return json({ sesionesFuturas: await sesionesFuturasDelSalon(id) });
 });
@@ -232,6 +237,7 @@ export const alcanceCambioGuiaHandler = handlerWithAuth(async (_request, auth, c
 export const cambiarGuiaSesionHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.cambiar_guia");
   const params = await context.params;
   const sessionId = z.uuid().parse(params["sessionId"]);
   const body = cambiarGuiaSchema.parse(await request.json());
@@ -255,6 +261,7 @@ const editarSalonSchema = z.object({
 export const editarSalonHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.salon_editar");
   const id = await idFromContext(context);
   const body = editarSalonSchema.parse(await request.json());
   const cambio = await editarSalon({
@@ -270,6 +277,7 @@ export const editarSalonHandler = handlerWithAuth(async (request, auth, context)
 export const eliminarSalonHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.calendario.salon_editar");
   const id = await idFromContext(context);
   await eliminarSalon({ actorUserId: auth.userId, classroomId: id, ip: ip(request) });
   return json({ ok: true });
@@ -280,6 +288,7 @@ export const eliminarSalonHandler = handlerWithAuth(async (request, auth, contex
 export const generarSalonesHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.campania_salones");
   const id = await idFromContext(context);
   const resultado = await generarSalonesDesdeCatalogo({
     actorUserId: auth.userId,
@@ -298,6 +307,7 @@ const agregarSalonSchema = z.object({
 export const agregarSalonHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.campania_salones");
   const id = await idFromContext(context);
   const body = agregarSalonSchema.parse(await request.json());
   const resultado = await agregarSalonDesdeCatalogo({
@@ -319,6 +329,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export const impactoFinProgramaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.campania_editar");
   const id = await idFromContext(context);
   const q = request.nextUrl.searchParams;
   const fin = z.string().regex(ISO_DATE).parse(q.get("fin"));
@@ -334,6 +345,7 @@ export const impactoFinProgramaHandler = handlerWithAuth(async (request, auth, c
 export const moverFinProgramaHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.campania_editar");
   const id = await idFromContext(context);
   const body = z
     .object({
@@ -384,6 +396,7 @@ export const listarHorariosHandler = handlerWithAuth(async (request, auth) => {
 export const crearHorarioHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.horarios_editar");
   const body = crearHorarioSchema.parse(await request.json());
   const resultado = await crearHorario({ actorUserId: auth.userId, ...body, ip: ip(request) });
   return json(resultado, { status: 201 });
@@ -402,6 +415,7 @@ const actualizarHorarioSchema = z.object({
 export const actualizarHorarioHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.horarios_editar");
   const id = await idFromContext(context);
   const body = actualizarHorarioSchema.parse(await request.json());
   await actualizarHorario({ actorUserId: auth.userId, horarioId: id, ...body, ip: ip(request) });
@@ -412,6 +426,7 @@ export const actualizarHorarioHandler = handlerWithAuth(async (request, auth, co
 export const eliminarHorarioHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.horarios_editar");
   const id = await idFromContext(context);
   await eliminarHorario({ actorUserId: auth.userId, horarioId: id, ip: ip(request) });
   return json({ ok: true });
@@ -423,6 +438,7 @@ const toggleHorarioSchema = z.object({ activo: z.boolean() });
 export const toggleHorarioHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.mant.horarios_editar");
   const id = await idFromContext(context);
   const body = toggleHorarioSchema.parse(await request.json());
   await cambiarActivoHorario({

@@ -6,6 +6,7 @@ import {
   requisitoParaOtorgar,
   type RequisitoOtorgar,
 } from "../domain/permisos";
+import { BASE_DE_OPCION, type OpCode } from "../domain/opciones";
 import type { AccessProfileData, PermissionGrant, RoleAssignment } from "./ports";
 
 /**
@@ -44,12 +45,25 @@ export class AccessProfile {
    * o estar otorgado para ese país.
    */
   hasPermission(code: string, countryCode?: string): boolean {
-    return this.data.permissions.some((grant) => {
+    const otorgado = this.data.permissions.some((grant) => {
       if (grant.code !== code) return false;
       if (grant.countryCode === null) return true; // global cubre todo
       if (countryCode === undefined) return true; // sin país exigido
       return grant.countryCode === countryCode;
     });
+    if (!otorgado) return false;
+    // Una OPCIÓN de pantalla (`op.*`) solo afina su permiso funcional: cuenta
+    // si el rol tiene también su base. Marcarla sola no da nada nuevo.
+    const base = BASE_DE_OPCION.get(code);
+    return base === undefined || base.every((b) => this.hasPermission(b, countryCode));
+  }
+
+  /**
+   * Exige una OPCIÓN de pantalla (`op.*`, que ya incluye su permiso base). El
+   * código va tipado: una opción mal escrita no compila.
+   */
+  requireOpcion(code: OpCode, countryCode?: string): void {
+    this.requirePermission(code, countryCode);
   }
 
   /** Lanza ForbiddenError si falta el permiso. */

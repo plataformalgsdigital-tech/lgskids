@@ -19,6 +19,7 @@ import {
   WhatsAppInasistencia,
   type LineaInasistencia,
 } from "./AccionesInasistencia";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * La consulta de asistencia de Servicio, en dos modos:
@@ -210,14 +211,16 @@ export function ConsultaAsistencia({ modo }: { modo: keyof typeof MODOS }) {
             {m.descripcion}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={exportar}
-          disabled={filas === null || filas.length === 0}
-          style={botonServicio}
-        >
-          ⬇ Descargar CSV
-        </button>
+        <SoloSi op="op.servicio.asistencia_csv">
+          <button
+            type="button"
+            onClick={exportar}
+            disabled={filas === null || filas.length === 0}
+            style={botonServicio}
+          >
+            ⬇ Descargar CSV
+          </button>
+        </SoloSi>
       </div>
 
       <FiltrosServicio filtros={filtros} onCambio={(c) => setFiltros((f) => ({ ...f, ...c }))}>

@@ -94,6 +94,7 @@ const destinatariosSchema = z.object({
 export const destinatariosHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
+  profile.requireOpcion("op.mensajes.gestion");
   const body = destinatariosSchema.parse(await request.json());
   return json(await buscarDestinatarios({ countryScope: auth.countryScope, ...body }));
 });
@@ -111,6 +112,7 @@ const envioSchema = z.object({
 export const envioHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
+  profile.requireOpcion("op.mensajes.gestion");
   const body = envioSchema.parse(await request.json());
   const r = await encolarEnvio({
     actorUserId: auth.userId,
@@ -134,6 +136,7 @@ const historialSchema = z.object({
 export const historialHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
+  profile.requireOpcion("op.mensajes.historial");
   const q = historialSchema.parse(Object.fromEntries(request.nextUrl.searchParams));
   return json({
     envios: await historialEnvios({ countryScope: auth.countryScope, ...q }),
@@ -145,6 +148,7 @@ export const historialHandler = handlerWithAuth(async (request, auth) => {
 export const credencialesVistaHandler = handlerWithAuth(async (_request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
+  profile.requireOpcion("op.kids.whatsapp_acceso");
   const childPersonId = await idDe(context, "childPersonId");
   return json({
     ...(await vistaCredenciales(childPersonId, auth.countryScope)),
@@ -156,6 +160,7 @@ export const credencialesVistaHandler = handlerWithAuth(async (_request, auth, c
 export const credencialesEnviarHandler = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
+  profile.requireOpcion("op.kids.whatsapp_acceso");
   const childPersonId = await idDe(context, "childPersonId");
   const r = await enviarCredenciales({
     actorUserId: auth.userId,

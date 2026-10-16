@@ -32,6 +32,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
 export const PUT = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.usuarios.guia");
   const b = cuerpo.parse(await request.json());
   const estado = await setRegistroAbierto({
     actorUserId: auth.userId,

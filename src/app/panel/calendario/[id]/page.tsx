@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { SoloSi } from "@/ui/SoloSi";
 
 interface Detalle {
   salon: {
@@ -355,21 +356,25 @@ export default function DetalleSalonPage() {
           </span>
         </h1>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button
-            style={boton}
-            disabled={ocupado}
-            onClick={() => void guardarSalon({ activo: !detalle.salon.activo })}
-            title={
-              detalle.salon.activo
-                ? "Al desactivar, el salón deja de ofrecerse en el wizard de contratos"
-                : "Reactivar el salón"
-            }
-          >
-            {detalle.salon.activo ? "🚫 Desactivar" : "✅ Activar"}
-          </button>
-          <button style={boton} disabled={ocupado} onClick={() => void accion("regenerate")}>
-            🔄 Regenerar sesiones
-          </button>
+          <SoloSi op="op.calendario.salon_editar">
+            <button
+              style={boton}
+              disabled={ocupado}
+              onClick={() => void guardarSalon({ activo: !detalle.salon.activo })}
+              title={
+                detalle.salon.activo
+                  ? "Al desactivar, el salón deja de ofrecerse en el wizard de contratos"
+                  : "Reactivar el salón"
+              }
+            >
+              {detalle.salon.activo ? "🚫 Desactivar" : "✅ Activar"}
+            </button>
+          </SoloSi>
+          <SoloSi op="op.calendario.regenerar">
+            <button style={boton} disabled={ocupado} onClick={() => void accion("regenerate")}>
+              🔄 Regenerar sesiones
+            </button>
+          </SoloSi>
         </div>
       </div>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
@@ -438,37 +443,39 @@ export default function DetalleSalonPage() {
             ))}
           </select>
         </label>
-        <button
-          style={{
-            ...boton,
-            borderColor: "var(--lgs-verde)",
-            background: "var(--lgs-verde)",
-            color: "#1b2a10",
-          }}
-          disabled={ocupado}
-          onClick={() => {
-            const guiaUserId = guiaEdit === "" ? null : guiaEdit;
-            const cupo = Number(cupoEdit);
-            if (guiaUserId === detalle.salon.guiaUserId) {
-              void guardarSalon({ cupo, guiaUserId });
-              return;
-            }
-            // Cambiar el guía mueve TODAS las sesiones que faltan: se confirma.
-            // El corte es el INSTANTE, no la fecha: el salón puede estar en otra zona.
-            const ahora = Date.now();
-            const futuras = detalle.sesiones.filter(
-              (s) => new Date(s.startsAt).getTime() >= ahora,
-            ).length;
-            setConfirmarGuia({
-              cupo,
-              guiaUserId,
-              futuras,
-              dictadas: detalle.sesiones.length - futuras,
-            });
-          }}
-        >
-          Guardar salón
-        </button>
+        <SoloSi op="op.calendario.salon_editar">
+          <button
+            style={{
+              ...boton,
+              borderColor: "var(--lgs-verde)",
+              background: "var(--lgs-verde)",
+              color: "#1b2a10",
+            }}
+            disabled={ocupado}
+            onClick={() => {
+              const guiaUserId = guiaEdit === "" ? null : guiaEdit;
+              const cupo = Number(cupoEdit);
+              if (guiaUserId === detalle.salon.guiaUserId) {
+                void guardarSalon({ cupo, guiaUserId });
+                return;
+              }
+              // Cambiar el guía mueve TODAS las sesiones que faltan: se confirma.
+              // El corte es el INSTANTE, no la fecha: el salón puede estar en otra zona.
+              const ahora = Date.now();
+              const futuras = detalle.sesiones.filter(
+                (s) => new Date(s.startsAt).getTime() >= ahora,
+              ).length;
+              setConfirmarGuia({
+                cupo,
+                guiaUserId,
+                futuras,
+                dictadas: detalle.sesiones.length - futuras,
+              });
+            }}
+          >
+            Guardar salón
+          </button>
+        </SoloSi>
       </section>
 
       {confirmarGuia !== null && (
@@ -533,9 +540,11 @@ export default function DetalleSalonPage() {
               style={{ padding: "0.45rem", borderRadius: "0.5rem", border: "1.5px solid #d8dce6" }}
             />
           </label>
-          <button style={boton} disabled={ocupado} onClick={() => void guardarFechasCampania()}>
-            Guardar fechas
-          </button>
+          <SoloSi op="op.mant.campania_editar">
+            <button style={boton} disabled={ocupado} onClick={() => void guardarFechasCampania()}>
+              Guardar fechas
+            </button>
+          </SoloSi>
         </section>
       )}
       {detalle.suspensiones.length > 0 && (
@@ -642,14 +651,16 @@ export default function DetalleSalonPage() {
                 {DIAS[new Date(`${s.fecha}T12:00:00Z`).getUTCDay()]} {s.fecha} ·{" "}
                 {horaLocal(s.startsAt)}
               </Link>
-              <button
-                style={{ ...boton, padding: "0.2rem 0.5rem" }}
-                disabled={ocupado}
-                onClick={() => suspender(s.fecha)}
-                title="Suspender este día"
-              >
-                ⏸
-              </button>
+              <SoloSi op="op.calendario.suspender">
+                <button
+                  style={{ ...boton, padding: "0.2rem 0.5rem" }}
+                  disabled={ocupado}
+                  onClick={() => suspender(s.fecha)}
+                  title="Suspender este día"
+                >
+                  ⏸
+                </button>
+              </SoloSi>
             </div>
           ))}
         </div>

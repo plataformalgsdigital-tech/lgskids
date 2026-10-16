@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Curso = "JUNIOR" | "YOUNGSTER";
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
@@ -474,21 +476,23 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
       </div>
 
       <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-        <button
-          type="button"
-          onClick={() => void guardar()}
-          disabled={ocupado || leccion.trim() === ""}
-          style={{
-            ...btn,
-            background: "var(--lgs-verde)",
-            borderColor: "var(--lgs-verde)",
-            color: "#1b2a10",
-            padding: "0.5rem 1.3rem",
-            fontSize: "0.88rem",
-          }}
-        >
-          {ocupado ? "Guardando…" : "Guardar lección"}
-        </button>
+        <SoloSi op="op.mant.lecciones_editar">
+          <button
+            type="button"
+            onClick={() => void guardar()}
+            disabled={ocupado || leccion.trim() === ""}
+            style={{
+              ...btn,
+              background: "var(--lgs-verde)",
+              borderColor: "var(--lgs-verde)",
+              color: "#1b2a10",
+              padding: "0.5rem 1.3rem",
+              fontSize: "0.88rem",
+            }}
+          >
+            {ocupado ? "Guardando…" : "Guardar lección"}
+          </button>
+        </SoloSi>
         {msg !== null && (
           <span style={{ fontSize: "0.85rem", color: msg.startsWith("✔") ? "#1b5e20" : "#c62828" }}>
             {msg}
@@ -499,7 +503,7 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
   );
 }
 
-export default function GestionContenidoPage() {
+function GestionContenidoPageContenido() {
   const [fCurso, setFCurso] = useState<Curso>("JUNIOR");
   const [fNivel, setFNivel] = useState<string>("ROOKIE");
   const [filas, setFilas] = useState<Fila[] | null>(null);
@@ -628,20 +632,22 @@ export default function GestionContenidoPage() {
             style={input}
           />
         </label>
-        <button
-          type="button"
-          onClick={() => void agregar()}
-          disabled={creando || nuevaLeccion.trim() === ""}
-          style={{
-            ...btn,
-            background: "var(--lgs-azul)",
-            borderColor: "var(--lgs-azul)",
-            color: "white",
-            padding: "0.5rem 1.2rem",
-          }}
-        >
-          {creando ? "Agregando…" : "+ Agregar lección"}
-        </button>
+        <SoloSi op="op.mant.lecciones_editar">
+          <button
+            type="button"
+            onClick={() => void agregar()}
+            disabled={creando || nuevaLeccion.trim() === ""}
+            style={{
+              ...btn,
+              background: "var(--lgs-azul)",
+              borderColor: "var(--lgs-azul)",
+              color: "white",
+              padding: "0.5rem 1.2rem",
+            }}
+          >
+            {creando ? "Agregando…" : "+ Agregar lección"}
+          </button>
+        </SoloSi>
       </div>
       {error !== null && (
         <p role="alert" style={{ color: "#c62828" }}>
@@ -661,5 +667,14 @@ export default function GestionContenidoPage() {
         )}
       </div>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function GestionContenidoPage() {
+  return (
+    <ConOpcion op="op.mant.contenido" volver="/panel/mantenimiento-cursos">
+      <GestionContenidoPageContenido />
+    </ConOpcion>
   );
 }

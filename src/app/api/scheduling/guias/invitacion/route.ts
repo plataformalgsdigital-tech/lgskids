@@ -24,6 +24,7 @@ function ip(request: Request): string | null {
 export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.guias.enlace");
   const b = cuerpo.parse(await request.json());
   const invitacion = await crearInvitacionGuia({
     actorUserId: auth.userId,
@@ -36,6 +37,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
 export const DELETE = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.guias.enlace");
   const b = cuerpo.parse(await request.json());
   return json(
     await revocarInvitacionGuia({

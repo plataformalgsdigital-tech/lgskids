@@ -17,6 +17,8 @@ import {
   tarjeta,
   type ConsultaClave,
 } from "../comunes";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 type Tipo = "estudiante" | "guia" | "administrativo" | "otro";
 
@@ -100,7 +102,7 @@ function descargarCsv(usuarios: Usuario[]) {
   URL.revokeObjectURL(url);
 }
 
-export default function ConsultarUsuariosPage() {
+function ConsultarUsuariosPageContenido() {
   const [tipo, setTipo] = useState<Tipo | "">("");
   const [estado, setEstado] = useState<"" | "ACTIVO" | "INACTIVO">("");
   const [buscar, setBuscar] = useState("");
@@ -313,14 +315,16 @@ export default function ConsultarUsuariosPage() {
           <button style={boton} onClick={() => void recargar()}>
             Buscar
           </button>
-          <button
-            style={{ ...boton, borderColor: "var(--lgs-verde)" }}
-            disabled={usuarios === null || usuarios.length === 0}
-            onClick={() => usuarios !== null && descargarCsv(usuarios)}
-            title="Exporta la lista filtrada. Las claves NO se exportan."
-          >
-            ⬇ Exportar CSV
-          </button>
+          <SoloSi op="op.usuarios.csv">
+            <button
+              style={{ ...boton, borderColor: "var(--lgs-verde)" }}
+              disabled={usuarios === null || usuarios.length === 0}
+              onClick={() => usuarios !== null && descargarCsv(usuarios)}
+              title="Exporta la lista filtrada. Las claves NO se exportan."
+            >
+              ⬇ Exportar CSV
+            </button>
+          </SoloSi>
         </div>
       </div>
 
@@ -470,39 +474,43 @@ export default function ConsultarUsuariosPage() {
                               alignItems: "center",
                             }}
                           >
-                            <label
-                              style={{
-                                display: "inline-flex",
-                                gap: "0.35rem",
-                                alignItems: "center",
-                                fontSize: "0.82rem",
-                                cursor: "pointer",
-                              }}
-                              title="Al entrar se le pide cambiar la clave antes de usar la plataforma."
-                            >
-                              <input
-                                type="checkbox"
-                                checked={u.debeCambiarPassword}
+                            <SoloSi op="op.usuarios.clave">
+                              <label
+                                style={{
+                                  display: "inline-flex",
+                                  gap: "0.35rem",
+                                  alignItems: "center",
+                                  fontSize: "0.82rem",
+                                  cursor: "pointer",
+                                }}
+                                title="Al entrar se le pide cambiar la clave antes de usar la plataforma."
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={u.debeCambiarPassword}
+                                  disabled={ocupado}
+                                  onChange={(e) =>
+                                    void accion(
+                                      () => patch(u, { debeCambiarPassword: e.target.checked }),
+                                      e.target.checked
+                                        ? `${u.username} deberá cambiar su clave al entrar.`
+                                        : `${u.username} ya no está obligado a cambiar su clave.`,
+                                      "No se pudo cambiar la opción.",
+                                    )
+                                  }
+                                />
+                                Cambiar clave al entrar
+                              </label>
+                            </SoloSi>
+                            <SoloSi op="op.usuarios.clave">
+                              <button
+                                style={boton}
                                 disabled={ocupado}
-                                onChange={(e) =>
-                                  void accion(
-                                    () => patch(u, { debeCambiarPassword: e.target.checked }),
-                                    e.target.checked
-                                      ? `${u.username} deberá cambiar su clave al entrar.`
-                                      : `${u.username} ya no está obligado a cambiar su clave.`,
-                                    "No se pudo cambiar la opción.",
-                                  )
-                                }
-                              />
-                              Cambiar clave al entrar
-                            </label>
-                            <button
-                              style={boton}
-                              disabled={ocupado}
-                              onClick={() => void restablecer(u)}
-                            >
-                              🔑 Restablecer clave
-                            </button>
+                                onClick={() => void restablecer(u)}
+                              >
+                                🔑 Restablecer clave
+                              </button>
+                            </SoloSi>
                             {puedeVerClaves && (
                               <button style={boton} onClick={() => void verClave(u)}>
                                 {claves[u.id] !== undefined ? "🙈 Ocultar clave" : "👁 Ver clave"}
@@ -540,85 +548,91 @@ export default function ConsultarUsuariosPage() {
                               >
                                 {r.rol} {r.pais !== null ? `(${r.pais})` : "(global)"}
                                 {r.rol !== "alumno" && !esYo && (
-                                  <button
-                                    aria-label={`Quitar rol ${r.rol}`}
-                                    title="Quitar este rol"
-                                    disabled={ocupado}
-                                    onClick={() => {
-                                      if (
-                                        !window.confirm(`¿Quitar el rol ${r.rol} a ${u.username}?`)
-                                      )
-                                        return;
-                                      void accion(
-                                        () =>
-                                          apiFetch("/api/access/user-roles", {
-                                            ...rolesBody(u, r.rol, r.pais),
-                                            method: "DELETE",
-                                          }),
-                                        `Rol ${r.rol} quitado a ${u.username}.`,
-                                        "No se pudo quitar el rol.",
-                                      );
-                                    }}
-                                    style={{
-                                      border: "none",
-                                      background: "transparent",
-                                      cursor: "pointer",
-                                      color: "#0d47a1",
-                                      fontWeight: 800,
-                                    }}
-                                  >
-                                    ×
-                                  </button>
+                                  <SoloSi op="op.usuarios.roles">
+                                    <button
+                                      aria-label={`Quitar rol ${r.rol}`}
+                                      title="Quitar este rol"
+                                      disabled={ocupado}
+                                      onClick={() => {
+                                        if (
+                                          !window.confirm(
+                                            `¿Quitar el rol ${r.rol} a ${u.username}?`,
+                                          )
+                                        )
+                                          return;
+                                        void accion(
+                                          () =>
+                                            apiFetch("/api/access/user-roles", {
+                                              ...rolesBody(u, r.rol, r.pais),
+                                              method: "DELETE",
+                                            }),
+                                          `Rol ${r.rol} quitado a ${u.username}.`,
+                                          "No se pudo quitar el rol.",
+                                        );
+                                      }}
+                                      style={{
+                                        border: "none",
+                                        background: "transparent",
+                                        cursor: "pointer",
+                                        color: "#0d47a1",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </SoloSi>
                                 )}
                               </span>
                             ))}
-                            <select
-                              value={rolElegido}
-                              onChange={(e) => setRolElegido(e.target.value)}
-                              style={{ ...input, width: "auto", padding: "0.3rem 0.5rem" }}
-                            >
-                              <option value="">+ Asignar rol…</option>
-                              {roles.map((r) => (
-                                <option key={r.code} value={r.code}>
-                                  {r.nombre}
-                                </option>
-                              ))}
-                            </select>
-                            {rolElegido !== "" && (
-                              <>
-                                <select
-                                  value={paisElegido}
-                                  onChange={(e) => setPaisElegido(e.target.value)}
-                                  style={{ ...input, width: "auto", padding: "0.3rem 0.5rem" }}
-                                >
-                                  <option value="">Global</option>
-                                  {PAISES.map((p) => (
-                                    <option key={p.code} value={p.code}>
-                                      {p.nombre}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  style={{ ...boton, borderColor: "var(--lgs-verde)" }}
-                                  disabled={ocupado}
-                                  onClick={() =>
-                                    void accion(
-                                      () =>
-                                        apiFetch(
-                                          "/api/access/user-roles",
-                                          rolesBody(u, rolElegido, paisElegido || null),
-                                        ),
-                                      `Rol ${rolElegido} asignado a ${u.username}.`,
-                                      "No se pudo asignar el rol.",
-                                    ).then((hecho) => {
-                                      if (hecho) setRolElegido("");
-                                    })
-                                  }
-                                >
-                                  Confirmar
-                                </button>
-                              </>
-                            )}
+                            <SoloSi op="op.usuarios.roles">
+                              <select
+                                value={rolElegido}
+                                onChange={(e) => setRolElegido(e.target.value)}
+                                style={{ ...input, width: "auto", padding: "0.3rem 0.5rem" }}
+                              >
+                                <option value="">+ Asignar rol…</option>
+                                {roles.map((r) => (
+                                  <option key={r.code} value={r.code}>
+                                    {r.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                              {rolElegido !== "" && (
+                                <>
+                                  <select
+                                    value={paisElegido}
+                                    onChange={(e) => setPaisElegido(e.target.value)}
+                                    style={{ ...input, width: "auto", padding: "0.3rem 0.5rem" }}
+                                  >
+                                    <option value="">Global</option>
+                                    {PAISES.map((p) => (
+                                      <option key={p.code} value={p.code}>
+                                        {p.nombre}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    style={{ ...boton, borderColor: "var(--lgs-verde)" }}
+                                    disabled={ocupado}
+                                    onClick={() =>
+                                      void accion(
+                                        () =>
+                                          apiFetch(
+                                            "/api/access/user-roles",
+                                            rolesBody(u, rolElegido, paisElegido || null),
+                                          ),
+                                        `Rol ${rolElegido} asignado a ${u.username}.`,
+                                        "No se pudo asignar el rol.",
+                                      ).then((hecho) => {
+                                        if (hecho) setRolElegido("");
+                                      })
+                                    }
+                                  >
+                                    Confirmar
+                                  </button>
+                                </>
+                              )}
+                            </SoloSi>
                           </div>
 
                           <div
@@ -641,24 +655,26 @@ export default function ConsultarUsuariosPage() {
                               </Link>
                             )}
                             {(u.tipo === "administrativo" || u.tipo === "otro") && (
-                              <button
-                                style={boton}
-                                onClick={() =>
-                                  setFicha(
-                                    ficha === null
-                                      ? {
-                                          nombres: u.nombres ?? "",
-                                          apellidos: u.apellidos ?? "",
-                                          email: u.email ?? "",
-                                          telefono: u.telefono ?? "",
-                                          docNumero: u.docNumero ?? "",
-                                        }
-                                      : null,
-                                  )
-                                }
-                              >
-                                ✏️ {ficha === null ? "Editar datos" : "Cancelar edición"}
-                              </button>
+                              <SoloSi op="op.usuarios.editar">
+                                <button
+                                  style={boton}
+                                  onClick={() =>
+                                    setFicha(
+                                      ficha === null
+                                        ? {
+                                            nombres: u.nombres ?? "",
+                                            apellidos: u.apellidos ?? "",
+                                            email: u.email ?? "",
+                                            telefono: u.telefono ?? "",
+                                            docNumero: u.docNumero ?? "",
+                                          }
+                                        : null,
+                                    )
+                                  }
+                                >
+                                  ✏️ {ficha === null ? "Editar datos" : "Cancelar edición"}
+                                </button>
+                              </SoloSi>
                             )}
                             {u.tipo === "estudiante" ? (
                               <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
@@ -667,62 +683,68 @@ export default function ConsultarUsuariosPage() {
                               </span>
                             ) : (
                               !esYo && (
+                                <SoloSi op="op.usuarios.estado">
+                                  <button
+                                    style={boton}
+                                    disabled={ocupado}
+                                    onClick={() => {
+                                      const nuevo = u.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO";
+                                      if (
+                                        nuevo === "INACTIVO" &&
+                                        !window.confirm(
+                                          `¿Inactivar a ${u.username}? No podrá entrar y se cierran sus sesiones. Se puede reactivar.`,
+                                        )
+                                      )
+                                        return;
+                                      void accion(
+                                        () => patch(u, { estado: nuevo }),
+                                        nuevo === "INACTIVO"
+                                          ? `${u.username} inactivado.`
+                                          : `${u.username} reactivado.`,
+                                        "No se pudo cambiar el estado.",
+                                      );
+                                    }}
+                                  >
+                                    {u.estado === "ACTIVO" ? "⏸ Inactivar" : "▶ Reactivar"}
+                                  </button>
+                                </SoloSi>
+                              )
+                            )}
+                            {!esYo && (
+                              <SoloSi op="op.usuarios.eliminar">
                                 <button
-                                  style={boton}
-                                  disabled={ocupado}
+                                  style={{
+                                    ...boton,
+                                    color: u.motivosNoBorrar.length === 0 ? "#b71c1c" : "#9e9e9e",
+                                  }}
+                                  disabled={ocupado || u.motivosNoBorrar.length > 0}
+                                  title={
+                                    u.motivosNoBorrar.length > 0
+                                      ? `No se puede eliminar: ${u.motivosNoBorrar.join(", ")}. Inactívala en su lugar.`
+                                      : "Borra la cuenta: solo si se creó por error y nunca se usó."
+                                  }
                                   onClick={() => {
-                                    const nuevo = u.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO";
                                     if (
-                                      nuevo === "INACTIVO" &&
                                       !window.confirm(
-                                        `¿Inactivar a ${u.username}? No podrá entrar y se cierran sus sesiones. Se puede reactivar.`,
+                                        `¿ELIMINAR la cuenta ${u.username}? No se puede deshacer.`,
                                       )
                                     )
                                       return;
                                     void accion(
-                                      () => patch(u, { estado: nuevo }),
-                                      nuevo === "INACTIVO"
-                                        ? `${u.username} inactivado.`
-                                        : `${u.username} reactivado.`,
-                                      "No se pudo cambiar el estado.",
-                                    );
+                                      () =>
+                                        apiFetch(`/api/identity/users/${u.id}`, {
+                                          method: "DELETE",
+                                        }),
+                                      `Cuenta ${u.username} eliminada.`,
+                                      "No se pudo eliminar la cuenta.",
+                                    ).then((hecho) => {
+                                      if (hecho) setAbierto(null);
+                                    });
                                   }}
                                 >
-                                  {u.estado === "ACTIVO" ? "⏸ Inactivar" : "▶ Reactivar"}
+                                  🗑 Eliminar
                                 </button>
-                              )
-                            )}
-                            {!esYo && (
-                              <button
-                                style={{
-                                  ...boton,
-                                  color: u.motivosNoBorrar.length === 0 ? "#b71c1c" : "#9e9e9e",
-                                }}
-                                disabled={ocupado || u.motivosNoBorrar.length > 0}
-                                title={
-                                  u.motivosNoBorrar.length > 0
-                                    ? `No se puede eliminar: ${u.motivosNoBorrar.join(", ")}. Inactívala en su lugar.`
-                                    : "Borra la cuenta: solo si se creó por error y nunca se usó."
-                                }
-                                onClick={() => {
-                                  if (
-                                    !window.confirm(
-                                      `¿ELIMINAR la cuenta ${u.username}? No se puede deshacer.`,
-                                    )
-                                  )
-                                    return;
-                                  void accion(
-                                    () =>
-                                      apiFetch(`/api/identity/users/${u.id}`, { method: "DELETE" }),
-                                    `Cuenta ${u.username} eliminada.`,
-                                    "No se pudo eliminar la cuenta.",
-                                  ).then((hecho) => {
-                                    if (hecho) setAbierto(null);
-                                  });
-                                }}
-                              >
-                                🗑 Eliminar
-                              </button>
+                              </SoloSi>
                             )}
                             {!esYo && u.motivosNoBorrar.length > 0 && (
                               <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
@@ -790,5 +812,14 @@ export default function ConsultarUsuariosPage() {
         )}
       </div>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function ConsultarUsuariosPage() {
+  return (
+    <ConOpcion op="op.usuarios.consultar" volver="/panel/usuarios">
+      <ConsultarUsuariosPageContenido />
+    </ConOpcion>
   );
 }

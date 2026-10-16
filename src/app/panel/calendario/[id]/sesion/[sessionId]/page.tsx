@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { SoloSi } from "@/ui/SoloSi";
 
 interface Fila {
   childPersonId: string;
@@ -308,17 +309,19 @@ export default function SesionPage() {
                     </button>
                   );
                 })}
-                <button
-                  title="Registrar cuestionario"
-                  style={boton}
-                  onClick={() => {
-                    setQuizPara(quizPara === fila.childPersonId ? null : fila.childPersonId);
-                    setQuizId("");
-                    setScore("");
-                  }}
-                >
-                  🧠 Quiz
-                </button>
+                <SoloSi op="op.calendario.cuestionario">
+                  <button
+                    title="Registrar cuestionario"
+                    style={boton}
+                    onClick={() => {
+                      setQuizPara(quizPara === fila.childPersonId ? null : fila.childPersonId);
+                      setQuizId("");
+                      setScore("");
+                    }}
+                  >
+                    🧠 Quiz
+                  </button>
+                </SoloSi>
               </div>
               {marca?.estado === "JUSTIFICADO" && (
                 <input
@@ -392,23 +395,25 @@ export default function SesionPage() {
       </section>
 
       {lista.lista.length > 0 && (
-        <button
-          onClick={() => void guardar()}
-          disabled={ocupado}
-          style={{
-            marginTop: "1.25rem",
-            padding: "0.7rem 1.6rem",
-            borderRadius: "0.7rem",
-            border: "none",
-            background: ocupado ? "#9e9e9e" : "var(--lgs-verde)",
-            color: "#1b2a10",
-            fontWeight: 700,
-            fontSize: "1rem",
-            cursor: ocupado ? "wait" : "pointer",
-          }}
-        >
-          {ocupado ? "Guardando…" : "💾 Guardar asistencia"}
-        </button>
+        <SoloSi op="op.calendario.asistencia">
+          <button
+            onClick={() => void guardar()}
+            disabled={ocupado}
+            style={{
+              marginTop: "1.25rem",
+              padding: "0.7rem 1.6rem",
+              borderRadius: "0.7rem",
+              border: "none",
+              background: ocupado ? "#9e9e9e" : "var(--lgs-verde)",
+              color: "#1b2a10",
+              fontWeight: 700,
+              fontSize: "1rem",
+              cursor: ocupado ? "wait" : "pointer",
+            }}
+          >
+            {ocupado ? "Guardando…" : "💾 Guardar asistencia"}
+          </button>
+        </SoloSi>
       )}
     </main>
   );

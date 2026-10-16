@@ -1,6 +1,10 @@
+import { BASE_DE_OPCION, CODIGOS_OP, OPCIONES_MENU, type OpCode } from "./opciones";
+
 /**
  * Catálogo de permisos de la plataforma (Fase 3). Crece por fase.
  * El seed los inserta; el código los referencia SOLO por estas constantes.
+ * Las OPCIONES de cada pantalla (`op.*`, tercer nivel del árbol) viven en
+ * `opciones.ts`.
  */
 export const PERMISOS = {
   USUARIOS_GESTIONAR: "usuarios.gestionar",
@@ -81,7 +85,21 @@ export const PERMISOS = {
   PANEL_ALUMNO: "panel.alumno",
 } as const;
 
-export type PermisoCode = (typeof PERMISOS)[keyof typeof PERMISOS];
+/** Un permiso del catálogo: los funcionales, los de menú y las opciones `op.*`. */
+export type PermisoCode = (typeof PERMISOS)[keyof typeof PERMISOS] | OpCode;
+
+/**
+ * La matriz de un rol más las opciones `op.*` cuya base ya tiene: una opción
+ * solo afina lo que el permiso funcional daba, así que el rol que puede hacer
+ * algo recibe también su opción.
+ */
+function conOpciones(permisos: PermisoCode[]): PermisoCode[] {
+  const tiene = new Set<string>(permisos);
+  return [
+    ...permisos,
+    ...CODIGOS_OP.filter((c) => (BASE_DE_OPCION.get(c) ?? []).every((b) => tiene.has(b))),
+  ];
+}
 
 /** Roles semilla. */
 export const ROLES = {
@@ -136,10 +154,13 @@ export function requisitoParaGestionarCuenta(rolesDelOtro: readonly string[]): R
 
 /** Matriz rol → permisos que el seed materializa. */
 export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
-  superadmin: Object.values(PERMISOS),
+  superadmin: [...Object.values(PERMISOS), ...CODIGOS_OP],
   // Todo, salvo lo que el negocio reservó por ahora al superadmin.
-  admin: Object.values(PERMISOS).filter((p) => p !== PERMISOS.SESIONES_SOLICITAR_REPETICION),
-  coordinador: [
+  admin: [
+    ...Object.values(PERMISOS).filter((p) => p !== PERMISOS.SESIONES_SOLICITAR_REPETICION),
+    ...CODIGOS_OP,
+  ],
+  coordinador: conOpciones([
     PERMISOS.USUARIOS_GESTIONAR,
     PERMISOS.AUDITORIA_VER,
     PERMISOS.CATALOGO_GESTIONAR,
@@ -191,8 +212,8 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.MENU_MENSAJES,
     PERMISOS.CASOS_VER,
     PERMISOS.CASOS_GESTIONAR,
-  ],
-  guia: [
+  ]),
+  guia: conOpciones([
     PERMISOS.PANEL_GUIA,
     PERMISOS.PANEL_TABLERO,
     PERMISOS.SECCION_ACADEMICA,
@@ -209,7 +230,7 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.EVALUACIONES_GESTIONAR,
     PERMISOS.EVALUACIONES_VER,
     PERMISOS.PROGRESION_VER,
-  ],
+  ]),
   apoderado: [PERMISOS.PANEL_APODERADO],
   alumno: [PERMISOS.PANEL_ALUMNO],
 };
@@ -218,14 +239,14 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
  * Secciones del menú: cada una tiene un permiso PADRE y sus ítems hijos.
  *
  * Quitarle el padre a un rol apaga la sección completa aunque los hijos sigan
- * marcados. La regla se aplica en el servidor igual que en el menú: el permiso
- * de sección se exige ADEMÁS del permiso propio de cada pantalla, nunca en su
- * lugar.
+ * marcados. `seccion.*` y `menu.*` son de VISIBILIDAD (el menú lateral); lo
+ * que el servidor exige es el permiso funcional de cada endpoint y, en las
+ * acciones, su opción `op.*` (tercer nivel, `opciones.ts`).
  *
  * Es la ÚNICA fuente de la jerarquía: la usan el sidebar para filtrar y la
  * pantalla de Roles para pintar el árbol de casillas.
  */
-export const SECCIONES_MENU: {
+const SECCIONES_BASE: {
   clave: string;
   etiqueta: string;
   permiso: PermisoCode;
@@ -296,3 +317,27 @@ export const SECCIONES_MENU: {
     ],
   },
 ];
+
+/**
+ * El árbol COMPLETO, de tres niveles: cada opción del menú lleva debajo las
+ * opciones de su pantalla (`opciones.ts`). Es lo que pinta Roles.
+ */
+export const SECCIONES_MENU: {
+  clave: string;
+  etiqueta: string;
+  permiso: PermisoCode;
+  hijos: {
+    etiqueta: string;
+    permiso: PermisoCode;
+    opciones: { etiqueta: string; permiso: string }[];
+  }[];
+}[] = SECCIONES_BASE.map((s) => ({
+  ...s,
+  hijos: s.hijos.map((h) => ({
+    ...h,
+    opciones: OPCIONES_MENU.filter((o) => o.menu === h.permiso).map((o) => ({
+      etiqueta: o.etiqueta,
+      permiso: o.permiso,
+    })),
+  })),
+}));

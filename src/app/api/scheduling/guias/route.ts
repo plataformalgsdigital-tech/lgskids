@@ -43,6 +43,7 @@ const fichaSchema = z.object({
 export const PUT = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.guias.ficha_editar");
   const b = fichaSchema.parse(await request.json());
   await guardarFichaGuia({
     actorUserId: auth.userId,

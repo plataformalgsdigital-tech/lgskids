@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { ZONA_CHILE, referenciaHoraria } from "@/ui/hora-paises";
+import { usePermisos } from "@/ui/permisos";
 import { ReportarCasoModal } from "../servicio/casos-atencion/ReportarCasoModal";
 import { CancelacionSesion } from "./CancelacionSesion";
 import type { EventoEditable } from "./NuevoEventoModal";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Evento del calendario en MODAL (antes era una página aparte).
@@ -198,13 +200,10 @@ const FICHA_VACIA = {
 
 export function SesionModal({
   sessionId,
-  puedeGestionarSalones,
   onCerrar,
   onEditar,
 }: {
   sessionId: string;
-  /** `salones.gestionar`: solo coordinación cambia guía y suspende. */
-  puedeGestionarSalones: boolean;
   onCerrar: () => void;
   /**
    * Abre el formulario en modo edición. Solo llega con `eventos.crear`, y solo
@@ -219,6 +218,9 @@ export function SesionModal({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // Cada acción con su OPCIÓN (Roles › Académica › Calendario); el servidor
+  // exige lo mismo.
+  const { puede } = usePermisos();
 
   // Alumno abierto en la segunda caja + su ficha en edición.
   const [alumno, setAlumno] = useState<Fila | null>(null);
@@ -747,7 +749,7 @@ export function SesionModal({
                       </span>
                     )}
                   </span>
-                  {puedeGestionarSalones && (
+                  {puede("op.calendario.cambiar_guia") && (
                     <button
                       type="button"
                       style={{ ...boton, padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
@@ -763,7 +765,7 @@ export function SesionModal({
                 </span>
               </div>
             )}
-            {puedeGestionarSalones && (
+            {puede("op.calendario.cambiar_guia") && (
               <>
                 {cambiandoGuia && (
                   <div
@@ -830,16 +832,18 @@ export function SesionModal({
 
           {/* ── Acciones ────────────────────────────────────────── */}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              style={botonPrimario}
-              disabled={ocupado || cerrada || sesion?.cancelada === true}
-              title={sesion?.cancelada === true ? "La sesión está cancelada" : undefined}
-              onClick={abrirRegistro}
-            >
-              ✔ Registrar sesión
-            </button>
-            {puedeGestionarSalones && cerrada && (
+            {puede("op.calendario.registrar") && (
+              <button
+                type="button"
+                style={botonPrimario}
+                disabled={ocupado || cerrada || sesion?.cancelada === true}
+                title={sesion?.cancelada === true ? "La sesión está cancelada" : undefined}
+                onClick={abrirRegistro}
+              >
+                ✔ Registrar sesión
+              </button>
+            )}
+            {puede("op.calendario.reabrir") && cerrada && (
               <button
                 type="button"
                 style={boton}
@@ -864,14 +868,16 @@ export function SesionModal({
                 🔁 {pendiente !== null ? "Repetición solicitada" : "Solicitar repetir sesión"}
               </button>
             )}
-            <button
-              type="button"
-              style={{ ...boton, background: abriendoMision ? "#eef2ff" : "white" }}
-              disabled={ocupado}
-              onClick={() => void abrirPanelMision()}
-            >
-              🔓 Abrir misión
-            </button>
+            {puede("op.calendario.misiones") && (
+              <button
+                type="button"
+                style={{ ...boton, background: abriendoMision ? "#eef2ff" : "white" }}
+                disabled={ocupado}
+                onClick={() => void abrirPanelMision()}
+              >
+                🔓 Abrir misión
+              </button>
+            )}
             {onEditar !== undefined && sesion !== null && sesion.esEvento && !cerrada && (
               <button
                 type="button"
@@ -897,7 +903,7 @@ export function SesionModal({
                 ✏️ Editar evento
               </button>
             )}
-            {puedeGestionarSalones && (
+            {puede("op.calendario.suspender") && (
               <button
                 type="button"
                 style={boton}
@@ -908,27 +914,37 @@ export function SesionModal({
               </button>
             )}
             <span style={{ flex: 1 }} />
-            <button
-              type="button"
-              style={{ ...boton, background: pestana === "material_usuario" ? "#eef2ff" : "white" }}
-              onClick={() => void abrirContenido("material_usuario")}
-            >
-              📚 Libros
-            </button>
-            <button
-              type="button"
-              style={{ ...boton, background: pestana === "material_guia" ? "#eef2ff" : "white" }}
-              onClick={() => void abrirContenido("material_guia")}
-            >
-              📖 Material
-            </button>
-            <button
-              type="button"
-              style={{ ...boton, background: pestana === "recursos" ? "#eef2ff" : "white" }}
-              onClick={() => void abrirContenido("recursos")}
-            >
-              🔗 Recursos
-            </button>
+            {puede("op.calendario.contenido") && (
+              <>
+                <button
+                  type="button"
+                  style={{
+                    ...boton,
+                    background: pestana === "material_usuario" ? "#eef2ff" : "white",
+                  }}
+                  onClick={() => void abrirContenido("material_usuario")}
+                >
+                  📚 Libros
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...boton,
+                    background: pestana === "material_guia" ? "#eef2ff" : "white",
+                  }}
+                  onClick={() => void abrirContenido("material_guia")}
+                >
+                  📖 Material
+                </button>
+                <button
+                  type="button"
+                  style={{ ...boton, background: pestana === "recursos" ? "#eef2ff" : "white" }}
+                  onClick={() => void abrirContenido("recursos")}
+                >
+                  🔗 Recursos
+                </button>
+              </>
+            )}
           </div>
 
           {abriendoMision && (
@@ -1731,20 +1747,23 @@ export function SesionModal({
                       flexWrap: "wrap",
                     }}
                   >
-                    <button
-                      type="button"
-                      disabled={ocupado || sesion?.cancelada === true}
-                      onClick={() => setReportando(true)}
-                      style={{
-                        ...boton,
-                        alignSelf: "flex-start",
-                        background: casoDe(alumno.childPersonId) !== null ? "#ffebee" : "white",
-                        borderColor: casoDe(alumno.childPersonId) !== null ? "#c62828" : "#e3e7f0",
-                        color: casoDe(alumno.childPersonId) !== null ? "#c62828" : "inherit",
-                      }}
-                    >
-                      ⚠️ Requiere atención
-                    </button>
+                    <SoloSi op="op.calendario.reportar_caso">
+                      <button
+                        type="button"
+                        disabled={ocupado || sesion?.cancelada === true}
+                        onClick={() => setReportando(true)}
+                        style={{
+                          ...boton,
+                          alignSelf: "flex-start",
+                          background: casoDe(alumno.childPersonId) !== null ? "#ffebee" : "white",
+                          borderColor:
+                            casoDe(alumno.childPersonId) !== null ? "#c62828" : "#e3e7f0",
+                          color: casoDe(alumno.childPersonId) !== null ? "#c62828" : "inherit",
+                        }}
+                      >
+                        ⚠️ Requiere atención
+                      </button>
+                    </SoloSi>
                     {casoDe(alumno.childPersonId) !== null && (
                       <span style={{ fontSize: "0.8rem", color: "#c62828", fontWeight: 600 }}>
                         Caso {casoDe(alumno.childPersonId)?.codigo} reportado en esta sesión
@@ -1752,14 +1771,16 @@ export function SesionModal({
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    style={botonPrimario}
-                    disabled={ocupado}
-                    onClick={() => void guardarRegistro()}
-                  >
-                    💾 Guardar registro
-                  </button>
+                  {puede("op.calendario.asistencia") && (
+                    <button
+                      type="button"
+                      style={botonPrimario}
+                      disabled={ocupado}
+                      onClick={() => void guardarRegistro()}
+                    >
+                      💾 Guardar registro
+                    </button>
+                  )}
                 </div>
               )}
             </section>

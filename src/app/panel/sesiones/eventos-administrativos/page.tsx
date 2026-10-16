@@ -3,6 +3,8 @@
 import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Eventos ADMINISTRATIVOS: reuniones, capacitaciones y talleres internos cuya
@@ -84,7 +86,7 @@ function mesActual(): { desde: string; hasta: string } {
   return { desde: iso(new Date(y, m, 1)), hasta: iso(new Date(y, m + 1, 0)) };
 }
 
-export default function EventosAdministrativosPage() {
+function EventosAdministrativosPageContenido() {
   const inicial = mesActual();
   const [desde, setDesde] = useState(inicial.desde);
   const [hasta, setHasta] = useState(inicial.hasta);
@@ -323,23 +325,25 @@ export default function EventosAdministrativosPage() {
                     )}
                   </td>
                   <td style={{ ...celda, textAlign: "right", whiteSpace: "nowrap" }}>
-                    <button
-                      type="button"
-                      onClick={() => void abrirLista(e)}
-                      style={{
-                        padding: "0.35rem 0.8rem",
-                        borderRadius: "0.5rem",
-                        border: "none",
-                        background: "var(--lgs-azul)",
-                        color: "white",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        fontSize: "0.78rem",
-                        marginRight: "0.5rem",
-                      }}
-                    >
-                      Pasar lista
-                    </button>
+                    <SoloSi op="op.sesiones.eventos_admin_lista">
+                      <button
+                        type="button"
+                        onClick={() => void abrirLista(e)}
+                        style={{
+                          padding: "0.35rem 0.8rem",
+                          borderRadius: "0.5rem",
+                          border: "none",
+                          background: "var(--lgs-azul)",
+                          color: "white",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontSize: "0.78rem",
+                          marginRight: "0.5rem",
+                        }}
+                      >
+                        Pasar lista
+                      </button>
+                    </SoloSi>
                     <button
                       type="button"
                       onClick={() => setAbierto(abierto === e.id ? null : e.id)}
@@ -531,5 +535,14 @@ export default function EventosAdministrativosPage() {
         </div>
       )}
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function EventosAdministrativosPage() {
+  return (
+    <ConOpcion op="op.sesiones.eventos_admin" volver="/panel/sesiones">
+      <EventosAdministrativosPageContenido />
+    </ConOpcion>
   );
 }

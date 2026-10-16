@@ -62,6 +62,7 @@ export const videosLibroListarHandler = handlerWithAuth(async (request, auth) =>
 export const videosLibroSubirHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.videos_subir");
   const form = await request.formData().catch(() => null);
   const archivo = form?.get("archivo");
   if (form === null || !(archivo instanceof File)) {
@@ -90,6 +91,7 @@ export const videosLibroSubirHandler = handlerWithAuth(async (request, auth) => 
 export const videoLibroConfirmarHandler = handlerWithAuth(async (_request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.videos_subir");
   const id = uuid(await param(context, "id"));
   return json(await confirmarVideoLibro({ actorUserId: auth.userId, id }));
 });
@@ -98,6 +100,7 @@ export const videoLibroConfirmarHandler = handlerWithAuth(async (_request, auth,
 export const videoLibroEliminarHandler = handlerWithAuth(async (_request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.mant.videos_subir");
   const id = uuid(await param(context, "id"));
   await eliminarVideoLibro({ actorUserId: auth.userId, id });
   return json({ ok: true });

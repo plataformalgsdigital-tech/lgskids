@@ -16,6 +16,7 @@ async function exigir(userId: string) {
   const profile = await getAccessProfile(userId);
   profile.requirePermission(PERMISOS.MENSAJES_ENVIAR);
   profile.requirePermission(PERMISOS.PERSONAS_VER);
+  profile.requireOpcion("op.servicio.whatsapp_inasistencia");
 }
 
 export const GET = handlerWithAuth(async (_request, auth, context) => {

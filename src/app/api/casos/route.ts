@@ -43,5 +43,13 @@ export const GET = handlerWithAuth(async (request, auth) => {
     tema: q.tema ?? null,
     origen: q.origen ?? null,
   });
-  return json({ ...r, puedeGestionar: profile.hasPermission(PERMISOS.CASOS_GESTIONAR) });
+  return json({
+    ...r,
+    puedeGestionar: profile.hasPermission(PERMISOS.CASOS_GESTIONAR),
+    // Cada acción con su opción (Roles › Servicio › Casos de atención).
+    puedeAdicionar: profile.hasPermission("op.casos.adicionar"),
+    puedeAsignar: profile.hasPermission("op.casos.asignar"),
+    puedeCerrar: profile.hasPermission("op.casos.cerrar"),
+    puedeCsv: profile.hasPermission("op.casos.csv"),
+  });
 });

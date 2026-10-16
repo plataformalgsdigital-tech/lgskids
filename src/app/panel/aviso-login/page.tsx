@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Aviso de la pantalla de login: subir/cambiar la imagen y prenderla o
@@ -137,22 +138,24 @@ export default function AvisoLoginPage() {
               : "Nadie lo ve, y la imagen tampoco queda expuesta."}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={ocupado}
-          onClick={() => void cambiarActivo(!encendido)}
-          style={{
-            padding: "0.6rem 1.2rem",
-            borderRadius: "0.6rem",
-            border: "none",
-            background: encendido ? "#c62828" : "var(--lgs-verde)",
-            color: "white",
-            fontWeight: 700,
-            cursor: ocupado ? "wait" : "pointer",
-          }}
-        >
-          {encendido ? "Apagar aviso" : "Prender aviso"}
-        </button>
+        <SoloSi op="op.admin.aviso_login">
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => void cambiarActivo(!encendido)}
+            style={{
+              padding: "0.6rem 1.2rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background: encendido ? "#c62828" : "var(--lgs-verde)",
+              color: "white",
+              fontWeight: 700,
+              cursor: ocupado ? "wait" : "pointer",
+            }}
+          >
+            {encendido ? "Apagar aviso" : "Prender aviso"}
+          </button>
+        </SoloSi>
       </section>
 
       <section style={{ border: "1px solid #e3e7f0", borderRadius: "0.9rem", padding: "1.25rem" }}>
@@ -162,27 +165,29 @@ export default function AvisoLoginPage() {
           que quieras (se recomienda vertical u horizontal cerrada, no muy alargada).
         </p>
 
-        <label
-          style={{
-            display: "inline-block",
-            padding: "0.6rem 1.1rem",
-            borderRadius: "0.6rem",
-            border: "1.5px solid var(--lgs-azul)",
-            color: "var(--lgs-azul)",
-            fontWeight: 700,
-            cursor: ocupado ? "wait" : "pointer",
-            marginBottom: "1rem",
-          }}
-        >
-          {estado?.url !== null && estado?.url !== undefined ? "Cambiar imagen" : "Subir imagen"}
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={ocupado}
-            onChange={(e) => void subir(e)}
-            style={{ display: "none" }}
-          />
-        </label>
+        <SoloSi op="op.admin.aviso_login">
+          <label
+            style={{
+              display: "inline-block",
+              padding: "0.6rem 1.1rem",
+              borderRadius: "0.6rem",
+              border: "1.5px solid var(--lgs-azul)",
+              color: "var(--lgs-azul)",
+              fontWeight: 700,
+              cursor: ocupado ? "wait" : "pointer",
+              marginBottom: "1rem",
+            }}
+          >
+            {estado?.url !== null && estado?.url !== undefined ? "Cambiar imagen" : "Subir imagen"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={ocupado}
+              onChange={(e) => void subir(e)}
+              style={{ display: "none" }}
+            />
+          </label>
+        </SoloSi>
 
         {estado?.url !== null && estado?.url !== undefined ? (
           <div>

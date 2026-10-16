@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { ConOpcion } from "@/ui/ConOpcion";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Colocar los JUEGOS de una unidad sobre su lámina.
@@ -67,7 +69,7 @@ const input: CSSProperties = {
 };
 const rotulo: CSSProperties = { fontSize: "0.78rem", fontWeight: 600 };
 
-export default function JuegosUnidadPage() {
+function JuegosUnidadPageContenido() {
   const [curso, setCurso] = useState("JUNIOR");
   const [nivel, setNivel] = useState("ROOKIE");
   const [unidad, setUnidad] = useState(1);
@@ -394,23 +396,25 @@ export default function JuegosUnidadPage() {
         )}
 
         {juegos.length > 0 && (
-          <button
-            type="button"
-            onClick={() => void guardar()}
-            disabled={ocupado}
-            style={{
-              marginTop: "0.9rem",
-              padding: "0.55rem 1.2rem",
-              borderRadius: "0.6rem",
-              border: "none",
-              background: "var(--lgs-azul)",
-              color: "white",
-              fontWeight: 700,
-              cursor: ocupado ? "wait" : "pointer",
-            }}
-          >
-            {ocupado ? "Guardando…" : "💾 Guardar posiciones"}
-          </button>
+          <SoloSi op="op.mant.juegos_editar">
+            <button
+              type="button"
+              onClick={() => void guardar()}
+              disabled={ocupado}
+              style={{
+                marginTop: "0.9rem",
+                padding: "0.55rem 1.2rem",
+                borderRadius: "0.6rem",
+                border: "none",
+                background: "var(--lgs-azul)",
+                color: "white",
+                fontWeight: 700,
+                cursor: ocupado ? "wait" : "pointer",
+              }}
+            >
+              {ocupado ? "Guardando…" : "💾 Guardar posiciones"}
+            </button>
+          </SoloSi>
         )}
       </section>
 
@@ -529,5 +533,14 @@ export default function JuegosUnidadPage() {
         )}
       </section>
     </main>
+  );
+}
+
+/** La página es una opción de Roles: sin ella, "No tienes acceso". */
+export default function JuegosUnidadPage() {
+  return (
+    <ConOpcion op="op.mant.juegos" volver="/panel/mantenimiento-cursos">
+      <JuegosUnidadPageContenido />
+    </ConOpcion>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Fichas de los guías: datos de contacto y su sala de Zoom.
@@ -565,62 +566,70 @@ export default function GuiasPage() {
                 )}
 
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => void emitirEnlace()}
-                    disabled={ocupado}
-                    style={{
-                      padding: "0.5rem 1rem",
-                      borderRadius: "0.5rem",
-                      border: "1.5px solid var(--lgs-azul)",
-                      background: "white",
-                      color: "var(--lgs-azul-oscuro)",
-                      fontWeight: 700,
-                      cursor: ocupado ? "wait" : "pointer",
-                      fontSize: "0.82rem",
-                    }}
-                  >
-                    {estadoSel?.estado === "VIGENTE" ? "↻ Generar uno nuevo" : "🔗 Generar enlace"}
-                  </button>
-                  {estadoSel?.estado === "VIGENTE" && (
+                  <SoloSi op="op.guias.enlace">
                     <button
                       type="button"
-                      onClick={() => void revocarEnlace()}
+                      onClick={() => void emitirEnlace()}
                       disabled={ocupado}
                       style={{
                         padding: "0.5rem 1rem",
                         borderRadius: "0.5rem",
-                        border: "1.5px solid #e0e4ee",
+                        border: "1.5px solid var(--lgs-azul)",
                         background: "white",
-                        color: "#8a2020",
+                        color: "var(--lgs-azul-oscuro)",
                         fontWeight: 700,
                         cursor: ocupado ? "wait" : "pointer",
                         fontSize: "0.82rem",
                       }}
                     >
-                      Revocar
+                      {estadoSel?.estado === "VIGENTE"
+                        ? "↻ Generar uno nuevo"
+                        : "🔗 Generar enlace"}
                     </button>
+                  </SoloSi>
+                  {estadoSel?.estado === "VIGENTE" && (
+                    <SoloSi op="op.guias.enlace">
+                      <button
+                        type="button"
+                        onClick={() => void revocarEnlace()}
+                        disabled={ocupado}
+                        style={{
+                          padding: "0.5rem 1rem",
+                          borderRadius: "0.5rem",
+                          border: "1.5px solid #e0e4ee",
+                          background: "white",
+                          color: "#8a2020",
+                          fontWeight: 700,
+                          cursor: ocupado ? "wait" : "pointer",
+                          fontSize: "0.82rem",
+                        }}
+                      >
+                        Revocar
+                      </button>
+                    </SoloSi>
                   )}
                 </div>
               </section>
 
-              <button
-                type="button"
-                onClick={() => void guardar()}
-                disabled={ocupado}
-                style={{
-                  alignSelf: "flex-start",
-                  padding: "0.6rem 1.2rem",
-                  borderRadius: "0.6rem",
-                  border: "none",
-                  background: "var(--lgs-azul)",
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: ocupado ? "wait" : "pointer",
-                }}
-              >
-                {ocupado ? "Guardando…" : "💾 Guardar ficha"}
-              </button>
+              <SoloSi op="op.guias.ficha_editar">
+                <button
+                  type="button"
+                  onClick={() => void guardar()}
+                  disabled={ocupado}
+                  style={{
+                    alignSelf: "flex-start",
+                    padding: "0.6rem 1.2rem",
+                    borderRadius: "0.6rem",
+                    border: "none",
+                    background: "var(--lgs-azul)",
+                    color: "white",
+                    fontWeight: 700,
+                    cursor: ocupado ? "wait" : "pointer",
+                  }}
+                >
+                  {ocupado ? "Guardando…" : "💾 Guardar ficha"}
+                </button>
+              </SoloSi>
             </div>
           )}
         </section>

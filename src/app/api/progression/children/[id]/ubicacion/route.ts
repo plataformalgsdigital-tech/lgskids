@@ -20,6 +20,7 @@ const schema = z.object({
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.MATRICULAS_GESTIONAR);
+  profile.requireOpcion("op.kids.academic_change");
   const params = await context.params;
   const childPersonId = z.uuid().parse(params["id"]);
   const body = schema.parse(await request.json());

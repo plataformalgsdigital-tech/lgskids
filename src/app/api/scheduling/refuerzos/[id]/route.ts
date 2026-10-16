@@ -31,6 +31,7 @@ const cuerpo = z.object({
 export const POST = handlerWithAuth(async (request, auth, context) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.SALONES_GESTIONAR);
+  profile.requireOpcion("op.sesiones.refuerzos");
 
   const { id } = (await context.params) as { id?: string };
   if (typeof id !== "string" || id === "") {

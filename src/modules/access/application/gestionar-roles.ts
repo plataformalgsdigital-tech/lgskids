@@ -69,7 +69,16 @@ export interface PermisosDeRol {
    * en árbol. Viaja desde el servidor: SECCIONES_MENU es la única fuente y el
    * cliente no la vuelve a declarar.
    */
-  secciones: { etiqueta: string; permiso: string; hijos: string[] }[];
+  secciones: {
+    etiqueta: string;
+    permiso: string;
+    /** Opción del menú y, debajo, las opciones de su pantalla (3er nivel). */
+    hijos: {
+      etiqueta: string;
+      permiso: string;
+      opciones: { etiqueta: string; permiso: string }[];
+    }[];
+  }[];
 }
 
 /** Catálogo completo con marca de cuáles tiene el rol. */
@@ -88,7 +97,11 @@ export async function permisosDeRol(roleCode: string): Promise<PermisosDeRol> {
     secciones: SECCIONES_MENU.map((s) => ({
       etiqueta: s.etiqueta,
       permiso: s.permiso as string,
-      hijos: s.hijos.map((h) => h.permiso as string),
+      hijos: s.hijos.map((h) => ({
+        etiqueta: h.etiqueta,
+        permiso: h.permiso as string,
+        opciones: h.opciones,
+      })),
     })),
   };
 }

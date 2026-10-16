@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { descargarCsv } from "@/ui/csv";
 import { numeroContrato } from "@/ui/numero-contrato";
+import { SoloSi } from "@/ui/SoloSi";
 
 /**
  * Servicio › Usuarios sin perfil creado: los niños con contrato aprobado (ya
@@ -221,21 +222,23 @@ export default function SinPerfilPage() {
         }}
       >
         <h1 style={{ fontSize: "1.6rem" }}>Usuarios sin perfil creado</h1>
-        <button
-          type="button"
-          onClick={() => exportar(visibles)}
-          disabled={visibles.length === 0}
-          style={{
-            padding: "0.55rem 1rem",
-            borderRadius: "0.6rem",
-            border: "1px solid #e3e7f0",
-            background: "white",
-            fontWeight: 700,
-            cursor: visibles.length > 0 ? "pointer" : "default",
-          }}
-        >
-          ⬇ Descargar CSV
-        </button>
+        <SoloSi op="op.servicio.sin_perfil_csv">
+          <button
+            type="button"
+            onClick={() => exportar(visibles)}
+            disabled={visibles.length === 0}
+            style={{
+              padding: "0.55rem 1rem",
+              borderRadius: "0.6rem",
+              border: "1px solid #e3e7f0",
+              background: "white",
+              fontWeight: 700,
+              cursor: visibles.length > 0 ? "pointer" : "default",
+            }}
+          >
+            ⬇ Descargar CSV
+          </button>
+        </SoloSi>
       </div>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem", marginTop: "0.3rem" }}>
         Niños con contrato aprobado —ya tienen usuario— que todavía no crearon su perfil. El enlace

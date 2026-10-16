@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { usePermisos } from "@/ui/permisos";
 import { AcademicChangeModal } from "./AcademicChangeModal";
 import { CURSO_UI, ubicacionActual, type Progreso } from "./ubicacion";
 
@@ -123,6 +124,8 @@ export function AcademicInfo(props: {
     null,
   );
   const [f, setF] = useState({ desde: "", hasta: "", estado: "", guia: "" });
+  // Academic Change y marcar asistencia: cada uno con su opción en Roles.
+  const { puede } = usePermisos();
 
   const cargar = useCallback(async () => {
     const [rp, ra] = await Promise.all([
@@ -212,7 +215,7 @@ export function AcademicInfo(props: {
           }}
         >
           <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Ubicación académica</h2>
-          {props.contractId !== null && (
+          {props.contractId !== null && puede("op.kids.academic_change") && (
             <button
               type="button"
               onClick={() => {
@@ -498,7 +501,7 @@ export function AcademicInfo(props: {
                         )}
                       </td>
                       <td style={td}>
-                        {!x.editable ? (
+                        {!x.editable || !puede("op.calendario.asistencia") ? (
                           <span
                             style={{ fontSize: "0.72rem", color: "var(--texto-suave)" }}
                             title="Ya no está en ese salón: su lista es la del salón actual."

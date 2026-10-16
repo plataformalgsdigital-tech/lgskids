@@ -84,7 +84,11 @@ export const meHandler = handlerWithAuth(async (_request, auth) => {
             tieneFoto: quien.tieneFoto,
           },
     roles: profile.roles,
-    permisos: profile.permissions,
+    // Con la regla de las opciones aplicada: una `op.*` sin su permiso base no
+    // viaja, así la pantalla no muestra un botón que el servidor rechazaría.
+    permisos: profile.permissions.filter((p) =>
+      profile.hasPermission(p.code, p.countryCode ?? undefined),
+    ),
     paises: profile.countryScope,
   });
 });
