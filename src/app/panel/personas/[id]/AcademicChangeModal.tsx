@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { apiFetch } from "@/ui/api-fetch";
 import { resumenHorario, type SlotResumen } from "@/ui/horario";
 import { usePermisos } from "@/ui/permisos";
+import { AgendarPanel } from "./AgendarPanel";
 
 /**
  * ACADEMIC CHANGE. Cada opción llama al camino que YA existe y cuida sus
@@ -50,7 +51,7 @@ interface Opciones {
   niveles: Record<string, Nivel[]>;
 }
 
-type Opcion = "CURSO" | "AJUSTE";
+type Opcion = "CURSO" | "AJUSTE" | "AGENDAR";
 type Movimiento = "SALON" | "PROMOVER" | "DEGRADAR";
 
 const CURSO_UI: Record<string, string> = { JUNIOR: "Junior (6–9)", YOUNGSTER: "Youngster (10–13)" };
@@ -367,7 +368,17 @@ export function AcademicChangeModal(props: {
                 "2. Ajuste",
                 "Otro nivel o lección en su mismo curso y salón (p. ej. alinear a quien entró tarde).",
               )}
+              {puede("op.kids.agendar") &&
+                tituloOpcion(
+                  "AGENDAR",
+                  "3. Agendar",
+                  "Sesión extra, club, taller, clase regular de otro salón o Welcome.",
+                )}
             </div>
+
+            {opcion === "AGENDAR" && (
+              <AgendarPanel childPersonId={props.childPersonId} nombre={props.nombre} />
+            )}
 
             {opcion === "CURSO" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
@@ -504,7 +515,7 @@ export function AcademicChangeModal(props: {
               </div>
             )}
 
-            {opcion !== null && (
+            {opcion !== null && opcion !== "AGENDAR" && (
               <Campo etiqueta="Motivo (queda en la auditoría)">
                 <input
                   value={motivo}
@@ -516,7 +527,7 @@ export function AcademicChangeModal(props: {
               </Campo>
             )}
 
-            {opcion !== null && (
+            {opcion !== null && opcion !== "AGENDAR" && (
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
                 {faltante !== null && (
                   <span

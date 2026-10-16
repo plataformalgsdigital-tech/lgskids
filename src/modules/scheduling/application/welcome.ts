@@ -461,6 +461,11 @@ export async function reservarWelcomeTx(
     nivel: string;
     /** null = lo agendó el propio niño desde su enlace. */
     agendadoPor: string | null;
+    /**
+     * Quién autorizó agendarlo LLENO (Academic management › Agendar, con el
+     * permiso de sobrecupo). Sin esto, lleno = rechazo.
+     */
+    sobrecupoAutorizadoPor?: string | null;
   },
 ): Promise<{ reservaId: string; startsAt: string }> {
   const bloqueado = await queryOne<{ id: string }>(
@@ -513,8 +518,12 @@ export async function reservarWelcomeTx(
       `El niño ya usó sus ${String(MAX_INTENTOS_WELCOME)} Welcome: corresponde enviarle el video de bienvenida.`,
     );
   }
-  if (cuposLibres(w.limite, w.inscritos) === 0) {
-    throw new ConflictError("Ese Welcome se llenó: elige otro horario.");
+  const sobrecupo = input.sobrecupoAutorizadoPor ?? null;
+  if (cuposLibres(w.limite, w.inscritos) === 0 && sobrecupo === null) {
+    // Los detalles le permiten a Agendar ofrecer el sobrecupo a quien puede autorizarlo.
+    throw new ConflictError("Ese Welcome se llenó: elige otro horario.", {
+      details: { tipo: "sobrecupo", limite: w.limite, ocupados: w.inscritos },
+    });
   }
   if (actual !== null) {
     // Si el Welcome que tenía YA PASÓ (faltó), queda REAGENDADA: sigue en su
@@ -530,9 +539,16 @@ export async function reservarWelcomeTx(
   }
   const reservaId = newId();
   await execute(
-    `INSERT INTO scheduling_welcome_reserva (id, welcome_id, child_person_id, agendado_por)
-     VALUES ($1, $2, $3, $4)`,
-    [reservaId, input.welcomeId, input.childPersonId, input.agendadoPor],
+    `INSERT INTO scheduling_welcome_reserva
+       (id, welcome_id, child_person_id, agendado_por, sobrecupo_autorizado_por)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [
+      reservaId,
+      input.welcomeId,
+      input.childPersonId,
+      input.agendadoPor,
+      cuposLibres(w.limite, w.inscritos) === 0 ? sobrecupo : null,
+    ],
     tx,
   );
   return { reservaId, startsAt: w.startsAt };

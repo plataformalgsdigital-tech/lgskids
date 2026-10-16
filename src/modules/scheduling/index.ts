@@ -96,7 +96,22 @@ export {
   fotoDeGuia,
   MAX_SALONES_COMPARTIDOS,
   DURACIONES_TALLER,
+  ESQUEMA_APERTURA,
 } from "./application/crear-evento";
+export type { AperturaEvento } from "./application/crear-evento";
+export {
+  opcionesAgenda,
+  agendarNino,
+  agendadosDeNino,
+  cancelarAgendado,
+} from "./application/agendar";
+export type { OpcionAgenda, Agendado, ContextoNino } from "./application/agendar";
+export {
+  TIPOS_AGENDA,
+  ETIQUETA_TIPO_AGENDA,
+  excesoAlAgendar,
+  type TipoAgenda,
+} from "./domain/agenda";
 export { crearGuia, MIMES_FOTO_GUIA } from "./application/alta-guia";
 export type { DatosAltaGuia } from "./application/alta-guia";
 export {

@@ -386,15 +386,20 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
        LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
        LEFT JOIN LATERAL (
          SELECT s.starts_at, s.tipo::text AS tipo, s.duracion_min,
-                COALESCE(NULLIF(TRIM(sg.zoom_url), ''), cl.meeting_url) AS url,
+                COALESCE(NULLIF(TRIM(sg.zoom_url), ''), scl.meeting_url) AS url,
                 COALESCE(NULLIF(TRIM(CONCAT_WS(' ', sg.nombres, sg.apellidos)), ''),
                          NULLIF(TRIM(CONCAT_WS(' ', spf.nombres, spf.apellidos)), ''),
                          su.username) AS guia
            FROM scheduling_session s
-           LEFT JOIN identity_user su ON su.id = COALESCE(s.guia_user_id, cl.guia_user_id)
+           JOIN scheduling_classroom scl ON scl.id = s.classroom_id
+           LEFT JOIN identity_user su ON su.id = COALESCE(s.guia_user_id, scl.guia_user_id)
            LEFT JOIN scheduling_guia sg ON sg.guia_user_id = su.id
            LEFT JOIN identity_perfil spf ON spf.user_id = su.id
-          WHERE s.classroom_id = cl.id
+          -- Su salón, o lo que se le AGENDÓ en otro (Academic management › Agendar).
+          WHERE (s.classroom_id = cl.id
+                 OR EXISTS (SELECT 1 FROM scheduling_agendado a
+                             WHERE a.child_person_id = p.id AND a.estado = 'ACTIVA'
+                               AND a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at))
             AND s.starts_at + make_interval(mins => s.duracion_min) > now()
             -- Cancelada sin reemplazo: no se dicta (mismo criterio que
             -- SQL_SESION_CANCELADA de scheduling, que people no puede importar).

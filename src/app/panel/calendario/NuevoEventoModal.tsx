@@ -53,6 +53,24 @@ interface CampaniaOpcion {
 }
 
 /**
+ * Sesión extra, club o taller ABIERTO a niños de otros salones (Academic
+ * management › Agendar): se les puede agendar si coinciden con su campaña,
+ * curso y salón; null = "Todos". Cerrado, su lista son solo sus salones.
+ */
+export interface AperturaEvento {
+  abierto: boolean;
+  campaignId: string | null;
+  curso: "JUNIOR" | "YOUNGSTER" | null;
+  classroomId: string | null;
+}
+export const APERTURA_CERRADA: AperturaEvento = {
+  abierto: false,
+  campaignId: null,
+  curso: null,
+  classroomId: null,
+};
+
+/**
  * Un evento YA creado que se abre para EDITAR. Cada clase guarda con su propia
  * ruta y conserva a sus inscritos (niños agendados, lista del salón o guías
  * convocados). El tipo no cambia de clase: un Welcome sigue siendo Welcome.
@@ -88,6 +106,7 @@ export type EventoEditable =
       observaciones: string | null;
       salon: string;
       compartido: boolean;
+      apertura: AperturaEvento;
     }
   | {
       clase: "admin";
@@ -250,6 +269,10 @@ export function NuevoEventoModal({
   // Welcome para niños que entran con el curso YA andando: no exige ser antes
   // del inicio. Se marca solo al elegir una campaña que ya no está en matrícula.
   const [enMarcha, setEnMarcha] = useState(editar?.clase === "welcome" ? editar.enMarcha : false);
+  // Sesión/Club/Taller abiertos a otros salones (Academic management › Agendar).
+  const [apertura, setApertura] = useState<AperturaEvento>(
+    editar?.clase === "suelto" ? editar.apertura : APERTURA_CERRADA,
+  );
 
   const cargarGuias = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/eventos");
@@ -400,6 +423,7 @@ export function NuevoEventoModal({
               limiteUsuarios: limite === "" ? null : Number(limite),
               guiaUserId,
               observaciones: observaciones.trim() === "" ? null : observaciones,
+              apertura,
             }
           : esAdmin
             ? {
@@ -428,6 +452,7 @@ export function NuevoEventoModal({
                 limiteUsuarios: limite === "" ? null : Number(limite),
                 guiaUserId,
                 observaciones: observaciones.trim() === "" ? null : observaciones,
+                apertura,
               };
       const base = esWelcome
         ? "/api/scheduling/welcomes"
@@ -890,6 +915,133 @@ export function NuevoEventoModal({
                   </span>
                 </span>
               </label>
+            </div>
+          )}
+
+          {/* Abierto a otros salones: lo agenda coordinación desde la ficha del
+              niño (Academic management › Agendar), si coincide con el alcance. */}
+          {!esAdmin && !esWelcome && (
+            <div
+              style={{
+                padding: "0.8rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1px solid #e3e7f0",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.6rem",
+              }}
+            >
+              <label
+                style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 700 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={apertura.abierto}
+                  onChange={(e) => setApertura({ ...apertura, abierto: e.target.checked })}
+                />
+                Abierto a niños de otros salones (se agendan desde su ficha)
+              </label>
+              {apertura.abierto && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(11rem, 1fr))",
+                    gap: "0.6rem",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      fontSize: "0.82rem",
+                    }}
+                  >
+                    <span style={{ fontWeight: 700 }}>Campaña</span>
+                    <select
+                      value={apertura.campaignId ?? ""}
+                      onChange={(e) =>
+                        setApertura({
+                          ...apertura,
+                          campaignId: e.target.value === "" ? null : e.target.value,
+                          classroomId: null,
+                        })
+                      }
+                      style={campo}
+                    >
+                      <option value="">Todas</option>
+                      {campaniasLista.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      fontSize: "0.82rem",
+                    }}
+                  >
+                    <span style={{ fontWeight: 700 }}>Curso</span>
+                    <select
+                      value={apertura.curso ?? ""}
+                      onChange={(e) =>
+                        setApertura({
+                          ...apertura,
+                          curso:
+                            e.target.value === "JUNIOR" || e.target.value === "YOUNGSTER"
+                              ? e.target.value
+                              : null,
+                          classroomId: null,
+                        })
+                      }
+                      style={campo}
+                    >
+                      <option value="">Todos</option>
+                      <option value="JUNIOR">Junior</option>
+                      <option value="YOUNGSTER">Youngster</option>
+                    </select>
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      fontSize: "0.82rem",
+                    }}
+                  >
+                    <span style={{ fontWeight: 700 }}>Salón</span>
+                    <select
+                      value={apertura.classroomId ?? ""}
+                      onChange={(e) =>
+                        setApertura({
+                          ...apertura,
+                          classroomId: e.target.value === "" ? null : e.target.value,
+                        })
+                      }
+                      style={campo}
+                    >
+                      <option value="">Todos</option>
+                      {salones
+                        .filter(
+                          (s) =>
+                            (apertura.campaignId === null ||
+                              s.campania ===
+                                campaniasLista.find((c) => c.id === apertura.campaignId)?.nombre) &&
+                            (apertura.curso === null || s.curso === apertura.curso),
+                        )
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.nombre}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+              )}
             </div>
           )}
 

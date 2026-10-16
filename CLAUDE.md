@@ -1915,6 +1915,50 @@ para niños de varios salones, países y campañas. Migración `20261009000000_w
   `matriculas.gestionar`): la MISMA regla y la MISMA reserva con bloqueo que el
   enlace, con `agendado_por` = quien lo hizo. Auditoría `scheduling.welcome_agendado`.
 
+## Agendar desde la ficha (Academic management, 2026-10-16)
+
+El botón **Academic Change** pasó a llamarse **Academic management** y ganó la opción
+**3. Agendar** (`AgendarPanel.tsx`): tipo → fecha (calendario) → lo que hay ese día →
+**resumen** → confirmar. Es la SEGUNDA excepción al modelo de cohortes, decidida por
+el negocio tras revisar MOSAICO y LGS: la lista de una clase sigue saliendo de las
+matrículas del salón, y agendar SUMA a un niño de OTRO salón a UNA sesión concreta.
+Migración `20261016000000_agendar`; núcleo en `scheduling/application/agendar.ts`,
+reglas puras en `domain/agenda.ts`, orquestación (alcance, matrícula, nivel) en
+`contracts/application/perfil-nino.ts`. Rutas `GET|POST /api/contracts/ninos/[id]/agenda`
+y `DELETE …/agenda/[agendadoId]`.
+
+- **Qué se le ofrece** (`sesionesElegibles`, UNA consulta para la lista y la reserva):
+  - **Sesión extra, Club, Taller**: eventos sueltos **ABIERTOS** cuyo alcance coincide
+    —`scheduling_session.abierto` + `alcance_campaign_id|curso|classroom_id`, NULL =
+    "Todos"—. Se marca al crear/editar el evento ("Abierto a niños de otros salones",
+    `AperturaEvento`). Un evento cerrado solo es de sus salones;
+  - **Clase regular**: una clase del horario de otro salón de su **MISMA campaña y
+    curso** (recuperación);
+  - **Welcome**: la misma regla y reserva de siempre (`reservarWelcomeTx`).
+  - Lo de SU salón ya lo tiene: sale "✓ ya en su lista". Un evento compartido (`grupo_id`)
+    es UNA opción, con el cupo sumado de sus salones.
+- **Se muestran los LLENOS** (marcados) y **los que CHOCAN** con lo que ya tiene a esa
+  hora (sus clases, lo agendado y su Welcome; `seSolapan`: tocarse no es pisarse). El
+  choque NO se puede agendar.
+- **Sobrecupo**: lleno → 409 con `details.tipo = "sobrecupo"`; el resumen avisa cuánto
+  quedaría por encima y solo quien tiene **`op.kids.agendar_sobrecupo`** marca
+  "Autorizo el sobrecupo" (leído de la SESIÓN, no del cuerpo; LGS lo tomaba del cuerpo y
+  se podía falsear). Esa opción nace SOLO para superadmin y admin (`OPCIONES_SOLO_ADMIN`
+  la saca de la matriz por base). Queda `sobrecupo_autorizado_por`. Agendar exige
+  `op.kids.agendar` (base `matriculas.gestionar`).
+- **Cupo sin carreras**: la reserva bloquea la sesión (y sus hermanas de grupo) con
+  `FOR UPDATE` y vuelve a comprobar regla, choque y cupo dentro de la transacción.
+- **`scheduling_agendado` se ata a (salón, instante), NO al id de la sesión**: la
+  regeneración del horario recrea las sesiones con ids nuevos. Si la hora desaparece
+  (suspensión), la reserva queda "la sesión ya no existe a esa hora". Editar un evento
+  muda a sus agendados a la hora nueva. Cancelar no borra (queda quién y cuándo).
+- **Dónde aparece el agendado**: en la lista de la sesión para pasar asistencia
+  (`getRosterConPais` con el instante; `marcarAsistencia` lo acepta, así que la regla 4
+  sigue igual), en las misiones, en reportar casos, en "Mis próximas clases" del niño
+  y en la caja "Siguiente clase" de su ficha. La lista lo marca "agendado (de otro salón)".
+- Auditoría `scheduling.nino_agendado` y `scheduling.agendado_cancelado`. Pruebas:
+  `scheduling/tests/agenda.test.ts` y `contracts/tests/agendar-integration.test.ts`.
+
 ## Servicio › Welcome (como MOSAICO, 2026-10-14)
 
 El proceso de Servicio › Welcome Session de MOSAICO, ajustado a KIDS. Migración

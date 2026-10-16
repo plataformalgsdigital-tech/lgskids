@@ -65,6 +65,13 @@ export interface SessionInfo {
   grupoId: string | null;
   /** El guía la canceló y administración lo aprobó sin cubrirla: no se dicta. */
   cancelada: boolean;
+  /** Evento suelto abierto a otros salones (Agendar): su alcance; null = Todos. */
+  apertura: {
+    abierto: boolean;
+    campaignId: string | null;
+    curso: "JUNIOR" | "YOUNGSTER" | null;
+    classroomId: string | null;
+  };
 }
 
 /** Nombre COMPLETO del guía efectivo `g` (su ficha, la del staff o el usuario). */
@@ -94,7 +101,10 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             sec.leccion, sec.nivel AS "leccionNivel", ord.n::int AS "claseNumero",
             (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
             s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,
-            s.grupo_id AS "grupoId", ${SQL_SESION_CANCELADA("s")} AS cancelada
+            s.grupo_id AS "grupoId", ${SQL_SESION_CANCELADA("s")} AS cancelada,
+            json_build_object('abierto', s.abierto, 'campaignId', s.alcance_campaign_id,
+                              'curso', s.alcance_curso, 'classroomId', s.alcance_classroom_id)
+              AS apertura
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course co ON co.id = cl.course_id
@@ -192,20 +202,37 @@ export interface RosterConPais {
   apellidos: string;
   username: string | null;
   paisContrato: string;
+  /** Viene de OTRO salón: se le agendó esta sesión (Academic management › Agendar). */
+  agendado: boolean;
 }
 
-/** Roster DERIVADO de matrículas activas, con el país del contrato de cada niño. */
-export async function getRosterConPais(classroomId: string): Promise<RosterConPais[]> {
+/**
+ * Roster DERIVADO de matrículas activas, con el país del contrato de cada niño,
+ * MÁS los niños de otros salones agendados en ESTA sesión (salón + instante: la
+ * reserva sobrevive a la regeneración del horario). Sin `startsAt`, solo el salón.
+ */
+export async function getRosterConPais(
+  classroomId: string,
+  startsAt?: Date | string,
+): Promise<RosterConPais[]> {
   return queryRows<RosterConPais>(
-    `SELECT p.id AS "childPersonId", p.nombres, p.apellidos, u.username,
-            c.country_code AS "paisContrato"
-       FROM enrollment_enrollment e
-       JOIN people_person p ON p.id = e.child_person_id
-       JOIN contracts_contract c ON c.id = e.contract_id
-       LEFT JOIN identity_user u ON u.id = p.user_id
-      WHERE e.classroom_id = $1 AND e.estado = 'ACTIVA'
-      ORDER BY p.apellidos, p.nombres`,
-    [classroomId],
+    `SELECT * FROM (
+       SELECT p.id AS "childPersonId", p.nombres, p.apellidos, u.username,
+              c.country_code AS "paisContrato", false AS agendado
+         FROM enrollment_enrollment e
+         JOIN people_person p ON p.id = e.child_person_id
+         JOIN contracts_contract c ON c.id = e.contract_id
+         LEFT JOIN identity_user u ON u.id = p.user_id
+        WHERE e.classroom_id = $1 AND e.estado = 'ACTIVA'
+       UNION ALL
+       SELECT p.id, p.nombres, p.apellidos, u.username, p.country_code, true
+         FROM scheduling_agendado a
+         JOIN people_person p ON p.id = a.child_person_id
+         LEFT JOIN identity_user u ON u.id = p.user_id
+        WHERE a.classroom_id = $1 AND a.starts_at = $2 AND a.estado = 'ACTIVA'
+     ) r
+     ORDER BY r.apellidos, r.nombres`,
+    [classroomId, startsAt ?? null],
   );
 }
 

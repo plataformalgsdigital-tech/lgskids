@@ -50,6 +50,10 @@ export {
   opcionesWelcomeNino,
   agendarWelcomeNino,
   ninosSinPerfil,
+  opcionesAgendaNino,
+  agendarParaNino,
+  agendaDeNino,
+  cancelarAgendadoNino,
 } from "./application/perfil-nino";
 export type {
   FichaPerfil,

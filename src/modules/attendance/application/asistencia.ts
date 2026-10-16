@@ -21,6 +21,8 @@ export interface FilaLista {
   apellidos: string;
   username: string | null;
   paisContrato: string;
+  /** De OTRO salón: se le agendó esta sesión (Academic management › Agendar). */
+  agendado: boolean;
   /**
    * POLÍTICA DE FERIADOS (docs/operacion/politica-feriados-asistencia.md):
    * la fecha es feriado en el país del NIÑO (no en el calendario del salón,
@@ -120,7 +122,7 @@ export async function listaDeSesion(sessionId: string): Promise<ListaDeSesion> {
   const sesion = await getSessionInfo(sessionId);
   if (sesion === null) throw new NotFoundError("La sesión no existe.");
 
-  const roster = await getRosterConPais(sesion.classroomId);
+  const roster = await getRosterConPais(sesion.classroomId, sesion.startsAt);
   const feriados = await paisesConFeriado(sesion.fecha, [
     ...new Set(roster.map((r) => r.paisContrato)),
   ]);
@@ -184,7 +186,9 @@ export async function marcarAsistencia(input: {
     throw new ValidationError("La sesión está cancelada: no se pasa lista.");
   }
 
-  const roster = new Set((await getRosterConPais(sesion.classroomId)).map((r) => r.childPersonId));
+  const roster = new Set(
+    (await getRosterConPais(sesion.classroomId, sesion.startsAt)).map((r) => r.childPersonId),
+  );
   for (const marca of input.marcas) {
     if (!roster.has(marca.childPersonId)) {
       throw new ValidationError(

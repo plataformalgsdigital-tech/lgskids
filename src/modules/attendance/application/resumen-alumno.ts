@@ -129,7 +129,12 @@ export async function comentariosDeGuia(
  * —por defecto las DOS SEMANAS siguientes—, con el guía. Incluye TODOS los
  * tipos (sesiones y clubes/talleres); no filtra por tipo.
  */
-export async function agendaProximas(classroomId: string, dias = 14): Promise<EventoAgenda[]> {
+export async function agendaProximas(
+  classroomId: string,
+  dias = 14,
+  /** Con el niño, suma lo que se le AGENDÓ en otros salones (Academic management). */
+  childPersonId?: string,
+): Promise<EventoAgenda[]> {
   return queryRows<EventoAgenda>(
     `SELECT s.id AS "sessionId", s.tipo::text AS tipo, s.fecha::text AS fecha,
             s.starts_at AS "startsAt", s.duracion_min AS "duracionMin",
@@ -146,11 +151,14 @@ export async function agendaProximas(classroomId: string, dias = 14): Promise<Ev
        LEFT JOIN identity_user gu ON gu.id = COALESCE(s.guia_user_id, cl.guia_user_id)
        LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
        LEFT JOIN people_person gp ON gp.user_id = gu.id
-      WHERE s.classroom_id = $1
+      WHERE (s.classroom_id = $1
+             OR EXISTS (SELECT 1 FROM scheduling_agendado a
+                         WHERE a.child_person_id = $3 AND a.estado = 'ACTIVA'
+                           AND a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at))
         AND s.starts_at >= now()
         AND s.starts_at < now() + ($2 || ' days')::interval
       ORDER BY s.starts_at
       LIMIT 60`,
-    [classroomId, String(dias)],
+    [classroomId, String(dias), childPersonId ?? null],
   );
 }

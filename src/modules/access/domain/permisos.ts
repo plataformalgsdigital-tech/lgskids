@@ -1,4 +1,10 @@
-import { BASE_DE_OPCION, CODIGOS_OP, OPCIONES_MENU, type OpCode } from "./opciones";
+import {
+  BASE_DE_OPCION,
+  CODIGOS_OP,
+  OPCIONES_MENU,
+  OPCIONES_SOLO_ADMIN,
+  type OpCode,
+} from "./opciones";
 
 /**
  * Catálogo de permisos de la plataforma (Fase 3). Crece por fase.
@@ -97,7 +103,10 @@ function conOpciones(permisos: PermisoCode[]): PermisoCode[] {
   const tiene = new Set<string>(permisos);
   return [
     ...permisos,
-    ...CODIGOS_OP.filter((c) => (BASE_DE_OPCION.get(c) ?? []).every((b) => tiene.has(b))),
+    ...CODIGOS_OP.filter(
+      (c) =>
+        !OPCIONES_SOLO_ADMIN.has(c) && (BASE_DE_OPCION.get(c) ?? []).every((b) => tiene.has(b)),
+    ),
   ];
 }
 

@@ -199,6 +199,12 @@ export const OPCIONES_MENU = [
   op("menu.kids", "op.kids.academic_change", "Academic management (ajuste de nivel y lección)", [
     "matriculas.gestionar",
   ]),
+  op("menu.kids", "op.kids.agendar", "Agendar (sesión, club, taller, clase regular y Welcome)", [
+    "matriculas.gestionar",
+  ]),
+  op("menu.kids", "op.kids.agendar_sobrecupo", "Autorizar sobrecupo al agendar", [
+    "matriculas.gestionar",
+  ]),
   op("menu.kids", "op.kids.casos", "Ver los casos de atención del niño", ["casos.ver"]),
 
   // ── Operación › Contratos ─────────────────────────────────────────────
@@ -333,6 +339,13 @@ export const MAX_PERMISOS_POR_ROL = 1000;
 export const CODIGOS_OP: readonly OpCode[] = OPCIONES_MENU.map((o) => o.permiso).filter(
   (c): c is OpCode => c.startsWith("op."),
 );
+
+/**
+ * Opciones que NO se reparten a quien tiene su base: el negocio las reservó a
+ * superadmin y admin (la migración hace lo mismo). Se abren a otro rol
+ * marcándolas en Roles y permisos.
+ */
+export const OPCIONES_SOLO_ADMIN: ReadonlySet<string> = new Set(["op.kids.agendar_sobrecupo"]);
 
 export function esOpcion(code: string): boolean {
   return BASE_DE_OPCION.has(code);

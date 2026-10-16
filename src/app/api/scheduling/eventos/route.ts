@@ -3,6 +3,7 @@ import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
 import {
   DURACIONES_TALLER,
+  ESQUEMA_APERTURA,
   DURACION_ADMIN_MAX,
   DURACION_ADMIN_MIN,
   TIPOS_EVENTO_ADMIN,
@@ -43,6 +44,7 @@ const crearSchema = z.object({
   limiteUsuarios: z.number().int().min(1).max(200).nullish(),
   guiaUserId: z.uuid(),
   observaciones: z.string().max(1000).nullish(),
+  apertura: ESQUEMA_APERTURA.optional(),
 });
 
 /** POST — crea el evento (uno por salón si se comparte entre cursos). */
@@ -62,6 +64,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
     limiteUsuarios: body.limiteUsuarios ?? null,
     guiaUserId: body.guiaUserId,
     observaciones: body.observaciones ?? null,
+    ...(body.apertura !== undefined && { apertura: body.apertura }),
     ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
   });
   return json(resultado, { status: 201 });

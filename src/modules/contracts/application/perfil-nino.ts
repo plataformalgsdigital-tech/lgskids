@@ -4,9 +4,17 @@ import { fijarClaveNinoTx, problemaClaveNino } from "@/modules/identity";
 import { enviarEnlacePerfil } from "@/modules/notifications";
 import { progresoDeNino } from "@/modules/progression";
 import {
+  agendadosDeNino,
+  agendarNino,
+  cancelarAgendado,
+  opcionesAgenda,
   reservarWelcomeTx,
   welcomeDeNino,
   welcomesDisponibles,
+  type Agendado,
+  type ContextoNino,
+  type OpcionAgenda,
+  type TipoAgenda,
   type WelcomeDeNino,
   type WelcomeDisponible,
 } from "@/modules/scheduling";
@@ -485,6 +493,86 @@ export async function agendarWelcomeNino(input: {
     ip: input.ip ?? null,
   });
   return welcomeDeNino(input.childPersonId);
+}
+
+// —— Agendar (Academic management) ———————————————————————————————————————
+
+/** El niño visto desde Agendar: su salón y su nivel, o por qué no se puede. */
+async function contextoAgenda(
+  childPersonId: string,
+  countryScope: string[] | null,
+): Promise<ContextoNino> {
+  await exigirAlcance(childPersonId, countryScope);
+  const matricula = await matriculaDeNino(childPersonId);
+  if (matricula === null) throw new ConflictError("El niño no tiene matrícula activa.");
+  return {
+    childPersonId,
+    classroomId: matricula.classroomId,
+    nivel: await nivelDeNino(childPersonId),
+  };
+}
+
+/** Lo que se le puede agendar ese día, del tipo pedido (llenos y choques marcados). */
+export async function opcionesAgendaNino(input: {
+  childPersonId: string;
+  countryScope: string[] | null;
+  tipo: TipoAgenda;
+  fecha: string;
+}): Promise<OpcionAgenda[]> {
+  const nino = await contextoAgenda(input.childPersonId, input.countryScope);
+  return opcionesAgenda({ nino, tipo: input.tipo, fecha: input.fecha });
+}
+
+/** Agenda al niño (la regla, el cupo y el choque los vuelve a mirar `agendarNino`). */
+export async function agendarParaNino(input: {
+  actorUserId: string;
+  childPersonId: string;
+  countryScope: string[] | null;
+  tipo: TipoAgenda;
+  id: string;
+  autorizarSobrecupo: boolean;
+  puedeSobrecupo: boolean;
+  ip?: string | null;
+}): Promise<{ startsAt: string; sobrecupo: boolean }> {
+  const nino = await contextoAgenda(input.childPersonId, input.countryScope);
+  return agendarNino({
+    actorUserId: input.actorUserId,
+    nino,
+    tipo: input.tipo,
+    id: input.id,
+    autorizarSobrecupo: input.autorizarSobrecupo,
+    puedeSobrecupo: input.puedeSobrecupo,
+    ip: input.ip ?? null,
+  });
+}
+
+/** Lo agendado fuera de su salón y su Welcome, para la ficha. */
+export async function agendaDeNino(
+  childPersonId: string,
+  countryScope: string[] | null,
+): Promise<{ agendados: Agendado[]; welcome: WelcomeDeNino | null }> {
+  await exigirAlcance(childPersonId, countryScope);
+  const [agendados, welcome] = await Promise.all([
+    agendadosDeNino(childPersonId),
+    welcomeDeNino(childPersonId),
+  ]);
+  return { agendados, welcome };
+}
+
+export async function cancelarAgendadoNino(input: {
+  actorUserId: string;
+  childPersonId: string;
+  countryScope: string[] | null;
+  agendadoId: string;
+  ip?: string | null;
+}): Promise<void> {
+  await exigirAlcance(input.childPersonId, input.countryScope);
+  await cancelarAgendado({
+    actorUserId: input.actorUserId,
+    childPersonId: input.childPersonId,
+    agendadoId: input.agendadoId,
+    ip: input.ip ?? null,
+  });
 }
 
 /** Un niño con cuenta que todavía no creó su perfil (Servicio › Usuarios sin perfil). */

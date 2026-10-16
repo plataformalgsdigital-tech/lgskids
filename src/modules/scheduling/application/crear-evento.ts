@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { z } from "zod";
 import { registrarAuditoria } from "@/modules/audit";
 import { descargarArchivo, metaArchivo } from "@/modules/files";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
@@ -217,6 +218,33 @@ export async function guardarFichaGuia(input: {
   });
 }
 
+/**
+ * Un evento suelto ABIERTO admite niños de otros salones (Academic management ›
+ * Agendar) si coinciden con su campaña, curso y salón; null = "Todos". Cerrado,
+ * su lista son solo los niños de los salones donde se dicta.
+ */
+export interface AperturaEvento {
+  abierto: boolean;
+  campaignId: string | null;
+  curso: "JUNIOR" | "YOUNGSTER" | null;
+  classroomId: string | null;
+}
+
+const CERRADO: AperturaEvento = {
+  abierto: false,
+  campaignId: null,
+  curso: null,
+  classroomId: null,
+};
+
+/** La forma de la apertura en las rutas de crear y editar (null = "Todos"). */
+export const ESQUEMA_APERTURA = z.object({
+  abierto: z.boolean(),
+  campaignId: z.uuid().nullable(),
+  curso: z.enum(["JUNIOR", "YOUNGSTER"]).nullable(),
+  classroomId: z.uuid().nullable(),
+});
+
 export async function crearEvento(input: {
   actorUserId: string;
   /** Salones donde se dicta. Más de uno = evento compartido entre cursos. */
@@ -231,6 +259,8 @@ export async function crearEvento(input: {
   limiteUsuarios?: number | null;
   guiaUserId: string;
   observaciones?: string | null;
+  /** Abierto a niños de OTROS salones que coincidan con el alcance (Agendar). */
+  apertura?: AperturaEvento;
   ip?: string | null;
   /** Para crearlo dentro de una transacción ya abierta (aprobar un refuerzo). */
   client?: PoolClient;
@@ -271,6 +301,7 @@ export async function crearEvento(input: {
   // Un evento compartido es UNA clase dictada en varios salones: comparte
   // grupo para que el conteo del guía no la cuente varias veces.
   const grupoId = salones.length > 1 ? newId() : null;
+  const apertura = input.apertura ?? CERRADO;
   const creadas: EventoCreado["sesiones"] = [];
 
   const insertar = async (tx: PoolClient) => {
@@ -312,9 +343,10 @@ export async function crearEvento(input: {
       await execute(
         `INSERT INTO scheduling_session
            (id, classroom_id, slot_id, tipo, fecha, starts_at, duracion_min, numero,
-            guia_user_id, nivel, observaciones, limite_usuarios, grupo_id)
+            guia_user_id, nivel, observaciones, limite_usuarios, grupo_id,
+            abierto, alcance_campaign_id, alcance_curso, alcance_classroom_id)
          VALUES ($1, $2, NULL, $3::scheduling_slot_tipo, $4::date, $5, $6, 0,
-                 $7, $8, $9, $10, $11)`,
+                 $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           id,
           classroomId,
@@ -327,6 +359,10 @@ export async function crearEvento(input: {
           input.observaciones?.trim() === "" ? null : (input.observaciones ?? null),
           input.limiteUsuarios ?? salon.cupo,
           grupoId,
+          apertura.abierto,
+          apertura.abierto ? apertura.campaignId : null,
+          apertura.abierto ? apertura.curso : null,
+          apertura.abierto ? apertura.classroomId : null,
         ],
         tx,
       );
@@ -376,6 +412,8 @@ export async function editarEvento(input: {
   limiteUsuarios?: number | null;
   guiaUserId: string;
   observaciones?: string | null;
+  /** Sin esto, la apertura que tenía se conserva. */
+  apertura?: AperturaEvento;
   ip?: string | null;
 }): Promise<{ sesiones: number }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) {
@@ -466,6 +504,31 @@ export async function editarEvento(input: {
           input.observaciones?.trim() === "" ? null : (input.observaciones ?? null),
           input.limiteUsuarios ?? f.cupo,
         ],
+        tx,
+      );
+      if (input.apertura !== undefined) {
+        const a = input.apertura;
+        await execute(
+          `UPDATE scheduling_session
+              SET abierto = $2, alcance_campaign_id = $3, alcance_curso = $4,
+                  alcance_classroom_id = $5
+            WHERE id = $1`,
+          [
+            f.id,
+            a.abierto,
+            a.abierto ? a.campaignId : null,
+            a.abierto ? a.curso : null,
+            a.abierto ? a.classroomId : null,
+          ],
+          tx,
+        );
+      }
+      // Los niños agendados de otros salones van atados a (salón, instante):
+      // si el evento cambia de hora, se mudan con él.
+      await execute(
+        `UPDATE scheduling_agendado SET starts_at = $3
+          WHERE classroom_id = $1 AND starts_at = $2 AND estado = 'ACTIVA'`,
+        [f.classroomId, f.startsAt, startsAt],
         tx,
       );
       editadas++;

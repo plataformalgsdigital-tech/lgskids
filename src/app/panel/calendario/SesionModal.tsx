@@ -6,7 +6,7 @@ import { ZONA_CHILE, referenciaHoraria } from "@/ui/hora-paises";
 import { usePermisos } from "@/ui/permisos";
 import { ReportarCasoModal } from "../servicio/casos-atencion/ReportarCasoModal";
 import { CancelacionSesion } from "./CancelacionSesion";
-import type { EventoEditable } from "./NuevoEventoModal";
+import { APERTURA_CERRADA, type AperturaEvento, type EventoEditable } from "./NuevoEventoModal";
 import { SoloSi } from "@/ui/SoloSi";
 
 /**
@@ -60,6 +60,8 @@ interface Fila {
   apellidos: string;
   username: string | null;
   paisContrato: string;
+  /** De otro salón: se le agendó esta sesión desde su ficha. */
+  agendado?: boolean;
   feriadoEnSuPais: boolean;
   marca: Marca | null;
 }
@@ -94,6 +96,7 @@ interface Sesion {
   limiteUsuarios: number | null;
   timezone: string;
   grupoId: string | null;
+  apertura?: AperturaEvento;
   /** Cancelada por el guía y sin reemplazo: no se registra ni se pasa lista. */
   cancelada: boolean;
 }
@@ -897,6 +900,7 @@ export function SesionModal({
                     observaciones: sesion.observaciones,
                     salon: tituloSalon(sesion),
                     compartido: sesion.grupoId !== null,
+                    apertura: sesion.apertura ?? APERTURA_CERRADA,
                   })
                 }
               >
@@ -1540,6 +1544,7 @@ export function SesionModal({
                           }}
                         >
                           {f.paisContrato}
+                          {f.agendado === true && " · agendado (de otro salón)"}
                           {f.feriadoEnSuPais && " · feriado en su país"}
                         </span>
                       </button>

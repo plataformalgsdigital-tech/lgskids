@@ -49,7 +49,8 @@ export const GET = handlerWithAuth(async (_request, auth) => {
 
   const [asistencia, agenda, progreso, historial, comentarios, welcome] = await Promise.all([
     resumenAsistencia(persona.id, matricula.classroomId),
-    agendaProximas(matricula.classroomId, 14), // próximas 2 semanas (incluye clubes/talleres)
+    // Próximas 2 semanas (incluye clubes/talleres y lo agendado en otros salones).
+    agendaProximas(matricula.classroomId, 14, persona.id),
     progresoDeNino(persona.id),
     historialAsistencia(persona.id, matricula.classroomId, 30),
     // Solo el comentario PARA EL ALUMNO; la nota privada del guía no sale de aquí.

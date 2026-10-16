@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
-import { editarEvento } from "@/modules/scheduling";
+import { ESQUEMA_APERTURA, editarEvento } from "@/modules/scheduling";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
 bootstrapIdentity();
@@ -16,6 +16,7 @@ const editarSchema = z.object({
   limiteUsuarios: z.number().int().min(1).max(200).nullish(),
   guiaUserId: z.uuid(),
   observaciones: z.string().max(1000).nullish(),
+  apertura: ESQUEMA_APERTURA.optional(),
 });
 
 /**
@@ -41,6 +42,7 @@ export const PATCH = handlerWithAuth(async (request, auth, context) => {
       limiteUsuarios: body.limiteUsuarios ?? null,
       guiaUserId: body.guiaUserId,
       observaciones: body.observaciones ?? null,
+      ...(body.apertura !== undefined && { apertura: body.apertura }),
       ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     }),
   );
