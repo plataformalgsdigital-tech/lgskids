@@ -20,9 +20,6 @@ interface Marcador {
   descripcion: string;
 }
 
-const SLUG_CREDENCIALES = "credenciales-kids";
-const LARGO = 1000;
-
 const input: CSSProperties = {
   padding: "0.5rem 0.65rem",
   borderRadius: "0.5rem",
@@ -78,6 +75,9 @@ export default function PlantillasPage() {
   const [marcadores, setMarcadores] = useState<Marcador[]>([]);
   const [proveedor, setProveedor] = useState<string | null>(null);
   const [puedeEditar, setPuedeEditar] = useState(false);
+  // Los sirve la API (dominio): el tope de largo y la plantilla del botón de la ficha.
+  const [largo, setLargo] = useState(2000);
+  const [slugFijo, setSlugFijo] = useState("");
   const [inactivas, setInactivas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editando, setEditando] = useState<Plantilla | "nueva" | null>(null);
@@ -89,6 +89,8 @@ export default function PlantillasPage() {
       marcadores?: Marcador[];
       proveedor?: string;
       puedeEditar?: boolean;
+      largoMaximo?: number;
+      slugFijo?: string;
       error?: { message: string };
     } = await res.json();
     if (!res.ok) {
@@ -99,6 +101,8 @@ export default function PlantillasPage() {
     setMarcadores(data.marcadores ?? []);
     setProveedor(data.proveedor ?? null);
     setPuedeEditar(data.puedeEditar === true);
+    if (data.largoMaximo !== undefined) setLargo(data.largoMaximo);
+    setSlugFijo(data.slugFijo ?? "");
   }, [inactivas]);
 
   useEffect(() => {
@@ -237,7 +241,7 @@ export default function PlantillasPage() {
                         <button type="button" style={btn} onClick={() => setEditando(p)}>
                           Editar
                         </button>
-                        {p.activo && p.slug !== SLUG_CREDENCIALES && (
+                        {p.activo && p.slug !== slugFijo && (
                           <button
                             type="button"
                             style={{ ...btn, color: "#c62828" }}
@@ -260,6 +264,8 @@ export default function PlantillasPage() {
         <EditorPlantilla
           plantilla={editando === "nueva" ? null : editando}
           marcadores={marcadores}
+          largo={largo}
+          slugFijo={slugFijo}
           onCerrar={() => setEditando(null)}
           onGuardada={() => {
             setEditando(null);
@@ -274,11 +280,15 @@ export default function PlantillasPage() {
 function EditorPlantilla({
   plantilla,
   marcadores,
+  largo,
+  slugFijo,
   onCerrar,
   onGuardada,
 }: {
   plantilla: Plantilla | null;
   marcadores: Marcador[];
+  largo: number;
+  slugFijo: string;
   onCerrar: () => void;
   onGuardada: () => void;
 }) {
@@ -389,11 +399,11 @@ function EditorPlantilla({
         </label>
         <label>
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>
-            Contenido ({contenido.length}/{LARGO})
+            Contenido ({contenido.length}/{largo})
           </span>
           <textarea
             value={contenido}
-            onChange={(e) => setContenido(e.target.value.slice(0, LARGO))}
+            onChange={(e) => setContenido(e.target.value.slice(0, largo))}
             rows={9}
             style={{ ...input, fontFamily: "inherit", resize: "vertical" }}
           />
@@ -408,7 +418,7 @@ function EditorPlantilla({
                 key={m.clave}
                 type="button"
                 title={m.descripcion}
-                onClick={() => setContenido((c) => `${c}{{${m.clave}}}`.slice(0, LARGO))}
+                onClick={() => setContenido((c) => `${c}{{${m.clave}}}`.slice(0, largo))}
                 style={{
                   ...btn,
                   padding: "0.2rem 0.55rem",
@@ -427,7 +437,7 @@ function EditorPlantilla({
             enviar desde la ficha de cada niño.
           </p>
         </div>
-        {!nueva && plantilla.slug !== SLUG_CREDENCIALES && (
+        {!nueva && plantilla.slug !== slugFijo && (
           <label
             style={{ display: "flex", gap: "0.4rem", alignItems: "center", fontSize: "0.88rem" }}
           >

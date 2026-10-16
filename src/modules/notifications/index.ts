@@ -31,3 +31,4 @@ export {
   credencialesVistaHandler,
   credencialesEnviarHandler,
 } from "./api/handlers";
+export { LARGO_MAXIMO_CONTENIDO } from "./domain/plantilla";

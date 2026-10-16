@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
-import { enviarMensajeInasistencia, vistaInasistencia } from "@/modules/notifications";
+import {
+  LARGO_MAXIMO_CONTENIDO,
+  enviarMensajeInasistencia,
+  vistaInasistencia,
+} from "@/modules/notifications";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
 bootstrapIdentity();
@@ -30,7 +34,9 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
 export const POST = handlerWithAuth(async (request, auth, context) => {
   await exigir(auth.userId);
   const attendanceId = z.uuid().parse((await context.params)["attendanceId"]);
-  const body = z.object({ mensaje: z.string().min(1).max(1000) }).parse(await request.json());
+  const body = z
+    .object({ mensaje: z.string().min(1).max(LARGO_MAXIMO_CONTENIDO) })
+    .parse(await request.json());
   const r = await enviarMensajeInasistencia({
     actorUserId: auth.userId,
     attendanceId,

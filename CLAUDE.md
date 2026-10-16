@@ -1829,8 +1829,13 @@ avisa). Migración `20261007000000_mensajes`.
 - **Plantillas** (`notifications_plantilla`, `domain/plantilla.ts`): `{{marcador}}`
   como LGS (`nombre`, `nombreCompleto`, `apoderado`, `usuario`, `clave`, `curso`,
   `salon`, `campania`, `contrato`, `plataforma`); el slug no se edita, desactivar
-  reemplaza a borrar, máx. 1000 caracteres. `credenciales-kids` (la del botón de la
-  ficha) se edita pero no se desactiva.
+  reemplaza a borrar, máx. **2000** caracteres (`LARGO_MAXIMO_CONTENIDO`; era 1000 y
+  la bienvenida con emojis no cabía; WhatsApp admite 4096 — el tope viaja a la
+  pantalla desde la API). **`envio-acceso`** (2026-10-16, migración
+  `20261016100000`) es la del botón "Enviar acceso por WhatsApp" de la ficha
+  (`SLUG_CREDENCIALES`): la bienvenida que definió el negocio con `{{apoderado}}`,
+  `{{nombre}}`, `{{usuario}}` y `{{clave}}`; se edita pero no se desactiva. La anterior,
+  `credenciales-kids`, sigue existiendo y ya no la usa el botón.
 - **Gestión** (`/panel/mensajes/gestion`): plantilla → destinatarios por **salón** o
   por **documentos/CSV** (máx. 300) → revisar (con vista previa) → enviar. El mensaje
   va al **APODERADO** de cada niño (el primero con teléfono; si no hay, el del

@@ -188,7 +188,7 @@ describe.runIf(RUN)("mensajes por WhatsApp (integración)", () => {
   });
 
   it("un envío masivo NO puede llevar la clave", async () => {
-    const cred = (await listarPlantillas(false)).find((p) => p.slug === "credenciales-kids");
+    const cred = (await listarPlantillas(false)).find((p) => p.slug === "envio-acceso");
     await expect(
       encolarEnvio({
         actorUserId: ACTOR,
@@ -211,10 +211,13 @@ describe.runIf(RUN)("mensajes por WhatsApp (integración)", () => {
       expect(r).toEqual({ ok: true, destinatario: "573001234567" });
       expect(enviados).toHaveLength(1);
       expect(enviados[0]?.mensaje).toContain(clave);
+      // Es la bienvenida del negocio (envio-acceso), con usuario y enlace de entrada.
+      expect(enviados[0]?.mensaje).toContain("bienvenida al programa de Inglés de LGS Kids");
+      expect(enviados[0]?.mensaje).toContain("app.lgskidsplataforma.com/login");
 
       const filas = await queryRows<{ mensaje: string; estado: string }>(
         `SELECT mensaje, estado::text AS estado FROM notifications_outbox
-          WHERE child_person_id = $1 AND plantilla_slug = 'credenciales-kids'`,
+          WHERE child_person_id = $1 AND plantilla_slug = 'envio-acceso'`,
         [ninoId],
       );
       expect(filas).toHaveLength(1);
@@ -239,7 +242,7 @@ describe.runIf(RUN)("mensajes por WhatsApp (integración)", () => {
         contenido: "x",
       }),
     ).rejects.toBeInstanceOf(ConflictError);
-    const cred = (await listarPlantillas(true)).find((p) => p.slug === "credenciales-kids");
+    const cred = (await listarPlantillas(true)).find((p) => p.slug === "envio-acceso");
     await expect(
       actualizarPlantilla({ actorUserId: ACTOR, id: cred?.id ?? "", activo: false }),
     ).rejects.toBeInstanceOf(ConflictError);

@@ -14,7 +14,12 @@ import {
   vistaCredenciales,
 } from "../application/mensajes";
 import { procesarOutbox } from "../application/outbox";
-import { DESCRIPCION_MARCADOR, MARCADORES } from "../domain/plantilla";
+import {
+  DESCRIPCION_MARCADOR,
+  LARGO_MAXIMO_CONTENIDO,
+  MARCADORES,
+  SLUG_CREDENCIALES,
+} from "../domain/plantilla";
 import { proveedorActivo } from "../infrastructure/senders";
 
 function ip(request: Request): string | null {
@@ -40,6 +45,9 @@ export const plantillasListarHandler = handlerWithAuth(async (request, auth) => 
     marcadores: MARCADORES.map((m) => ({ clave: m, descripcion: DESCRIPCION_MARCADOR[m] })),
     proveedor: proveedorActivo(),
     puedeEditar: profile.hasPermission(PERMISOS.MENSAJES_PLANTILLAS),
+    // Del dominio, para que la pantalla no copie el tope ni cuál no se desactiva.
+    largoMaximo: LARGO_MAXIMO_CONTENIDO,
+    slugFijo: SLUG_CREDENCIALES,
   });
 });
 
@@ -47,7 +55,7 @@ const crearSchema = z.object({
   slug: z.string().min(1).max(60),
   nombre: z.string().min(1).max(120),
   descripcion: z.string().max(500).nullish(),
-  contenido: z.string().min(1).max(1000),
+  contenido: z.string().min(1).max(LARGO_MAXIMO_CONTENIDO),
 });
 
 /** POST /api/notifications/plantillas */
@@ -62,7 +70,7 @@ export const plantillaCrearHandler = handlerWithAuth(async (request, auth) => {
 const actualizarSchema = z.object({
   nombre: z.string().min(1).max(120).optional(),
   descripcion: z.string().max(500).nullish(),
-  contenido: z.string().min(1).max(1000).optional(),
+  contenido: z.string().min(1).max(LARGO_MAXIMO_CONTENIDO).optional(),
   activo: z.boolean().optional(),
 });
 

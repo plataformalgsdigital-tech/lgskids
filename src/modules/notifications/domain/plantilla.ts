@@ -79,9 +79,13 @@ export function rellenarParaHistorial(contenido: string, ctx: ContextoMensaje): 
 }
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
-export const LARGO_MAXIMO_CONTENIDO = 1000;
-/** La plantilla del botón de la ficha del niño. */
-export const SLUG_CREDENCIALES = "credenciales-kids";
+/** WhatsApp admite 4096; la bienvenida con emojis pasa de 1000 (2026-10-16). */
+export const LARGO_MAXIMO_CONTENIDO = 2000;
+/**
+ * La plantilla del botón "Enviar acceso por WhatsApp" de la ficha del niño
+ * (2026-10-16: el texto de bienvenida del negocio; antes `credenciales-kids`).
+ */
+export const SLUG_CREDENCIALES = "envio-acceso";
 /** La del enlace de creación de perfil: sale sola al aprobar el contrato. */
 export const SLUG_CREACION_PERFIL = "creacion-perfil-kids";
 /** La misma, para quien entra con el curso andando: no menciona el Welcome. */
