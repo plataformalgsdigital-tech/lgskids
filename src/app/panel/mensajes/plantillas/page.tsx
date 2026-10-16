@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { AvisoProveedor } from "../AvisoProveedor";
+import { VistaPreviaWhatsApp } from "./VistaPreviaWhatsApp";
 
 interface Plantilla {
   id: string;
@@ -18,6 +19,8 @@ interface Plantilla {
 interface Marcador {
   clave: string;
   descripcion: string;
+  /** Dato de ejemplo para la vista previa (lo sirve la API). */
+  ejemplo?: string;
 }
 
 const input: CSSProperties = {
@@ -300,6 +303,8 @@ function EditorPlantilla({
   const [activo, setActivo] = useState(plantilla?.activo ?? true);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [verPrevia, setVerPrevia] = useState(false);
+  const ejemplos = Object.fromEntries(marcadores.map((m) => [m.clave, m.ejemplo ?? ""]));
 
   async function guardar() {
     setError(null);
@@ -437,6 +442,7 @@ function EditorPlantilla({
             enviar desde la ficha de cada niño.
           </p>
         </div>
+        {verPrevia && <VistaPreviaWhatsApp contenido={contenido} ejemplos={ejemplos} />}
         {!nueva && plantilla.slug !== slugFijo && (
           <label
             style={{ display: "flex", gap: "0.4rem", alignItems: "center", fontSize: "0.88rem" }}
@@ -450,7 +456,22 @@ function EditorPlantilla({
             {error}
           </p>
         )}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+        <div
+          style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", flexWrap: "wrap" }}
+        >
+          <button
+            type="button"
+            onClick={() => setVerPrevia((v) => !v)}
+            style={{
+              ...btn,
+              marginRight: "auto",
+              background: verPrevia ? "#e8f5e9" : "white",
+              borderColor: verPrevia ? "#a5d6a7" : "#d8dce6",
+              color: verPrevia ? "#1b5e20" : undefined,
+            }}
+          >
+            {verPrevia ? "🙈 Ocultar vista previa" : "👁 Vista previa"}
+          </button>
           <button type="button" style={btn} onClick={onCerrar}>
             Cancelar
           </button>

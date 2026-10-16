@@ -16,6 +16,7 @@ import {
 import { procesarOutbox } from "../application/outbox";
 import {
   DESCRIPCION_MARCADOR,
+  EJEMPLO_MARCADOR,
   LARGO_MAXIMO_CONTENIDO,
   MARCADORES,
   SLUG_CREDENCIALES,
@@ -42,7 +43,11 @@ export const plantillasListarHandler = handlerWithAuth(async (request, auth) => 
   const incluirInactivas = request.nextUrl.searchParams.get("inactivas") === "1";
   return json({
     plantillas: await listarPlantillas(incluirInactivas),
-    marcadores: MARCADORES.map((m) => ({ clave: m, descripcion: DESCRIPCION_MARCADOR[m] })),
+    marcadores: MARCADORES.map((m) => ({
+      clave: m,
+      descripcion: DESCRIPCION_MARCADOR[m],
+      ejemplo: EJEMPLO_MARCADOR[m],
+    })),
     proveedor: proveedorActivo(),
     puedeEditar: profile.hasPermission(PERMISOS.MENSAJES_PLANTILLAS),
     // Del dominio, para que la pantalla no copie el tope ni cuál no se desactiva.

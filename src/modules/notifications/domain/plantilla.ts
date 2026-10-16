@@ -39,6 +39,26 @@ export const DESCRIPCION_MARCADOR: Record<Marcador, string> = {
 };
 
 /**
+ * Datos de EJEMPLO para la vista previa del editor de plantillas. Es un
+ * `Record` de todos los marcadores: uno nuevo sin ejemplo no compila.
+ */
+export const EJEMPLO_MARCADOR: Record<Marcador, string> = {
+  nombre: "Sofía",
+  nombreCompleto: "Sofía González Rojas",
+  apoderado: "Carolina",
+  usuario: "sgonzalez1234",
+  clave: "lunamarsol42",
+  curso: "Junior",
+  salon: "JUNIOR Salón 04",
+  campania: "OCTUBRE2026",
+  contrato: "02-10764-26",
+  plataforma: "Colombia",
+  enlace: "https://app.lgskidsplataforma.com/crear-perfil/AbC123…",
+  fecha: "martes 20 de octubre",
+  video: "https://youtu.be/ejemplo",
+};
+
+/**
  * La CLAVE solo viaja desde la ficha del niño, de a un envío y sin quedar
  * escrita en el historial. Un envío masivo con `{{clave}}` dejaría las claves
  * de todo un salón en la cola de envíos, en texto plano.
