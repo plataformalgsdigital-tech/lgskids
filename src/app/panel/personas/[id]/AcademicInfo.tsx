@@ -232,7 +232,7 @@ export function AcademicInfo(props: {
                 cursor: "pointer",
               }}
             >
-              🔀 Academic Change
+              🔀 Academic management
             </button>
           )}
         </div>

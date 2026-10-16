@@ -66,9 +66,7 @@ export function SiguienteClase(props: { clase: SiguienteClaseDato | null }) {
     border: "1px solid #c5cae9",
     background: "#f5f7ff",
     borderRadius: "0.8rem",
-    padding: "0.7rem 0.9rem",
-    minWidth: "17rem",
-    maxWidth: "26rem",
+    padding: "0.6rem 0.85rem",
   };
 
   if (c === null) {
@@ -86,6 +84,8 @@ export function SiguienteClase(props: { clase: SiguienteClaseDato | null }) {
 
   const hora = referenciaHoraria(c.startsAt);
   const fecha = fechaLarga(c.startsAt, c.timezone);
+  // "Martes, 20 de octubre": mayúscula solo al inicio (capitalize ponía "De Octubre").
+  const fechaTitulo = fecha.charAt(0).toUpperCase() + fecha.slice(1);
   const tipo = TIPO[c.tipo] ?? c.tipo;
   const enlace = c.meetingUrl;
   const invitacion = [
@@ -106,14 +106,12 @@ export function SiguienteClase(props: { clase: SiguienteClaseDato | null }) {
       <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "#3949ab" }}>
         📅 SIGUIENTE CLASE
       </div>
-      <div style={{ fontWeight: 700, marginTop: "0.2rem", textTransform: "capitalize" }}>
-        {tipo} · {fecha}
-      </div>
-      <div style={{ fontSize: "0.85rem" }}>
-        <strong>{hora.chile} Chile</strong> · {hora.colombia} Colombia/Ecuador/Perú
+      <div style={{ fontWeight: 700, marginTop: "0.15rem" }}>
+        {tipo} · {fechaTitulo} · {hora.chile} Chile{" "}
+        <span style={{ fontWeight: 400 }}>· {hora.colombia} Col/Ecu/Perú</span>
       </div>
       {c.guia !== null && (
-        <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>con {c.guia}</div>
+        <div style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>Guía: {c.guia}</div>
       )}
       <div
         style={{

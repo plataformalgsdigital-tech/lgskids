@@ -204,6 +204,11 @@ export default function DetalleNinoPage() {
 
       {/* Encabezado */}
       <section style={{ ...card, marginTop: "0.6rem" }}>
+        <h1 style={{ fontSize: "1.7rem", margin: 0 }}>
+          {nino.nombres} {nino.apellidos}
+        </h1>
+        {/* Debajo del nombre: los datos a la izquierda y, EN FRENTE, la siguiente
+            clase. En pantallas angostas la caja baja sola. */}
         <div
           style={{
             display: "flex",
@@ -213,10 +218,7 @@ export default function DetalleNinoPage() {
             flexWrap: "wrap",
           }}
         >
-          <div>
-            <h1 style={{ fontSize: "1.7rem", margin: 0 }}>
-              {nino.nombres} {nino.apellidos}
-            </h1>
+          <div style={{ flex: "1 1 26rem", minWidth: 0 }}>
             <p style={{ margin: "0.4rem 0 0", color: "var(--texto-suave)", fontSize: "0.9rem" }}>
               ID: <strong>{nino.docNumero}</strong> · Contrato: <strong>{nc.numero}</strong> ·
               Programa: <strong>{nino.campania ?? "—"}</strong> ({cursoLabel(nino.curso)}) · Estado:{" "}
@@ -262,7 +264,11 @@ export default function DetalleNinoPage() {
               </span>
             </div>
           </div>
-          {nino.salon !== null && <SiguienteClase clase={nino.siguienteClase} />}
+          {nino.salon !== null && (
+            <div style={{ flex: "0 1 25rem", marginTop: "0.4rem" }}>
+              <SiguienteClase clase={nino.siguienteClase} />
+            </div>
+          )}
         </div>
       </section>
 

@@ -320,7 +320,7 @@ export function AcademicChangeModal(props: {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 id="titulo-academic-change" style={{ fontSize: "1.2rem", margin: 0 }}>
-            Academic Change · {props.nombre}
+            Academic management · {props.nombre}
           </h2>
           <button
             type="button"

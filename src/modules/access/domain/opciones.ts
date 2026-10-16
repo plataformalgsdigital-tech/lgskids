@@ -196,7 +196,7 @@ export const OPCIONES_MENU = [
   op("menu.kids", "op.kids.agendar_welcome", "Agendar o cambiar el Welcome", [
     "matriculas.gestionar",
   ]),
-  op("menu.kids", "op.kids.academic_change", "Academic Change (ajuste de nivel y lección)", [
+  op("menu.kids", "op.kids.academic_change", "Academic management (ajuste de nivel y lección)", [
     "matriculas.gestionar",
   ]),
   op("menu.kids", "op.kids.casos", "Ver los casos de atención del niño", ["casos.ver"]),
