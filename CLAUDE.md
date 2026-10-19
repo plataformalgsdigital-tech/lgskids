@@ -1246,6 +1246,16 @@ entrar). Probado en `reserva-lgs-integration.test.ts`. **LGS ya las llama**
 (commit `5357b2f` de LGS): `src/lib/suspension-beneficiario.ts` las dispara al
 inactivar/reactivar un beneficiario Kids, best-effort (si KIDS falla, la
 suspensión en LGS sigue).
+**BAJA desde LGS: anulado, rechazado o retractado (2026-10-18)** —
+`POST /api/kids-intake/reservations/[externalRef]/cancel` con
+`{ motivo: "ANULADO" | "RECHAZADO" | "RETRACTADO", detalle? }` (`bajaPorExternalRef`):
+INACTIVA el contrato con la MISMA cascada del panel (`inactivarContrato`), que
+CANCELA su matrícula —la RESERVADA de un contrato sin aprobar o la ACTIVA de uno
+aprobado— y libera el CUPO en el acto. Idempotente (`aplicado: false` si ya estaba
+inactivo) y devuelve `cupoLiberado`. Motivo en la matrícula y en la auditoría
+(`contracts.baja_lgs`) con prefijo `LGS: `. Probado en `reserva-lgs-integration.test.ts`.
+**Ojo**: el mismo niño no se puede volver a RESERVAR desde LGS después (la reserva
+exige que el niño sea nuevo; ver Pendientes).
 **No se puede leer desde `people`** (la sección Kids): `contracts` importa
 `people`, así que `people → contracts` sería un ciclo y `depcruise` lo rechaza.
 Por eso el estado se ve en la ficha del contrato, no en la lista de Kids.

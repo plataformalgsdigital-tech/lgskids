@@ -21,6 +21,7 @@ export {
   reservarIntakeHandler,
   aprobarIntakeHandler,
   suspenderIntakeHandler,
+  bajaIntakeHandler,
   reactivarIntakeHandler,
   pausarIntakeHandler,
   finPausaIntakeHandler,

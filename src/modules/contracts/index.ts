@@ -13,6 +13,8 @@ export {
   aprobarContrato,
   aprobarReservaPorExternalRef,
   suspenderPorExternalRef,
+  bajaPorExternalRef,
+  MOTIVOS_BAJA_LGS,
   reactivarPorExternalRef,
   ponerEnPausa,
   pausarPorExternalRef,

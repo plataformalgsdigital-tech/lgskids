@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
+  MOTIVOS_BAJA_LGS,
   aprobarReservaPorExternalRef,
+  bajaPorExternalRef,
   cambiarApoderadoPorExternalRef,
   crearReservaBeneficiario,
   extenderPorExternalRef,
@@ -233,6 +235,32 @@ export const extenderIntakeHandler = handlerWithServiceAuth(async (request, cont
       dias: body.dias,
       motivo: body.motivo,
       ejecutadoPor: body.ejecutadoPor ?? null,
+      ip: ip(request),
+    }),
+  );
+});
+
+/**
+ * POST /api/kids-intake/reservations/[externalRef]/cancel — el contrato se
+ * ANULÓ, se RECHAZÓ o se RETRACTÓ en LGS: inactiva el contrato y LIBERA el cupo
+ * (cancela la matrícula reservada o activa). Body { motivo, detalle? }.
+ * Idempotente (`aplicado: false` si ya estaba inactivo).
+ */
+export const bajaIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const externalRef = z.string().min(1).max(60).parse(params["externalRef"]);
+  const body = z
+    .object({
+      motivo: z.enum(MOTIVOS_BAJA_LGS),
+      detalle: z.string().max(400).nullish(),
+    })
+    .parse(await request.json());
+  return json(
+    await bajaPorExternalRef({
+      actorUserId: SYSTEM_ACTOR,
+      externalRef,
+      motivo: body.motivo,
+      detalle: body.detalle ?? null,
       ip: ip(request),
     }),
   );

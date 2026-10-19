@@ -10,6 +10,7 @@ import { ConflictError, NotFoundError } from "@/platform/errors";
 import { fichaAcademicaPorRef } from "../application/estado-academico";
 import {
   aprobarContrato,
+  bajaPorExternalRef,
   crearReservaBeneficiario,
   listarContratos,
   ponerEnPausa,
@@ -312,5 +313,53 @@ describe.runIf(RUN)("reserva desde LGS (integración)", () => {
         parentesco: "MADRE",
       }),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("ANULAR, RECHAZAR o RETRACTAR en LGS libera el cupo (y repetirlo no falla)", async () => {
+    // Una reserva sin aprobar: el contrato se retracta en LGS.
+    const ref = `02-9${marca.replace(/\D/g, "1")}2-26#N${marca}R`;
+    const r = await crearReservaBeneficiario({
+      actorUserId: ACTOR,
+      externalRef: ref,
+      countryCode: "CO",
+      tipoCurso: "JUNIOR",
+      inicio: hoy,
+      classroomId,
+      titular,
+      titularEsApoderado: true,
+      nino: nino(`R-${marca}`),
+      parentesco: "MADRE",
+    });
+    const estadoMatricula = async () =>
+      (
+        await queryOne<{ estado: string }>(
+          `SELECT estado::text AS estado FROM enrollment_enrollment WHERE id = $1`,
+          [r.enrollmentId],
+        )
+      )?.estado;
+    expect(await estadoMatricula()).toBe("RESERVADA");
+
+    const baja = await bajaPorExternalRef({
+      actorUserId: ACTOR,
+      externalRef: ref,
+      motivo: "RETRACTADO",
+      detalle: "la familia se retractó",
+    });
+    expect(baja).toEqual({ aplicado: true, estado: "INACTIVO", cupoLiberado: true });
+    expect(await estadoMatricula()).toBe("CANCELADA");
+
+    // El reintento de LGS no falla ni hace nada.
+    expect(
+      await bajaPorExternalRef({ actorUserId: ACTOR, externalRef: ref, motivo: "RETRACTADO" }),
+    ).toEqual({ aplicado: false, estado: "INACTIVO", cupoLiberado: false });
+
+    // Un contrato YA APROBADO también se da de baja (p. ej. anulado), con su matrícula.
+    const aprobada = await bajaPorExternalRef({
+      actorUserId: ACTOR,
+      externalRef,
+      motivo: "ANULADO",
+    });
+    expect(aprobada.aplicado).toBe(true);
+    expect(aprobada.cupoLiberado).toBe(true);
   });
 });

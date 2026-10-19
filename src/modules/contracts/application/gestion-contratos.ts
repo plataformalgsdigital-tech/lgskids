@@ -1032,6 +1032,64 @@ export async function reactivarPorExternalRef(input: {
   return { aplicado: true, estado: "APROBADO" };
 }
 
+/** Por qué LGS da de baja un contrato de Kids: los tres terminan igual aquí. */
+export const MOTIVOS_BAJA_LGS = ["ANULADO", "RECHAZADO", "RETRACTADO"] as const;
+export type MotivoBajaLgs = (typeof MOTIVOS_BAJA_LGS)[number];
+
+const ETIQUETA_BAJA_LGS: Record<MotivoBajaLgs, string> = {
+  ANULADO: "anulado",
+  RECHAZADO: "rechazado",
+  RETRACTADO: "retractado (derecho de retracto)",
+};
+
+/**
+ * BAJA desde LGS: el contrato se ANULÓ, se RECHAZÓ o se RETRACTÓ allá. Aquí
+ * INACTIVA el contrato con la misma cascada del panel (`inactivarContrato`), y
+ * eso CANCELA su matrícula —la RESERVADA de un contrato sin aprobar, o la
+ * ACTIVA de uno ya aprobado—, así que el CUPO del salón queda libre en el acto.
+ * Idempotente: uno ya inactivo responde `aplicado: false` sin error, para que el
+ * reintento de LGS no falle.
+ */
+export async function bajaPorExternalRef(input: {
+  actorUserId: string;
+  externalRef: string;
+  motivo: MotivoBajaLgs;
+  detalle?: string | null;
+  ip?: string | null;
+}): Promise<{ aplicado: boolean; estado: string; cupoLiberado: boolean }> {
+  const contrato = await findContractByExternalRef(input.externalRef);
+  if (contrato === null) {
+    throw new NotFoundError(`No hay contrato con referencia LGS ${input.externalRef}.`);
+  }
+  if (contrato.estado === "INACTIVO") {
+    return { aplicado: false, estado: "INACTIVO", cupoLiberado: false };
+  }
+  // ¿Ocupaba un lugar? (la matrícula viva: reservada o activa).
+  const ocupaba = await queryOne<{ ok: boolean }>(
+    `SELECT true AS ok FROM enrollment_enrollment
+      WHERE contract_id = $1 AND estado IN ('ACTIVA', 'RESERVADA') LIMIT 1`,
+    [contrato.id],
+  );
+  const detalle = input.detalle?.trim() ?? "";
+  await inactivarContrato({
+    actorUserId: input.actorUserId,
+    contractId: contrato.id,
+    motivo:
+      `${PREFIJO_PAUSA_LGS}contrato ${ETIQUETA_BAJA_LGS[input.motivo]} en LGS` +
+      (detalle !== "" ? ` — ${detalle}` : ""),
+    ip: input.ip ?? null,
+  });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.baja_lgs",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: { motivo: input.motivo, detalle, cupoLiberado: ocupaba !== null },
+    ip: input.ip ?? null,
+  });
+  return { aplicado: true, estado: "INACTIVO", cupoLiberado: ocupaba !== null };
+}
+
 /**
  * REACTIVA un contrato en pausa desde el panel: extiende `final_contrato` por
  * los días REALMENTE pausados (misma regla que LGS: hasta hoy, o hasta el fin
