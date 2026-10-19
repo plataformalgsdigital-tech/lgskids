@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { descargarCsv } from "@/ui/csv";
+import { SoloSi } from "@/ui/SoloSi";
 import { fechaLocal, horaLocal } from "@/ui/fecha-local";
 import { numeroContrato } from "@/ui/numero-contrato";
 import { usePermisos } from "@/ui/permisos";
@@ -293,6 +295,48 @@ const PAIS_NOMBRE: Record<string, string> = {
   PE: "Perú",
 };
 
+/** CSV de las reservas sin aprobar: lo mismo de la tabla, más la referencia completa. */
+function descargarReservas(reservas: Reserva[]) {
+  descargarCsv(
+    "reservas-sin-aprobar.csv",
+    [
+      "N° contrato",
+      "Referencia LGS completa",
+      "País",
+      "Titular",
+      "Tipo doc. titular",
+      "Documento titular",
+      "Teléfono titular",
+      "Beneficiario",
+      "Documento beneficiario",
+      "Fecha reserva",
+      "Hora reserva",
+      "Curso",
+      "Salón",
+      "Campaña",
+    ],
+    reservas.map((r) => {
+      const n = numeroContrato(r);
+      return [
+        n.numero,
+        r.externalRef,
+        PAIS_NOMBRE[r.countryCode] ?? r.countryCode,
+        r.titular,
+        r.titularDocTipo,
+        r.titularDocNumero,
+        r.titularTelefono,
+        r.beneficiario,
+        n.documento,
+        r.matriculaDesde !== null ? fechaLocal(r.matriculaDesde) : null,
+        r.matriculaDesde !== null ? horaLocal(r.matriculaDesde) : null,
+        r.tipoCurso,
+        r.salon,
+        r.campania,
+      ];
+    }),
+  );
+}
+
 /**
  * Los cupos RESERVADOS cuyo contrato aún no se aprueba: la matrícula RESERVADA
  * es justo eso, y al aprobar pasa a ACTIVA y sale de aquí sola.
@@ -342,11 +386,41 @@ function ReservasSinAprobar() {
 
   return (
     <section style={{ marginTop: "1.25rem" }}>
-      <p style={{ margin: 0, color: "var(--texto-suave)", fontSize: "0.88rem" }}>
-        {reservas.length === 0
-          ? "No hay reservas pendientes de aprobación."
-          : `${String(reservas.length)} ${reservas.length === 1 ? "cupo reservado" : "cupos reservados"} esperando aprobación. Las que llegan desde LGS se aprueban en LGS: es ahí donde quedan el usuario y la clave del niño.`}
-      </p>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <p style={{ margin: 0, color: "var(--texto-suave)", fontSize: "0.88rem", flex: 1 }}>
+          {reservas.length === 0
+            ? "No hay reservas pendientes de aprobación."
+            : `${String(reservas.length)} ${reservas.length === 1 ? "cupo reservado" : "cupos reservados"} esperando aprobación. Las que llegan desde LGS se aprueban en LGS: es ahí donde quedan el usuario y la clave del niño.`}
+        </p>
+        {reservas.length > 0 && (
+          <SoloSi op="op.reservas.csv">
+            <button
+              type="button"
+              onClick={() => descargarReservas(reservas)}
+              title="Descarga las reservas sin aprobar"
+              style={{
+                padding: "0.5rem 1.1rem",
+                borderRadius: "0.6rem",
+                border: "none",
+                background: "var(--lgs-verde)",
+                color: "#1b2a10",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              ⬇ Descargar CSV ({reservas.length})
+            </button>
+          </SoloSi>
+        )}
+      </div>
       {reservas.length > 0 && (
         <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.86rem" }}>

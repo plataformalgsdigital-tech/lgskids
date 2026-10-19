@@ -140,6 +140,9 @@ export const OPCIONES_MENU = [
     ["catalogo.gestionar"],
   ),
   op("menu.mantenimiento", "op.mant.campania_eliminar", "Eliminar campaña", ["catalogo.gestionar"]),
+  op("menu.mantenimiento", "op.mant.campania_csv", "Descargar CSV de los salones de la campaña", [
+    "catalogo.ver",
+  ]),
   op(
     "menu.mantenimiento",
     "op.mant.campania_salones",
@@ -185,6 +188,7 @@ export const OPCIONES_MENU = [
   op("menu.guias", "op.guias.enlace", "Generar y revocar el enlace de ficha", [
     "usuarios.gestionar",
   ]),
+  op("menu.guias", "op.guias.csv", "Descargar CSV de los guías", ["usuarios.gestionar"]),
 
   // ── Operación › Kids ──────────────────────────────────────────────────
   op("menu.kids", "op.kids.csv", "Descargar CSV", ["personas.ver"]),
@@ -226,6 +230,9 @@ export const OPCIONES_MENU = [
   // ── Operación › Gestión de Reservas ───────────────────────────────────
   op("menu.reservas", "op.reservas.lista", "Reservas sin aprobar", ["contratos.ver"]),
   op("menu.reservas", "op.reservas.nueva", "Nueva reserva", ["contratos.gestionar"]),
+  op("menu.reservas", "op.reservas.csv", "Descargar CSV de reservas sin aprobar", [
+    "contratos.ver",
+  ]),
 
   // ── Servicio › Welcome ────────────────────────────────────────────────
   op("menu.servicio_welcome", "op.servicio.welcome_eventos", "Eventos Welcome", ["personas.ver"]),

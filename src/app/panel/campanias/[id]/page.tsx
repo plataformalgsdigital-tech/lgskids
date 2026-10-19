@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/ui/api-fetch";
+import { descargarCsv } from "@/ui/csv";
 import { resumenHorario, type SlotResumen } from "@/ui/horario";
 import { numeroContrato } from "@/ui/numero-contrato";
 import { usePermisos } from "@/ui/permisos";
@@ -1022,6 +1023,61 @@ function DetalleCampaniaPageContenido() {
                   </button>
                 );
               })}
+              <SoloSi op="op.mant.campania_csv">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sufijo =
+                      filtroEstado === "TODOS" ? "" : `-${filtroEstado.toLowerCase()}s`;
+                    descargarCsv(
+                      `salones-${detalle.nombre}${sufijo}.csv`,
+                      [
+                        "Campaña",
+                        "Tipo",
+                        "Salón",
+                        "País",
+                        "Guía",
+                        "Horario",
+                        "Inicio curso",
+                        "Final curso",
+                        "Cierre ventas",
+                        "Inscritos",
+                        "Cupo",
+                        "Estado",
+                      ],
+                      visibles.map(({ curso, salon }) => [
+                        detalle.nombre,
+                        curso.tipo,
+                        etiquetaSalon(salon.nombre, curso.tipo),
+                        PAIS_NOMBRE[salon.holidayCountry] ?? salon.holidayCountry,
+                        salon.guia,
+                        resumenHorario(salon.horario),
+                        curso.inicio,
+                        curso.finalCurso,
+                        detalle.finalVenta,
+                        salon.ocupados,
+                        salon.cupo,
+                        salon.activo ? "Activo" : "Inactivo",
+                      ]),
+                    );
+                  }}
+                  disabled={visibles.length === 0}
+                  title="Descarga los salones que muestra el filtro"
+                  style={{
+                    marginLeft: "auto",
+                    padding: "0.3rem 0.9rem",
+                    borderRadius: "999px",
+                    border: "none",
+                    background: visibles.length === 0 ? "#9e9e9e" : "var(--lgs-verde)",
+                    color: "#1b2a10",
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
+                    cursor: visibles.length === 0 ? "default" : "pointer",
+                  }}
+                >
+                  ⬇ Descargar CSV ({visibles.length})
+                </button>
+              </SoloSi>
             </div>
           )}
 

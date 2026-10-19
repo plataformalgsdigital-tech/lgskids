@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
+import { descargarCsv } from "@/ui/csv";
 import { SoloSi } from "@/ui/SoloSi";
 
 /**
@@ -125,6 +126,44 @@ const VACIA = {
   fechaNacimiento: "",
   zoomUrl: "",
 };
+
+/** CSV con la ficha de todos los guías (sin foto: solo si la tiene). */
+function descargarGuias(guias: Ficha[], enlaces: Record<string, Enlace>) {
+  descargarCsv(
+    "guias.csv",
+    [
+      "Nombres",
+      "Apellidos",
+      "Usuario",
+      "Documento",
+      "Fecha de nacimiento",
+      "Correo",
+      "Teléfono",
+      "País",
+      "Domicilio",
+      "Sala de Zoom",
+      "Tiene foto",
+      "Enlace de ficha",
+    ],
+    guias.map((g) => {
+      const e = enlaces[g.guiaUserId];
+      return [
+        g.nombres,
+        g.apellidos,
+        g.username,
+        g.docNumero,
+        g.fechaNacimiento,
+        g.email,
+        g.telefono,
+        g.pais,
+        g.domicilio,
+        g.zoomUrl,
+        g.fotoFileId !== null,
+        e === undefined ? "" : COLOR_ENLACE[e.estado].txt,
+      ];
+    }),
+  );
+}
 
 export default function GuiasPage() {
   const [guias, setGuias] = useState<Ficha[] | null>(null);
@@ -262,7 +301,37 @@ export default function GuiasPage() {
 
   return (
     <main>
-      <h1 style={{ fontSize: "1.6rem", marginBottom: "0.35rem" }}>Guías</h1>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+          marginBottom: "0.35rem",
+        }}
+      >
+        <h1 style={{ fontSize: "1.6rem", margin: 0 }}>Guías</h1>
+        <SoloSi op="op.guias.csv">
+          <button
+            type="button"
+            onClick={() => descargarGuias(guias ?? [], enlaces)}
+            disabled={guias === null || guias.length === 0}
+            title="Descarga la ficha de todos los guías"
+            style={{
+              padding: "0.5rem 1.1rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background: guias === null || guias.length === 0 ? "#9e9e9e" : "var(--lgs-verde)",
+              color: "#1b2a10",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            ⬇ Descargar CSV{guias !== null ? ` (${String(guias.length)})` : ""}
+          </button>
+        </SoloSi>
+      </div>
       <p style={{ color: "var(--texto-suave)", marginBottom: "1.25rem" }}>
         Datos de contacto y sala de Zoom. Un guía nuevo se da de alta en{" "}
         <Link href="/panel/usuarios/guia">Usuarios y roles › Guía</Link>, con su ficha o con enlace;

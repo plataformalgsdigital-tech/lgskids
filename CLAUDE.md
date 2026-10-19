@@ -1559,7 +1559,11 @@ solo servía para completar la ficha.
     tienes acceso"). Varias pantallas reciben banderas `puedeX` del servidor, que
     ahora salen de las opciones.
     Un permiso que ya era justo una acción (`sesiones.solicitar_repeticion`,
-    `mensajes.plantillas`) se reutiliza en el árbol. **Una opción nueva exige
+    `mensajes.plantillas`) se reutiliza en el árbol.
+    **Descargas CSV (2026-10-19, migración `20261019100000`)**: salones de una campaña
+    según su filtro Todos/Activos/Inactivos (`op.mant.campania_csv`), ficha de todos
+    los guías (`op.guias.csv`) y reservas sin aprobar (`op.reservas.csv`); se arman en
+    el navegador con `src/ui/csv.ts` sobre lo que ya muestra la pantalla. **Una opción nueva exige
     migración** (la de esta tanda, `20261015300000_opciones_pantalla`, se GENERA desde
     `opciones.ts` y da cada opción a los roles que tienen su base: nadie perdió nada);
     `opciones.test.ts` falla si una opción no tiene migración, si su base no existe o
