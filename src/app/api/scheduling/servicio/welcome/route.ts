@@ -38,7 +38,9 @@ export const GET = handlerWithAuth(async (request, auth) => {
       curso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
       classroomId: z.uuid().optional(),
       estado: z.enum(["ASISTIO", "ASISTIO_OTRA", "VIDEO", "PENDIENTE", "NO_ASISTIO"]).optional(),
-      motivo: z.enum(["SOLO_PERFIL", "SIN_PERFIL", "SIN_REGISTRO"]).optional(),
+      motivo: z
+        .enum(["SOLO_PERFIL", "SIN_PERFIL", "SIN_DISPONIBILIDAD", "SIN_REGISTRO"])
+        .optional(),
       soloSinReagendar: z.enum(["1", "0"]).optional(),
     })
     .parse(Object.fromEntries([...p.entries()].filter(([, v]) => v !== "")));

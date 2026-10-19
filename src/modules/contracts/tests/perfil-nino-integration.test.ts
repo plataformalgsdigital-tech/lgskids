@@ -227,6 +227,34 @@ describe.runIf(RUN)("creación de perfil del niño (integración)", () => {
     expect((await fichaPorEnlacePerfil(t)).estado).toBe("VIGENTE");
   });
 
+  it("sin Welcome con cupo: la casilla lo omite y va a Pendientes de agendar (SIN_DISPONIBILIDAD)", async () => {
+    // Con un Welcome con cupo, la casilla no sirve: hay que elegirlo.
+    await expect(
+      completarPerfilNino(tokenDelUltimo(), datos({ welcomeId: "", sinWelcomeDisponible: true })),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    // Sin ninguno que le sirva (el único pasa a otro nivel), sí termina sin Welcome.
+    await execute(`UPDATE scheduling_welcome SET nivel = 'CHAMPION' WHERE id = $1`, [welcomeId]);
+    try {
+      const t = tokenDelUltimo();
+      const f = await fichaPorEnlacePerfil(t);
+      expect(f.estado === "VIGENTE" && f.welcomes.length).toBe(0);
+      const r = await completarPerfilNino(t, datos({ welcomeId: "", sinWelcomeDisponible: true }));
+      expect(r.welcome).toBeNull();
+      expect(await welcomeDeNino(childPersonId)).toBeNull();
+      const pend = await pendientesWelcome({ countryScope: null, buscar: `NP-${marca}` });
+      expect(pend.map((p) => p.childPersonId)).toEqual([childPersonId]);
+      expect(pend[0]?.motivo).toBe("SIN_DISPONIBILIDAD");
+    } finally {
+      // Deja al niño sin perfil y con enlace nuevo para la prueba siguiente.
+      await execute(`UPDATE scheduling_welcome SET nivel = 'ROOKIE' WHERE id = $1`, [welcomeId]);
+      await execute(`UPDATE people_person SET perfil_completado_en = NULL WHERE id = $1`, [
+        childPersonId,
+      ]);
+    }
+    await reenviarEnlacePerfil({ actorUserId: actor, childPersonId, countryScope: null });
+  });
+
   it("completar guarda clave, perfil y Welcome juntos, y el enlace no sirve dos veces", async () => {
     const t = tokenDelUltimo();
     const r = await completarPerfilNino(t, datos());

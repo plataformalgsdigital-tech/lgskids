@@ -52,6 +52,7 @@ export const POST = handler(async (request) => {
       hobbies: texto(form, "hobbies"),
       fechaNacimiento: texto(form, "fechaNacimiento"),
       welcomeId: texto(form, "welcomeId"),
+      sinWelcomeDisponible: texto(form, "sinWelcomeDisponible") === "1",
       foto,
     },
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,

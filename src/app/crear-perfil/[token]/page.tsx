@@ -103,6 +103,8 @@ export default function CrearPerfilPage() {
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
   const [welcomeId, setWelcomeId] = useState("");
+  // Sin Welcome con cupo: el niño termina su perfil sin él y Servicio se lo agenda.
+  const [sinDisponibilidad, setSinDisponibilidad] = useState(false);
   const [intento, setIntento] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +134,11 @@ export default function CrearPerfilPage() {
 
   // El enlace "sin Welcome" (curso ya andando) no pide agendar sesión.
   const exigeWelcome = ficha?.estado === "VIGENTE" ? ficha.exigeWelcome : true;
+  const welcomesFicha = ficha?.estado === "VIGENTE" ? ficha.welcomes : [];
+  const sinWelcome = exigeWelcome && welcomesFicha.length === 0;
+  const todosLlenos = exigeWelcome && !sinWelcome && welcomesFicha.every((w) => w.libres === 0);
+  /** No hay ninguno que se pueda elegir: se ofrece seguir sin Welcome. */
+  const sinOpcion = sinWelcome || todosLlenos;
   const problemas = {
     clave: problemaClave(clave),
     confirmacion: confirmacion !== clave ? "Las dos claves no coinciden." : null,
@@ -144,7 +151,14 @@ export default function CrearPerfilPage() {
         : foto.size > TOPE_FOTO
           ? "La foto pesa más de 10 MB."
           : null,
-    welcome: exigeWelcome && welcomeId === "" ? "Elige tu sesión Welcome." : null,
+    welcome:
+      !exigeWelcome || welcomeId !== ""
+        ? null
+        : sinOpcion
+          ? sinDisponibilidad
+            ? null
+            : "Marca la casilla para terminar tu perfil sin Welcome."
+          : "Elige tu sesión Welcome.",
   };
   const valido = Object.values(problemas).every((p) => p === null);
   const mostrar = (p: string | null) =>
@@ -167,6 +181,7 @@ export default function CrearPerfilPage() {
       form.set("hobbies", hobbies);
       form.set("fechaNacimiento", fechaNacimiento);
       form.set("welcomeId", welcomeId);
+      if (sinOpcion && sinDisponibilidad && welcomeId === "") form.set("sinWelcomeDisponible", "1");
       form.set("foto", foto);
       const res = await fetch("/api/public/perfil", { method: "POST", body: form });
       const cuerpo = (await res.json().catch(() => ({}))) as {
@@ -238,6 +253,20 @@ export default function CrearPerfilPage() {
                   esperamos!
                 </p>
               )}
+              {listo.welcome === null && sinDisponibilidad && (
+                <p
+                  style={{
+                    background: "#fff8e1",
+                    border: "1px solid #ffe082",
+                    borderRadius: "0.7rem",
+                    padding: "0.7rem",
+                    marginBottom: "0.9rem",
+                  }}
+                >
+                  👋 Tu sesión <strong>Welcome</strong> queda pendiente: el equipo de Servicio te
+                  ayudará a agendarla.
+                </p>
+              )}
             </>
           ) : (
             <p style={{ color: "#4b5563", marginBottom: "0.9rem" }}>
@@ -264,9 +293,6 @@ export default function CrearPerfilPage() {
       </main>
     );
   }
-
-  const sinWelcome = exigeWelcome && ficha.welcomes.length === 0;
-  const todosLlenos = exigeWelcome && !sinWelcome && ficha.welcomes.every((w) => w.libres === 0);
 
   return (
     <main style={marco}>
@@ -460,9 +486,31 @@ export default function CrearPerfilPage() {
                 >
                   {sinWelcome
                     ? "Todavía no hay sesiones Welcome programadas para ti."
-                    : "Todas las sesiones Welcome están llenas por ahora."}{" "}
-                  Vuelve a abrir este enlace más tarde, o escríbenos para que te ayudemos. Tu perfil
-                  se guarda cuando eliges tu Welcome.
+                    : "Todas las sesiones Welcome están llenas por ahora."}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "0.5rem",
+                      marginTop: "0.6rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sinDisponibilidad}
+                      onChange={(e) => setSinDisponibilidad(e.target.checked)}
+                      style={{ marginTop: "0.2rem" }}
+                    />
+                    <span>
+                      Sin disponibilidad de Welcome: consultaré a Servicio
+                      <span style={{ display: "block", fontWeight: 400 }}>
+                        Termino mi perfil ahora y el equipo de Servicio me ayuda a agendar la sesión
+                        Welcome.
+                      </span>
+                    </span>
+                  </label>
                 </div>
               ) : (
                 <div style={{ display: "grid", gap: "0.4rem" }}>
@@ -515,7 +563,7 @@ export default function CrearPerfilPage() {
                   <div style={ayuda}>La hora está en la zona horaria de este dispositivo.</div>
                 </div>
               )}
-              {!sinWelcome && !todosLlenos && mostrar(problemas.welcome)}
+              {mostrar(problemas.welcome)}
             </div>
           )}
 

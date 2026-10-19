@@ -2000,8 +2000,8 @@ El proceso de Servicio › Welcome Session de MOSAICO, ajustado a KIDS. Migraci�
   usa la ruta de la ficha (`/api/contracts/ninos/[id]/welcome`, `matriculas.gestionar`);
   con 2 perdidos el botón cede al video.
 - **Pendientes de agendar**: matrícula ACTIVA sin ningún Welcome, con motivo DERIVADO —
-  SOLO_PERFIL (se mandó el enlace sin Welcome), SIN_PERFIL (no creó su perfil) o
-  SIN_REGISTRO—, de lo más antiguo a lo nuevo.
+  SOLO_PERFIL (se mandó el enlace sin Welcome), SIN_PERFIL (no creó su perfil),
+  SIN_DISPONIBILIDAD (lo creó marcando "sin Welcome disponible") o SIN_REGISTRO—, de lo más antiguo a lo nuevo.
 - **Video Welcome**: quien faltó a sus 2 sin asistir a ninguno y sin otro por delante.
   El video es un **ENLACE** configurable (`platform_config.welcome_video_url`,
   `PUT …/welcome/video`, `catalogo.gestionar`) —MOSAICO sube un mp4 de hasta 300 MB a
@@ -2189,6 +2189,12 @@ la clave inicial en una alerta y deja "el WhatsApp lo maneja KIDS2026").
   **elige su Welcome, obligatorio**: sin Welcome programado no se puede terminar
   (el negocio los programa con anticipación). Solo ve los que le sirven, con la
   regla de `sqlElegible` y SU nivel (el del panel del alumno).
+  **Sin Welcome con cupo (2026-10-19, migración `20261019000000`)**: si no le sirve
+  NINGUNO o están todos llenos, la página muestra la casilla "Sin disponibilidad de
+  Welcome: consultaré a Servicio", que omite la obligación (`sinWelcomeDisponible`).
+  El servidor la rechaza (409) si en realidad hay uno con cupo. Queda en
+  `contracts_enlace_perfil.sin_welcome_disponible` y el niño sale en Servicio ›
+  Welcome › Pendientes de agendar con el motivo `SIN_DISPONIBILIDAD`.
 - **Todo junto o nada** (`completarPerfilNino`): clave (`fijarClaveNinoTx`: hash +
   copia en la bóveda + "cambiar clave al entrar" APAGADO + sesiones revocadas),
   perfil (`people_person.sobre_ti|hobbies|perfil_completado_en`), reserva del

@@ -44,5 +44,11 @@ export function cuandoWelcome(iso: string): { fecha: string; hora: string } {
 export const MOTIVO_PENDIENTE: Record<string, { texto: string; color: string; fondo: string }> = {
   SOLO_PERFIL: { texto: "Enlace de sólo perfil", color: "#4527a0", fondo: "#ede7f6" },
   SIN_PERFIL: { texto: "No ha creado su perfil", color: "#b57a00", fondo: "#fff8e1" },
+  // Creó su perfil sin Welcome porque no había cupo: hay que agendárselo.
+  SIN_DISPONIBILIDAD: {
+    texto: "Sin Welcome disponible: consultar a Servicio",
+    color: "#c62828",
+    fondo: "#ffebee",
+  },
   SIN_REGISTRO: { texto: "Sin registro de motivo", color: "#37474f", fondo: "#eceff1" },
 };

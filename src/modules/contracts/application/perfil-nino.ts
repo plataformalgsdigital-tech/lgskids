@@ -282,6 +282,12 @@ export interface DatosPerfil {
   hobbies: string;
   fechaNacimiento: string;
   welcomeId: string;
+  /**
+   * "Sin disponibilidad de Welcome: consultaré a Servicio" (2026-10-19): sin
+   * ningún Welcome con cupo para él, termina su perfil sin agendar y Servicio se
+   * lo agenda después. El servidor lo acepta SOLO si de verdad no hay uno con cupo.
+   */
+  sinWelcomeDisponible?: boolean;
   foto: { nombre: string; mime: string; bytes: Buffer } | null;
 }
 
@@ -321,8 +327,10 @@ export async function completarPerfilNino(
       "Este enlace ya se usó o fue reemplazado. Si necesitas uno nuevo, pídelo a LGS Kids.",
     );
   }
-  // El Welcome es obligatorio salvo en el enlace "sin Welcome" (curso ya andando).
-  if (enlace.exigeWelcome && datos.welcomeId === "") {
+  // El Welcome es obligatorio salvo en el enlace "sin Welcome" (curso ya andando)
+  // o cuando no hay NINGUNO con cupo y el niño marcó "consultaré a Servicio".
+  const sinWelcome = enlace.exigeWelcome && datos.welcomeId === "";
+  if (sinWelcome && datos.sinWelcomeDisponible !== true) {
     throw new ValidationError("Elige tu sesión Welcome.");
   }
   const nino = await queryOne<{ userId: string | null; usuario: string | null }>(
@@ -340,6 +348,16 @@ export async function completarPerfilNino(
     throw new ConflictError("El niño no tiene matrícula activa: avisa a LGS Kids.");
   }
   const nivel = await nivelDeNino(enlace.childPersonId);
+  // La casilla no sirve para saltarse el Welcome si hay uno que se puede elegir:
+  // se mira con la MISMA regla que la lista que vio el niño.
+  if (sinWelcome) {
+    const conCupo = (await welcomesDisponibles({ classroomId: matricula.classroomId, nivel })).some(
+      (w) => w.libres > 0,
+    );
+    if (conCupo) {
+      throw new ConflictError("Ya hay sesiones Welcome con cupo: elige una.");
+    }
+  }
 
   // La foto va primero; si algo falla después, se suelta.
   const foto = datos.foto as NonNullable<DatosPerfil["foto"]>;
@@ -374,7 +392,7 @@ export async function completarPerfilNino(
         [enlace.childPersonId, datos.sobreTi.trim(), datos.hobbies.trim(), datos.fechaNacimiento],
         tx,
       );
-      if (enlace.exigeWelcome) {
+      if (enlace.exigeWelcome && !sinWelcome) {
         await reservarWelcomeTx(tx, {
           welcomeId: datos.welcomeId,
           childPersonId: enlace.childPersonId,
@@ -383,9 +401,11 @@ export async function completarPerfilNino(
           agendadoPor: null,
         });
       }
+      // `sin_welcome_disponible` deja la marca para Servicio › Welcome › Pendientes.
       await execute(
-        `UPDATE contracts_enlace_perfil SET usado_en = now() WHERE id = $1`,
-        [enlace.id],
+        `UPDATE contracts_enlace_perfil SET usado_en = now(), sin_welcome_disponible = $2
+          WHERE id = $1`,
+        [enlace.id, sinWelcome],
         tx,
       );
     });
@@ -399,7 +419,11 @@ export async function completarPerfilNino(
     accion: "contracts.perfil_completado",
     entidad: "people_person",
     entidadId: enlace.childPersonId,
-    payload: { welcomeId: datos.welcomeId, fotoId: subida.id },
+    payload: {
+      welcomeId: sinWelcome ? null : datos.welcomeId,
+      sinWelcomeDisponible: sinWelcome,
+      fotoId: subida.id,
+    },
     ip: ip ?? null,
   });
   return { usuario: nino.usuario, welcome: await welcomeDeNino(enlace.childPersonId) };

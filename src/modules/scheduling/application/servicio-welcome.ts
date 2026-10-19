@@ -312,9 +312,11 @@ export async function reagendamientosWelcome(
  * Por qué un niño no tiene Welcome (como MOSAICO, derivado):
  *  - SOLO_PERFIL: se le mandó el enlace de perfil SIN Welcome (curso ya andando).
  *  - SIN_PERFIL: todavía no crea su perfil (ahí es donde lo agenda).
+ *  - SIN_DISPONIBILIDAD: creó su perfil sin Welcome porque no había ninguno con
+ *    cupo ("consultaré a Servicio"): hay que agendárselo.
  *  - SIN_REGISTRO: creó su perfil y no quedó agendado.
  */
-export type MotivoPendiente = "SOLO_PERFIL" | "SIN_PERFIL" | "SIN_REGISTRO";
+export type MotivoPendiente = "SOLO_PERFIL" | "SIN_PERFIL" | "SIN_DISPONIBILIDAD" | "SIN_REGISTRO";
 
 export interface PendienteWelcome extends NinoWelcome {
   motivo: MotivoPendiente;
@@ -325,6 +327,7 @@ export interface PendienteWelcome extends NinoWelcome {
 const SQL_MOTIVO = `CASE
     WHEN ep.exige_welcome = false THEN 'SOLO_PERFIL'
     WHEN b.perfil_completado_en IS NULL THEN 'SIN_PERFIL'
+    WHEN ep.sin_welcome_disponible THEN 'SIN_DISPONIBILIDAD'
     ELSE 'SIN_REGISTRO' END`;
 
 /**
@@ -346,7 +349,7 @@ export async function pendientesWelcome(
        ${CONTEXTO_NINO}
        ${HISTORIA_NINO}
        LEFT JOIN LATERAL (
-            SELECT exige_welcome FROM contracts_enlace_perfil
+            SELECT exige_welcome, sin_welcome_disponible FROM contracts_enlace_perfil
              WHERE child_person_id = b.id ORDER BY creado_en DESC LIMIT 1) ep ON true
       WHERE m.matricula_estado = 'ACTIVA'
         AND COALESCE(h.sesiones, 0) = 0
