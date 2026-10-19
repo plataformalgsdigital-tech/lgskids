@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { descargarCsv } from "@/ui/csv";
 import { SoloSi } from "@/ui/SoloSi";
@@ -28,6 +28,8 @@ interface Ficha {
   zoomUrl: string | null;
   /** Foto de su ficha. La sirve `/api/scheduling/guias/[id]/foto`. */
   fotoFileId: string | null;
+  /** Salones activos que tiene asignados. */
+  salonesActivos: number;
 }
 
 interface Enlace {
@@ -143,6 +145,7 @@ function descargarGuias(guias: Ficha[], enlaces: Record<string, Enlace>) {
       "Domicilio",
       "Sala de Zoom",
       "Tiene foto",
+      "Salones activos",
       "Enlace de ficha",
     ],
     guias.map((g) => {
@@ -159,6 +162,7 @@ function descargarGuias(guias: Ficha[], enlaces: Record<string, Enlace>) {
         g.domicilio,
         g.zoomUrl,
         g.fotoFileId !== null,
+        g.salonesActivos,
         e === undefined ? "" : COLOR_ENLACE[e.estado].txt,
       ];
     }),
@@ -177,30 +181,12 @@ export default function GuiasPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
-  const cargar = useCallback(async () => {
-    const res = await apiFetch("/api/scheduling/guias");
-    if (!res.ok) {
-      setError("No se pudo cargar la lista de guías.");
-      return;
-    }
-    const data = (await res.json()) as {
-      guias: Ficha[];
-      enlaces: Enlace[];
-      diasVigencia: number;
-    };
-    setGuias(data.guias);
-    setEnlaces(Object.fromEntries(data.enlaces.map((e) => [e.guiaUserId, e])));
-    setDiasVigencia(data.diasVigencia);
-  }, []);
+  const [buscar, setBuscar] = useState("");
+  /** La ficha abierta desde la lista dejó una entrada en el historial. */
+  const empujado = useRef(false);
+  const primeraCarga = useRef(true);
 
-  useEffect(() => {
-    async function inicial() {
-      await cargar();
-    }
-    void inicial();
-  }, [cargar]);
-
-  function abrir(g: Ficha) {
+  const abrir = useCallback((g: Ficha, empujar = true) => {
     setSel(g);
     setAviso(null);
     setError(null);
@@ -218,7 +204,93 @@ export default function GuiasPage() {
       fechaNacimiento: g.fechaNacimiento ?? "",
       zoomUrl: g.zoomUrl ?? "",
     });
+    // La ficha tiene su URL (?guia=…): "Atrás" del navegador vuelve a la lista
+    // y el enlace se puede compartir.
+    if (empujar) {
+      window.history.pushState(null, "", `?guia=${g.guiaUserId}`);
+      empujado.current = true;
+    }
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  const cargar = useCallback(async () => {
+    const res = await apiFetch("/api/scheduling/guias");
+    if (!res.ok) {
+      setError("No se pudo cargar la lista de guías.");
+      return;
+    }
+    const data = (await res.json()) as {
+      guias: Ficha[];
+      enlaces: Enlace[];
+      diasVigencia: number;
+    };
+    setGuias(data.guias);
+    setEnlaces(Object.fromEntries(data.enlaces.map((e) => [e.guiaUserId, e])));
+    setDiasVigencia(data.diasVigencia);
+    // Al entrar con ?guia=… (enlace directo o recarga) se abre esa ficha.
+    if (primeraCarga.current) {
+      primeraCarga.current = false;
+      const id = new URLSearchParams(window.location.search).get("guia");
+      const g = data.guias.find((x) => x.guiaUserId === id);
+      if (g !== undefined) abrir(g, false);
+    }
+  }, [abrir]);
+
+  useEffect(() => {
+    async function inicial() {
+      await cargar();
+    }
+    void inicial();
+  }, [cargar]);
+
+  // "Atrás"/"Adelante" del navegador: la URL dice qué ficha mostrar.
+  useEffect(() => {
+    function alNavegar() {
+      const id = new URLSearchParams(window.location.search).get("guia");
+      const g = id === null ? undefined : guias?.find((x) => x.guiaUserId === id);
+      if (g === undefined) {
+        empujado.current = false;
+        setSel(null);
+        setEnlaceNuevo(null);
+      } else {
+        abrir(g, false);
+      }
+    }
+    window.addEventListener("popstate", alNavegar);
+    return () => window.removeEventListener("popstate", alNavegar);
+  }, [guias, abrir]);
+
+  function volver() {
+    setAviso(null);
+    setError(null);
+    if (empujado.current) {
+      window.history.back(); // el popstate cierra la ficha
+      return;
+    }
+    window.history.replaceState(null, "", window.location.pathname);
+    setSel(null);
+    setEnlaceNuevo(null);
   }
+
+  const q = buscar.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const visibles = (guias ?? []).filter((g) =>
+    q === ""
+      ? true
+      : [nombreDeGuia(g), g.username, g.docNumero, g.email, g.pais]
+          .join(" ")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .includes(q),
+  );
+  const th: CSSProperties = {
+    padding: "0.5rem 0.6rem",
+    textAlign: "left",
+    fontWeight: 600,
+    color: "var(--texto-suave)",
+    whiteSpace: "nowrap",
+  };
+  const td: CSSProperties = { padding: "0.55rem 0.6rem", verticalAlign: "middle" };
 
   async function emitirEnlace() {
     if (sel === null) return;
@@ -347,75 +419,141 @@ export default function GuiasPage() {
         <p style={{ color: "#1b5e20", fontWeight: 600, marginBottom: "0.8rem" }}>{aviso}</p>
       )}
 
-      <div
-        style={{ display: "grid", gridTemplateColumns: "18rem 1fr", gap: "1rem" }}
-        className="guias-dos"
-      >
-        <section style={{ ...tarjeta, padding: "0.6rem" }}>
+      {sel === null ? (
+        <section style={{ ...tarjeta, padding: "0.9rem 1rem" }}>
+          <input
+            type="search"
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            placeholder="Buscar por nombre, usuario, documento, correo o país"
+            aria-label="Buscar guía"
+            style={{ ...campo, maxWidth: "26rem", marginBottom: "0.75rem" }}
+          />
           {guias === null ? (
-            <p style={{ color: "var(--texto-suave)", padding: "0.5rem" }}>Cargando…</p>
+            <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
           ) : guias.length === 0 ? (
-            <p style={{ color: "var(--texto-suave)", padding: "0.5rem" }}>
+            <p style={{ color: "var(--texto-suave)" }}>
               No hay guías activos. Créalos en Usuarios y roles con el rol <strong>guia</strong>.
             </p>
+          ) : visibles.length === 0 ? (
+            <p style={{ color: "var(--texto-suave)" }}>Ningún guía coincide con la búsqueda.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              {guias.map((g) => (
-                <button
-                  key={g.guiaUserId}
-                  type="button"
-                  onClick={() => abrir(g)}
-                  style={{
-                    textAlign: "left",
-                    border: "none",
-                    borderRadius: "0.5rem",
-                    padding: "0.6rem 0.7rem",
-                    cursor: "pointer",
-                    background: sel?.guiaUserId === g.guiaUserId ? "#eef2ff" : "transparent",
-                    font: "inherit",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.6rem",
-                  }}
-                >
-                  <FotoGuia guia={g} />
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ fontWeight: 700 }}>{nombreDeGuia(g)}</span>
-                    <span
-                      style={{ display: "block", fontSize: "0.74rem", color: "var(--texto-suave)" }}
-                    >
-                      {g.username}
-                      {g.zoomUrl === null || g.zoomUrl === ""
-                        ? " · sin Zoom"
-                        : ` · ${g.pais ?? "—"}`}
-                    </span>
-                    {enlaces[g.guiaUserId] !== undefined && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          marginTop: "0.25rem",
-                          fontSize: "0.68rem",
-                          fontWeight: 700,
-                          padding: "0.1rem 0.45rem",
-                          borderRadius: "1rem",
-                          background: COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].bg,
-                          color: COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].c,
-                        }}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.86rem" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1.5px solid #e3e7f0" }}>
+                    {[
+                      "Guía",
+                      "Documento",
+                      "País",
+                      "Correo",
+                      "Teléfono",
+                      "Sala de Zoom",
+                      "Salones activos",
+                      "Enlace de ficha",
+                      "",
+                    ].map((t) => (
+                      <th key={t} style={th}>
+                        {t}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map((g) => {
+                    const e = enlaces[g.guiaUserId];
+                    const sinZoom = g.zoomUrl === null || g.zoomUrl === "";
+                    return (
+                      <tr
+                        key={g.guiaUserId}
+                        onClick={() => abrir(g)}
+                        title="Abrir la ficha del guía"
+                        style={{ borderBottom: "1px solid #edf0f6", cursor: "pointer" }}
                       >
-                        {COLOR_ENLACE[enlaces[g.guiaUserId]!.estado].txt}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              ))}
+                        <td style={td}>
+                          <span style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                            <FotoGuia guia={g} />
+                            <span style={{ minWidth: 0 }}>
+                              <span style={{ display: "block", fontWeight: 700 }}>
+                                {nombreDeGuia(g)}
+                              </span>
+                              <span style={{ fontSize: "0.74rem", color: "var(--texto-suave)" }}>
+                                {g.username}
+                              </span>
+                            </span>
+                          </span>
+                        </td>
+                        <td style={td}>{g.docNumero ?? "—"}</td>
+                        <td style={td}>{g.pais ?? "—"}</td>
+                        <td style={{ ...td, wordBreak: "break-all" }}>{g.email ?? "—"}</td>
+                        <td style={{ ...td, whiteSpace: "nowrap" }}>{g.telefono ?? "—"}</td>
+                        <td style={td}>
+                          {sinZoom ? (
+                            <span style={{ color: "#c62828", fontWeight: 700 }}>Sin sala</span>
+                          ) : (
+                            <a
+                              href={g.zoomUrl ?? undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(ev) => ev.stopPropagation()}
+                              style={{ fontWeight: 600 }}
+                            >
+                              🎥 Abrir
+                            </a>
+                          )}
+                        </td>
+                        <td style={{ ...td, textAlign: "center", fontWeight: 700 }}>
+                          {g.salonesActivos}
+                        </td>
+                        <td style={td}>
+                          {e === undefined ? (
+                            <span style={{ color: "var(--texto-suave)" }}>—</span>
+                          ) : (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                fontSize: "0.72rem",
+                                fontWeight: 700,
+                                padding: "0.1rem 0.5rem",
+                                borderRadius: "1rem",
+                                whiteSpace: "nowrap",
+                                background: COLOR_ENLACE[e.estado].bg,
+                                color: COLOR_ENLACE[e.estado].c,
+                              }}
+                            >
+                              {COLOR_ENLACE[e.estado].txt}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ ...td, whiteSpace: "nowrap", fontWeight: 700 }}>
+                          <span style={{ color: "var(--lgs-azul)" }}>Ver ficha →</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
-
-        <section style={tarjeta}>
-          {sel === null ? (
-            <p style={{ color: "var(--texto-suave)" }}>Elige un guía para ver y editar su ficha.</p>
-          ) : (
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={volver}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              marginBottom: "0.75rem",
+              color: "var(--lgs-azul)",
+              fontSize: "0.9rem",
+              cursor: "pointer",
+            }}
+          >
+            ← Volver a Guías
+          </button>
+          <section style={{ ...tarjeta, maxWidth: "52rem" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
                 <FotoGuia guia={sel} />
@@ -700,9 +838,9 @@ export default function GuiasPage() {
                 </button>
               </SoloSi>
             </div>
-          )}
-        </section>
-      </div>
+          </section>
+        </>
+      )}
 
       <style>{`@media (max-width: 860px) { .guias-dos { grid-template-columns: 1fr !important; } }`}</style>
     </main>

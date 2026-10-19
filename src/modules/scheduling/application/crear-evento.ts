@@ -86,6 +86,8 @@ export interface FichaGuia {
   fechaNacimiento: string | null;
   zoomUrl: string | null;
   fotoFileId: string | null;
+  /** Salones ACTIVOS que tiene asignados (el guía del salón, no los reemplazos). */
+  salonesActivos: number;
 }
 
 /** Ficha operativa de todos los guías activos. */
@@ -94,7 +96,9 @@ export async function fichasDeGuias(): Promise<FichaGuia[]> {
     `SELECT u.id AS "guiaUserId", u.username,
             g.nombres, g.apellidos, g.doc_numero AS "docNumero", g.email, g.telefono,
             g.pais, g.domicilio, g.fecha_nacimiento::text AS "fechaNacimiento",
-            g.zoom_url AS "zoomUrl", g.foto_file_id AS "fotoFileId"
+            g.zoom_url AS "zoomUrl", g.foto_file_id AS "fotoFileId",
+            (SELECT count(*)::int FROM scheduling_classroom c
+              WHERE c.guia_user_id = u.id AND c.activo) AS "salonesActivos"
        FROM identity_user u
        JOIN access_user_role ur ON ur.user_id = u.id
        JOIN access_role r ON r.id = ur.role_id
@@ -102,7 +106,7 @@ export async function fichasDeGuias(): Promise<FichaGuia[]> {
       WHERE r.code = 'guia' AND u.estado = 'ACTIVO'
       GROUP BY u.id, u.username, g.nombres, g.apellidos, g.doc_numero, g.email,
                g.telefono, g.pais, g.domicilio, g.fecha_nacimiento, g.zoom_url, g.foto_file_id
-      ORDER BY u.username`,
+      ORDER BY COALESCE(NULLIF(TRIM(CONCAT_WS(' ', g.nombres, g.apellidos)), ''), u.username)`,
   );
 }
 
