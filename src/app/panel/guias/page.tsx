@@ -112,7 +112,8 @@ function FotoGuia({ guia }: { guia: Ficha }) {
     // La sirve una ruta AUTENTICADA: `next/image` no puede optimizarla.
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/api/scheduling/guias/${guia.guiaUserId}/foto`}
+      // `v` cambia con la foto: la ruta cachea una hora y la URL es la del guía.
+      src={`/api/scheduling/guias/${guia.guiaUserId}/foto?v=${guia.fotoFileId}`}
       alt=""
       style={{
         width: lado,
@@ -201,6 +202,18 @@ function descargarGuias(guias: Ficha[], enlaces: Record<string, Enlace>) {
   );
 }
 
+const formDe = (g: Ficha) => ({
+  nombres: g.nombres ?? "",
+  apellidos: g.apellidos ?? "",
+  docNumero: g.docNumero ?? "",
+  email: g.email ?? "",
+  telefono: g.telefono ?? "",
+  pais: g.pais ?? "",
+  domicilio: g.domicilio ?? "",
+  fechaNacimiento: g.fechaNacimiento ?? "",
+  zoomUrl: g.zoomUrl ?? "",
+});
+
 export default function GuiasPage() {
   const [guias, setGuias] = useState<Ficha[] | null>(null);
   const [enlaces, setEnlaces] = useState<Record<string, Enlace>>({});
@@ -219,24 +232,30 @@ export default function GuiasPage() {
   const empujado = useRef(false);
   const primeraCarga = useRef(true);
 
+  /** La ficha se ve en solo lectura; "Editar ficha" (con su permiso) la abre. */
+  const [editando, setEditando] = useState(false);
+  const [fotoNueva, setFotoNueva] = useState<File | null>(null);
+  const [previoFoto, setPrevioFoto] = useState<string | null>(null);
+
+  const elegirFoto = (f: File | null) => {
+    setFotoNueva(f);
+    setPrevioFoto((anterior) => {
+      if (anterior !== null) URL.revokeObjectURL(anterior);
+      return f === null ? null : URL.createObjectURL(f);
+    });
+  };
+
   const abrir = useCallback((g: Ficha, empujar = true) => {
     setSel(g);
     setAviso(null);
     setError(null);
+    setEditando(false);
+    setFotoNueva(null);
+    setPrevioFoto(null);
     // El enlace se muestra UNA vez, al emitirlo: después solo queda su hash.
     setEnlaceNuevo(null);
     setCopiado(false);
-    setForm({
-      nombres: g.nombres ?? "",
-      apellidos: g.apellidos ?? "",
-      docNumero: g.docNumero ?? "",
-      email: g.email ?? "",
-      telefono: g.telefono ?? "",
-      pais: g.pais ?? "",
-      domicilio: g.domicilio ?? "",
-      fechaNacimiento: g.fechaNacimiento ?? "",
-      zoomUrl: g.zoomUrl ?? "",
-    });
+    setForm(formDe(g));
     // La ficha tiene su URL (?guia=…): "Atrás" del navegador vuelve a la lista
     // y el enlace se puede compartir.
     if (empujar) {
@@ -439,11 +458,34 @@ export default function GuiasPage() {
         setError(c.error?.message ?? "No se pudo guardar la ficha.");
         return;
       }
-      setAviso(`Ficha de ${sel.username} guardada.`);
+      if (fotoNueva !== null) {
+        const fd = new FormData();
+        fd.set("foto", fotoNueva);
+        const rf = await apiFetch(`/api/scheduling/guias/${sel.guiaUserId}/foto`, {
+          method: "POST",
+          body: fd,
+        });
+        if (!rf.ok) {
+          const c: { error?: { message?: string } } = await rf.json().catch(() => ({}));
+          setError(`Se guardaron los datos, pero no la foto: ${c.error?.message ?? "error"}.`);
+          await cargar();
+          return;
+        }
+      }
+      setAviso(`Ficha de ${nombreDeGuia(sel)} guardada.`);
+      setEditando(false);
+      elegirFoto(null);
       await cargar();
     } finally {
       setOcupado(false);
     }
+  }
+
+  function cancelarEdicion() {
+    if (sel !== null) setForm(formDe(sel));
+    elegirFoto(null);
+    setEditando(false);
+    setError(null);
   }
 
   const estadoSel = sel === null ? undefined : enlaces[sel.guiaUserId];
@@ -685,6 +727,29 @@ export default function GuiasPage() {
                     {sel.salonesActivos === 1 ? "salón activo" : "salones activos"}
                   </span>
                 </div>
+                {!editando && (
+                  <SoloSi op="op.guias.ficha_editar">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditando(true);
+                        setAviso(null);
+                      }}
+                      style={{
+                        padding: "0.5rem 1rem",
+                        borderRadius: "0.6rem",
+                        border: "1.5px solid var(--lgs-azul)",
+                        background: "white",
+                        color: "var(--lgs-azul-oscuro)",
+                        fontWeight: 700,
+                        fontSize: "0.85rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✏️ Editar ficha
+                    </button>
+                  </SoloSi>
+                )}
                 <SoloSi op="op.guias.estado">
                   <button
                     type="button"
@@ -720,129 +785,240 @@ export default function GuiasPage() {
                 </p>
               )}
 
-              <div
-                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
-                className="guias-dos"
+              {/* Solo lectura hasta "Editar ficha": un fieldset deshabilitado
+                  apaga todos sus campos de una vez. */}
+              <fieldset
+                className="ficha-guia"
+                disabled={!editando || ocupado}
+                style={{
+                  border: "none",
+                  padding: 0,
+                  margin: 0,
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.7rem",
+                }}
               >
-                <div>
-                  <label style={rotulo} htmlFor="g-nom">
-                    Nombres
-                  </label>
-                  <input
-                    id="g-nom"
-                    value={form.nombres}
-                    onChange={(e) => setForm({ ...form, nombres: e.target.value })}
-                    style={campo}
-                  />
-                </div>
-                <div>
-                  <label style={rotulo} htmlFor="g-ape">
-                    Apellidos
-                  </label>
-                  <input
-                    id="g-ape"
-                    value={form.apellidos}
-                    onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
-                    style={campo}
-                  />
-                </div>
-                <div>
-                  <label style={rotulo} htmlFor="g-doc">
-                    Documento
-                  </label>
-                  <input
-                    id="g-doc"
-                    value={form.docNumero}
-                    onChange={(e) => setForm({ ...form, docNumero: e.target.value })}
-                    style={campo}
-                  />
-                </div>
-                <div>
-                  <label style={rotulo} htmlFor="g-nac">
-                    Fecha de nacimiento
-                  </label>
-                  <input
-                    id="g-nac"
-                    type="date"
-                    value={form.fechaNacimiento}
-                    onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
-                    style={campo}
-                  />
-                </div>
-                <div>
-                  <label style={rotulo} htmlFor="g-mail">
-                    Correo
-                  </label>
-                  <input
-                    id="g-mail"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    style={campo}
-                  />
-                </div>
-                <div>
-                  <label style={rotulo} htmlFor="g-tel">
-                    Teléfono
-                  </label>
-                  <input
-                    id="g-tel"
-                    value={form.telefono}
-                    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                    style={campo}
-                  />
-                </div>
-                <div>
-                  <label style={rotulo} htmlFor="g-pais">
-                    País
-                  </label>
-                  <select
-                    id="g-pais"
-                    value={form.pais}
-                    onChange={(e) => setForm({ ...form, pais: e.target.value })}
-                    style={campo}
+                {editando && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.8rem",
+                      padding: "0.6rem 0.8rem",
+                      border: "1px dashed #cfd6e6",
+                      borderRadius: "0.7rem",
+                      background: "#fbfcff",
+                    }}
                   >
-                    <option value="">Sin país</option>
-                    {PAISES.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+                    {previoFoto !== null ? (
+                      // Vista previa local de la foto elegida (aún no subida).
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={previoFoto}
+                        alt=""
+                        style={{
+                          width: "3.2rem",
+                          height: "3.2rem",
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <FotoGuia guia={sel} />
+                    )}
+                    <label style={{ flex: 1 }}>
+                      <span style={rotulo}>Foto (JPG, PNG o WebP)</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) => elegirFoto(e.target.files?.[0] ?? null)}
+                        style={{ fontSize: "0.82rem" }}
+                      />
+                    </label>
+                    {fotoNueva !== null && (
+                      <button
+                        type="button"
+                        onClick={() => elegirFoto(null)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#8a2020",
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div
+                  style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
+                  className="guias-dos"
+                >
+                  <div>
+                    <label style={rotulo} htmlFor="g-nom">
+                      Nombres
+                    </label>
+                    <input
+                      id="g-nom"
+                      value={form.nombres}
+                      onChange={(e) => setForm({ ...form, nombres: e.target.value })}
+                      style={campo}
+                    />
+                  </div>
+                  <div>
+                    <label style={rotulo} htmlFor="g-ape">
+                      Apellidos
+                    </label>
+                    <input
+                      id="g-ape"
+                      value={form.apellidos}
+                      onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
+                      style={campo}
+                    />
+                  </div>
+                  <div>
+                    <label style={rotulo} htmlFor="g-doc">
+                      Documento
+                    </label>
+                    <input
+                      id="g-doc"
+                      value={form.docNumero}
+                      onChange={(e) => setForm({ ...form, docNumero: e.target.value })}
+                      style={campo}
+                    />
+                  </div>
+                  <div>
+                    <label style={rotulo} htmlFor="g-nac">
+                      Fecha de nacimiento
+                    </label>
+                    <input
+                      id="g-nac"
+                      type="date"
+                      value={form.fechaNacimiento}
+                      onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
+                      style={campo}
+                    />
+                  </div>
+                  <div>
+                    <label style={rotulo} htmlFor="g-mail">
+                      Correo
+                    </label>
+                    <input
+                      id="g-mail"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      style={campo}
+                    />
+                  </div>
+                  <div>
+                    <label style={rotulo} htmlFor="g-tel">
+                      Teléfono
+                    </label>
+                    <input
+                      id="g-tel"
+                      value={form.telefono}
+                      onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                      style={campo}
+                    />
+                  </div>
+                  <div>
+                    <label style={rotulo} htmlFor="g-pais">
+                      País
+                    </label>
+                    <select
+                      id="g-pais"
+                      value={form.pais}
+                      onChange={(e) => setForm({ ...form, pais: e.target.value })}
+                      style={campo}
+                    >
+                      <option value="">Sin país</option>
+                      {PAISES.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={rotulo} htmlFor="g-dom">
+                      Domicilio
+                    </label>
+                    <input
+                      id="g-dom"
+                      value={form.domicilio}
+                      onChange={(e) => setForm({ ...form, domicilio: e.target.value })}
+                      style={campo}
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label style={rotulo} htmlFor="g-dom">
-                    Domicilio
+                  <label style={rotulo} htmlFor="g-zoom">
+                    Sala de Zoom
                   </label>
                   <input
-                    id="g-dom"
-                    value={form.domicilio}
-                    onChange={(e) => setForm({ ...form, domicilio: e.target.value })}
+                    id="g-zoom"
+                    value={form.zoomUrl}
+                    onChange={(e) => setForm({ ...form, zoomUrl: e.target.value })}
+                    placeholder="https://zoom.us/j/NÚMERO"
                     style={campo}
                   />
+                  <p
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--texto-suave)",
+                      marginTop: "0.2rem",
+                    }}
+                  >
+                    Debe ser el enlace de la <strong>sala</strong>, no el de chat o contacto: ese
+                    último le abre al alumno “Enviar solicitud de contacto” en vez de la clase. El
+                    enlace de anfitrión (<code>/s/</code>) se convierte solo. Dos guías no pueden
+                    compartir sala.
+                  </p>
                 </div>
-              </div>
+              </fieldset>
 
-              <div>
-                <label style={rotulo} htmlFor="g-zoom">
-                  Sala de Zoom
-                </label>
-                <input
-                  id="g-zoom"
-                  value={form.zoomUrl}
-                  onChange={(e) => setForm({ ...form, zoomUrl: e.target.value })}
-                  placeholder="https://zoom.us/j/NÚMERO"
-                  style={campo}
-                />
-                <p
-                  style={{ fontSize: "0.75rem", color: "var(--texto-suave)", marginTop: "0.2rem" }}
-                >
-                  Debe ser el enlace de la <strong>sala</strong>, no el de chat o contacto: ese
-                  último le abre al alumno “Enviar solicitud de contacto” en vez de la clase. El
-                  enlace de anfitrión (<code>/s/</code>) se convierte solo. Dos guías no pueden
-                  compartir sala.
-                </p>
-              </div>
+              {editando && (
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => void guardar()}
+                    disabled={ocupado}
+                    style={{
+                      padding: "0.6rem 1.2rem",
+                      borderRadius: "0.6rem",
+                      border: "none",
+                      background: "var(--lgs-azul)",
+                      color: "white",
+                      fontWeight: 700,
+                      cursor: ocupado ? "wait" : "pointer",
+                    }}
+                  >
+                    {ocupado ? "Guardando…" : "💾 Guardar cambios"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelarEdicion}
+                    disabled={ocupado}
+                    style={{
+                      padding: "0.6rem 1.2rem",
+                      borderRadius: "0.6rem",
+                      border: "1.5px solid #d8dce6",
+                      background: "white",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
 
               <section
                 style={{
@@ -969,32 +1145,13 @@ export default function GuiasPage() {
                   )}
                 </div>
               </section>
-
-              <SoloSi op="op.guias.ficha_editar">
-                <button
-                  type="button"
-                  onClick={() => void guardar()}
-                  disabled={ocupado}
-                  style={{
-                    alignSelf: "flex-start",
-                    padding: "0.6rem 1.2rem",
-                    borderRadius: "0.6rem",
-                    border: "none",
-                    background: "var(--lgs-azul)",
-                    color: "white",
-                    fontWeight: 700,
-                    cursor: ocupado ? "wait" : "pointer",
-                  }}
-                >
-                  {ocupado ? "Guardando…" : "💾 Guardar ficha"}
-                </button>
-              </SoloSi>
             </div>
           </section>
         </>
       )}
 
-      <style>{`@media (max-width: 860px) { .guias-dos { grid-template-columns: 1fr !important; } }`}</style>
+      <style>{`@media (max-width: 860px) { .guias-dos { grid-template-columns: 1fr !important; } }
+.ficha-guia :disabled { background: #f6f8fb; color: #2b2f3a; opacity: 1; cursor: default; }`}</style>
     </main>
   );
 }

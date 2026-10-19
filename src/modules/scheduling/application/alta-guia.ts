@@ -2,8 +2,9 @@ import { ROLES } from "@/modules/access";
 import { registrarAuditoria } from "@/modules/audit";
 import { eliminarArchivo, subirArchivo } from "@/modules/files";
 import { crearCuentaStaffTx, type CuentaCreada } from "@/modules/identity";
+import { execute, queryOne } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
-import { ValidationError } from "@/platform/errors";
+import { NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { logger } from "@/platform/logging/logger";
 import { guardarFichaGuia } from "./crear-evento";
@@ -14,6 +15,62 @@ import { crearInvitacionGuia, type InvitacionEmitida } from "./invitacion-guia";
  * acepta además PDF y audio, que aquí no tienen sentido).
  */
 export const MIMES_FOTO_GUIA: readonly string[] = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * Cambia la foto del guía desde su ficha (Académica › Guías). Primero sube la
+ * nueva y la deja en la ficha; la anterior se suelta DESPUÉS, así un fallo a
+ * medias deja la vieja y no al guía sin cara.
+ */
+export async function cambiarFotoGuia(input: {
+  actorUserId: string;
+  guiaUserId: string;
+  foto: { nombreOriginal: string; mime: string; bytes: Buffer };
+  ip?: string | null;
+}): Promise<{ fotoFileId: string }> {
+  if (!MIMES_FOTO_GUIA.includes(input.foto.mime)) {
+    throw new ValidationError("La foto debe ser JPG, PNG o WebP.");
+  }
+  const existe = await queryOne<{ anterior: string | null }>(
+    `SELECT foto_file_id AS anterior FROM scheduling_guia WHERE guia_user_id = $1`,
+    [input.guiaUserId],
+  );
+  if (existe === null) throw new NotFoundError("El guía no tiene ficha.");
+  const { id: fotoFileId } = await subirArchivo({
+    actorUserId: input.actorUserId,
+    nombreOriginal: input.foto.nombreOriginal,
+    mime: input.foto.mime,
+    bytes: input.foto.bytes,
+    entidad: "scheduling_guia_foto",
+    entidadId: input.guiaUserId,
+  });
+  try {
+    await execute(
+      `UPDATE scheduling_guia SET foto_file_id = $2, actualizado_en = now() WHERE guia_user_id = $1`,
+      [input.guiaUserId, fotoFileId],
+    );
+  } catch (error) {
+    await eliminarArchivo(fotoFileId).catch(() => undefined);
+    throw error;
+  }
+  if (existe.anterior !== null) {
+    const anterior = existe.anterior;
+    await eliminarArchivo(anterior).catch((e: unknown) => {
+      logger.warn("No se pudo soltar la foto anterior del guía", {
+        fotoFileId: anterior,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    });
+  }
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.foto_guia_cambiada",
+    entidad: "identity_user",
+    entidadId: input.guiaUserId,
+    payload: { fotoFileId },
+    ip: input.ip ?? null,
+  });
+  return { fotoFileId };
+}
 
 export interface DatosAltaGuia {
   nombres: string;

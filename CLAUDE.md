@@ -1297,7 +1297,10 @@ la reserva, curso y salón; la fila abre la ficha del contrato— y **Nueva
 reserva** (el asistente). La lista es `GET /api/contracts?matriculaEstado=RESERVADA`:
 se mira la MATRÍCULA, no el estado del contrato, porque un contrato PENDIENTE del
 panel sin salón no tomó cupo y no es una reserva; al aprobar pasa a ACTIVA y sale
-sola. `ContractListItem` ganó `matriculaDesde` (la fecha de la reserva). No ofrece
+sola. `ContractListItem` ganó `matriculaDesde` (la fecha de la reserva).
+El ítem del menú pide `contratos.ver` (2026-10-19; antes `contratos.gestionar`, y
+un rol de Servicio con `menu.reservas` marcado no lo veía): cada pestaña tiene su
+opción (`op.reservas.lista` con ver, `op.reservas.nueva` con gestionar). No ofrece
 "Aprobar" a propósito: las que llegan de LGS se aprueban en LGS (ver abajo).
 Dos puertas al mismo núcleo: el **wizard**
 `/panel/reservas` (JWT) y la **puerta de servicio** módulo `intake`
@@ -1443,6 +1446,11 @@ hacen cosas distintas:
   `usuarios.gestionar` + `op.guias.estado`) usa el MISMO `cambiarEstadoCuenta` de
   Usuarios y roles, solo para cuentas que son ÚNICAMENTE de guía (`exigirSoloGuia`;
   con otro rol, 409). Desactivar no le quita los salones: la confirmación avisa.
+  La ficha se ve en SOLO LECTURA; **"✏️ Editar ficha"** (`op.guias.ficha_editar`)
+  abre los campos y permite cambiar la **foto** (`POST
+/api/scheduling/guias/[guiaUserId]/foto` → `cambiarFotoGuia`: sube la nueva y
+  suelta la anterior DESPUÉS). La `<img>` lleva `?v=<fotoFileId>` porque la ruta
+  cachea una hora con la misma URL.
 - Reglas puras en `scheduling/domain/invitacion.ts` (token, hash, estado
   VIGENTE|USADA|REVOCADA|VENCIDA, vencimiento, armado del enlace) con pruebas en
   `tests/invitacion.test.ts`. Aplicación en `application/invitacion-guia.ts`.

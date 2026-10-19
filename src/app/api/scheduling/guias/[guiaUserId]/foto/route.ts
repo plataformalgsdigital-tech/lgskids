@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
-import { fotoDeGuia } from "@/modules/scheduling";
-import { handlerWithAuth } from "@/platform/http/handler";
+import { cambiarFotoGuia, fotoDeGuia } from "@/modules/scheduling";
+import { ValidationError } from "@/platform/errors";
+import { handlerWithAuth, json } from "@/platform/http/handler";
 
 bootstrapIdentity();
 
@@ -32,4 +33,32 @@ export const GET = handlerWithAuth(async (_request, auth, context) => {
       "Cache-Control": "private, max-age=3600",
     },
   });
+});
+
+/**
+ * POST — cambia la foto desde la ficha del guía (multipart, campo `foto`).
+ * Es parte de EDITAR la ficha: `usuarios.gestionar` + `op.guias.ficha_editar`.
+ */
+export const POST = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.guias.ficha_editar");
+  const params = await context.params;
+  const guiaUserId = z.uuid().parse(params["guiaUserId"]);
+  const form = await request.formData().catch(() => null);
+  const archivo = form?.get("foto");
+  if (!(archivo instanceof File) || archivo.size === 0) {
+    throw new ValidationError("Elige la foto (JPG, PNG o WebP).");
+  }
+  const r = await cambiarFotoGuia({
+    actorUserId: auth.userId,
+    guiaUserId,
+    foto: {
+      nombreOriginal: archivo.name,
+      mime: archivo.type,
+      bytes: Buffer.from(await archivo.arrayBuffer()),
+    },
+    ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+  });
+  return json(r);
 });

@@ -6,7 +6,7 @@ import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
-import { crearGuia } from "../application/alta-guia";
+import { cambiarFotoGuia, crearGuia } from "../application/alta-guia";
 import {
   exigirSoloGuia,
   fichasDeGuias,
@@ -136,6 +136,35 @@ describe.runIf(RUN)("alta del guía (integración)", () => {
     expect(await estado()).toBe("ACTIVO");
     // Quien no es guía no se toca desde aquí.
     await expect(exigirSoloGuia(randomUUID())).rejects.toThrow(NotFoundError);
+  });
+
+  it("cambiar la foto desde la ficha: queda la nueva y la anterior se suelta", async () => {
+    const anterior = fotos[0] as string;
+    const nombre = `nueva-${marca}.png`;
+    const { fotoFileId } = await cambiarFotoGuia({
+      actorUserId: ACTOR,
+      guiaUserId: guia.userId,
+      foto: { ...foto(), nombreOriginal: nombre },
+    });
+    fotos[0] = fotoFileId;
+    const ficha = await queryOne<{ foto: string | null }>(
+      `SELECT foto_file_id AS foto FROM scheduling_guia WHERE guia_user_id = $1`,
+      [guia.userId],
+    );
+    expect(ficha?.foto).toBe(fotoFileId);
+    expect(await fotosConNombre(nombre)).toBe(1);
+    const vieja = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM files_object WHERE id = $1`,
+      [anterior],
+    );
+    expect(vieja?.n).toBe(0);
+    await expect(
+      cambiarFotoGuia({
+        actorUserId: ACTOR,
+        guiaUserId: guia.userId,
+        foto: { nombreOriginal: "x.pdf", mime: "application/pdf", bytes: PNG },
+      }),
+    ).rejects.toThrow(ValidationError);
   });
 
   it("si la ficha falla (sala de Zoom ajena) no queda cuenta ni foto sueltas", async () => {

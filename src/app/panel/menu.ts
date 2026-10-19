@@ -106,7 +106,10 @@ export const MENU: {
   },
   {
     seccion: "Operación",
-    permiso: "contratos.gestionar",
+    // "Ver" basta: la pestaña "Reservas sin aprobar" pide contratos.ver y la de
+    // "Nueva reserva" su propia opción con contratos.gestionar. Con gestionar
+    // aquí, un rol de Servicio con el menú marcado nunca veía el ítem.
+    permiso: "contratos.ver",
     etiqueta: "Gestión de Reservas",
     color: "var(--lgs-purpura)",
     href: "/panel/reservas",
