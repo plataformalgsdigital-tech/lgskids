@@ -30,7 +30,16 @@ interface Ficha {
   fotoFileId: string | null;
   /** Salones activos que tiene asignados. */
   salonesActivos: number;
+  /** Estado de su cuenta: desactivado no entra al panel. */
+  estado: "ACTIVO" | "INACTIVO";
 }
+
+type FiltroEstado = "ACTIVO" | "INACTIVO" | "TODOS";
+const ETIQUETA_FILTRO: Record<FiltroEstado, string> = {
+  ACTIVO: "Activos",
+  INACTIVO: "Inactivos",
+  TODOS: "Todos",
+};
 
 interface Enlace {
   guiaUserId: string;
@@ -117,6 +126,27 @@ function FotoGuia({ guia }: { guia: Ficha }) {
   );
 }
 
+function PastillaEstado({ estado }: { estado: Ficha["estado"] }) {
+  const activo = estado === "ACTIVO";
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        verticalAlign: "middle",
+        fontSize: "0.72rem",
+        fontWeight: 700,
+        padding: "0.1rem 0.5rem",
+        borderRadius: "1rem",
+        whiteSpace: "nowrap",
+        background: activo ? "#e8f5e9" : "#ffebee",
+        color: activo ? "#1b5e20" : "#c62828",
+      }}
+    >
+      {activo ? "Activo" : "Inactivo"}
+    </span>
+  );
+}
+
 const VACIA = {
   nombres: "",
   apellidos: "",
@@ -147,6 +177,7 @@ function descargarGuias(guias: Ficha[], enlaces: Record<string, Enlace>) {
       "Tiene foto",
       "Salones activos",
       "Enlace de ficha",
+      "Estado",
     ],
     guias.map((g) => {
       const e = enlaces[g.guiaUserId];
@@ -164,6 +195,7 @@ function descargarGuias(guias: Ficha[], enlaces: Record<string, Enlace>) {
         g.fotoFileId !== null,
         g.salonesActivos,
         e === undefined ? "" : COLOR_ENLACE[e.estado].txt,
+        g.estado === "ACTIVO" ? "Activo" : "Inactivo",
       ];
     }),
   );
@@ -182,6 +214,7 @@ export default function GuiasPage() {
   const [ocupado, setOcupado] = useState(false);
 
   const [buscar, setBuscar] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("ACTIVO");
   /** La ficha abierta desde la lista dejó una entrada en el historial. */
   const empujado = useRef(false);
   const primeraCarga = useRef(true);
@@ -225,6 +258,10 @@ export default function GuiasPage() {
       diasVigencia: number;
     };
     setGuias(data.guias);
+    // La ficha abierta toma lo recién guardado (nombre, estado…).
+    setSel((prev) =>
+      prev === null ? null : (data.guias.find((x) => x.guiaUserId === prev.guiaUserId) ?? prev),
+    );
     setEnlaces(Object.fromEntries(data.enlaces.map((e) => [e.guiaUserId, e])));
     setDiasVigencia(data.diasVigencia);
     // Al entrar con ?guia=… (enlace directo o recarga) se abre esa ficha.
@@ -272,17 +309,57 @@ export default function GuiasPage() {
     setEnlaceNuevo(null);
   }
 
-  const q = buscar.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const visibles = (guias ?? []).filter((g) =>
-    q === ""
-      ? true
-      : [nombreDeGuia(g), g.username, g.docNumero, g.email, g.pais]
-          .join(" ")
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[̀-ͯ]/g, "")
-          .includes(q),
+  const sinTildes = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+  const q = sinTildes(buscar.trim());
+  const conteo: Record<FiltroEstado, number> = {
+    ACTIVO: (guias ?? []).filter((g) => g.estado === "ACTIVO").length,
+    INACTIVO: (guias ?? []).filter((g) => g.estado !== "ACTIVO").length,
+    TODOS: (guias ?? []).length,
+  };
+  const visibles = (guias ?? []).filter(
+    (g) =>
+      (filtroEstado === "TODOS" || g.estado === filtroEstado) &&
+      (q === "" ||
+        sinTildes([nombreDeGuia(g), g.username, g.docNumero, g.email, g.pais].join(" ")).includes(
+          q,
+        )),
   );
+
+  async function cambiarEstado() {
+    if (sel === null) return;
+    const nuevo = sel.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO";
+    const pregunta =
+      nuevo === "INACTIVO"
+        ? `¿Desactivar a ${nombreDeGuia(sel)}? No podrá entrar al panel y se cierran sus sesiones.` +
+          (sel.salonesActivos > 0
+            ? `\n\nOJO: tiene ${String(sel.salonesActivos)} salón(es) activo(s) asignado(s), que seguirán a su nombre hasta que les cambies el guía.`
+            : "")
+        : `¿Activar de nuevo a ${nombreDeGuia(sel)}? Volverá a entrar al panel con su usuario y clave.`;
+    if (!window.confirm(pregunta)) return;
+    setOcupado(true);
+    setError(null);
+    setAviso(null);
+    try {
+      const res = await apiFetch(`/api/scheduling/guias/${sel.guiaUserId}/estado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: nuevo }),
+      });
+      if (!res.ok) {
+        const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
+        setError(c.error?.message ?? "No se pudo cambiar el estado del guía.");
+        return;
+      }
+      setAviso(
+        nuevo === "INACTIVO"
+          ? `${nombreDeGuia(sel)} quedó desactivado.`
+          : `${nombreDeGuia(sel)} quedó activo.`,
+      );
+      await cargar();
+    } finally {
+      setOcupado(false);
+    }
+  }
   const th: CSSProperties = {
     padding: "0.5rem 0.6rem",
     textAlign: "left",
@@ -427,8 +504,37 @@ export default function GuiasPage() {
             onChange={(e) => setBuscar(e.target.value)}
             placeholder="Buscar por nombre, usuario, documento, correo o país"
             aria-label="Buscar guía"
-            style={{ ...campo, maxWidth: "26rem", marginBottom: "0.75rem" }}
+            style={{ ...campo, maxWidth: "26rem", marginBottom: "0.6rem" }}
           />
+          <div
+            role="group"
+            aria-label="Filtrar guías por estado"
+            style={{ display: "flex", gap: "0.4rem", marginBottom: "0.75rem", flexWrap: "wrap" }}
+          >
+            {(["ACTIVO", "INACTIVO", "TODOS"] as const).map((op) => {
+              const activo = filtroEstado === op;
+              return (
+                <button
+                  key={op}
+                  type="button"
+                  aria-pressed={activo}
+                  onClick={() => setFiltroEstado(op)}
+                  style={{
+                    padding: "0.3rem 0.8rem",
+                    borderRadius: "999px",
+                    border: `1.5px solid ${activo ? "var(--lgs-azul)" : "#d6dbe6"}`,
+                    background: activo ? "var(--lgs-azul)" : "white",
+                    color: activo ? "white" : "var(--texto-suave)",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  {ETIQUETA_FILTRO[op]} ({conteo[op]})
+                </button>
+              );
+            })}
+          </div>
           {guias === null ? (
             <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
           ) : guias.length === 0 ? (
@@ -436,7 +542,9 @@ export default function GuiasPage() {
               No hay guías activos. Créalos en Usuarios y roles con el rol <strong>guia</strong>.
             </p>
           ) : visibles.length === 0 ? (
-            <p style={{ color: "var(--texto-suave)" }}>Ningún guía coincide con la búsqueda.</p>
+            <p style={{ color: "var(--texto-suave)" }}>
+              Ningún guía {filtroEstado === "INACTIVO" ? "inactivo " : ""}coincide con la búsqueda.
+            </p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.86rem" }}>
@@ -451,6 +559,7 @@ export default function GuiasPage() {
                       "Sala de Zoom",
                       "Salones activos",
                       "Enlace de ficha",
+                      "Estado",
                       "",
                     ].map((t) => (
                       <th key={t} style={th}>
@@ -468,7 +577,11 @@ export default function GuiasPage() {
                         key={g.guiaUserId}
                         onClick={() => abrir(g)}
                         title="Abrir la ficha del guía"
-                        style={{ borderBottom: "1px solid #edf0f6", cursor: "pointer" }}
+                        style={{
+                          borderBottom: "1px solid #edf0f6",
+                          cursor: "pointer",
+                          opacity: g.estado === "ACTIVO" ? 1 : 0.6,
+                        }}
                       >
                         <td style={td}>
                           <span style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
@@ -525,6 +638,9 @@ export default function GuiasPage() {
                             </span>
                           )}
                         </td>
+                        <td style={td}>
+                          <PastillaEstado estado={g.estado} />
+                        </td>
                         <td style={{ ...td, whiteSpace: "nowrap", fontWeight: 700 }}>
                           <span style={{ color: "var(--lgs-azul)" }}>Ver ficha →</span>
                         </td>
@@ -555,18 +671,54 @@ export default function GuiasPage() {
           </button>
           <section style={{ ...tarjeta, maxWidth: "52rem" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.7rem", flexWrap: "wrap" }}
+              >
                 <FotoGuia guia={sel} />
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>
-                    {nombreDeGuia(sel)}
+                    {nombreDeGuia(sel)} <PastillaEstado estado={sel.estado} />
                   </h2>
                   <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
                     {sel.username}
-                    {sel.fotoFileId === null && " · sin foto"}
+                    {sel.fotoFileId === null && " · sin foto"} · {sel.salonesActivos}{" "}
+                    {sel.salonesActivos === 1 ? "salón activo" : "salones activos"}
                   </span>
                 </div>
+                <SoloSi op="op.guias.estado">
+                  <button
+                    type="button"
+                    onClick={() => void cambiarEstado()}
+                    disabled={ocupado}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      borderRadius: "0.6rem",
+                      fontWeight: 700,
+                      fontSize: "0.85rem",
+                      cursor: ocupado ? "wait" : "pointer",
+                      ...(sel.estado === "ACTIVO"
+                        ? { border: "1.5px solid #e57373", background: "white", color: "#c62828" }
+                        : { border: "none", background: "var(--lgs-verde)", color: "#1b2a10" }),
+                    }}
+                  >
+                    {sel.estado === "ACTIVO" ? "⏸ Desactivar guía" : "▶ Activar guía"}
+                  </button>
+                </SoloSi>
               </div>
+              {sel.estado !== "ACTIVO" && (
+                <p
+                  style={{
+                    margin: 0,
+                    padding: "0.55rem 0.8rem",
+                    borderRadius: "0.6rem",
+                    background: "#ffebee",
+                    color: "#b71c1c",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  Este guía está <strong>desactivado</strong>: no puede entrar al panel.
+                </p>
+              )}
 
               <div
                 style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}

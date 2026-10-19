@@ -93,6 +93,7 @@ export {
   guiasConZoom,
   guardarFichaGuia,
   fichasDeGuias,
+  exigirSoloGuia,
   fotoDeGuia,
   MAX_SALONES_COMPARTIDOS,
   DURACIONES_TALLER,

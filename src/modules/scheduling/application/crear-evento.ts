@@ -88,9 +88,32 @@ export interface FichaGuia {
   fotoFileId: string | null;
   /** Salones ACTIVOS que tiene asignados (el guía del salón, no los reemplazos). */
   salonesActivos: number;
+  /** Estado de su CUENTA: un guía desactivado no entra al panel. */
+  estado: "ACTIVO" | "INACTIVO";
 }
 
-/** Ficha operativa de todos los guías activos. */
+/**
+ * La cuenta es de un guía y SOLO de guía. Activarlo o desactivarlo desde su
+ * ficha basta con `usuarios.gestionar` (lo que pide administrar a un guía); una
+ * cuenta que además es staff se administra en Usuarios y roles, donde se exige
+ * lo que pide su rol más alto.
+ */
+export async function exigirSoloGuia(userId: string): Promise<void> {
+  const r = await queryOne<{ guia: boolean; otros: boolean }>(
+    `SELECT bool_or(r.code = 'guia') AS guia, bool_or(r.code <> 'guia') AS otros
+       FROM access_user_role ur JOIN access_role r ON r.id = ur.role_id
+      WHERE ur.user_id = $1`,
+    [userId],
+  );
+  if (r?.guia !== true) throw new NotFoundError("No es un guía.");
+  if (r.otros) {
+    throw new ConflictError(
+      "Esta cuenta tiene además otros roles: actívala o desactívala en Usuarios y roles.",
+    );
+  }
+}
+
+/** Ficha operativa de todos los guías, activos primero. */
 export async function fichasDeGuias(): Promise<FichaGuia[]> {
   return queryRows<FichaGuia>(
     `SELECT u.id AS "guiaUserId", u.username,
@@ -98,15 +121,16 @@ export async function fichasDeGuias(): Promise<FichaGuia[]> {
             g.pais, g.domicilio, g.fecha_nacimiento::text AS "fechaNacimiento",
             g.zoom_url AS "zoomUrl", g.foto_file_id AS "fotoFileId",
             (SELECT count(*)::int FROM scheduling_classroom c
-              WHERE c.guia_user_id = u.id AND c.activo) AS "salonesActivos"
+              WHERE c.guia_user_id = u.id AND c.activo) AS "salonesActivos",
+            u.estado
        FROM identity_user u
        JOIN access_user_role ur ON ur.user_id = u.id
        JOIN access_role r ON r.id = ur.role_id
        LEFT JOIN scheduling_guia g ON g.guia_user_id = u.id
-      WHERE r.code = 'guia' AND u.estado = 'ACTIVO'
-      GROUP BY u.id, u.username, g.nombres, g.apellidos, g.doc_numero, g.email,
+      WHERE r.code = 'guia'
+      GROUP BY u.id, u.username, u.estado, g.nombres, g.apellidos, g.doc_numero, g.email,
                g.telefono, g.pais, g.domicilio, g.fecha_nacimiento, g.zoom_url, g.foto_file_id
-      ORDER BY COALESCE(NULLIF(TRIM(CONCAT_WS(' ', g.nombres, g.apellidos)), ''), u.username)`,
+      ORDER BY u.estado = 'ACTIVO' DESC, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', g.nombres, g.apellidos)), ''), u.username)`,
   );
 }
 

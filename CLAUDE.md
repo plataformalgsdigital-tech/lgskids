@@ -1434,6 +1434,15 @@ hacen cosas distintas:
   eso el enlace se muestra UNA vez, al emitirlo. Índice único parcial
   `scheduling_guia_invitacion_vigente`: **un solo enlace vivo por guía** — emitir uno
   nuevo revoca el anterior en la misma transacción.
+- **/panel/guias (2026-10-19)**: la lista es una TABLA (documento, país, correo,
+  teléfono, sala de Zoom, salones activos, enlace y estado) con buscador y filtro
+  Activos/Inactivos/Todos —`fichasDeGuias` ya trae también a los INACTIVOS, con
+  `estado` y `salonesActivos`—; la fila abre la ficha en su propia vista
+  (`?guia=<id>`, con "← Volver a Guías" y el Atrás del navegador). En la ficha,
+  **Desactivar/Activar guía** (`POST /api/scheduling/guias/[guiaUserId]/estado`,
+  `usuarios.gestionar` + `op.guias.estado`) usa el MISMO `cambiarEstadoCuenta` de
+  Usuarios y roles, solo para cuentas que son ÚNICAMENTE de guía (`exigirSoloGuia`;
+  con otro rol, 409). Desactivar no le quita los salones: la confirmación avisa.
 - Reglas puras en `scheduling/domain/invitacion.ts` (token, hash, estado
   VIGENTE|USADA|REVOCADA|VENCIDA, vencimiento, armado del enlace) con pruebas en
   `tests/invitacion.test.ts`. Aplicación en `application/invitacion-guia.ts`.

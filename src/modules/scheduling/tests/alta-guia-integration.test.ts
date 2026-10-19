@@ -1,13 +1,18 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { eliminarArchivo } from "@/modules/files";
-import { listarUsuarios } from "@/modules/identity";
+import { cambiarEstadoCuenta, listarUsuarios } from "@/modules/identity";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { crearGuia } from "../application/alta-guia";
-import { fotoDeGuia, guardarFichaGuia } from "../application/crear-evento";
+import {
+  exigirSoloGuia,
+  fichasDeGuias,
+  fotoDeGuia,
+  guardarFichaGuia,
+} from "../application/crear-evento";
 
 /**
  * ALTA DEL GUÍA desde Gestión de Usuarios (2026-09-22): cuenta + rol + ficha +
@@ -118,6 +123,19 @@ describe.runIf(RUN)("alta del guía (integración)", () => {
       [guia.userId],
     );
     expect(ficha?.foto).toBe(fotos[0]);
+  });
+
+  it("desactivar y activar desde su ficha: la lista lo sigue mostrando con su estado", async () => {
+    const estado = async () =>
+      (await fichasDeGuias()).find((g) => g.guiaUserId === guia.userId)?.estado;
+    await exigirSoloGuia(guia.userId);
+    expect(await estado()).toBe("ACTIVO");
+    await cambiarEstadoCuenta({ actorUserId: ACTOR, userId: guia.userId, estado: "INACTIVO" });
+    expect(await estado()).toBe("INACTIVO");
+    await cambiarEstadoCuenta({ actorUserId: ACTOR, userId: guia.userId, estado: "ACTIVO" });
+    expect(await estado()).toBe("ACTIVO");
+    // Quien no es guía no se toca desde aquí.
+    await expect(exigirSoloGuia(randomUUID())).rejects.toThrow(NotFoundError);
   });
 
   it("si la ficha falla (sala de Zoom ajena) no queda cuenta ni foto sueltas", async () => {

@@ -189,6 +189,7 @@ export const OPCIONES_MENU = [
     "usuarios.gestionar",
   ]),
   op("menu.guias", "op.guias.csv", "Descargar CSV de los guías", ["usuarios.gestionar"]),
+  op("menu.guias", "op.guias.estado", "Activar y desactivar al guía", ["usuarios.gestionar"]),
 
   // ── Operación › Kids ──────────────────────────────────────────────────
   op("menu.kids", "op.kids.csv", "Descargar CSV", ["personas.ver"]),
