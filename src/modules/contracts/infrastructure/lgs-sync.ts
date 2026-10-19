@@ -32,6 +32,19 @@ export interface ExtensionLgs {
   ejecutadoPor: string | null;
 }
 
+/**
+ * Traslado hecho en KIDS (cambio de salón o de curso) → LGS refleja curso y salón
+ * (`/api/kids-sync/matricula`). KIDS es la fuente de verdad de la ubicación.
+ */
+export interface MatriculaLgs {
+  externalRef: string;
+  tipoCurso: string;
+  /** Salón vivo (ACTIVA/RESERVADA) tras el cambio; null si quedó sin salón. */
+  classroomId: string | null;
+  enrollmentId: string | null;
+  motivo: string;
+}
+
 export interface RespuestaLgs {
   configurado: boolean;
   /** false = LGS no tenía nada que hacer (ya estaba así o no existe allá). */
@@ -58,7 +71,15 @@ export async function avisarExtensionALgs(cuerpo: ExtensionLgs): Promise<Respues
   return llamarLgs("extension", cuerpo);
 }
 
-async function llamarLgs(ruta: "onhold" | "extension", cuerpo: object): Promise<RespuestaLgs> {
+/** Traslado de curso/salón hecho en KIDS → LGS (mismas reglas de error). */
+export async function avisarMatriculaALgs(cuerpo: MatriculaLgs): Promise<RespuestaLgs> {
+  return llamarLgs("matricula", cuerpo);
+}
+
+async function llamarLgs(
+  ruta: "onhold" | "extension" | "matricula",
+  cuerpo: object,
+): Promise<RespuestaLgs> {
   const e = env();
   if (!e.LGS_API_URL || !e.LGS_INTAKE_API_KEY) return { configurado: false };
   const url = `${e.LGS_API_URL.replace(/\/+$/, "")}/api/kids-sync/${ruta}`;

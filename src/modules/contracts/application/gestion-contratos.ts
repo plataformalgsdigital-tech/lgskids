@@ -44,6 +44,7 @@ import {
 } from "../domain/vigencia";
 import {
   avisarExtensionALgs,
+  avisarMatriculaALgs,
   avisarOnholdALgs,
   lgsSyncConfigurado,
 } from "../infrastructure/lgs-sync";
@@ -1332,6 +1333,40 @@ export async function fichaContrato(
  * cumplió años, o llegó con la fecha de nacimiento equivocada y se corrigió.
  * La advertencia viaja en la respuesta y queda en la auditoría con el motivo.
  */
+/**
+ * Avisa a LGS la ubicación actual (curso + salón vivo) de un contrato que viene
+ * de LGS. Se llama después de un traslado (cambio de salón o de curso). NUNCA
+ * lanza: el traslado ya quedó hecho en KIDS (fuente de verdad); si LGS no
+ * responde se registra y el script de reconciliación de LGS lo corrige.
+ */
+export async function sincronizarUbicacionConLgs(
+  contractId: string,
+  motivo: string,
+): Promise<void> {
+  try {
+    if (!lgsSyncConfigurado()) return;
+    const externalRef = await externalRefDe(contractId);
+    if (externalRef === null) return; // nació en KIDS: no existe en LGS
+    const contrato = await findContractById(contractId);
+    if (contrato === null) return;
+    const viva = await findMatriculaVivaByContract(contractId);
+    const r = await avisarMatriculaALgs({
+      externalRef,
+      tipoCurso: contrato.tipoCurso,
+      classroomId: viva?.classroomId ?? null,
+      enrollmentId: viva?.id ?? null,
+      motivo: motivo.slice(0, 300),
+    });
+    logger.info("Ubicación sincronizada con LGS", {
+      contractId,
+      externalRef,
+      aplicado: r.aplicado ?? false,
+    });
+  } catch (error) {
+    logger.warn("No se pudo avisar el traslado a LGS", { contractId, error: String(error) });
+  }
+}
+
 export async function cambiarCursoContrato(input: {
   actorUserId: string;
   contractId: string;
@@ -1428,5 +1463,7 @@ export async function cambiarCursoContrato(input: {
     },
     ip: input.ip ?? null,
   });
+  // Contrato que viene de LGS: LGS refleja el curso y el salón nuevos.
+  await sincronizarUbicacionConLgs(input.contractId, `cambio de curso: ${input.motivo.trim()}`);
   return { enrollmentId, advertencia };
 }

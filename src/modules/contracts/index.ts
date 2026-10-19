@@ -31,6 +31,7 @@ export {
   obtenerContrato,
   fichaContrato,
   cambiarCursoContrato,
+  sincronizarUbicacionConLgs,
   academicoDeContrato,
 } from "./application/gestion-contratos";
 export type { FichaContrato } from "./application/gestion-contratos";

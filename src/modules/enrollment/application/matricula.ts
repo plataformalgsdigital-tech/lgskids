@@ -156,7 +156,7 @@ export async function cambioAcademico(input: {
   nuevoClassroomId: string;
   motivo: string;
   ip?: string | null;
-}): Promise<{ enrollmentId: string }> {
+}): Promise<{ enrollmentId: string; contractId: string }> {
   if (input.motivo.trim().length < 5) {
     throw new ValidationError("El motivo del cambio es obligatorio (mínimo 5 caracteres).");
   }
@@ -196,7 +196,7 @@ export async function cambioAcademico(input: {
     },
     ip: input.ip ?? null,
   });
-  return { enrollmentId: nuevoId };
+  return { enrollmentId: nuevoId, contractId: actual.contractId };
 }
 
 /** Cancela la matrícula activa de un contrato (usado por la cascada de contratos). */
