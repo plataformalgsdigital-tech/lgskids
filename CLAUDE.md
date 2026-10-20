@@ -1443,7 +1443,7 @@ hacen cosas distintas:
   `estado` y `salonesActivos`—; la fila abre la ficha en su propia vista
   (`?guia=<id>`, con "← Volver a Guías" y el Atrás del navegador). En la ficha,
   **Desactivar/Activar guía** (`POST /api/scheduling/guias/[guiaUserId]/estado`,
-  `usuarios.gestionar` + `op.guias.estado`) usa el MISMO `cambiarEstadoCuenta` de
+  `usuarios.gestionar` + `op.guias.estado`, migración `20261019200000`) usa el MISMO `cambiarEstadoCuenta` de
   Usuarios y roles, solo para cuentas que son ÚNICAMENTE de guía (`exigirSoloGuia`;
   con otro rol, 409). Desactivar no le quita los salones: la confirmación avisa.
   La ficha se ve en SOLO LECTURA; **"✏️ Editar ficha"** (`op.guias.ficha_editar`)
