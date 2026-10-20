@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { AvisoProveedor } from "../AvisoProveedor";
+import { EmojiPicker } from "./EmojiPicker";
 import { VistaPreviaWhatsApp } from "./VistaPreviaWhatsApp";
 
 interface Plantilla {
@@ -304,6 +305,23 @@ function EditorPlantilla({
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verPrevia, setVerPrevia] = useState(false);
+  const [verEmojis, setVerEmojis] = useState(false);
+  const area = useRef<HTMLTextAreaElement>(null);
+
+  /** Inserta donde está el cursor (o reemplaza lo seleccionado), sin pasar el tope. */
+  function insertar(texto: string) {
+    const el = area.current;
+    const ini = el?.selectionStart ?? contenido.length;
+    const fin = el?.selectionEnd ?? contenido.length;
+    const nuevo = contenido.slice(0, ini) + texto + contenido.slice(fin);
+    if (nuevo.length > largo) return;
+    setContenido(nuevo);
+    const cursor = ini + texto.length;
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(cursor, cursor);
+    });
+  }
   const ejemplos = Object.fromEntries(marcadores.map((m) => [m.clave, m.ejemplo ?? ""]));
 
   async function guardar() {
@@ -407,6 +425,7 @@ function EditorPlantilla({
             Contenido ({contenido.length}/{largo})
           </span>
           <textarea
+            ref={area}
             value={contenido}
             onChange={(e) => setContenido(e.target.value.slice(0, largo))}
             rows={9}
@@ -415,15 +434,30 @@ function EditorPlantilla({
         </label>
         <div>
           <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>
-            Marcadores (clic para agregarlo al final)
+            Marcadores y emojis (clic para insertarlo donde está el cursor)
           </span>
           <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginTop: "0.35rem" }}>
+            <button
+              type="button"
+              aria-expanded={verEmojis}
+              onClick={() => setVerEmojis((v) => !v)}
+              style={{
+                ...btn,
+                padding: "0.2rem 0.6rem",
+                fontSize: "0.78rem",
+                background: verEmojis ? "#fff3c4" : "#fff8e1",
+                color: "#8a6d00",
+                border: "1px solid #ffe08a",
+              }}
+            >
+              😊 Emojis
+            </button>
             {marcadores.map((m) => (
               <button
                 key={m.clave}
                 type="button"
                 title={m.descripcion}
-                onClick={() => setContenido((c) => `${c}{{${m.clave}}}`.slice(0, largo))}
+                onClick={() => insertar(`{{${m.clave}}}`)}
                 style={{
                   ...btn,
                   padding: "0.2rem 0.55rem",
@@ -437,6 +471,11 @@ function EditorPlantilla({
               </button>
             ))}
           </div>
+          {verEmojis && (
+            <div style={{ marginTop: "0.45rem" }}>
+              <EmojiPicker onElegir={insertar} />
+            </div>
+          )}
           <p style={{ margin: "0.4rem 0 0", fontSize: "0.75rem", color: "var(--texto-suave)" }}>
             Usa *texto* para negrita en WhatsApp. Una plantilla con {"{{clave}}"} solo se puede
             enviar desde la ficha de cada niño.

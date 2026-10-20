@@ -1862,7 +1862,9 @@ avisa). Migración `20261007000000_mensajes`.
   `salon`, `campania`, `contrato`, `plataforma`); el slug no se edita, desactivar
   reemplaza a borrar, máx. **2000** caracteres (`LARGO_MAXIMO_CONTENIDO`; era 1000 y
   la bienvenida con emojis no cabía; WhatsApp admite 4096 — el tope viaja a la
-  pantalla desde la API). **`envio-acceso`** (2026-10-16, migración
+  pantalla desde la API). El editor inserta marcadores y **emojis** (botón "😊
+  Emojis", paleta curada por categoría en `mensajes/plantillas/EmojiPicker.tsx`,
+  2026-10-20) DONDE ESTÁ EL CURSOR, no al final. **`envio-acceso`** (2026-10-16, migración
   `20261016100000`) es la del botón "Enviar acceso por WhatsApp" de la ficha
   (`SLUG_CREDENCIALES`): la bienvenida que definió el negocio con `{{apoderado}}`,
   `{{nombre}}`, `{{usuario}}` y `{{clave}}`; se edita pero no se desactiva. La anterior,
