@@ -82,6 +82,7 @@ const MODOS = {
       { valor: "AUSENTE", texto: "Solo ausentes" },
       { valor: "JUSTIFICADO", texto: "Solo justificados" },
       { valor: "PRESENTE", texto: "Asistentes" },
+      { valor: "TODOS", texto: "Todos (asistieron y faltaron)" },
     ],
     archivo: "inasistencias",
   },
@@ -247,7 +248,7 @@ export function ConsultaAsistencia({ modo }: { modo: keyof typeof MODOS }) {
         <p style={{ color: "var(--texto-suave)" }}>Cargando…</p>
       ) : filas.length === 0 ? (
         <p style={{ color: "var(--texto-suave)" }}>
-          {estado === "PRESENTE"
+          {estado === "PRESENTE" || estado === "TODOS"
             ? "Nadie registró asistencia en esas fechas con estos filtros."
             : modo === "justificacion" && estado === "AUSENTE"
               ? "No hay faltas pendientes de justificar con estos filtros. 🎉"
@@ -257,9 +258,11 @@ export function ConsultaAsistencia({ modo }: { modo: keyof typeof MODOS }) {
         <>
           <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", margin: "0 0 0.5rem" }}>
             {filas.length}{" "}
-            {estado === "PRESENTE"
-              ? `asistencia${filas.length === 1 ? "" : "s"}`
-              : `inasistencia${filas.length === 1 ? "" : "s"}`}
+            {estado === "TODOS"
+              ? `registro${filas.length === 1 ? "" : "s"} de asistencia`
+              : estado === "PRESENTE"
+                ? `asistencia${filas.length === 1 ? "" : "s"}`
+                : `inasistencia${filas.length === 1 ? "" : "s"}`}
             {filas.length >= tope
               ? ` (se muestran las primeras ${String(tope)}: acota el filtro)`
               : ""}

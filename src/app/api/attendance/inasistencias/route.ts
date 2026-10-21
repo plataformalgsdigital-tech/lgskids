@@ -27,7 +27,7 @@ export const GET = handlerWithAuth(async (request, auth) => {
       campaignId: z.uuid().optional(),
       curso: z.enum(["JUNIOR", "YOUNGSTER"]).optional(),
       classroomId: z.uuid().optional(),
-      estado: z.enum(["AUSENTE", "JUSTIFICADO", "PRESENTE"]).optional(),
+      estado: z.enum(["AUSENTE", "JUSTIFICADO", "PRESENTE", "TODOS"]).optional(),
     })
     .parse({
       desde: p.get("desde"),

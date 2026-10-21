@@ -63,9 +63,9 @@ export interface FiltrosInasistencias {
   classroomId?: string | null;
   /**
    * Sin valor: las dos inasistencias (ausente y justificada). PRESENTE lista a
-   * los que SÍ asistieron, con los mismos filtros.
+   * los que SÍ asistieron, con los mismos filtros; TODOS, cualquier marca.
    */
-  estado?: "AUSENTE" | "JUSTIFICADO" | "PRESENTE" | null;
+  estado?: "AUSENTE" | "JUSTIFICADO" | "PRESENTE" | "TODOS" | null;
 }
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -94,7 +94,9 @@ export async function inasistencias(f: FiltrosInasistencias): Promise<Inasistenc
     values.push(valor);
     condiciones.push(sql(`$${String(values.length)}`));
   };
-  if (f.estado != null) {
+  if (f.estado === "TODOS") {
+    // Sin condición de estado: toda marca de la sesión (asistió, faltó o justificó).
+  } else if (f.estado != null) {
     agregar((n) => `a.estado = ${n}::attendance_estado`, f.estado);
   } else {
     condiciones.push(`a.estado IN ('AUSENTE', 'JUSTIFICADO')`);

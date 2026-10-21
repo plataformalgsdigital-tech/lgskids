@@ -1520,7 +1520,7 @@ solo servía para completar la ficha.
   palabras, documento sin guiones), campaña, curso, salón y estado, y el apoderado
   con teléfono; una sesión SIN marca no entra (eso es "sesiones sin marcar" del
   Tablero). Rango máx. 93 días y 2.000 filas. El estado **Asistentes** (PRESENTE) lista
-  a los que sí fueron. Cada AUSENTE tiene dos acciones: **📲 WhatsApp**
+  a los que sí fueron, y **Todos** (`estado=TODOS`, 2026-10-21) toda marca. Cada AUSENTE tiene dos acciones: **📲 WhatsApp**
   (`GET|POST /api/notifications/inasistencia/[attendanceId]` → `vistaInasistencia` /
   `enviarMensajeInasistencia`, `mensajes.enviar` + `personas.ver`): propone la plantilla
   `inasistencia-kids` (marcador nuevo `{{fecha}}`, migración `20261014200000`), quien
