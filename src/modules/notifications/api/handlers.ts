@@ -1,7 +1,8 @@
 import { after } from "next/server";
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
-import { handlerWithAuth, json } from "@/platform/http/handler";
+import { handler, handlerWithAuth, json } from "@/platform/http/handler";
+import { enviarEnlaceDeSolicitud, registrarOlvidoClave } from "../application/olvido-clave";
 import {
   MAX_DESTINATARIOS,
   actualizarPlantilla,
@@ -26,6 +27,34 @@ import { proveedorActivo } from "../infrastructure/senders";
 function ip(request: Request): string | null {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 }
+
+/**
+ * POST /api/public/olvido-clave — pública. Registra la solicitud y, DESPUÉS de
+ * responder, manda el enlace por WhatsApp al teléfono registrado. Responde
+ * SIEMPRE lo mismo, exista o no el usuario.
+ */
+export const olvidoClaveHandler = handler(async (request) => {
+  const body = z
+    .object({
+      usuario: z.string().trim().min(1).max(60),
+      contacto: z.string().max(200).nullish(),
+    })
+    .parse(await request.json());
+  const desde = ip(request);
+  const s = await registrarOlvidoClave({
+    usuario: body.usuario,
+    contacto: body.contacto ?? null,
+    ip: desde,
+  });
+  after(() => enviarEnlaceDeSolicitud(s, desde));
+  return json(
+    {
+      mensaje:
+        "Recibimos tu solicitud. Si el usuario existe, enviaremos por WhatsApp, al número registrado, un enlace para elegir una clave nueva (vence en 24 horas). Si no te llega, el equipo de LGS Kids te contactará.",
+    },
+    { status: 202 },
+  );
+});
 
 async function idDe(
   context: { params: Promise<Record<string, string | string[]>> },

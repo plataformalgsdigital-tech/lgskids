@@ -68,6 +68,13 @@ export async function restablecerClave(input: {
       [input.userId, input.actorUserId],
       tx,
     );
+    // Un enlace de "olvidé mi clave" que siguiera vivo podría pisar esta clave.
+    await execute(
+      `UPDATE identity_enlace_clave SET revocado_en = now()
+        WHERE user_id = $1 AND usado_en IS NULL AND revocado_en IS NULL`,
+      [input.userId],
+      tx,
+    );
   });
 
   await registrarAuditoria({

@@ -15,7 +15,29 @@ interface Solicitud {
   nombre: string | null;
   contacto: string | null;
   creadaEn: string;
+  estado: "PENDIENTE" | "ATENDIDA" | "DESCARTADA";
+  enlaceEnviadoA: string | null;
+  enlaceProblema: string | null;
+  resueltaPorEnlace: boolean;
+  atendidaEn: string | null;
+  atendidaPor: string | null;
 }
+
+/** Qué pasó con el enlace de WhatsApp de una solicitud, en una frase. */
+function textoEnlace(s: Solicitud): { texto: string; color: string } | null {
+  if (s.resueltaPorEnlace) return { texto: "✅ Eligió su clave con el enlace", color: "#1b5e20" };
+  if (s.enlaceEnviadoA !== null) {
+    return { texto: `📲 Enlace enviado por WhatsApp a ${s.enlaceEnviadoA}`, color: "#0d47a1" };
+  }
+  if (s.enlaceProblema !== null) return { texto: `⚠ ${s.enlaceProblema}`, color: "#b26a00" };
+  return null;
+}
+
+const ESTADO_SOLICITUD: Record<Solicitud["estado"], { texto: string; color: string }> = {
+  PENDIENTE: { texto: "Pendiente", color: "#b26a00" },
+  ATENDIDA: { texto: "Atendida", color: "#1b5e20" },
+  DESCARTADA: { texto: "Descartada", color: "#6b7280" },
+};
 
 /** Las tres puertas de alta, una por tipo de usuario (como en MOSAICO). */
 const PUERTAS = [
@@ -57,6 +79,9 @@ export default function UsuariosPage() {
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
+  /** El registro completo (60 días), solo cuando se pide verlo. */
+  const [registro, setRegistro] = useState<Solicitud[] | null>(null);
+
   const cargarSolicitudes = useCallback(async () => {
     const res = await apiFetch("/api/identity/solicitudes-clave");
     if (res.ok) {
@@ -64,6 +89,20 @@ export default function UsuariosPage() {
       setSolicitudes(data.solicitudes);
     }
   }, []);
+
+  async function alternarRegistro() {
+    if (registro !== null) {
+      setRegistro(null);
+      return;
+    }
+    const res = await apiFetch("/api/identity/solicitudes-clave?historial=1");
+    if (res.ok) {
+      const data: { solicitudes: Solicitud[] } = await res.json();
+      setRegistro(data.solicitudes);
+    } else {
+      setError("No se pudo cargar el registro de solicitudes.");
+    }
+  }
 
   useEffect(() => {
     async function inicial() {
@@ -255,10 +294,11 @@ export default function UsuariosPage() {
                 borderRadius: "0.9rem",
               }}
             >
-              <strong>🔔 Solicitudes de clave ({solicitudes.length})</strong>
+              <strong>🔔 Solicitudes de clave pendientes ({solicitudes.length})</strong>
               <p style={{ margin: "0.2rem 0 0.6rem", fontSize: "0.8rem", color: "#6b5a1e" }}>
-                Pidieron “olvidé mi clave” en el login. Restablece y entrega la clave nueva (por
-                ejemplo por WhatsApp): al entrar se les pedirá cambiarla.
+                Pidieron “olvidé mi clave” en el login. A quien tiene WhatsApp registrado le llega
+                solo un enlace para elegir clave (se cierra sola al usarlo). Si no le llegó,
+                restablece y entrega la clave nueva: al entrar se le pedirá cambiarla.
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 {solicitudes.map((s) => (
@@ -286,6 +326,17 @@ export default function UsuariosPage() {
                         {" "}
                         · {new Date(s.creadaEn).toLocaleString("es")}
                       </span>
+                      {textoEnlace(s) !== null && (
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "0.78rem",
+                            color: textoEnlace(s)?.color,
+                          }}
+                        >
+                          {textoEnlace(s)?.texto}
+                        </span>
+                      )}
                     </span>
                     <span style={{ display: "flex", gap: "0.4rem" }}>
                       {s.userId !== null && (
@@ -310,6 +361,81 @@ export default function UsuariosPage() {
               </div>
             </div>
           )}
+
+          <SoloSi op="op.usuarios.clave">
+            <div>
+              <button type="button" style={boton} onClick={() => void alternarRegistro()}>
+                {registro === null
+                  ? "📋 Ver registro de solicitudes de clave (60 días)"
+                  : "Ocultar registro de solicitudes"}
+              </button>
+              {registro !== null && (
+                <div style={{ overflowX: "auto", marginTop: "0.6rem" }}>
+                  {registro.length === 0 ? (
+                    <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
+                      No hubo solicitudes en los últimos 60 días.
+                    </p>
+                  ) : (
+                    <table
+                      style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}
+                    >
+                      <thead>
+                        <tr style={{ borderBottom: "1.5px solid #e3e7f0", textAlign: "left" }}>
+                          {[
+                            "Fecha",
+                            "Usuario",
+                            "Nombre",
+                            "Estado",
+                            "Enlace por WhatsApp",
+                            "Atendida",
+                          ].map((t) => (
+                            <th key={t} style={{ padding: "0.4rem 0.5rem", whiteSpace: "nowrap" }}>
+                              {t}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registro.map((s) => {
+                          const enlace = textoEnlace(s);
+                          return (
+                            <tr key={s.id} style={{ borderBottom: "1px solid #edf0f6" }}>
+                              <td style={{ padding: "0.4rem 0.5rem", whiteSpace: "nowrap" }}>
+                                {new Date(s.creadaEn).toLocaleString("es")}
+                              </td>
+                              <td style={{ padding: "0.4rem 0.5rem" }}>{s.usuarioIngresado}</td>
+                              <td style={{ padding: "0.4rem 0.5rem" }}>
+                                {s.nombre ?? (s.userId === null ? "— no existe —" : "—")}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "0.4rem 0.5rem",
+                                  fontWeight: 700,
+                                  color: ESTADO_SOLICITUD[s.estado].color,
+                                }}
+                              >
+                                {ESTADO_SOLICITUD[s.estado].texto}
+                              </td>
+                              <td style={{ padding: "0.4rem 0.5rem", color: enlace?.color }}>
+                                {enlace?.texto ?? "—"}
+                              </td>
+                              <td style={{ padding: "0.4rem 0.5rem" }}>
+                                {s.atendidaEn !== null
+                                  ? `${new Date(s.atendidaEn).toLocaleString("es")} · ${
+                                      s.resueltaPorEnlace ? "por el enlace" : (s.atendidaPor ?? "—")
+                                    }`
+                                  : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
+          </SoloSi>
         </section>
       )}
     </main>

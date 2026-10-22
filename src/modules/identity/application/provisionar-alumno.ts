@@ -16,19 +16,26 @@ export interface AlumnoProvisionado {
 /**
  * Crea las credenciales de un ALUMNO dentro de la transacción del alta única
  * (la invoca `contracts` al aprobar el contrato). Usuario y clave generados
- * (`crearCuentaTx`); correo SINTÉTICO no enrutable (hermanos que comparten el
- * correo del papá no colisionan — ADR-0005).
+ * (`crearCuentaTx`).
+ *
+ * Correo (2026-10-21): el de la FAMILIA —el del apoderado, como viene de LGS—,
+ * marcado `email_familiar` porque los hermanos lo comparten y el índice de
+ * correo único no debe contarlo. Solo si la familia no tiene correo se usa el
+ * SINTÉTICO no enrutable de antes (ADR-0005). El login sigue siendo por usuario.
  */
 export async function provisionarUsuarioAlumno(
   tx: Queryable,
-  datos: { nombres: string; apellidos: string },
+  datos: { nombres: string; apellidos: string; correoFamiliar?: string | null },
 ): Promise<AlumnoProvisionado> {
+  const familiar = datos.correoFamiliar?.trim().toLowerCase() || null;
+  const correo = (username: string) => familiar ?? correoSintetico(username);
   const cuenta = await crearCuentaTx(tx, {
     base: baseUsername(datos.nombres, datos.apellidos),
-    email: correoSintetico,
-    emailSintetico: true,
+    email: correo,
+    emailSintetico: familiar === null,
+    emailFamiliar: familiar !== null,
   });
-  return { ...cuenta, correo: correoSintetico(cuenta.username) };
+  return { ...cuenta, correo: correo(cuenta.username) };
 }
 
 /**

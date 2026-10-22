@@ -264,8 +264,8 @@ export default function LoginPage() {
             }}
           >
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--texto-suave)" }}>
-              Déjanos tu usuario y cómo contactarte. El equipo de LGS Kids te enviará una clave
-              nueva; al entrar con ella te pediremos que la cambies.
+              Escribe tu usuario. Te enviaremos por WhatsApp, al número registrado (el del apoderado
+              si eres alumno), un enlace para elegir una clave nueva.
             </p>
             <input
               placeholder="Tu usuario"
@@ -279,7 +279,7 @@ export default function LoginPage() {
               }}
             />
             <input
-              placeholder="WhatsApp o correo para contactarte (opcional)"
+              placeholder="Otro WhatsApp o correo, si el registrado ya no sirve (opcional)"
               value={contactoOlvido}
               onChange={(e) => setContactoOlvido(e.target.value)}
               maxLength={200}

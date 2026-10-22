@@ -10,6 +10,7 @@ import {
   SLUG_CREDENCIALES,
   SLUG_INASISTENCIA,
   SLUG_RE,
+  SLUG_RESTABLECER_CLAVE,
   SLUG_VIDEO_WELCOME,
   marcadoresDe,
   rellenarParaHistorial,
@@ -682,6 +683,175 @@ export async function enviarEnlacePerfil(input: {
         destinatario: destinatario.whatsapp,
         error: resultado.error ?? "desconocido",
       };
+}
+
+// —— "¿Olvidaste tu clave?" por WhatsApp ————————————————————————————————————
+
+interface FilaCuentaClave {
+  username: string;
+  childPersonId: string | null;
+  ninoNombres: string | null;
+  ninoApellidos: string | null;
+  ninoPais: string | null;
+  ninoTelefono: string | null;
+  apoderadoNombres: string | null;
+  apoderadoTelefono: string | null;
+  guiaNombres: string | null;
+  guiaTelefono: string | null;
+  guiaPais: string | null;
+  staffNombres: string | null;
+  staffTelefono: string | null;
+  staffPais: string | null;
+}
+
+/**
+ * A QUÉ teléfono va el enlace de una cuenta, siempre uno YA registrado:
+ *  - NIÑO: el de su apoderado (el primero con teléfono; si no, el del niño, que
+ *    desde 2026-10-21 es el mismo de la familia);
+ *  - GUÍA: el de su ficha;
+ *  - personal administrativo: el de su perfil.
+ * El país completa el indicativo de un móvil local (`telefonoWhatsApp`); para el
+ * personal sale del alcance de su rol, y sin país el número tiene que venir
+ * completo con indicativo.
+ */
+async function destinoDeCuenta(userId: string): Promise<{
+  fila: FilaCuentaClave;
+  telefono: string | null;
+  pais: string;
+  nombre: string | null;
+  apoderado: string;
+  childPersonId: string | null;
+}> {
+  const fila = await queryOne<FilaCuentaClave>(
+    `SELECT u.username,
+            p.id AS "childPersonId", p.nombres AS "ninoNombres", p.apellidos AS "ninoApellidos",
+            p.country_code AS "ninoPais", p.telefono AS "ninoTelefono",
+            ap.nombres AS "apoderadoNombres", ap.telefono AS "apoderadoTelefono",
+            g.nombres AS "guiaNombres", g.telefono AS "guiaTelefono", g.pais AS "guiaPais",
+            pf.nombres AS "staffNombres", pf.telefono AS "staffTelefono",
+            (SELECT ur.country_code FROM access_user_role ur
+              WHERE ur.user_id = u.id AND ur.country_code IS NOT NULL
+              ORDER BY ur.country_code LIMIT 1) AS "staffPais"
+       FROM identity_user u
+       LEFT JOIN people_person p ON p.user_id = u.id
+       LEFT JOIN LATERAL (
+         SELECT a.nombres, a.telefono
+           FROM people_guardianship gu JOIN people_person a ON a.id = gu.apoderado_id
+          WHERE gu.nino_id = p.id
+          ORDER BY (NULLIF(TRIM(a.telefono), '') IS NULL), a.created_at
+          LIMIT 1) ap ON true
+       LEFT JOIN scheduling_guia g ON g.guia_user_id = u.id
+       LEFT JOIN identity_perfil pf ON pf.user_id = u.id
+      WHERE u.id = $1`,
+    [userId],
+  );
+  if (fila === null) throw new NotFoundError("La cuenta no existe.");
+  const lleno = (s: string | null) => (s !== null && s.trim() !== "" ? s : null);
+  if (fila.childPersonId !== null) {
+    return {
+      fila,
+      telefono: lleno(fila.apoderadoTelefono) ?? lleno(fila.ninoTelefono),
+      pais: fila.ninoPais ?? "",
+      nombre: primerNombre(fila.ninoNombres),
+      apoderado: primerNombre(fila.apoderadoNombres) ?? "",
+      childPersonId: fila.childPersonId,
+    };
+  }
+  if (lleno(fila.guiaTelefono) !== null || fila.guiaNombres !== null) {
+    return {
+      fila,
+      telefono: lleno(fila.guiaTelefono) ?? lleno(fila.staffTelefono),
+      pais: fila.guiaPais ?? fila.staffPais ?? "",
+      nombre: primerNombre(fila.guiaNombres ?? fila.staffNombres),
+      apoderado: "",
+      childPersonId: null,
+    };
+  }
+  return {
+    fila,
+    telefono: lleno(fila.staffTelefono),
+    pais: fila.staffPais ?? "",
+    nombre: primerNombre(fila.staffNombres),
+    apoderado: "",
+    childPersonId: null,
+  };
+}
+
+/**
+ * Manda por WhatsApp el enlace para elegir clave nueva al teléfono YA
+ * registrado de la cuenta. Como el de creación de perfil, `{{enlace}}` es
+ * secreto: sale AL MOMENTO, el historial lo guarda tapado y una falla no se
+ * reintenta sola (se vuelve a pedir en la entrada). Devuelve el teléfono TAPADO
+ * al que salió, o por qué no salió; nunca lanza por eso.
+ */
+export async function enviarEnlaceClave(input: {
+  userId: string;
+  enlace: string;
+  ip?: string | null;
+}): Promise<{ enviadoA: string | null; problema: string | null }> {
+  const f = await queryOne<FilaPlantilla>(`${SELECT_PLANTILLA} WHERE slug = $1`, [
+    SLUG_RESTABLECER_CLAVE,
+  ]);
+  if (f === null || !f.activo) {
+    return {
+      enviadoA: null,
+      problema: `Falta la plantilla "${SLUG_RESTABLECER_CLAVE}" en Administración › Mensajes.`,
+    };
+  }
+  const plantilla = aPlantilla(f);
+  const d = await destinoDeCuenta(input.userId);
+  const tel = telefonoWhatsApp(d.telefono, d.pais);
+  if (!tel.ok) {
+    return { enviadoA: null, problema: `Sin WhatsApp registrado: ${tel.error}.` };
+  }
+  const ctx: ContextoMensaje = {
+    nombre: d.nombre,
+    nombreCompleto: d.nombre,
+    apoderado: d.apoderado,
+    usuario: d.fila.username,
+    curso: null,
+    salon: null,
+    campania: null,
+    contrato: null,
+    plataforma: PAIS[d.pais] ?? null,
+  };
+  const resultado = await getSender().enviar({
+    canal: "WHATSAPP",
+    destinatario: tel.numero,
+    mensaje: rellenarPlantilla(plantilla.contenido, { ...ctx, enlace: input.enlace }),
+  });
+  await execute(
+    `INSERT INTO notifications_outbox
+       (id, canal, destinatario, mensaje, payload, estado, intentos, ultimo_error, enviada_en,
+        plantilla_slug, child_person_id)
+     VALUES ($1, 'WHATSAPP', $2, $3, $4, $5::notifications_estado, $6, $7,
+             CASE WHEN $5 = 'ENVIADA' THEN now() END, $8, $9)`,
+    [
+      newId(),
+      tel.numero,
+      rellenarParaHistorial(plantilla.contenido, ctx),
+      JSON.stringify({ enlaceClave: true, userId: input.userId }),
+      resultado.ok ? "ENVIADA" : "FALLIDA",
+      resultado.ok ? 1 : MAX_INTENTOS,
+      resultado.ok ? null : (resultado.error ?? "desconocido"),
+      plantilla.slug,
+      d.childPersonId,
+    ],
+  );
+  const tapado = `•••• ${tel.numero.slice(-4)}`;
+  await registrarAuditoria({
+    actorUserId: null,
+    accion: resultado.ok
+      ? "notifications.enlace_clave_enviado"
+      : "notifications.enlace_clave_fallido",
+    entidad: "identity_user",
+    entidadId: input.userId,
+    payload: { destinatario: tapado, ...(resultado.ok ? {} : { error: resultado.error }) },
+    ip: input.ip ?? null,
+  });
+  return resultado.ok
+    ? { enviadoA: tapado, problema: null }
+    : { enviadoA: null, problema: `WhatsApp falló: ${resultado.error ?? "desconocido"}.` };
 }
 
 // —— Aviso de inasistencia (Servicio › Asistencia) ———————————————————————————

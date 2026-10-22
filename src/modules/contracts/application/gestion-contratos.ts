@@ -242,7 +242,18 @@ export async function crearReservaBeneficiario(input: {
       input.titularEsApoderado === true
         ? titularId
         : await personaExistenteOInsertar(input.apoderadoNuevo as PersonInput, tx);
-    const ninoId = await insertPerson(input.nino, tx);
+    // El niño usa el contacto de su APODERADO (así viene de LGS): lo que no traiga
+    // propio, lo toma de él. Es el que reciben los WhatsApp y el correo de su cuenta.
+    const apoderado =
+      input.titularEsApoderado === true ? input.titular : (input.apoderadoNuevo as PersonInput);
+    const ninoId = await insertPerson(
+      {
+        ...input.nino,
+        email: input.nino.email?.trim() || apoderado.email || null,
+        telefono: input.nino.telefono?.trim() || apoderado.telefono || null,
+      },
+      tx,
+    );
     await insertGuardianship(ninoId, apoderadoId, input.parentesco ?? null, tx);
     const contractId = await insertContract(
       {
@@ -302,6 +313,20 @@ export async function crearReservaBeneficiario(input: {
  * activación del alumno ocurre al aprobar, igual que la primera vez. Antes la
  * cuenta seguía apagada y el niño, con contrato vigente, no podía entrar.
  */
+/** El correo de la familia: el del niño o, si no tiene, el de su apoderado. */
+async function correoFamiliarDe(ninoId: string): Promise<string | null> {
+  const f = await queryOne<{ email: string | null }>(
+    `SELECT COALESCE(NULLIF(TRIM(n.email), ''),
+                     (SELECT NULLIF(TRIM(a.email), '')
+                        FROM people_guardianship g JOIN people_person a ON a.id = g.apoderado_id
+                       WHERE g.nino_id = n.id AND NULLIF(TRIM(a.email), '') IS NOT NULL
+                       ORDER BY a.created_at LIMIT 1)) AS email
+       FROM people_person n WHERE n.id = $1`,
+    [ninoId],
+  );
+  return f?.email ?? null;
+}
+
 export async function aprobarContrato(input: {
   actorUserId: string;
   contractId: string;
@@ -345,6 +370,7 @@ export async function aprobarContrato(input: {
       credenciales = await provisionarUsuarioAlumno(tx, {
         nombres: beneficiario.nombres,
         apellidos: beneficiario.apellidos,
+        correoFamiliar: await correoFamiliarDe(beneficiario.id),
       });
       await linkUser(beneficiario.id, credenciales.userId, tx);
       await asignarRolTx(tx, {

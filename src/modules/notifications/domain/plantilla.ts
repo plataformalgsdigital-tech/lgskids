@@ -33,7 +33,8 @@ export const DESCRIPCION_MARCADOR: Record<Marcador, string> = {
   campania: "Campaña",
   contrato: "N° de contrato",
   plataforma: "País",
-  enlace: "Enlace de creación de perfil (solo el envío automático y la ficha)",
+  enlace:
+    "Enlace personal: el de creación de perfil o el de elegir clave nueva (solo los envíos automáticos)",
   fecha: "Fecha de la sesión (solo el aviso de inasistencia de Servicio)",
   video: "Enlace del video de bienvenida (solo Servicio › Welcome)",
 };
@@ -114,3 +115,5 @@ export const SLUG_CREACION_PERFIL_SIN_WELCOME = "creacion-perfil-kids-sin-welcom
 export const SLUG_INASISTENCIA = "inasistencia-kids";
 /** El video de bienvenida, a quien faltó a sus Welcome (Servicio › Welcome). */
 export const SLUG_VIDEO_WELCOME = "video-welcome-kids";
+/** El enlace para elegir clave nueva de "¿Olvidaste tu clave?" (2026-10-21). */
+export const SLUG_RESTABLECER_CLAVE = "restablecer-clave";

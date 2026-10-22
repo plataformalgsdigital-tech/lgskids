@@ -36,6 +36,11 @@ export async function crearCuentaTx(
     email: (username: string) => string | null;
     emailSintetico: boolean;
     /**
+     * El correo es el de la FAMILIA (el del apoderado, que comparten los
+     * hermanos): no cuenta para el índice de correo único.
+     */
+    emailFamiliar?: boolean;
+    /**
      * Id ya reservado, cuando algo que cuelga de la cuenta se guarda ANTES de
      * la transacción (la foto del guía va a almacenamiento, no a la base).
      */
@@ -51,12 +56,20 @@ export async function crearCuentaTx(
     const username = `${opciones.base}${randomDigits(4)}`;
     const fila = await queryOne<{ id: string }>(
       `INSERT INTO identity_user
-         (id, username, email, email_sintetico, password_hash, password_cifrada,
+         (id, username, email, email_sintetico, email_familiar, password_hash, password_cifrada,
           estado, debe_cambiar_password, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVO', true, now())
+       VALUES ($1, $2, $3, $4, $7, $5, $6, 'ACTIVO', true, now())
        ON CONFLICT (username) DO NOTHING
        RETURNING id`,
-      [userId, username, opciones.email(username), opciones.emailSintetico, passwordHash, cifrada],
+      [
+        userId,
+        username,
+        opciones.email(username),
+        opciones.emailSintetico,
+        passwordHash,
+        cifrada,
+        opciones.emailFamiliar === true,
+      ],
       tx,
     );
     if (fila !== null) return { userId, username, passwordInicial };

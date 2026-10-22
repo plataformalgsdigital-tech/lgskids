@@ -52,10 +52,20 @@ export {
   usuarioEliminarHandler,
   usuarioRestablecerClaveHandler,
   usuarioConsultarClaveHandler,
-  olvidoClaveHandler,
+  enlaceClaveFichaHandler,
+  enlaceClaveUsarHandler,
   solicitudesClaveListarHandler,
   solicitudClaveDescartarHandler,
 } from "./api/cuentas-handlers";
+/** "¿Olvidaste tu clave?" por WhatsApp: lo compone `notifications`. */
+export { registrarSolicitudClave } from "./application/solicitudes-clave";
+export {
+  anotarEnvioEnlaceClave,
+  emitirEnlaceClave,
+  fichaPorEnlaceClave,
+  usarEnlaceClave,
+} from "./application/enlace-clave";
+export { enlaceClave, telefonoTapado } from "./domain/enlace-clave";
 export { generarPasswordInicial } from "./domain/credenciales";
 /** Solo para el envío de credenciales por WhatsApp (notifications): audita el propósito. */
 export { consultarClave } from "./application/gestion-cuentas";

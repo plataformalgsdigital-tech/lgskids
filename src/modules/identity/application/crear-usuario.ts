@@ -23,7 +23,8 @@ export async function exigirCorreoLibre(
   if (email === null) return;
   const dueno = await queryOne<{ username: string }>(
     `SELECT username FROM identity_user
-      WHERE LOWER(email) = LOWER($1) AND NOT email_sintetico AND id <> $2`,
+      WHERE LOWER(email) = LOWER($1) AND NOT email_sintetico AND NOT email_familiar
+        AND id <> $2`,
     [email, excluirUserId ?? "00000000-0000-0000-0000-000000000000"],
     tx,
   );

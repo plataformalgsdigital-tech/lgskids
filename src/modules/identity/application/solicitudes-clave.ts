@@ -9,8 +9,10 @@ import { newId } from "@/platform/ids";
  * equipo la ve en Usuarios, restablece la clave y se la entrega (p. ej. por
  * WhatsApp). Al entrar con la clave nueva se le pide cambiarla.
  *
- * No hay correo de recuperación a propósito: los niños tienen un correo
- * sintético que no recibe nada, y la plataforma no envía correo.
+ * Desde 2026-10-21, además, le llega por WhatsApp un ENLACE para elegirla sola
+ * (`enlace-clave.ts`), al teléfono YA registrado. La solicitud se sigue
+ * guardando como REGISTRO: dice a dónde salió el enlace, o por qué no, y si se
+ * resolvió con él. Sin teléfono, la atiende el equipo como antes.
  */
 
 /** Pedidos por IP por hora: la puerta es pública. */
@@ -26,7 +28,7 @@ export async function registrarSolicitudClave(input: {
   usuario: string;
   contacto?: string | null;
   ip: string | null;
-}): Promise<void> {
+}): Promise<{ solicitudId: string; userId: string | null; cuentaActiva: boolean }> {
   const usuario = input.usuario.trim().toLowerCase().slice(0, 60);
   const contacto = input.contacto?.trim().slice(0, 200) || null;
 
@@ -41,27 +43,29 @@ export async function registrarSolicitudClave(input: {
     }
   }
 
-  const cuenta = await queryOne<{ id: string }>(
-    `SELECT id FROM identity_user WHERE username = $1`,
+  const cuenta = await queryOne<{ id: string; estado: string }>(
+    `SELECT id, estado::text AS estado FROM identity_user WHERE username = $1`,
     [usuario],
   );
-  const id = newId();
+  let solicitudId = newId();
   if (cuenta === null) {
     await execute(
       `INSERT INTO identity_solicitud_clave (id, username_ingresado, contacto, ip)
        VALUES ($1, $2, $3, $4)`,
-      [id, usuario, contacto, input.ip],
+      [solicitudId, usuario, contacto, input.ip],
     );
   } else {
-    await execute(
+    const fila = await queryOne<{ id: string }>(
       `INSERT INTO identity_solicitud_clave (id, username_ingresado, user_id, contacto, ip)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (user_id) WHERE estado = 'PENDIENTE' AND user_id IS NOT NULL
        DO UPDATE SET creada_en = now(),
                      contacto = COALESCE(EXCLUDED.contacto, identity_solicitud_clave.contacto),
-                     ip = EXCLUDED.ip`,
-      [id, usuario, cuenta.id, contacto, input.ip],
+                     ip = EXCLUDED.ip
+       RETURNING id`,
+      [solicitudId, usuario, cuenta.id, contacto, input.ip],
     );
+    solicitudId = fila?.id ?? solicitudId;
   }
   await registrarAuditoria({
     actorUserId: null,
@@ -71,6 +75,11 @@ export async function registrarSolicitudClave(input: {
     payload: { usuario, existe: cuenta !== null },
     ip: input.ip,
   });
+  return {
+    solicitudId,
+    userId: cuenta?.id ?? null,
+    cuentaActiva: cuenta?.estado === "ACTIVO",
+  };
 }
 
 export interface SolicitudClave {
@@ -81,23 +90,46 @@ export interface SolicitudClave {
   nombre: string | null;
   contacto: string | null;
   creadaEn: Date;
+  estado: "PENDIENTE" | "ATENDIDA" | "DESCARTADA";
+  /** Teléfono (tapado) al que salió el enlace por WhatsApp. */
+  enlaceEnviadoA: string | null;
+  /** Por qué no salió el enlace (sin teléfono, tope diario…). */
+  enlaceProblema: string | null;
+  /** La persona eligió su clave con el enlace, sin que el equipo interviniera. */
+  resueltaPorEnlace: boolean;
+  atendidaEn: Date | null;
+  /** Quién la atendió o descartó desde el panel. */
+  atendidaPor: string | null;
 }
 
-/** Solicitudes PENDIENTES, la más reciente primero. */
-export async function listarSolicitudesClave(): Promise<SolicitudClave[]> {
+/**
+ * El REGISTRO de solicitudes, la más reciente primero: por defecto solo las
+ * PENDIENTES; con `historial`, también las de los últimos 60 días.
+ */
+export async function listarSolicitudesClave(
+  opciones: { historial?: boolean } = {},
+): Promise<SolicitudClave[]> {
+  const filtro =
+    opciones.historial === true
+      ? `s.estado = 'PENDIENTE' OR s.creada_en > now() - interval '60 days'`
+      : `s.estado = 'PENDIENTE'`;
   return queryRows<SolicitudClave>(
     `SELECT s.id, s.username_ingresado AS "usuarioIngresado", s.user_id AS "userId",
             COALESCE(p.nombres || ' ' || p.apellidos,
                      g.nombres || ' ' || g.apellidos,
                      pf.nombres || ' ' || pf.apellidos) AS nombre,
-            s.contacto, s.creada_en AS "creadaEn"
+            s.contacto, s.creada_en AS "creadaEn", s.estado,
+            s.enlace_enviado_a AS "enlaceEnviadoA", s.enlace_problema AS "enlaceProblema",
+            s.resuelta_por_enlace AS "resueltaPorEnlace", s.atendida_en AS "atendidaEn",
+            ua.username AS "atendidaPor"
        FROM identity_solicitud_clave s
        LEFT JOIN people_person p ON p.user_id = s.user_id
        LEFT JOIN scheduling_guia g ON g.guia_user_id = s.user_id
        LEFT JOIN identity_perfil pf ON pf.user_id = s.user_id
-      WHERE s.estado = 'PENDIENTE'
-      ORDER BY s.creada_en DESC
-      LIMIT 100`,
+       LEFT JOIN identity_user ua ON ua.id = s.atendida_por
+      WHERE ${filtro}
+      ORDER BY (s.estado = 'PENDIENTE') DESC, s.creada_en DESC
+      LIMIT 300`,
   );
 }
 

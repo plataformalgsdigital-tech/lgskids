@@ -431,8 +431,8 @@ Migración `20260921100000_cuentas_usuario`.
   cada opción rebotaba al cambio de clave sin explicación y parecía que
   "Usuarios y roles no funciona". Al guardar se va a `/login?clave=cambiada`,
   que lo confirma: las sesiones se cierran y hay que volver a entrar.
-- **Olvidé mi clave = solicitud al equipo**, no enlace por correo. El correo del
-  alumno es sintético y el niño no tiene buzón.
+- **Olvidé mi clave = solicitud registrada + enlace por WhatsApp** (no por correo:
+  la plataforma no envía correo). Hasta 2026-10-21 era solo la solicitud al equipo.
   - `POST /api/public/olvido-clave` (sin sesión) registra en
     `identity_solicitud_clave` y responde SIEMPRE lo mismo (202), exista o no el
     usuario, para que no sirva para descubrir cuentas;
@@ -442,7 +442,36 @@ Migración `20260921100000_cuentas_usuario`.
   - el panel las lista arriba de Usuarios y marca la cuenta con 🔔.
     **Restablecer** (`POST /api/identity/users/[id]/restablecer-clave`) hace todo
     en una transacción: clave nueva generada, marca de cambiarla encendida,
-    sesiones revocadas y solicitud ATENDIDA.
+    sesiones revocadas, enlace de clave vivo revocado y solicitud ATENDIDA.
+  - **Por WhatsApp (2026-10-21, migración `20261021000000_clave_por_whatsapp`)**:
+    además de registrarse, si la cuenta existe y está ACTIVA le llega un ENLACE
+    de un solo uso (`/restablecer-clave/<token>`, vence en **24 h**, de la base
+    solo sale el hash, uno vivo por cuenta, máx. **3 por cuenta en 24 h**) al
+    teléfono YA REGISTRADO: el del **apoderado** si es un niño; el de su ficha si
+    es **guía**; el de su perfil si es **administrativo** (el país del indicativo
+    sale del alcance de su rol; sin país, el número tiene que venir completo).
+    Plantilla `restablecer-clave` (`{{enlace}}` es secreto: sale al momento y el
+    historial lo guarda tapado). La puerta (`POST /api/public/olvido-clave`) la
+    sirve **`notifications`** (`olvido-clave.ts`), que compone la solicitud de
+    `identity` con el envío —`identity` no puede importar `notifications`—, y
+    manda DESPUÉS de responder (`after()`), para que el tiempo de respuesta no
+    delate qué usuarios existen. La página pública (`GET|POST
+/api/public/restablecer-clave` → `fichaPorEnlaceClave`/`usarEnlaceClave`)
+    pide 8+ con letras y números al niño y la política de 10 al resto, deja la
+    clave con "cambiar al entrar" APAGADO, cierra sesiones y da la solicitud por
+    ATENDIDA "por el enlace". **La solicitud sigue siendo el REGISTRO**: guarda a
+    qué número (tapado) salió el enlace o por qué no (sin teléfono, tope, falla),
+    y el panel muestra las pendientes con eso y un **registro de 60 días**
+    (`?historial=1`). Sin teléfono, la atiende el equipo como antes. Prueba:
+    `notifications/tests/olvido-clave-integration.test.ts`.
+- **Contacto del niño = el del apoderado (2026-10-21)**: la reserva
+  (`crearReservaBeneficiario`) copia al registro del niño el correo y el celular
+  del apoderado si no trae propios (así vienen de LGS), y el alta
+  (`provisionarUsuarioAlumno` con `correoFamiliar`) pone en su cuenta el correo de
+  la familia en vez del sintético. La migración hizo lo mismo con los niños ya
+  existentes. `exigirCorreoLibre` y el índice `identity_user_email_real_unico`
+  ignoran los correos `email_familiar`: el correo único sigue valiendo para el
+  personal y los guías.
 - **Quién administra la cuenta de quién** (`requisitoParaGestionarCuenta`): hace
   falta tanto como para otorgar el rol MÁS ALTO de esa cuenta
   (`requisitoParaOtorgar`):
@@ -1077,8 +1106,10 @@ se toca lo que miden:
    desde TODOS los caminos que registran asistencia o califican.
 5. UN solo lugar transaccional donde nace un alumno (enrollment).
 6. Autorización en el servidor, endpoint por endpoint (`handlerWithAuth`).
-7. Login por username autogenerado; correo sintético para hermanos
-   (`@alumnos.lgskidsplataforma.com`, no enrutable).
+7. Login por username autogenerado. La cuenta del niño lleva el correo de su
+   FAMILIA (el del apoderado, marcado `email_familiar`: los hermanos lo
+   comparten y el índice de correo único no lo cuenta); solo sin correo
+   familiar, el sintético `@alumnos.lgskidsplataforma.com` (desde 2026-10-21).
 8. Campaña GLOBAL; el país vive en contrato/persona; calendario de feriados
    configurable por salón (ADR-0009 y
    `docs/operacion/politica-feriados-asistencia.md`).

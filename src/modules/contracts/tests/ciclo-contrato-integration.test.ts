@@ -93,12 +93,20 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
     expect((await findContractById(contractId))?.finalContrato).toBe("2027-08-03");
   });
 
-  it("APROBAR = alta única: credenciales con username autogenerado, correo sintético y rol alumno CO", async () => {
+  it("APROBAR = alta única: credenciales con username autogenerado, correo de la familia y rol alumno CO", async () => {
     const { credenciales } = await aprobarContrato({ actorUserId: ACTOR, contractId });
     expect(credenciales).not.toBeNull();
     username = credenciales?.username;
     expect(credenciales?.username).toMatch(/^vprueba/);
-    expect(credenciales?.correo).toContain("@alumnos.lgskidsplataforma.com");
+    // El correo de la cuenta es el del apoderado (2026-10-21), marcado familiar:
+    // lo comparten los hermanos y no choca con el índice de correo único.
+    expect(credenciales?.correo).toBe("papa@example.com");
+    const cuenta = await queryOne<{ familiar: boolean; sintetico: boolean }>(
+      `SELECT email_familiar AS familiar, email_sintetico AS sintetico
+         FROM identity_user WHERE username = $1`,
+      [credenciales?.username],
+    );
+    expect(cuenta).toEqual({ familiar: true, sintetico: false });
     expect(credenciales?.passwordInicial.length).toBeGreaterThanOrEqual(10);
 
     // La persona quedó vinculada y con rol alumno de alcance CO.

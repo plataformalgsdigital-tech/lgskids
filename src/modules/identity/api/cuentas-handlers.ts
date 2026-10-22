@@ -12,11 +12,8 @@ import {
   restablecerClave,
 } from "../application/gestion-cuentas";
 import { MAX_USUARIOS_LISTA, TIPOS_USUARIO, listarUsuarios } from "../application/listar-usuarios";
-import {
-  descartarSolicitudClave,
-  listarSolicitudesClave,
-  registrarSolicitudClave,
-} from "../application/solicitudes-clave";
+import { fichaPorEnlaceClave, usarEnlaceClave } from "../application/enlace-clave";
+import { descartarSolicitudClave, listarSolicitudesClave } from "../application/solicitudes-clave";
 import { bootstrapIdentity } from "../infrastructure/authenticator";
 import { clientIp } from "./cookies";
 
@@ -217,36 +214,38 @@ export const usuarioConsultarClaveHandler = handlerWithAuth(async (request, auth
 
 // —— Olvidé mi clave ————————————————————————————————————————————————————
 
+// La puerta pública "¿Olvidaste tu clave?" (`POST /api/public/olvido-clave`) la
+// sirve `notifications`: registra aquí la solicitud y además manda el enlace por
+// WhatsApp, y `identity` no puede importar `notifications` (ciclo).
+
 /**
- * POST /api/public/olvido-clave — pública. Responde SIEMPRE lo mismo, exista
- * o no el usuario: la puerta no sirve para averiguar qué cuentas hay.
+ * GET /api/public/restablecer-clave?token= — pública: qué cuenta abre el
+ * enlace y qué largo pide la clave. Nada más.
  */
-export const olvidoClaveHandler = handler(async (request) => {
-  const body = z
-    .object({
-      usuario: z.string().trim().min(1).max(60),
-      contacto: z.string().max(200).nullish(),
-    })
-    .parse(await request.json());
-  await registrarSolicitudClave({
-    usuario: body.usuario,
-    contacto: body.contacto ?? null,
-    ip: clientIp(request),
-  });
-  return json(
-    {
-      mensaje:
-        "Recibimos tu solicitud. El equipo de LGS Kids te contactará con una clave nueva; al entrar con ella te pediremos que la cambies.",
-    },
-    { status: 202 },
-  );
+export const enlaceClaveFichaHandler = handler(async (request) => {
+  const token = new URL(request.url).searchParams.get("token") ?? "";
+  return json(await fichaPorEnlaceClave(token), SIN_CACHE);
 });
 
-/** GET /api/identity/solicitudes-clave — pendientes. */
-export const solicitudesClaveListarHandler = handlerWithAuth(async (_request, auth) => {
+/** POST /api/public/restablecer-clave — { token, clave, confirmacion }: fija la clave. */
+export const enlaceClaveUsarHandler = handler(async (request) => {
+  const body = z
+    .object({
+      token: z.string().max(100),
+      clave: z.string().min(1).max(200),
+      confirmacion: z.string().max(200),
+    })
+    .parse(await request.json());
+  const r = await usarEnlaceClave({ ...body, ip: clientIp(request) });
+  return json(r, SIN_CACHE);
+});
+
+/** GET /api/identity/solicitudes-clave[?historial=1] — pendientes, o el registro completo. */
+export const solicitudesClaveListarHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
-  return json({ solicitudes: await listarSolicitudesClave() });
+  const historial = new URL(request.url).searchParams.get("historial") === "1";
+  return json({ solicitudes: await listarSolicitudesClave({ historial }) });
 });
 
 /** POST /api/identity/solicitudes-clave/[id]/descartar */

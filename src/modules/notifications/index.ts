@@ -30,5 +30,7 @@ export {
   historialHandler,
   credencialesVistaHandler,
   credencialesEnviarHandler,
+  olvidoClaveHandler,
 } from "./api/handlers";
+export { enviarEnlaceDeSolicitud, registrarOlvidoClave } from "./application/olvido-clave";
 export { LARGO_MAXIMO_CONTENIDO } from "./domain/plantilla";
