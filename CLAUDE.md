@@ -1126,11 +1126,18 @@ se toca lo que miden:
 
 ## Versiones (registradas 2026-07-22)
 
-Node 24.11.0 · pnpm 11.16.0 · Next 16.3.8 · React 19.2.8 · TypeScript 5.9.3
+Node 24.11.0 · pnpm 11.16.0 · Next 16.4.2 · React 19.2.8 · TypeScript 5.9.3
 (NO subir a TS 7: rompe Next/ESLint/depcruise) · ESLint 9.39.5 (NO subir a
 10: eslint-plugin-react incompatible) · Zod 4.4.3 (API nueva: `z.url()`) ·
 pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
 
+- **Next 16.4.2 (2026-10-23, por seguridad)**: dos avisos CRÍTICOS y uno ALTO
+  contra >=16.0.0 <=16.4.0 (`GHSA-2464-fhr4-w9xw` y `GHSA-673q-mjm6-r5xr`, RCE sin
+  autenticar —este último en funciones `use cache`—, y `GHSA-p3m5-59mp-jv5r`, DoS
+  con Server Actions) pusieron en rojo el `audit` de CI. KIDS no usa `use cache` ni
+  Server Actions, pero el pipeline no pasa con un crítico en producción. Subir a
+  16.4.x es una versión MENOR: se corrió `verify` completo y la instalación
+  congelada en worktree limpio. `eslint-config-next` a la par.
 - **Next 16.3.8 (2026-10-10, por seguridad)**: seis avisos nuevos contra
   > =16.0.0 <16.3.8 (uno ALTO, `GHSA-cjq9-62q9-8jv4`; cuatro moderados y uno
   > bajo) ponían en rojo el `audit` de `verify` y de CI. Se fijó el PARCHE exacto:
