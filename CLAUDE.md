@@ -1883,7 +1883,18 @@ tocaría varias filas. Topes: 200 filas por página, 20.000 en el CSV, 100 por
 borrado (en una transacción). El conteo del listado es la estimación de
 `reltuples`, no un `count(*)` por tabla.
 
-Endpoints: `GET /api/dbadmin/tablas` y
+**Mapa de la base (2026-10-23)**: `dbadmin/domain/mapa-tablas.ts` (`MAPA_TABLAS`)
+dice de cada tabla su TEMA del negocio (Niños y familias, Contratos y matrícula,
+Calendario, Welcome, Guías, Asistencia y avance, Contenido, Mensajes, Casos,
+Cuentas, Sistema), para qué sirve y en qué pantalla se ve. La lista se agrupa por
+tema, el buscador encuentra también por la descripción ("asistencia", "clave") y
+sin tabla elegida se ve el **🗺 Mapa** completo. **Una tabla nueva hay que sumarla
+al mapa**: `explorador-integration.test.ts` falla si alguna queda sin describir.
+Además de editar una celda con doble clic, **✏️** abre la fila completa en un
+formulario y guarda SOLO lo que cambió, columna por columna (cada una auditada con
+su valor anterior, por el mismo PATCH).
+
+Endpoints: `GET /api/dbadmin/tablas` (devuelve también `temas`, en orden) y
 `GET|PATCH|POST|DELETE /api/dbadmin/tablas/[tabla]` (el GET con `?formato=csv`
 exporta lo filtrado). Pruebas: `dbadmin/tests/tablas.test.ts` (identificadores e
 inyección) y `explorador-integration.test.ts` (el hash no sale ni en el CSV, la

@@ -13,6 +13,7 @@ import {
   motivoSensible,
   tamanoPagina,
 } from "../domain/tablas";
+import { MAPA_TABLAS, type Tema } from "../domain/mapa-tablas";
 
 /**
  * Explorador de la base: listar tablas, leer filas y escribirlas.
@@ -43,6 +44,10 @@ export interface TablaInfo {
   /** Estimación barata del planificador; no cuenta filas de verdad. */
   filasAprox: number;
   sensible: boolean;
+  /** Del mapa de la base: tema del negocio, para qué sirve y dónde se ve. */
+  tema: Tema | null;
+  para: string | null;
+  pantalla: string | null;
 }
 
 export interface EsquemaTabla {
@@ -75,6 +80,9 @@ export async function listarTablas(): Promise<TablaInfo[]> {
     modulo: f.nombre.startsWith("_") ? "sistema" : (f.nombre.split("_")[0] ?? "otros"),
     filasAprox: Math.max(Number(f.filas), 0),
     sensible: esTablaSensible(f.nombre),
+    tema: MAPA_TABLAS[f.nombre]?.tema ?? null,
+    para: MAPA_TABLAS[f.nombre]?.para ?? null,
+    pantalla: MAPA_TABLAS[f.nombre]?.pantalla ?? null,
   }));
 }
 

@@ -44,6 +44,11 @@ describe.runIf(RUN)("explorador de la base (integración)", () => {
     expect(tablas.find((t) => t.nombre === "identity_user")?.modulo).toBe("identity");
   });
 
+  it("toda tabla está en el MAPA de la base (una tabla nueva hay que describirla)", async () => {
+    const sinDescribir = (await listarTablas()).filter((t) => t.para === null).map((t) => t.nombre);
+    expect(sinDescribir).toEqual([]);
+  });
+
   it("el esquema marca la clave primaria y deja las credenciales fuera de alcance", async () => {
     const e = await esquemaTabla("identity_user");
     expect(e.pk).toBe("id");

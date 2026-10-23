@@ -1,5 +1,5 @@
 import { getAccessProfile } from "@/modules/access";
-import { listarTablas } from "@/modules/dbadmin";
+import { TEMAS_TABLAS, listarTablas } from "@/modules/dbadmin";
 import { bootstrapIdentity } from "@/modules/identity";
 import { ForbiddenError } from "@/platform/errors";
 import { handlerWithAuth, json } from "@/platform/http/handler";
@@ -18,5 +18,8 @@ export const GET = handlerWithAuth(async (_request, auth) => {
   if (!profile.esSuperadmin) {
     throw new ForbiddenError("Solo el superadmin puede abrir la base de datos.");
   }
-  return json({ tablas: await listarTablas() }, { headers: { "Cache-Control": "no-store" } });
+  return json(
+    { tablas: await listarTablas(), temas: TEMAS_TABLAS },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 });

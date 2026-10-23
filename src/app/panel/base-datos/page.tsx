@@ -18,7 +18,16 @@ interface TablaInfo {
   modulo: string;
   filasAprox: number;
   sensible: boolean;
+  /** Del mapa de la base (`dbadmin/domain/mapa-tablas.ts`). */
+  tema: string | null;
+  para: string | null;
+  pantalla: string | null;
 }
+
+const SIN_TEMA = "Sin descripción";
+
+/** Minúsculas y sin tildes: "Asistencia" encuentra "asistencia". */
+const plano = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 
 interface ColumnaInfo {
   nombre: string;
@@ -79,9 +88,97 @@ function pintar(valor: unknown): string {
   return String(valor);
 }
 
+/**
+ * El MAPA de la base: cada tema del negocio con sus tablas, para qué sirve cada
+ * una y dónde se ve en el panel. Respeta el buscador de la izquierda.
+ */
+function MapaBase({
+  grupos,
+  onAbrir,
+}: {
+  grupos: [string, TablaInfo[]][];
+  onAbrir: (nombre: string) => void;
+}) {
+  return (
+    <div>
+      <h2 style={{ fontSize: "1.1rem", margin: "0 0 0.3rem" }}>🗺 Mapa de la base</h2>
+      <p style={{ fontSize: "0.82rem", color: "var(--texto-suave)", margin: "0 0 0.9rem" }}>
+        Para qué sirve cada tabla y dónde se ve en el panel. Clic en una tabla para abrirla. ⚠ =
+        pide confirmación para escribir (alimenta reglas que se recalculan solas).
+      </p>
+      {grupos.length === 0 && (
+        <p style={{ color: "var(--texto-suave)" }}>Ninguna tabla coincide con la búsqueda.</p>
+      )}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(26rem, 1fr))",
+          gap: "0.8rem",
+        }}
+      >
+        {grupos.map(([tema, lista]) => (
+          <section
+            key={tema}
+            style={{
+              border: "1px solid #e6e9f2",
+              borderRadius: "0.7rem",
+              padding: "0.7rem 0.8rem",
+            }}
+          >
+            <h3
+              style={{ fontSize: "0.92rem", margin: "0 0 0.4rem", color: "var(--lgs-azul-oscuro)" }}
+            >
+              {tema}{" "}
+              <span style={{ color: "var(--texto-suave)", fontWeight: 500 }}>({lista.length})</span>
+            </h3>
+            {lista.map((t) => (
+              <button
+                key={t.nombre}
+                type="button"
+                onClick={() => onAbrir(t.nombre)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  borderTop: "1px solid #f0f2f7",
+                  background: "transparent",
+                  padding: "0.4rem 0.2rem",
+                  cursor: "pointer",
+                  color: "inherit",
+                  fontSize: "0.8rem",
+                }}
+              >
+                <span style={{ fontWeight: 700, fontFamily: "monospace" }}>
+                  {t.sensible && "⚠ "}
+                  {t.nombre}
+                </span>{" "}
+                <span style={{ color: "var(--texto-suave)", fontSize: "0.72rem" }}>
+                  ~{t.filasAprox} filas
+                </span>
+                <span style={{ display: "block" }}>{t.para ?? "Sin descripción todavía."}</span>
+                {t.pantalla !== null && (
+                  <span
+                    style={{ display: "block", color: "var(--texto-suave)", fontSize: "0.74rem" }}
+                  >
+                    📍 {t.pantalla}
+                  </span>
+                )}
+              </button>
+            ))}
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function BaseDatosPage() {
   const [tablas, setTablas] = useState<TablaInfo[]>([]);
+  const [temas, setTemas] = useState<string[]>([]);
   const [filtroTablas, setFiltroTablas] = useState("");
+  /** Fila abierta en el editor de fila: su id y los valores escritos. */
+  const [fila, setFila] = useState<{ id: string; valores: Record<string, string> } | null>(null);
   const [tabla, setTabla] = useState<string | null>(null);
   const [datos, setDatos] = useState<Pagina | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -113,8 +210,9 @@ export default function BaseDatosPage() {
         );
         return;
       }
-      const data = (await res.json()) as { tablas: TablaInfo[] };
+      const data = (await res.json()) as { tablas: TablaInfo[]; temas?: string[] };
       setTablas(data.tablas);
+      setTemas(data.temas ?? []);
     }
     void cargar();
   }, []);
@@ -161,8 +259,9 @@ export default function BaseDatosPage() {
     void run();
   }, [cargarFilas]);
 
-  function abrir(nombre: string) {
+  function abrir(nombre: string | null) {
     setTabla(nombre);
+    setFila(null);
     setPagina(1);
     setOrden(null);
     setDescendente(false);
@@ -239,14 +338,81 @@ export default function BaseDatosPage() {
     await cargarFilas();
   }
 
-  const porModulo = useMemo(() => {
-    const filtradas = tablas.filter((t) => t.nombre.includes(filtroTablas.trim().toLowerCase()));
+  /**
+   * Las tablas agrupadas por TEMA del negocio, en el orden del mapa. El buscador
+   * mira el nombre Y la descripción: "asistencia", "clave" o "Welcome" encuentran
+   * la tabla aunque no se sepa cómo se llama.
+   */
+  const porTema = useMemo(() => {
+    const q = plano(filtroTablas.trim());
+    const filtradas = tablas.filter(
+      (t) =>
+        q === "" ||
+        plano([t.nombre, t.tema, t.para, t.pantalla].filter(Boolean).join(" ")).includes(q),
+    );
     const mapa = new Map<string, TablaInfo[]>();
     for (const t of filtradas) {
-      mapa.set(t.modulo, [...(mapa.get(t.modulo) ?? []), t]);
+      const tema = t.tema ?? SIN_TEMA;
+      mapa.set(tema, [...(mapa.get(tema) ?? []), t]);
     }
-    return [...mapa.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [tablas, filtroTablas]);
+    const orden = [...temas, SIN_TEMA];
+    return [...mapa.entries()].sort(([a], [b]) => orden.indexOf(a) - orden.indexOf(b));
+  }, [tablas, temas, filtroTablas]);
+
+  const infoTabla = tablas.find((t) => t.nombre === tabla) ?? null;
+
+  /** Abre la fila en el editor, con todo lo editable a la vista. */
+  function editarFila(id: string, registro: Record<string, unknown>) {
+    setNueva(null);
+    setFila({
+      id,
+      valores: Object.fromEntries(
+        (datos?.esquema.columnas ?? [])
+          .filter((c) => !c.oculta)
+          .map((c) => [c.nombre, pintar(registro[c.nombre])]),
+      ),
+    });
+  }
+
+  /** Guarda SOLO las columnas que cambiaron, una por una (cada una auditada). */
+  async function guardarFila() {
+    if (tabla === null || fila === null || datos === null) return;
+    const original = datos.filas.find((f) => String(f[pk ?? ""] ?? "") === fila.id);
+    if (original === undefined) return;
+    const cambios = datos.esquema.columnas.filter(
+      (c) => c.editable && fila.valores[c.nombre] !== pintar(original[c.nombre]),
+    );
+    if (cambios.length === 0) {
+      setAviso("No cambiaste nada.");
+      setFila(null);
+      return;
+    }
+    let hechos = 0;
+    for (const c of cambios) {
+      const texto = fila.valores[c.nombre] ?? "";
+      const valor = texto === "∅" || (texto === "" && c.nullable) ? null : texto;
+      const res = await apiFetch(`/api/dbadmin/tablas/${tabla}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: fila.id, columna: c.nombre, valor, confirmado }),
+      });
+      if (!res.ok) {
+        const e = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        setError(
+          `${c.nombre}: ${e.error?.message ?? "no se pudo guardar"}. ${
+            hechos > 0 ? `Se guardaron ${String(hechos)} cambio(s) antes.` : ""
+          }`,
+        );
+        await cargarFilas();
+        return;
+      }
+      hechos += 1;
+    }
+    setError(null);
+    setAviso(`✔ Fila actualizada: ${cambios.map((c) => c.nombre).join(", ")}.`);
+    setFila(null);
+    await cargarFilas();
+  }
 
   const esquema = datos?.esquema ?? null;
   const pk = esquema?.pk ?? null;
@@ -295,13 +461,25 @@ export default function BaseDatosPage() {
         <aside
           style={{ ...caja, width: "17rem", flexShrink: 0, maxHeight: "76vh", overflowY: "auto" }}
         >
+          <button
+            type="button"
+            onClick={() => abrir(null)}
+            style={{
+              ...boton,
+              width: "100%",
+              marginBottom: "0.5rem",
+              background: tabla === null ? "#eef2ff" : "white",
+            }}
+          >
+            🗺 Mapa de la base
+          </button>
           <input
             value={filtroTablas}
             onChange={(e) => setFiltroTablas(e.target.value)}
-            placeholder="Buscar tabla…"
+            placeholder="Buscar tabla o tema (ej. asistencia)…"
             style={{ ...entrada, width: "100%", marginBottom: "0.6rem" }}
           />
-          {porModulo.map(([modulo, lista]) => (
+          {porTema.map(([modulo, lista]) => (
             <div key={modulo} style={{ marginBottom: "0.7rem" }}>
               <div
                 style={{
@@ -319,6 +497,7 @@ export default function BaseDatosPage() {
                   key={t.nombre}
                   type="button"
                   onClick={() => abrir(t.nombre)}
+                  title={t.para ?? undefined}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -354,9 +533,26 @@ export default function BaseDatosPage() {
         {/* ── Tabla ───────────────────────────────────────── */}
         <section style={{ ...caja, flex: 1, minWidth: 0 }}>
           {tabla === null ? (
-            <p style={{ color: "var(--texto-suave)" }}>Elige una tabla de la izquierda.</p>
+            <MapaBase grupos={porTema} onAbrir={abrir} />
           ) : (
             <>
+              {infoTabla?.para != null && (
+                <p
+                  style={{
+                    margin: "0 0 0.6rem",
+                    fontSize: "0.84rem",
+                    color: "var(--texto-suave)",
+                  }}
+                >
+                  <strong style={{ color: "inherit" }}>{infoTabla.tema}</strong> · {infoTabla.para}
+                  {infoTabla.pantalla !== null && (
+                    <>
+                      <br />
+                      📍 Se ve en: {infoTabla.pantalla}
+                    </>
+                  )}
+                </p>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -404,15 +600,16 @@ export default function BaseDatosPage() {
                   <button
                     type="button"
                     style={boton}
-                    onClick={() =>
+                    onClick={() => {
+                      setFila(null);
                       setNueva(
                         Object.fromEntries(
                           (esquema?.columnas ?? [])
                             .filter((c) => !c.oculta)
                             .map((c) => [c.nombre, ""]),
                         ),
-                      )
-                    }
+                      );
+                    }}
                   >
                     + Nueva fila
                   </button>
@@ -510,10 +707,87 @@ export default function BaseDatosPage() {
                 </div>
               )}
 
+              {fila !== null && esquema !== null && (
+                <div style={{ ...caja, marginBottom: "0.7rem", background: "#fffdf3" }}>
+                  <strong style={{ fontSize: "0.88rem" }}>
+                    ✏️ Editar fila de {tabla} · <code>{fila.id}</code>
+                  </strong>
+                  <p style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+                    Cambia lo que necesites y guarda: se escriben solo los campos que cambiaste, y
+                    cada uno queda en la auditoría con su valor anterior. Escribe <code>∅</code>{" "}
+                    para guardar NULL. Los campos grises no se editan aquí (clave primaria o
+                    credenciales).
+                  </p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(16rem, 1fr))",
+                      gap: "0.5rem",
+                      margin: "0.6rem 0",
+                    }}
+                  >
+                    {esquema.columnas
+                      .filter((c) => !c.oculta)
+                      .map((c) => {
+                        const valor = fila.valores[c.nombre] ?? "";
+                        const largo = valor.length > 60 || c.tipo === "jsonb" || c.tipo === "json";
+                        const props = {
+                          value: valor,
+                          disabled: !c.editable,
+                          onChange: (e: { target: { value: string } }) =>
+                            setFila({
+                              ...fila,
+                              valores: { ...fila.valores, [c.nombre]: e.target.value },
+                            }),
+                          style: {
+                            ...entrada,
+                            width: "100%",
+                            background: c.editable ? "white" : "#f1f3f7",
+                          },
+                        };
+                        return (
+                          <label
+                            key={c.nombre}
+                            style={{
+                              fontSize: "0.78rem",
+                              gridColumn: largo ? "1 / -1" : undefined,
+                            }}
+                          >
+                            <span style={{ fontWeight: 700 }}>
+                              {c.esPk && "🔑 "}
+                              {c.nombre}
+                            </span>{" "}
+                            <span style={{ color: "var(--texto-suave)" }}>
+                              {c.tipo}
+                              {c.nullable ? "" : " *"}
+                            </span>
+                            {largo ? (
+                              <textarea
+                                {...props}
+                                rows={4}
+                                style={{ ...props.style, resize: "vertical" }}
+                              />
+                            ) : (
+                              <input {...props} />
+                            )}
+                          </label>
+                        );
+                      })}
+                  </div>
+                  <button type="button" style={boton} onClick={() => void guardarFila()}>
+                    💾 Guardar cambios
+                  </button>{" "}
+                  <button type="button" style={boton} onClick={() => setFila(null)}>
+                    Cancelar
+                  </button>
+                </div>
+              )}
+
               <div style={{ overflowX: "auto", maxHeight: "60vh" }}>
                 <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
                   <thead>
                     <tr style={{ position: "sticky", top: 0, background: "#f7f9ff" }}>
+                      {pk !== null && <th style={{ padding: "0.35rem" }}></th>}
                       {pk !== null && <th style={{ padding: "0.35rem" }}></th>}
                       {(esquema?.columnas ?? []).map((c) => (
                         <th
@@ -558,6 +832,23 @@ export default function BaseDatosPage() {
                                   setSeleccion(s);
                                 }}
                               />
+                            </td>
+                          )}
+                          {pk !== null && (
+                            <td style={{ padding: "0.3rem" }}>
+                              <button
+                                type="button"
+                                title="Editar la fila completa"
+                                onClick={() => editarFila(id, fila)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "0.9rem",
+                                }}
+                              >
+                                ✏️
+                              </button>
                             </td>
                           )}
                           {(esquema?.columnas ?? []).map((c) => {
@@ -656,7 +947,8 @@ export default function BaseDatosPage() {
                 </select>
                 {cargando && <span style={{ color: "var(--texto-suave)" }}>cargando…</span>}
                 <span style={{ color: "var(--texto-suave)" }}>
-                  Doble clic en una celda para editarla.
+                  ✏️ edita la fila completa · doble clic edita una celda · ☑ marca filas para
+                  borrarlas.
                 </span>
               </div>
             </>

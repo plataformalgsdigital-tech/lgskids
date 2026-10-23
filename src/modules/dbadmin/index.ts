@@ -12,6 +12,8 @@
  * REGLA DE ARQUITECTURA: este archivo es lo ÚNICO importable desde fuera del
  * módulo.
  */
+/** El mapa de la base: temas del negocio y para qué sirve cada tabla. */
+export { TEMAS as TEMAS_TABLAS, MAPA_TABLAS } from "./domain/mapa-tablas";
 export {
   listarTablas,
   esquemaTabla,
