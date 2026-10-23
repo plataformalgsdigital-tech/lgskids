@@ -1133,8 +1133,12 @@ se toca lo que miden:
 
 Node 24.11.0 · pnpm 11.16.0 · Next 16.4.2 · React 19.2.8 · TypeScript 5.9.3
 (NO subir a TS 7: rompe Next/ESLint/depcruise) · ESLint 9.39.5 (NO subir a
-10: eslint-plugin-react incompatible) · Zod 4.4.3 (API nueva: `z.url()`) ·
+10: eslint-plugin-react incompatible) · Zod 4.6.7 (API nueva: `z.url()`) ·
 pg 8.22.0 · Vitest 4.1.10 · dependency-cruiser 18.1.0 · Prettier 3.9.6.
+
+- **Zod 4.6.7 (2026-10-23, por seguridad)**: `GHSA-mrhx-c7xc-m3w5` (ALTO, agotar
+  memoria validando colecciones grandes) afecta a <4.6.6 y ponía en rojo el `audit`.
+  Desde 4.4.3, sin cambios de código: `verify` y la suite completa de integración en verde.
 
 - **Next 16.4.2 (2026-10-23, por seguridad)**: dos avisos CRÍTICOS y uno ALTO
   contra >=16.0.0 <=16.4.0 (`GHSA-2464-fhr4-w9xw` y `GHSA-673q-mjm6-r5xr`, RCE sin
@@ -1837,6 +1841,16 @@ solo servía para completar la ficha.
   borra solo `slot_id IS NOT NULL` y la regeneración destructiva no se los lleva.
   Hasta **3 salones** compartidos (`MAX_SALONES_COMPARTIDOS`, `grupo_id` común). El
   enlace de Zoom se HEREDA del guía asignado, nunca se copia al evento.
+  **"Todos" en Campaña, País, Curso, Salón y Nivel (2026-10-23)**: con salón "Todos",
+  la clase se crea como UNA clase compartida (un `grupo_id`, sin el tope de 3) en
+  TODOS los salones ACTIVOS del alcance, que resuelve el servidor
+  (`salonesDelAlcance`; el POST manda `todos: {campaignId, pais, curso}`). La hora va
+  en el reloj de quien la escribe (`zona`), porque puede cruzar países. **Una clase
+  compartida es UN instante** (crear y editar): antes cada salón tomaba la hora de
+  pared de SU zona y un grupo Chile+Colombia quedaba partido en dos horas; ahora el
+  instante sale de una zona (la enviada, o la del salón del evento que se edita) y
+  cada salón guarda su FECHA local. Si algún salón ya tiene algo a esa hora no se
+  crea en ninguno y el error los nombra. Nivel vacío = "Todos los niveles".
 - **Evento ADMINISTRATIVO** (`scheduling_evento_admin` + `…_guia`, `20260828000001`):
   reunión o capacitación cuya audiencia son GUÍAS. Vive en tabla propia a propósito:
   en `scheduling_session` arrastraría lista de matriculados, asistencia y progresión,
@@ -1980,7 +1994,9 @@ para niños de varios salones, países y campañas. Migración `20261009000000_w
   por niño (índice único parcial); cambiar de Welcome cancela la anterior.
 - **Se crea en el calendario** como un tipo más de "Evento académico". Por defecto:
   campaña EN MATRÍCULA (o cualquiera, o Todas), país/curso/salón **Todos**, nivel
-  **Rookie** (siempre UN nivel: solo lo ven los niños que van en él), límite que pone
+  **Rookie** (solo lo ven los niños que van en él; desde 2026-10-23 también **"Todos
+  los niveles"** = `nivel` NULL, migración `20261023000000`, y `sqlElegible` acepta
+  `w.nivel IS NULL`), límite que pone
   quien lo crea (obligatorio), guía obligatorio (el Zoom sale de su ficha). Vacío =
   todos. Se pinta en VERDE; su modal (`WelcomeModal.tsx`) lista a los agendados y
   pasa lista. Se borra solo sin niños dentro.

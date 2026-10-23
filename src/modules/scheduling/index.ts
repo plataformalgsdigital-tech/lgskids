@@ -90,6 +90,7 @@ export {
 export type { RegistroSesion, Repeticion, FilaRefuerzo } from "./application/registro-sesion";
 export {
   crearEvento,
+  salonesDelAlcance,
   guiasConZoom,
   guardarFichaGuia,
   fichasDeGuias,

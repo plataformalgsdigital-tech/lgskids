@@ -24,7 +24,8 @@ export const welcomeSchema = z.object({
   pais: z.enum(PAISES_WELCOME).nullable(),
   curso: z.enum(CURSOS_WELCOME).nullable(),
   classroomId: z.uuid().nullable(),
-  nivel: z.enum(NIVELES_WELCOME).default(NIVEL_WELCOME_DEFECTO),
+  // null = todos los niveles; sin el campo, el de defecto (Rookie).
+  nivel: z.enum(NIVELES_WELCOME).nullable().default(NIVEL_WELCOME_DEFECTO),
   limiteUsuarios: z.number().int().min(1).max(LIMITE_WELCOME_MAX),
   observaciones: z.string().max(1000).nullish(),
   // Para niños con el curso ya andando: no exige ser antes del inicio.

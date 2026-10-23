@@ -22,7 +22,7 @@ interface Welcome {
   curso: string | null;
   classroomId: string | null;
   salon: string | null;
-  nivel: string;
+  nivel: string | null;
   limiteUsuarios: number;
   inscritos: number;
   observaciones: string | null;
@@ -241,7 +241,7 @@ export function WelcomeModal({
                 )}
                 {fila("Curso", welcome.curso ?? "Todos")}
                 {fila("Salón", welcome.salon ?? "Todos")}
-                {fila("Nivel", welcome.nivel)}
+                {fila("Nivel", welcome.nivel ?? "Todos los niveles")}
                 {welcome.enMarcha && fila("Tipo", "Para niños con el curso en marcha")}
                 {fila(
                   "Inscritos",

@@ -232,7 +232,7 @@ export async function agendadosWelcome(
   }
   return queryRows<AgendadoWelcome>(
     `SELECT r.id AS "reservaId", w.id AS "welcomeId", w.starts_at AS "startsAt",
-            w.duracion_min AS "duracionMin", ${NOMBRE_GUIA} AS guia, w.nivel, r.asistio,
+            w.duracion_min AS "duracionMin", ${NOMBRE_GUIA} AS guia, COALESCE(w.nivel, 'Todos los niveles') AS nivel, r.asistio,
             ${SQL_ESTADO_WELCOME} AS estado, h.sesiones,
             CASE WHEN r.agendado_por IS NULL THEN NULL
                  ELSE (SELECT username FROM identity_user WHERE id = r.agendado_por) END
@@ -287,7 +287,7 @@ export async function reagendamientosWelcome(
   if (f.soloSinReagendar === true) cond.push("h.proximo IS NULL");
   return queryRows<InasistenteWelcome>(
     `SELECT r.id AS "reservaId", w.id AS "welcomeId", w.starts_at AS "startsAt",
-            ${NOMBRE_GUIA} AS guia, w.nivel, h.proximo AS "reagendadoA", h.perdidos,
+            ${NOMBRE_GUIA} AS guia, COALESCE(w.nivel, 'Todos los niveles') AS nivel, h.proximo AS "reagendadoA", h.perdidos,
             ${COLUMNAS_NINO}
        FROM scheduling_welcome_reserva r
        JOIN scheduling_welcome w ON w.id = r.welcome_id

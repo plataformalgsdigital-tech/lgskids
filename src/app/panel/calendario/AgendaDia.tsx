@@ -23,7 +23,7 @@ export interface WelcomeAgenda {
   guia: string;
   inscritos: number;
   limiteUsuarios: number;
-  nivel: string;
+  nivel: string | null;
 }
 export interface AdminAgenda {
   id: string;
@@ -338,7 +338,7 @@ export function AgendaDia(props: {
                         >
                           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
                             <span style={chip("#c8e6c9", "#1b5e20")}>WELCOME</span>
-                            <strong>{w.nivel}</strong>
+                            <strong>{w.nivel ?? "Todos los niveles"}</strong>
                           </div>
                           <div>
                             Advisor: <strong>{w.guia}</strong>

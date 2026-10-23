@@ -34,7 +34,7 @@ type Queryable = Pick<PoolClient, "query">;
  */
 function sqlElegible(pNivel: string): string {
   return `w.starts_at > now()
-      AND w.nivel = ${pNivel}
+      AND (w.nivel IS NULL OR w.nivel = ${pNivel})
       AND (w.classroom_id IS NULL OR w.classroom_id = ncl.id)
       AND (w.campaign_id IS NULL OR w.campaign_id = nco.campaign_id)
       AND (w.curso IS NULL OR w.curso = nco.tipo::text)
@@ -67,7 +67,8 @@ export interface WelcomeResumen {
   curso: string | null;
   classroomId: string | null;
   salon: string | null;
-  nivel: string;
+  /** null = todos los niveles. */
+  nivel: string | null;
   limiteUsuarios: number;
   inscritos: number;
   observaciones: string | null;
@@ -102,7 +103,8 @@ export interface DatosWelcome {
   pais: string | null;
   curso: string | null;
   classroomId: string | null;
-  nivel: NivelWelcome;
+  /** null = todos los niveles. */
+  nivel: NivelWelcome | null;
   limiteUsuarios: number;
   observaciones?: string | null;
   /**

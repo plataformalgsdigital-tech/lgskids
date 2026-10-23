@@ -86,7 +86,7 @@ export type EventoEditable =
       pais: string | null;
       curso: string | null;
       classroomId: string | null;
-      nivel: string;
+      nivel: string | null;
       limiteUsuarios: number;
       observaciones: string | null;
       enMarcha: boolean;
@@ -344,14 +344,12 @@ export function NuevoEventoModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCerrar]);
 
-  // Cascada: cada nivel del filtro se calcula sobre el anterior.
-  // El evento ADMINISTRATIVO no se dicta en un salón: campaña, curso, salón y
-  // nivel son contexto, y dejarlos vacíos significa TODOS. En el académico la
-  // cascada sí obliga, porque la clase ocurre en UN salón concreto.
-  // En el Welcome, campaña, país, curso y salón son FILTROS de quién puede
-  // agendarlo: vacío = todos, igual que en el evento administrativo.
-  const filtrosLibres = esAdmin || esWelcome;
-  const libre = (valor: string) => filtrosLibres && valor === "";
+  // Cascada: cada nivel del filtro se calcula sobre el anterior, y vacío = TODOS
+  // en los tres modos. En el ADMINISTRATIVO son contexto; en el Welcome, filtros
+  // de quién puede agendarlo; en el ACADÉMICO, dónde se dicta: con salón "Todos"
+  // la clase se crea, como UNA clase compartida, en todos los salones activos
+  // que coincidan (los resuelve el servidor).
+  const libre = (valor: string) => valor === "";
   const campanias = [...new Set(salones.map((s) => s.campania))];
   const paises = [
     ...new Set(
@@ -385,11 +383,16 @@ export function NuevoEventoModal({
 
   const guia = guias.find((g) => g.id === guiaUserId) ?? null;
   const seleccionados = [salonPrincipal, ...(compartir ? extras : [])].filter((x) => x !== "");
+  /** Clase académica con salón "Todos": va a todos los salones que coincidan. */
+  const todosLosSalones = !esAdmin && !esWelcome && !salonFijo && salonPrincipal === "";
   const listo = esAdmin
     ? fecha !== "" && hora !== "" && audiencia.length > 0
     : esWelcome
       ? fecha !== "" && hora !== "" && guiaUserId !== "" && Number(limite) > 0
-      : fecha !== "" && hora !== "" && (salonFijo || salonPrincipal !== "") && guiaUserId !== "";
+      : fecha !== "" &&
+        hora !== "" &&
+        (salonFijo || salonPrincipal !== "" || salonesFiltrados.length > 0) &&
+        guiaUserId !== "";
   const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   async function crear() {
@@ -407,7 +410,7 @@ export function NuevoEventoModal({
             pais: pais === "" ? null : pais,
             curso: curso === "" ? null : curso,
             classroomId: salonPrincipal === "" ? null : salonPrincipal,
-            nivel: nivel === "" ? "ROOKIE" : nivel,
+            nivel: nivel === "" ? null : nivel,
             limiteUsuarios: Number(limite),
             observaciones: observaciones.trim() === "" ? null : observaciones,
             enMarcha,
@@ -443,7 +446,17 @@ export function NuevoEventoModal({
                 guiaUserIds: audiencia,
               }
             : {
-                classroomIds: seleccionados,
+                ...(todosLosSalones
+                  ? {
+                      todos: {
+                        campaignId: campaniasLista.find((c) => c.nombre === campania)?.id ?? null,
+                        pais: pais === "" ? null : pais,
+                        curso: curso === "" ? null : curso,
+                      },
+                      // Puede cruzar países: la hora va en el reloj de quien la escribe.
+                      zona: zonaNavegador,
+                    }
+                  : { classroomIds: seleccionados }),
                 tipo,
                 fecha,
                 horaLocal: hora,
@@ -682,7 +695,7 @@ export function NuevoEventoModal({
               <>
                 <div>
                   <label style={rotulo} htmlFor="ev-camp">
-                    Campaña {filtrosLibres ? "" : "*"}
+                    Campaña
                   </label>
                   <select
                     id="ev-camp"
@@ -702,9 +715,7 @@ export function NuevoEventoModal({
                     }}
                     style={campo}
                   >
-                    <option value="">
-                      {filtrosLibres ? "Todas las campañas" : "Seleccionar campaña"}
-                    </option>
+                    <option value="">Todas las campañas</option>
                     {campanias.map((c) => (
                       <option key={c} value={c}>
                         {c}
@@ -718,12 +729,11 @@ export function NuevoEventoModal({
                 </div>
                 <div>
                   <label style={rotulo} htmlFor="ev-pais">
-                    País {filtrosLibres ? "" : "*"}
+                    País
                   </label>
                   <select
                     id="ev-pais"
                     value={pais}
-                    disabled={!filtrosLibres && campania === ""}
                     onChange={(e) => {
                       setPais(e.target.value);
                       setCurso("");
@@ -732,9 +742,7 @@ export function NuevoEventoModal({
                     }}
                     style={campo}
                   >
-                    <option value="">
-                      {filtrosLibres ? "Todos los países" : "Seleccionar país"}
-                    </option>
+                    <option value="">Todos los países</option>
                     {paises.map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -744,21 +752,18 @@ export function NuevoEventoModal({
                 </div>
                 <div>
                   <label style={rotulo} htmlFor="ev-curso">
-                    Curso {filtrosLibres ? "" : "*"}
+                    Curso
                   </label>
                   <select
                     id="ev-curso"
                     value={curso}
-                    disabled={!filtrosLibres && pais === ""}
                     onChange={(e) => {
                       setCurso(e.target.value);
                       setSalonPrincipal("");
                     }}
                     style={campo}
                   >
-                    <option value="">
-                      {filtrosLibres ? "Todos los cursos" : "Seleccionar curso"}
-                    </option>
+                    <option value="">Todos los cursos</option>
                     {cursos.map((c) => (
                       <option key={c} value={c}>
                         {c}
@@ -768,21 +773,20 @@ export function NuevoEventoModal({
                 </div>
                 <div>
                   <label style={rotulo} htmlFor="ev-salon">
-                    Salón {filtrosLibres ? "" : "*"}
+                    Salón
                   </label>
                   <select
                     id="ev-salon"
                     value={salonPrincipal}
-                    disabled={!filtrosLibres && curso === ""}
                     onChange={(e) => setSalonPrincipal(e.target.value)}
                     style={campo}
                   >
-                    <option value="">
-                      {filtrosLibres ? "Todos los salones" : "Seleccionar salón"}
-                    </option>
+                    <option value="">Todos los salones</option>
                     {salonesFiltrados.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.nombre}
+                        {curso === "" && !s.nombre.includes(s.curso) ? ` · ${s.curso}` : ""}
+                        {campania === "" ? ` · ${s.campania}` : ""}
                       </option>
                     ))}
                   </select>
@@ -799,10 +803,8 @@ export function NuevoEventoModal({
                 onChange={(e) => setNivel(e.target.value)}
                 style={campo}
               >
-                {/* El Welcome siempre es de UN nivel: solo lo ven los niños que van en él. */}
-                {!esWelcome && (
-                  <option value="">{esAdmin ? "Todos los niveles" : "Sin nivel"}</option>
-                )}
+                {/* Vacío = todos: en el Welcome, lo agenda un niño de cualquier nivel. */}
+                <option value="">Todos los niveles</option>
                 {NIVELES.map((n) => (
                   <option key={n} value={n}>
                     {n}
@@ -877,6 +879,26 @@ export function NuevoEventoModal({
             </div>
           </div>
 
+          {todosLosSalones && (
+            <div
+              style={{
+                padding: "0.7rem 0.9rem",
+                borderRadius: "0.6rem",
+                background: "#e3f2fd",
+                border: "1px solid #90caf9",
+                fontSize: "0.83rem",
+                lineHeight: 1.45,
+              }}
+            >
+              <strong>🏫 Todos los salones.</strong>{" "}
+              {salonesFiltrados.length === 0
+                ? "Ningún salón coincide con esa campaña, país y curso."
+                : `Se crea como UNA sola clase (misma hora, guía y Zoom) en los ${String(salonesFiltrados.length)} salón${salonesFiltrados.length === 1 ? "" : "es"} de esa campaña, país y curso que estén activos; cada uno la ve en su lista.`}{" "}
+              La hora va en tu reloj ({zonaNavegador}): cada salón la ve en su propia hora. Si algún
+              salón ya tiene un evento a esa hora, no se crea y se dice cuál.
+            </div>
+          )}
+
           {esWelcome && (
             <div
               style={{
@@ -889,8 +911,9 @@ export function NuevoEventoModal({
               }}
             >
               <strong>👋 Welcome.</strong> La hora va en tu reloj ({zonaNavegador}); cada niño la
-              verá en su propia hora. Lo agendan los niños de nivel {nivel || "ROOKIE"} al crear su
-              perfil (o coordinación desde su ficha). Campaña, país, curso y salón vacíos = todos.
+              verá en su propia hora. Lo agendan los niños{" "}
+              {nivel === "" ? "de cualquier nivel" : `de nivel ${nivel}`} al crear su perfil (o
+              coordinación desde su ficha). Campaña, país, curso, salón y nivel vacíos = todos.
               <label
                 style={{
                   display: "flex",
@@ -1045,8 +1068,9 @@ export function NuevoEventoModal({
             </div>
           )}
 
-          {/* Compartir entre cursos: solo tiene sentido en el evento académico. */}
-          {!esAdmin && !esWelcome && !salonFijo && (
+          {/* Compartir entre cursos: solo tiene sentido en el evento académico
+              de UN salón elegido (con "Todos" ya se comparte entre todos). */}
+          {!esAdmin && !esWelcome && !salonFijo && !todosLosSalones && (
             <div
               style={{
                 padding: "0.8rem 0.9rem",

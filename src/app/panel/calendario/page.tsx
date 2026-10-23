@@ -96,7 +96,7 @@ interface WelcomeCal {
   guia: string;
   inscritos: number;
   limiteUsuarios: number;
-  nivel: string;
+  nivel: string | null;
 }
 
 const MESES = [
@@ -545,7 +545,7 @@ function CalendarioSalones({
                       type="button"
                       key={w.id}
                       onClick={() => setWelcomeAbierto(w.id)}
-                      title={`Welcome · ${w.guia} · ${String(w.inscritos)}/${String(w.limiteUsuarios)} niños · ${w.nivel}`}
+                      title={`Welcome · ${w.guia} · ${String(w.inscritos)}/${String(w.limiteUsuarios)} niños · ${w.nivel ?? "todos los niveles"}`}
                       style={{
                         width: "100%",
                         textAlign: "left",

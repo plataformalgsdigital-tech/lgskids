@@ -6,7 +6,7 @@ import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
-import { wallTimeToUtc } from "@/platform/time";
+import { isValidTimeZone, operationalDate, wallTimeToUtc } from "@/platform/time";
 import {
   DURACION_ADMIN_MAX,
   DURACION_ADMIN_MIN,
@@ -273,6 +273,29 @@ export const ESQUEMA_APERTURA = z.object({
   classroomId: z.uuid().nullable(),
 });
 
+/**
+ * Los salones ACTIVOS de un alcance (null = "Todos"): el evento académico
+ * creado con salón "Todos" se dicta, como UNA clase compartida, en todos ellos.
+ */
+export async function salonesDelAlcance(alcance: {
+  campaignId: string | null;
+  pais: string | null;
+  curso: string | null;
+}): Promise<string[]> {
+  const filas = await queryRows<{ id: string }>(
+    `SELECT cl.id
+       FROM scheduling_classroom cl
+       JOIN catalog_course co ON co.id = cl.course_id
+      WHERE cl.activo
+        AND ($1::uuid IS NULL OR co.campaign_id = $1)
+        AND ($2::text IS NULL OR cl.holiday_country = $2)
+        AND ($3::text IS NULL OR co.tipo::text = $3)
+      ORDER BY cl.nombre`,
+    [alcance.campaignId, alcance.pais, alcance.curso],
+  );
+  return filas.map((f) => f.id);
+}
+
 export async function crearEvento(input: {
   actorUserId: string;
   /** Salones donde se dicta. Más de uno = evento compartido entre cursos. */
@@ -289,6 +312,13 @@ export async function crearEvento(input: {
   observaciones?: string | null;
   /** Abierto a niños de OTROS salones que coincidan con el alcance (Agendar). */
   apertura?: AperturaEvento;
+  /**
+   * Zona IANA en la que está escrita la hora. Sin ella, la del primer salón.
+   * El evento para "todos" los salones la manda: puede cruzar países.
+   */
+  zona?: string;
+  /** Salones resueltos por `salonesDelAlcance` ("Todos"): sin tope de compartidos. */
+  todos?: boolean;
   ip?: string | null;
   /** Para crearlo dentro de una transacción ya abierta (aprobar un refuerzo). */
   client?: PoolClient;
@@ -307,12 +337,19 @@ export async function crearEvento(input: {
   }
   const salones = [...new Set(input.classroomIds)];
   if (salones.length === 0) {
-    throw new ValidationError("Elige al menos un salón.");
+    throw new ValidationError(
+      input.todos === true
+        ? "Ningún salón activo coincide con esa campaña, país y curso."
+        : "Elige al menos un salón.",
+    );
   }
-  if (salones.length > MAX_SALONES_COMPARTIDOS) {
+  if (input.todos !== true && salones.length > MAX_SALONES_COMPARTIDOS) {
     throw new ValidationError(
       `Un evento compartido admite hasta ${String(MAX_SALONES_COMPARTIDOS)} salones.`,
     );
+  }
+  if (input.zona !== undefined && !isValidTimeZone(input.zona)) {
+    throw new ValidationError(`Zona horaria desconocida: ${input.zona}.`);
   }
 
   // El enlace de Zoom sale del guía; si no lo tiene, el evento se crea igual
@@ -333,6 +370,7 @@ export async function crearEvento(input: {
   const creadas: EventoCreado["sesiones"] = [];
 
   const insertar = async (tx: PoolClient) => {
+    const filas: { id: string; nombre: string; timezone: string; cupo: number }[] = [];
     for (const classroomId of salones) {
       const salon = await queryOne<{ id: string; nombre: string; timezone: string; cupo: number }>(
         `SELECT id, nombre, timezone, cupo FROM scheduling_classroom WHERE id = $1 AND activo`,
@@ -342,31 +380,36 @@ export async function crearEvento(input: {
       if (salon === null) {
         throw new NotFoundError("Un salón no existe o está desactivado.");
       }
+      filas.push(salon);
+    }
 
-      // La hora es de PARED en la zona del salón (ADR-0007); el instante se
-      // calcula por salón, porque dos salones pueden estar en zonas distintas.
-      const [hh, mm] = input.horaLocal.split(":");
-      const [y, m, d] = input.fecha.split("-");
-      const startsAt = wallTimeToUtc(
-        {
-          year: Number(y),
-          month: Number(m),
-          day: Number(d),
-          hour: Number(hh),
-          minute: Number(mm),
-        },
-        salon.timezone,
+    // UNA clase es UN instante, aunque se dicte en salones de zonas distintas
+    // (el guía no puede estar en dos horas a la vez). La hora es de PARED en la
+    // zona de quien la escribe si la manda (evento para "todos" los salones) o,
+    // si no, en la del primer salón (ADR-0007). Cada salón guarda su fecha local.
+    const [hh, mm] = input.horaLocal.split(":");
+    const [y, m, d] = input.fecha.split("-");
+    const startsAt = wallTimeToUtc(
+      { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
+      input.zona ?? filas[0]?.timezone ?? "UTC",
+    );
+
+    const choques = await queryRows<{ nombre: string }>(
+      `SELECT cl.nombre FROM scheduling_session s
+         JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+        WHERE s.classroom_id = ANY($1::uuid[]) AND s.starts_at = $2
+        ORDER BY cl.nombre`,
+      [salones, startsAt],
+      tx,
+    );
+    if (choques.length > 0) {
+      throw new ConflictError(
+        `Ya tiene${choques.length === 1 ? "" : "n"} un evento a esa hora: ${choques.map((c) => c.nombre).join(", ")}.`,
       );
+    }
 
-      const choque = await queryOne<{ id: string }>(
-        `SELECT id FROM scheduling_session WHERE classroom_id = $1 AND starts_at = $2`,
-        [classroomId, startsAt],
-        tx,
-      );
-      if (choque !== null) {
-        throw new ConflictError(`${salon.nombre} ya tiene un evento a esa hora.`);
-      }
-
+    for (const salon of filas) {
+      const classroomId = salon.id;
       const id = newId();
       await execute(
         `INSERT INTO scheduling_session
@@ -379,7 +422,7 @@ export async function crearEvento(input: {
           id,
           classroomId,
           input.tipo,
-          input.fecha,
+          operationalDate(startsAt, salon.timezone),
           startsAt,
           input.duracionMin,
           input.guiaUserId,
@@ -411,6 +454,7 @@ export async function crearEvento(input: {
       hora: input.horaLocal,
       salones: creadas.map((c) => c.salon),
       compartido: grupoId !== null,
+      todos: input.todos === true,
       conZoom: guia.zoom_url !== null && guia.zoom_url !== "",
     },
     ip: input.ip ?? null,
@@ -501,11 +545,14 @@ export async function editarEvento(input: {
     if (filas.some((f) => f.cerradaEn !== null)) {
       throw new ConflictError("El evento ya se dictó y se cerró: no se puede editar.");
     }
+    // UNA clase es UN instante: la hora está escrita en el reloj del salón del
+    // evento que se abrió, y sus hermanos de grupo (quizá en otra zona) la siguen.
+    const zona = filas.find((f) => f.id === sesion.id)?.timezone ?? filas[0]?.timezone ?? "UTC";
+    const startsAt = wallTimeToUtc(
+      { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
+      zona,
+    );
     for (const f of filas) {
-      const startsAt = wallTimeToUtc(
-        { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
-        f.timezone,
-      );
       const choque = await queryOne<{ id: string }>(
         `SELECT id FROM scheduling_session WHERE classroom_id = $1 AND starts_at = $2 AND id <> $3`,
         [f.classroomId, startsAt, f.id],
@@ -524,7 +571,7 @@ export async function editarEvento(input: {
         [
           f.id,
           input.tipo,
-          input.fecha,
+          operationalDate(startsAt, f.timezone),
           startsAt,
           input.duracionMin,
           input.guiaUserId,

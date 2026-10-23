@@ -14,6 +14,7 @@ import {
   editarEvento,
   editarEventoAdmin,
   marcarAsistenciaEventoAdmin,
+  salonesDelAlcance,
 } from "../application/crear-evento";
 import { crearSalon } from "../application/gestion-salones";
 import {
@@ -341,6 +342,57 @@ describe.runIf(RUN)("Welcome (integración)", () => {
         guiaUserId: actor,
       }),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('salón "Todos": UNA clase en todos los salones del alcance, en UN instante', async () => {
+    const delAlcance = await salonesDelAlcance({ campaignId: campaniaId, pais: null, curso: null });
+    expect(delAlcance.sort()).toEqual([junior, youngster].sort());
+    expect(await salonesDelAlcance({ campaignId: campaniaId, pais: "CO", curso: null })).toEqual([
+      youngster,
+    ]);
+
+    // Chile y Colombia: la hora va en el reloj de quien la escribe.
+    const creado = await crearEvento({
+      actorUserId: actor,
+      classroomIds: delAlcance,
+      todos: true,
+      zona: "America/Bogota",
+      tipo: "CLUB",
+      fecha: dias(9),
+      horaLocal: "13:00",
+      duracionMin: 60,
+      guiaUserId: actor,
+    });
+    expect(creado.grupoId).not.toBeNull();
+    const filas = await queryRows<{ startsAt: Date }>(
+      `SELECT starts_at AS "startsAt" FROM scheduling_session WHERE id = ANY($1)`,
+      [creado.sesiones.map((s) => s.id)],
+    );
+    expect(filas).toHaveLength(2);
+    expect(new Set(filas.map((f) => f.startsAt.toISOString())).size).toBe(1);
+
+    // Si un salón ya tiene algo a esa hora, no se crea en ninguno y se dice cuál.
+    await expect(
+      crearEvento({
+        actorUserId: actor,
+        classroomIds: delAlcance,
+        todos: true,
+        zona: "America/Bogota",
+        tipo: "TALLER",
+        fecha: dias(9),
+        horaLocal: "13:00",
+        duracionMin: 60,
+        guiaUserId: actor,
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('Welcome de nivel "Todos" le sirve a un niño de cualquier nivel', async () => {
+    const id = await nuevo({ nivel: null, horaLocal: "08:00" });
+    for (const nivel of ["ROOKIE", "CHAMPION", "ULTIMATE"]) {
+      const lista = await welcomesDisponibles({ classroomId: junior, nivel });
+      expect(lista.map((w) => w.id)).toContain(id);
+    }
   });
 
   it("una clase del HORARIO no se edita como evento", async () => {

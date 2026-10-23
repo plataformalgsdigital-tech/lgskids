@@ -9,6 +9,7 @@ import {
   TIPOS_EVENTO_ADMIN,
   MAX_SALONES_COMPARTIDOS,
   crearEvento,
+  salonesDelAlcance,
   guiasConZoom,
 } from "@/modules/scheduling";
 import { handlerWithAuth, json } from "@/platform/http/handler";
@@ -35,7 +36,18 @@ export const GET = handlerWithAuth(async (_request, auth) => {
 });
 
 const crearSchema = z.object({
-  classroomIds: z.array(z.uuid()).min(1).max(MAX_SALONES_COMPARTIDOS),
+  // Salones elegidos uno a uno, O `todos`: el alcance (null = "Todos") cuyos
+  // salones activos se resuelven en el servidor.
+  classroomIds: z.array(z.uuid()).max(MAX_SALONES_COMPARTIDOS).default([]),
+  todos: z
+    .object({
+      campaignId: z.uuid().nullable(),
+      pais: z.enum(["CL", "CO", "EC", "PE"]).nullable(),
+      curso: z.enum(["JUNIOR", "YOUNGSTER"]).nullable(),
+    })
+    .optional(),
+  // Zona IANA de quien escribe la hora (la manda el evento para "todos").
+  zona: z.string().min(1).max(64).optional(),
   tipo: z.enum(["SESION", "CLUB", "TALLER"]),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe ser YYYY-MM-DD."),
   horaLocal: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "La hora debe ser HH:MM."),
@@ -55,7 +67,10 @@ export const POST = handlerWithAuth(async (request, auth) => {
   const body = crearSchema.parse(await request.json());
   const resultado = await crearEvento({
     actorUserId: auth.userId,
-    classroomIds: body.classroomIds,
+    classroomIds:
+      body.todos !== undefined ? await salonesDelAlcance(body.todos) : body.classroomIds,
+    todos: body.todos !== undefined,
+    ...(body.zona !== undefined && { zona: body.zona }),
     tipo: body.tipo,
     fecha: body.fecha,
     horaLocal: body.horaLocal,
