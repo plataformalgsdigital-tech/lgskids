@@ -1,7 +1,11 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { crearCampania } from "@/modules/catalog";
-import { aprobarContrato, crearReservaBeneficiario } from "@/modules/contracts";
+import {
+  aprobarContrato,
+  cambiarApoderadoPorExternalRef,
+  crearReservaBeneficiario,
+} from "@/modules/contracts";
 import { crearUsuarioStaff, fichaPorEnlaceClave, usarEnlaceClave } from "@/modules/identity";
 import { crearSalon } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
@@ -43,6 +47,16 @@ async function pedir(usuario: string) {
        FROM identity_solicitud_clave WHERE id = $1`,
     [s.solicitudId],
   );
+}
+
+/** El N° de LGS del contrato del niño dueño de la cuenta. */
+async function refDe(userId: string): Promise<string | null> {
+  const f = await queryOne<{ ref: string }>(
+    `SELECT c.external_ref AS ref FROM contracts_contract c
+       JOIN people_person p ON p.id = c.beneficiario_id WHERE p.user_id = $1`,
+    [userId],
+  );
+  return f?.ref ?? null;
 }
 
 const tokenDe = (m: MensajeSaliente | undefined): string =>
@@ -230,6 +244,44 @@ describe.runIf(RUN)("olvidé mi clave por WhatsApp (integración)", () => {
     expect(enviados.length).toBe(antes);
     expect(cuarto?.problema).toContain("3 enlaces");
     expect(cuarto?.estado).toBe("PENDIENTE");
+  });
+
+  it("LGS cambia el apoderado de UN hermano: ese niño y su cuenta toman el contacto nuevo", async () => {
+    const [juan, ana] = ninos as [
+      { usuario: string; userId: string },
+      { usuario: string; userId: string },
+    ];
+    await cambiarApoderadoPorExternalRef({
+      actorUserId: ACTOR,
+      externalRef: (await refDe(ana.userId)) ?? "",
+      titularEsApoderado: false,
+      apoderado: {
+        nombres: "Laura",
+        apellidos: `Olv${marca}`,
+        docTipo: "CC",
+        docNumero: `OA-${marca}`,
+        countryCode: "CO",
+        email: `mama-${marca}@prueba.lgs`,
+        // Como lo manda LGS desde 2026-10-21: dígitos con indicativo.
+        telefono: "573119998877",
+      },
+      parentesco: "MADRE",
+    });
+    const contacto = async (userId: string) =>
+      queryOne<{ email: string; tel: string | null }>(
+        `SELECT u.email, p.telefono AS tel
+           FROM identity_user u JOIN people_person p ON p.user_id = u.id WHERE u.id = $1`,
+        [userId],
+      );
+    expect(await contacto(ana.userId)).toEqual({
+      email: `mama-${marca}@prueba.lgs`,
+      tel: "573119998877",
+    });
+    // El hermano sigue con el apoderado de antes.
+    expect((await contacto(juan.userId))?.email).toBe(`familia-${marca}@prueba.lgs`);
+    // Y el enlace de "olvidé mi clave" de Ana va al apoderado nuevo.
+    await pedir(ana.usuario);
+    expect(enviados.at(-1)?.destinatario).toBe("573119998877");
   });
 
   it("SIN teléfono no sale nada, y un usuario inexistente solo queda registrado", async () => {

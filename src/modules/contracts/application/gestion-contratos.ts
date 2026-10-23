@@ -9,6 +9,7 @@ import {
   moverMatriculaTx,
 } from "@/modules/enrollment";
 import {
+  actualizarCorreoFamiliarTx,
   inactivarUsuarioTx,
   provisionarUsuarioAlumno,
   reactivarUsuarioTx,
@@ -462,6 +463,32 @@ export async function aprobarReservaPorExternalRef(input: {
 }
 
 /**
+ * El niño usa el contacto de su apoderado (2026-10-21): al cambiar de apoderado —o
+ * cambiar este su correo o celular— el niño toma los nuevos, y su cuenta el correo
+ * familiar nuevo. Sin dato nuevo, se conserva el que tenía.
+ */
+async function sincronizarContactoDelNino(
+  ninoId: string,
+  apoderadoId: string,
+  tx: Parameters<Parameters<typeof withTransaction>[0]>[0],
+): Promise<void> {
+  const ap = await queryOne<{ email: string | null; telefono: string | null }>(
+    `SELECT NULLIF(TRIM(email), '') AS email, NULLIF(TRIM(telefono), '') AS telefono
+       FROM people_person WHERE id = $1`,
+    [apoderadoId],
+    tx,
+  );
+  if (ap === null) return;
+  await actualizarDatosPersona(ninoId, { email: ap.email, telefono: ap.telefono }, true, tx);
+  const nino = await queryOne<{ userId: string | null }>(
+    `SELECT user_id AS "userId" FROM people_person WHERE id = $1`,
+    [ninoId],
+    tx,
+  );
+  if (nino?.userId != null) await actualizarCorreoFamiliarTx(tx, nino.userId, ap.email);
+}
+
+/**
  * CAMBIO DE APODERADO desde LGS (Modificar beneficiario Kids): el niño queda con
  * ESE apoderado y su parentesco. Si el documento ya existe en KIDS se reutiliza la
  * persona: se le actualizan correo/teléfono y, solo si no está ligada a nadie más
@@ -489,6 +516,7 @@ export async function cambiarApoderadoPorExternalRef(input: {
   const apoderadoId = await withTransaction(async (tx) => {
     if (input.titularEsApoderado) {
       await reemplazarApoderado(ninoId, contrato.titularId, input.parentesco, tx);
+      await sincronizarContactoDelNino(ninoId, contrato.titularId, tx);
       return contrato.titularId;
     }
     const ap = input.apoderado as PersonInput;
@@ -520,6 +548,7 @@ export async function cambiarApoderadoPorExternalRef(input: {
       );
     }
     await reemplazarApoderado(ninoId, id, input.parentesco, tx);
+    await sincronizarContactoDelNino(ninoId, id, tx);
     return id;
   });
 

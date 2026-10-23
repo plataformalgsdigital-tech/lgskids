@@ -471,7 +471,14 @@ Migración `20260921100000_cuentas_usuario`.
   la familia en vez del sintético. La migración hizo lo mismo con los niños ya
   existentes. `exigirCorreoLibre` y el índice `identity_user_email_real_unico`
   ignoran los correos `email_familiar`: el correo único sigue valiendo para el
-  personal y los guías.
+  personal y los guías. **Cambio de apoderado desde LGS** (`…/reservations/[ref]/apoderado`
+  → `cambiarApoderadoPorExternalRef`, 2026-10-23): el niño toma el correo y el
+  celular del apoderado nuevo y su cuenta el correo familiar nuevo
+  (`sincronizarContactoDelNino` + `actualizarCorreoFamiliarTx`, que no pisa un
+  correo propio). **LGS guarda los teléfonos con indicativo desde 2026-10-21**
+  (`normalizarTelefono`: solo dígitos, `573001234567`); `telefonoWhatsApp` los
+  acepta tal cual. Lo que LGS cambia en el TITULAR fuera del formulario Kids
+  (editar el contrato) NO viaja a KIDS: solo la reserva y el cambio de apoderado.
 - **Quién administra la cuenta de quién** (`requisitoParaGestionarCuenta`): hace
   falta tanto como para otorgar el rol MÁS ALTO de esa cuenta
   (`requisitoParaOtorgar`):

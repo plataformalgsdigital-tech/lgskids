@@ -25,6 +25,7 @@ export {
 export { fijarClaveNinoTx } from "./application/clave-nino";
 export {
   provisionarUsuarioAlumno,
+  actualizarCorreoFamiliarTx,
   inactivarUsuarioTx,
   reactivarUsuarioTx,
 } from "./application/provisionar-alumno";

@@ -46,6 +46,10 @@ describe("teléfono para WhatsApp", () => {
   it("deja tal cual el número con indicativo", () => {
     expect(telefonoWhatsApp("+56 9 4245 9016", "CL")).toEqual({ ok: true, numero: "56942459016" });
     expect(telefonoWhatsApp("573001234567", "CO")).toEqual({ ok: true, numero: "573001234567" });
+    // Como los guarda LGS desde 2026-10-21 (solo dígitos, con indicativo).
+    expect(telefonoWhatsApp("593991234567", "EC")).toEqual({ ok: true, numero: "593991234567" });
+    expect(telefonoWhatsApp("51987654321", "PE")).toEqual({ ok: true, numero: "51987654321" });
+    expect(telefonoWhatsApp("56942459016", "CO")).toEqual({ ok: true, numero: "56942459016" });
   });
 
   it("completa el indicativo SOLO al móvil local con la forma exacta del país", () => {

@@ -39,6 +39,27 @@ export async function provisionarUsuarioAlumno(
 }
 
 /**
+ * Cambia el correo FAMILIAR de la cuenta de un alumno (cuando su apoderado
+ * cambia o cambia su correo). Solo toca cuentas con correo familiar o sintético:
+ * un correo propio no se pisa. Sin correo nuevo, no hace nada.
+ */
+export async function actualizarCorreoFamiliarTx(
+  tx: Queryable,
+  userId: string,
+  correo: string | null,
+): Promise<void> {
+  const familiar = correo?.trim().toLowerCase() || null;
+  if (familiar === null) return;
+  await execute(
+    `UPDATE identity_user
+        SET email = $2, email_familiar = true, email_sintetico = false, updated_at = now()
+      WHERE id = $1 AND (email_familiar OR email_sintetico)`,
+    [userId, familiar],
+    tx,
+  );
+}
+
+/**
  * Reactiva las credenciales de un usuario DENTRO de una transacción: el camino
  * inverso de `inactivarUsuarioTx`. Lo usa el alta única cuando el niño VUELVE
  * (su cuenta quedó INACTIVA al vencer el contrato anterior y aprueba uno
