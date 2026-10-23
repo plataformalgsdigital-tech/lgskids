@@ -152,7 +152,34 @@ async function personaExistenteOInsertar(
     p.docNumero.trim(),
     tx,
   );
+  if (existe !== null) await exigirNoEsNino(existe.id, p.docNumero, tx);
   return existe?.id ?? insertPerson(p, tx);
+}
+
+/**
+ * Un titular o apoderado NUNCA es un niño de la plataforma. Pasó (2026-10-23,
+ * contrato de empresa 01-16158-26): en LGS se escribió como documento de la
+ * apoderada el del OTRO niño del contrato; KIDS encontró a ese niño por su
+ * documento, lo dejó de "apoderado" y le copió encima el contacto de la mamá.
+ */
+async function exigirNoEsNino(
+  personaId: string,
+  doc: string,
+  tx: Parameters<typeof insertPerson>[1],
+): Promise<void> {
+  const nino = await queryOne<{ nombre: string }>(
+    `SELECT p.nombres || ' ' || p.apellidos AS nombre FROM people_person p
+      WHERE p.id = $1
+        AND (EXISTS (SELECT 1 FROM contracts_contract c WHERE c.beneficiario_id = p.id)
+          OR EXISTS (SELECT 1 FROM people_guardianship g WHERE g.nino_id = p.id))`,
+    [personaId],
+    tx,
+  );
+  if (nino !== null) {
+    throw new ValidationError(
+      `El documento ${doc.trim()} es del niño ${nino.nombre}, no de un apoderado ni titular. Revisa el documento del apoderado.`,
+    );
+  }
 }
 
 /**
@@ -533,6 +560,7 @@ export async function cambiarApoderadoPorExternalRef(input: {
       if (existente.id === ninoId) {
         throw new ValidationError("El documento del apoderado es el del propio niño.");
       }
+      await exigirNoEsNino(existente.id, ap.docNumero, tx);
       id = existente.id;
       nombresConservados = await personaCompartida(id, ninoId, tx);
       await actualizarDatosPersona(

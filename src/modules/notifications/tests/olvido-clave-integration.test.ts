@@ -284,6 +284,41 @@ describe.runIf(RUN)("olvidé mi clave por WhatsApp (integración)", () => {
     expect(enviados.at(-1)?.destinatario).toBe("573119998877");
   });
 
+  it("el documento de OTRO niño no puede quedar como apoderado (contrato 01-16158-26)", async () => {
+    const [juan, ana] = ninos as [
+      { usuario: string; userId: string },
+      { usuario: string; userId: string },
+    ];
+    const antes = await queryOne<{ tel: string | null }>(
+      `SELECT telefono AS tel FROM people_person WHERE user_id = $1`,
+      [juan.userId],
+    );
+    await expect(
+      cambiarApoderadoPorExternalRef({
+        actorUserId: ACTOR,
+        externalRef: (await refDe(ana.userId)) ?? "",
+        titularEsApoderado: false,
+        // Por error, el documento de Juan (el otro niño) como si fuera la mamá de Ana.
+        apoderado: {
+          nombres: "Daniela",
+          apellidos: `Olv${marca}`,
+          docTipo: "TI",
+          docNumero: `ON-${marca}-0`,
+          countryCode: "CO",
+          email: `otra-${marca}@prueba.lgs`,
+          telefono: "573000000000",
+        },
+        parentesco: "MADRE",
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    // Y a Juan no se le copió nada encima.
+    const despues = await queryOne<{ tel: string | null }>(
+      `SELECT telefono AS tel FROM people_person WHERE user_id = $1`,
+      [juan.userId],
+    );
+    expect(despues?.tel).toBe(antes?.tel);
+  });
+
   it("SIN teléfono no sale nada, y un usuario inexistente solo queda registrado", async () => {
     const staff = await crearUsuarioStaff({
       actorUserId: ACTOR,

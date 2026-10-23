@@ -475,7 +475,12 @@ Migración `20260921100000_cuentas_usuario`.
   → `cambiarApoderadoPorExternalRef`, 2026-10-23): el niño toma el correo y el
   celular del apoderado nuevo y su cuenta el correo familiar nuevo
   (`sincronizarContactoDelNino` + `actualizarCorreoFamiliarTx`, que no pisa un
-  correo propio). **LGS guarda los teléfonos con indicativo desde 2026-10-21**
+  correo propio). **Un apoderado o titular NUNCA es un niño** (`exigirNoEsNino`, en
+  la reserva y en el cambio de apoderado, 2026-10-23): en el contrato de empresa
+  01-16158-26 se escribió en LGS como documento de la apoderada el del OTRO niño;
+  KIDS lo encontró por documento, lo dejó de "apoderado" y le copió encima el
+  contacto de la mamá. Ahora responde 400 y LGS muestra "KIDS no aceptó el cambio".
+  **LGS guarda los teléfonos con indicativo desde 2026-10-21**
   (`normalizarTelefono`: solo dígitos, `573001234567`); `telefonoWhatsApp` los
   acepta tal cual. Lo que LGS cambia en el TITULAR fuera del formulario Kids
   (editar el contrato) NO viaja a KIDS: solo la reserva y el cambio de apoderado.
