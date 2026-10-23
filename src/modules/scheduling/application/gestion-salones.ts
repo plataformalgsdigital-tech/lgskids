@@ -29,6 +29,9 @@ import {
   historiaDeCampania,
   insertClassroom,
   insertSessionsBatch,
+  instantesDeHorario,
+  matriculasVivasDeSalon,
+  quitarSesionesFuturasDeHorario,
   salonesDeCampania,
   setCourseVentana,
   getSalonCampania,
@@ -101,6 +104,48 @@ async function generarSesionesTx(
   classroom: ClassroomRecord,
   slots: SlotRecord[],
 ): Promise<number> {
+  let rows = await filasDeSesiones(tx, classroom, slots);
+  await deleteSessions(tx, classroom.id);
+  // Un salón INACTIVO y sin niños no tiene clases por delante: regenerarlo (o
+  // mover el fin de la campaña) no puede volver a llenarle el calendario.
+  if (await salonDormido(tx, classroom)) {
+    const ahora = Date.now();
+    rows = rows.filter((r) => r.startsAt.getTime() <= ahora);
+  }
+  await insertSessionsBatch(tx, classroom.id, rows);
+  return rows.length;
+}
+
+/** Inactivo y sin ningún niño (matrícula ACTIVA o RESERVADA). */
+async function salonDormido(tx: Queryable, classroom: ClassroomRecord): Promise<boolean> {
+  return !classroom.activo && (await matriculasVivasDeSalon(classroom.id, tx)) === 0;
+}
+
+/**
+ * Al REACTIVAR un salón: crea las sesiones futuras de su horario que le faltan,
+ * con la MISMA generación (y numeración) de siempre, sin borrar nada — lo ya
+ * dictado, con asistencia o cerrado, no se toca.
+ */
+async function rellenarSesionesFuturasTx(
+  tx: Queryable,
+  classroom: ClassroomRecord,
+  slots: SlotRecord[],
+): Promise<number> {
+  const existentes = await instantesDeHorario(tx, classroom.id);
+  const ahora = Date.now();
+  const faltan = (await filasDeSesiones(tx, classroom, slots)).filter(
+    (r) => r.startsAt.getTime() > ahora && !existentes.has(r.startsAt.getTime()),
+  );
+  await insertSessionsBatch(tx, classroom.id, faltan);
+  return faltan.length;
+}
+
+/** Las sesiones que le tocan al salón por su horario, numeradas, SIN escribir nada. */
+async function filasDeSesiones(
+  tx: Queryable,
+  classroom: ClassroomRecord,
+  slots: SlotRecord[],
+): Promise<SessionRow[]> {
   const ventana = await getCourseWindow(classroom.courseId, tx);
   if (ventana === null) {
     throw new NotFoundError("El curso del salón no existe.");
@@ -114,8 +159,6 @@ async function generarSesionesTx(
   );
   const suspensiones = await getSuspensionDates(classroom.id, tx);
   const noDictables = new Set([...feriados, ...suspensiones]);
-
-  await deleteSessions(tx, classroom.id);
 
   const rows: SessionRow[] = [];
   for (const slot of slots) {
@@ -156,8 +199,7 @@ async function generarSesionesTx(
     porTipo.set(row.tipo, n);
     row.numero = n;
   }
-  await insertSessionsBatch(tx, classroom.id, rows);
-  return rows.length;
+  return rows;
 }
 
 const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -620,8 +662,23 @@ export async function detalleSalon(classroomId: string): Promise<DetalleSalon> {
   };
 }
 
-/** Edita cupo, guía y activo de un salón (no toca el horario). Al desactivarlo,
- * deja de ofrecerse en el wizard de contratos y en el intake de LGS. */
+/** Lo que movió editar un salón: el guía y, al (des)activarlo, sus sesiones. */
+export interface EdicionSalon extends CambioDeGuia {
+  /** Sesiones futuras quitadas al desactivarlo vacío. */
+  sesionesQuitadas: number;
+  /** Sesiones futuras creadas al reactivarlo. */
+  sesionesCreadas: number;
+  /** Niños que tiene: desactivado CON niños, sus clases se conservan. */
+  ninos: number;
+}
+
+/**
+ * Edita cupo, guía y activo de un salón (no toca el horario). Al desactivarlo,
+ * deja de ofrecerse en el wizard de contratos y en el intake de LGS y, si no
+ * tiene niños, se le QUITAN las sesiones futuras de su horario (un salón vacío
+ * e inactivo no tiene clases agendadas). Con niños se conservan: siguen
+ * tomando su curso. Al REACTIVARLO se le crean las que falten.
+ */
 export async function editarSalon(input: {
   actorUserId: string;
   classroomId: string;
@@ -629,7 +686,7 @@ export async function editarSalon(input: {
   guiaUserId?: string | null | undefined;
   activo?: boolean | undefined;
   ip?: string | null;
-}): Promise<CambioDeGuia> {
+}): Promise<EdicionSalon> {
   const salon = await findClassroomById(input.classroomId);
   if (salon === null) throw new NotFoundError("El salón no existe.");
 
@@ -643,11 +700,33 @@ export async function editarSalon(input: {
 
   // Guardar el salón y reacomodar sus sesiones es UNA operación: si lo segundo
   // falla, el guía nuevo no puede quedar puesto con el histórico a medias.
-  const cambio = await withTransaction(async (client) => {
+  const cambio = await withTransaction(async (client): Promise<EdicionSalon> => {
     await updateClassroom(input.classroomId, { cupo, guiaUserId, activo }, client);
-    return cambiaGuia
+    const guia = cambiaGuia
       ? await aplicarGuiaDeSalon(client, input.classroomId, salon.guiaUserId, guiaUserId)
       : { pasadasCongeladas: 0, futurasAsignadas: 0, futurasSoltadas: 0 };
+    const ninos = await matriculasVivasDeSalon(input.classroomId, client);
+    let sesionesQuitadas = 0;
+    let sesionesCreadas = 0;
+    if (salon.activo && !activo && ninos === 0) {
+      sesionesQuitadas = await quitarSesionesFuturasDeHorario(client, input.classroomId);
+    } else if (!salon.activo && activo) {
+      const ventana = await getCourseWindow(salon.courseId, client);
+      if (ventana !== null) {
+        await sincronizarFeriados(
+          salon.holidayCountry,
+          aniosDeVentana(ventana.inicio, ventana.finalCurso),
+          client,
+        );
+      }
+      const reactivado = { ...salon, cupo, guiaUserId, activo };
+      sesionesCreadas = await rellenarSesionesFuturasTx(
+        client,
+        reactivado,
+        await getSlots(input.classroomId, client),
+      );
+    }
+    return { ...guia, sesionesQuitadas, sesionesCreadas, ninos };
   });
 
   await registrarAuditoria({
@@ -659,6 +738,11 @@ export async function editarSalon(input: {
       cupo,
       guiaUserId,
       activo,
+      ...(activo !== salon.activo && {
+        sesionesQuitadas: cambio.sesionesQuitadas,
+        sesionesCreadas: cambio.sesionesCreadas,
+        ninos: cambio.ninos,
+      }),
       ...(cambiaGuia && { guiaAnterior: salon.guiaUserId, ...cambio }),
     },
     ip: input.ip ?? null,

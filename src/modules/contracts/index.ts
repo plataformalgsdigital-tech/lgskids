@@ -52,6 +52,8 @@ export {
   estadoPerfilNino,
   opcionesWelcomeNino,
   agendarWelcomeNino,
+  reagendarPropio,
+  reagendarPropioOpciones,
   ninosSinPerfil,
   opcionesAgendaNino,
   agendarParaNino,

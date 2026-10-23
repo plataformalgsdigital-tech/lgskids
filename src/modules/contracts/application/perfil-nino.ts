@@ -10,6 +10,7 @@ import {
   opcionesAgenda,
   reservarWelcomeTx,
   welcomeDeNino,
+  welcomePorReagendar,
   welcomesDisponibles,
   type Agendado,
   type ContextoNino,
@@ -514,6 +515,66 @@ export async function agendarWelcomeNino(input: {
     entidad: "people_person",
     entidadId: input.childPersonId,
     payload: { welcomeId: input.welcomeId, desde: "ficha" },
+    ip: input.ip ?? null,
+  });
+  return welcomeDeNino(input.childPersonId);
+}
+
+// —— Reagendar Bienvenida (panel del ALUMNO) ——————————————————————————————
+
+/**
+ * Lo que ve el NIÑO en "Reagendar Bienvenida": solo si faltó a su Welcome y está
+ * en Servicio › Welcome › Reagendamientos sin reagendar (`welcomePorReagendar`,
+ * la misma regla de la bandeja). Los Welcome que le sirven son los mismos que le
+ * ofrece Servicio (`welcomesDisponibles` con su salón y su nivel).
+ */
+export async function reagendarPropioOpciones(childPersonId: string): Promise<{
+  pendiente: { perdidoEl: string; perdidos: number; maximo: number } | null;
+  welcomes: WelcomeDisponible[];
+}> {
+  const pendiente = await welcomePorReagendar(childPersonId);
+  const matricula = await matriculaDeNino(childPersonId);
+  if (pendiente === null || matricula === null) return { pendiente: null, welcomes: [] };
+  const welcomes = await welcomesDisponibles({
+    classroomId: matricula.classroomId,
+    nivel: await nivelDeNino(childPersonId),
+  });
+  return { pendiente, welcomes };
+}
+
+/**
+ * El NIÑO reagenda su Welcome desde su panel. Se vuelve a exigir que esté por
+ * reagendar (no basta con que la pantalla muestre el botón) y pasa por la MISMA
+ * reserva con bloqueo de Servicio y de la ficha: regla, cupo y tope de intentos.
+ * La sesión perdida no se borra: queda REAGENDADA en su Welcome.
+ */
+export async function reagendarPropio(input: {
+  userId: string;
+  childPersonId: string;
+  welcomeId: string;
+  ip?: string | null;
+}): Promise<WelcomeDeNino | null> {
+  if ((await welcomePorReagendar(input.childPersonId)) === null) {
+    throw new ConflictError("No tienes una Bienvenida por reagendar.");
+  }
+  const matricula = await matriculaDeNino(input.childPersonId);
+  if (matricula === null) throw new ConflictError("No tienes matrícula activa.");
+  const nivel = await nivelDeNino(input.childPersonId);
+  await withTransaction((tx) =>
+    reservarWelcomeTx(tx, {
+      welcomeId: input.welcomeId,
+      childPersonId: input.childPersonId,
+      classroomId: matricula.classroomId,
+      nivel,
+      agendadoPor: input.userId,
+    }),
+  );
+  await registrarAuditoria({
+    actorUserId: input.userId,
+    accion: "scheduling.welcome_agendado",
+    entidad: "people_person",
+    entidadId: input.childPersonId,
+    payload: { welcomeId: input.welcomeId, desde: "panel_alumno" },
     ip: input.ip ?? null,
   });
   return welcomeDeNino(input.childPersonId);

@@ -24,6 +24,7 @@ import {
   guardarVideoWelcome,
   reagendamientosWelcome,
   videoWelcome,
+  welcomePorReagendar,
 } from "../application/servicio-welcome";
 import { setSenderForTests, type MensajeSaliente } from "@/modules/notifications";
 import {
@@ -538,6 +539,8 @@ describe.runIf(RUN)("Welcome (integración)", () => {
       expect(faltas.map((x) => x.welcomeId)).toEqual([w1]);
       expect(faltas[0]?.reagendadoA).toBeNull();
       expect((await agendadosWelcome(base))[0]?.estado).toBe("NO_ASISTIO");
+      // Su panel le ofrece "Reagendar Bienvenida" (la misma regla de la bandeja).
+      expect((await welcomePorReagendar(d))?.perdidos).toBe(1);
 
       // Se le reagenda: la reserva perdida NO se borra (REAGENDADA) y el nuevo se ve.
       const w2 = await nuevo({ fecha: dias(17) });
@@ -546,6 +549,8 @@ describe.runIf(RUN)("Welcome (integración)", () => {
       faltas = await reagendamientosWelcome(base);
       expect(faltas[0]?.reagendadoA).not.toBeNull();
       expect(await reagendamientosWelcome({ ...base, soloSinReagendar: true })).toHaveLength(0);
+      // Ya reagendado: el botón desaparece.
+      expect(await welcomePorReagendar(d)).toBeNull();
 
       // Faltó también al segundo: el tope de 2 no deja un tercero; toca el video.
       await pasar(w2);
@@ -554,6 +559,8 @@ describe.runIf(RUN)("Welcome (integración)", () => {
       const candidatos = await candidatosVideoWelcome(base);
       expect(candidatos.map((x) => x.childPersonId)).toEqual([d]);
       expect(candidatos[0]?.perdidos).toBe(2);
+      // Con 2 perdidos ya no hay "Reagendar Bienvenida": corresponde el video.
+      expect(await welcomePorReagendar(d)).toBeNull();
 
       // Sin enlace configurado no se envía; con enlace, sale al apoderado.
       const enviados: MensajeSaliente[] = [];

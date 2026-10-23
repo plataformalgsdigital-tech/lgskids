@@ -20,7 +20,7 @@ import { matriculaDeNino } from "@/modules/enrollment";
 import { bootstrapIdentity } from "@/modules/identity";
 import { findPersonByUserId } from "@/modules/people";
 import { progresoDeNino } from "@/modules/progression";
-import { welcomeDeNino } from "@/modules/scheduling";
+import { welcomeDeNino, welcomePorReagendar } from "@/modules/scheduling";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
 bootstrapIdentity();
@@ -47,17 +47,20 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     });
   }
 
-  const [asistencia, agenda, progreso, historial, comentarios, welcome] = await Promise.all([
-    resumenAsistencia(persona.id, matricula.classroomId),
-    // Próximas 2 semanas (incluye clubes/talleres y lo agendado en otros salones).
-    agendaProximas(matricula.classroomId, 14, persona.id),
-    progresoDeNino(persona.id),
-    historialAsistencia(persona.id, matricula.classroomId, 30),
-    // Solo el comentario PARA EL ALUMNO; la nota privada del guía no sale de aquí.
-    comentariosDeGuia(persona.id, 20),
-    // El Welcome que agendó al crear su perfil (con el guía y la sala del EVENTO).
-    welcomeDeNino(persona.id),
-  ]);
+  const [asistencia, agenda, progreso, historial, comentarios, welcome, porReagendar] =
+    await Promise.all([
+      resumenAsistencia(persona.id, matricula.classroomId),
+      // Próximas 2 semanas (incluye clubes/talleres y lo agendado en otros salones).
+      agendaProximas(matricula.classroomId, 14, persona.id),
+      progresoDeNino(persona.id),
+      historialAsistencia(persona.id, matricula.classroomId, 30),
+      // Solo el comentario PARA EL ALUMNO; la nota privada del guía no sale de aquí.
+      comentariosDeGuia(persona.id, 20),
+      // El Welcome que agendó al crear su perfil (con el guía y la sala del EVENTO).
+      welcomeDeNino(persona.id),
+      // Faltó a su Welcome y le queda intento: el botón "Reagendar Bienvenida".
+      welcomePorReagendar(persona.id),
+    ]);
 
   // Imagen de portada del curso según el nivel actual (o el primero no completado).
   // Si el nivel no tiene imagen propia, cae a la imagen de TODO el curso (respaldo).
@@ -102,6 +105,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     asistencia,
     proxima: agenda[0] ?? null,
     welcome,
+    reagendarBienvenida: porReagendar,
     talleres: agenda.filter((e) => e.tipo === "TALLER"),
     agenda,
     progreso,

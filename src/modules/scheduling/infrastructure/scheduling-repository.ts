@@ -792,6 +792,53 @@ export async function classroomTieneMatriculas(classroomId: string): Promise<boo
   return (row?.n ?? 0) > 0;
 }
 
+/** Niños que HOY ocupan el salón (matrícula ACTIVA o RESERVADA). */
+export async function matriculasVivasDeSalon(
+  classroomId: string,
+  client?: Queryable,
+): Promise<number> {
+  const row = await queryOne<{ n: number }>(
+    `SELECT count(*)::int AS n FROM enrollment_enrollment
+      WHERE classroom_id = $1 AND estado IN ('ACTIVA', 'RESERVADA')`,
+    [classroomId],
+    client,
+  );
+  return row?.n ?? 0;
+}
+
+/**
+ * Quita las sesiones FUTURAS del horario de un salón que se desactiva vacío.
+ * Nunca toca lo que tiene historia: una sesión cerrada, con asistencia o con un
+ * niño de otro salón agendado se queda (los eventos a mano tampoco se tocan).
+ */
+export async function quitarSesionesFuturasDeHorario(
+  tx: Queryable,
+  classroomId: string,
+): Promise<number> {
+  return execute(
+    `DELETE FROM scheduling_session s
+      WHERE s.classroom_id = $1 AND s.slot_id IS NOT NULL
+        AND s.starts_at > now() AND s.cerrada_en IS NULL
+        AND NOT EXISTS (SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM scheduling_agendado g
+                         WHERE g.classroom_id = s.classroom_id AND g.starts_at = s.starts_at
+                           AND g.estado = 'ACTIVA')`,
+    [classroomId],
+    tx,
+  );
+}
+
+/** Instantes de las sesiones del horario que el salón YA tiene. */
+export async function instantesDeHorario(tx: Queryable, classroomId: string): Promise<Set<number>> {
+  const filas = await queryRows<{ startsAt: Date }>(
+    `SELECT starts_at AS "startsAt" FROM scheduling_session
+      WHERE classroom_id = $1 AND slot_id IS NOT NULL`,
+    [classroomId],
+    tx,
+  );
+  return new Set(filas.map((f) => f.startsAt.getTime()));
+}
+
 /** Borra el salón y sus dependencias (sesiones, slots, suspensiones). Úsese solo
  * tras verificar que no tiene matrículas. Transaccional. */
 export async function deleteClassroom(tx: Queryable, id: string): Promise<void> {

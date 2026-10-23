@@ -38,15 +38,31 @@ const cuando = (iso: string) =>
 export function AgendarWelcomeModal({
   nino,
   aviso,
+  ruta,
+  titulo = "👋 Agendar Welcome",
+  nota = "La sesión a la que faltó no se borra: queda en su Welcome. Cada niño tiene hasta 2 Welcome; después corresponde el video de bienvenida.",
+  sinOpciones = "No hay Welcome futuros que le sirvan a este niño (su nivel, campaña, país y salón). Programa uno en el calendario.",
+  textoBoton = "Agendar",
   onCerrar,
   onAgendado,
 }: {
   nino: { childPersonId: string; nombre: string };
   /** Contexto para quien agenda (p. ej. "Faltó al Welcome del …"). */
   aviso?: string;
+  /**
+   * Ruta de GET (opciones) y POST (agendar). Por defecto la de la ficha; el
+   * panel del alumno usa la suya (`/api/student/welcome`), que toma al niño de
+   * la sesión.
+   */
+  ruta?: string;
+  titulo?: string;
+  nota?: string;
+  sinOpciones?: string;
+  textoBoton?: string;
   onCerrar: () => void;
   onAgendado: (texto: string) => void;
 }) {
+  const url = ruta ?? `/api/contracts/ninos/${nino.childPersonId}/welcome`;
   const [opciones, setOpciones] = useState<Opcion[] | null>(null);
   const [motivo, setMotivo] = useState<string | null>(null);
   const [elegido, setElegido] = useState("");
@@ -55,7 +71,7 @@ export function AgendarWelcomeModal({
 
   useEffect(() => {
     async function cargar() {
-      const res = await apiFetch(`/api/contracts/ninos/${nino.childPersonId}/welcome`);
+      const res = await apiFetch(url);
       if (!res.ok) {
         const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
         setError(c.error?.message ?? "No se pudieron cargar los Welcome.");
@@ -67,7 +83,7 @@ export function AgendarWelcomeModal({
       setMotivo(d.motivo);
     }
     void cargar();
-  }, [nino.childPersonId]);
+  }, [url]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -81,7 +97,7 @@ export function AgendarWelcomeModal({
     setOcupado(true);
     setError(null);
     try {
-      const res = await apiFetch(`/api/contracts/ninos/${nino.childPersonId}/welcome`, {
+      const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ welcomeId: elegido }),
@@ -132,7 +148,7 @@ export function AgendarWelcomeModal({
           gap: "0.75rem",
         }}
       >
-        <h2 style={{ fontSize: "1.15rem", fontWeight: 800, margin: 0 }}>👋 Agendar Welcome</h2>
+        <h2 style={{ fontSize: "1.15rem", fontWeight: 800, margin: 0 }}>{titulo}</h2>
         <p style={{ margin: 0, fontSize: "0.9rem" }}>
           <strong>{nino.nombre}</strong>
         </p>
@@ -153,8 +169,7 @@ export function AgendarWelcomeModal({
               fontSize: "0.86rem",
             }}
           >
-            {motivo ??
-              "No hay Welcome futuros que le sirvan a este niño (su nivel, campaña, país y salón). Programa uno en el calendario."}
+            {motivo ?? sinOpciones}
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
@@ -203,10 +218,7 @@ export function AgendarWelcomeModal({
             })}
           </div>
         )}
-        <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--texto-suave)" }}>
-          La sesión a la que faltó no se borra: queda en su Welcome. Cada niño tiene hasta 2
-          Welcome; después corresponde el video de bienvenida.
-        </p>
+        <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--texto-suave)" }}>{nota}</p>
 
         {error !== null && (
           <p role="alert" style={{ color: "#c62828", fontWeight: 600, margin: 0 }}>
@@ -228,7 +240,7 @@ export function AgendarWelcomeModal({
               color: "white",
             }}
           >
-            {ocupado ? "Agendando…" : "Agendar"}
+            {ocupado ? "Agendando…" : textoBoton}
           </button>
         </div>
       </div>

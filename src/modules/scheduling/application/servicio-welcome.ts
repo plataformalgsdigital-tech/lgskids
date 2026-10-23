@@ -306,6 +306,32 @@ export async function reagendamientosWelcome(
   );
 }
 
+/**
+ * El Welcome que el NIÑO puede reagendar él mismo desde su panel ("Reagendar
+ * Bienvenida"): está en Reagendamientos SIN reagendar (faltó, no fue a ningún
+ * otro, no recibió el video y no tiene otro por delante) y le queda intento
+ * (menos de MAX_INTENTOS_WELCOME perdidos; con 2 corresponde el video). Misma
+ * regla que la bandeja: las piezas SQL son las mismas.
+ */
+export async function welcomePorReagendar(
+  childPersonId: string,
+): Promise<{ perdidoEl: string; perdidos: number; maximo: number } | null> {
+  const fila = await queryOne<{ perdidoEl: string; perdidos: number }>(
+    `SELECT w.starts_at AS "perdidoEl", h.perdidos
+       FROM scheduling_welcome_reserva r
+       JOIN scheduling_welcome w ON w.id = r.welcome_id
+       JOIN people_person b ON b.id = r.child_person_id
+       ${HISTORIA_NINO}
+      WHERE b.id = $1 AND r.estado IN ${RESERVA_VIGENTE}
+        AND ${TERMINO("w")} AND r.asistio IS NOT TRUE
+        AND NOT h.asistio_alguna AND vid.ultimo IS NULL AND h.proximo IS NULL
+      ORDER BY w.starts_at DESC LIMIT 1`,
+    [childPersonId],
+  );
+  if (fila === null || fila.perdidos >= MAX_INTENTOS_WELCOME) return null;
+  return { ...fila, maximo: MAX_INTENTOS_WELCOME };
+}
+
 // —— 3. Pendientes de agendar ————————————————————————————————————————————
 
 /**

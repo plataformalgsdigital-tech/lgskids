@@ -178,6 +178,7 @@ export type { SesionServicio, EstadoSesionServicio } from "./application/servici
 export {
   agendadosWelcome,
   reagendamientosWelcome,
+  welcomePorReagendar,
   pendientesWelcome,
   candidatosVideoWelcome,
   videoWelcome,

@@ -225,6 +225,9 @@ export default function DetalleSalonPage() {
       const data: {
         pasadasCongeladas?: number;
         futurasAsignadas?: number;
+        sesionesQuitadas?: number;
+        sesionesCreadas?: number;
+        ninos?: number;
         error?: { message: string };
       } = await res.json();
       if (!res.ok) {
@@ -234,9 +237,15 @@ export default function DetalleSalonPage() {
       const futuras = data.futurasAsignadas ?? 0;
       const pasadas = data.pasadasCongeladas ?? 0;
       setAviso(
-        patch.guiaUserId !== undefined && (futuras > 0 || pasadas > 0)
-          ? `Salón actualizado. El guía nuevo toma ${plural(futuras, "sesión", "sesiones")} desde hoy; ${plural(pasadas, "sesión ya dictada conserva", "sesiones ya dictadas conservan")} su guía.`
-          : "Salón actualizado.",
+        patch.activo === false
+          ? (data.ninos ?? 0) > 0
+            ? `Salón desactivado. Tiene ${plural(data.ninos ?? 0, "niño", "niños")}: sus sesiones se conservan.`
+            : `Salón desactivado. Se quitaron ${plural(data.sesionesQuitadas ?? 0, "sesión futura", "sesiones futuras")} de su horario.`
+          : patch.activo === true
+            ? `Salón activado. Se agendaron ${plural(data.sesionesCreadas ?? 0, "sesión futura", "sesiones futuras")}.`
+            : patch.guiaUserId !== undefined && (futuras > 0 || pasadas > 0)
+              ? `Salón actualizado. El guía nuevo toma ${plural(futuras, "sesión", "sesiones")} desde hoy; ${plural(pasadas, "sesión ya dictada conserva", "sesiones ya dictadas conservan")} su guía.`
+              : "Salón actualizado.",
       );
       await cargar();
     } catch {
@@ -360,11 +369,21 @@ export default function DetalleSalonPage() {
             <button
               style={boton}
               disabled={ocupado}
-              onClick={() => void guardarSalon({ activo: !detalle.salon.activo })}
+              onClick={() => {
+                if (
+                  detalle.salon.activo &&
+                  !window.confirm(
+                    "¿Desactivar el salón? Deja de ofrecerse para matricular y, si no tiene niños, se quitan sus sesiones futuras (al reactivarlo se vuelven a agendar).",
+                  )
+                ) {
+                  return;
+                }
+                void guardarSalon({ activo: !detalle.salon.activo });
+              }}
               title={
                 detalle.salon.activo
-                  ? "Al desactivar, el salón deja de ofrecerse en el wizard de contratos"
-                  : "Reactivar el salón"
+                  ? "Al desactivar, el salón deja de ofrecerse y, sin niños, se quitan sus sesiones futuras"
+                  : "Reactivar el salón y agendar sus sesiones futuras"
               }
             >
               {detalle.salon.activo ? "🚫 Desactivar" : "✅ Activar"}

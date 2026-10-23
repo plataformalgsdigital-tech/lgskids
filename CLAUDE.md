@@ -1383,7 +1383,16 @@ Mantenible en `/panel/horarios`, alimenta el selector al crear salón (materiali
 catálogo para generar JUNIOR/YOUNGSTER Salón 1–6 por grupo.
 **Salón editable (2026-08-24)**: `PATCH /api/scheduling/classrooms/[id]` →
 `editarSalon` (cupo, guía, `activo`); al **desactivar** un salón sale del wizard
-de contratos y del intake (ambos filtran `activo`). `DELETE` → `eliminarSalon`
+de contratos y del intake (ambos filtran `activo`). **Inactivo y sin niños = sin
+clases agendadas (2026-10-23)**: desactivarlo sin matrícula ACTIVA/RESERVADA le
+QUITA las sesiones FUTURAS de su horario (`quitarSesionesFuturasDeHorario`: nunca
+una cerrada, con asistencia o con un niño agendado de otro salón; los eventos a
+mano no se tocan); con niños se conservan. Reactivarlo las vuelve a crear
+(`rellenarSesionesFuturasTx`: la MISMA generación, solo las futuras que faltan,
+sin borrar nada). Y `generarSesionesTx` no le genera futuras a un salón dormido,
+así que regenerar o mover el Fin del Programa no le vuelve a llenar el
+calendario. La migración `20261023100000` limpió los 11 inactivos de OCTUBRE2026.
+Prueba: `salon-inactivo-integration.test.ts`. `DELETE` → `eliminarSalon`
 (borra salón+sesiones+slots+suspensiones; SE BLOQUEA con 409 si el salón tiene
 matrículas — desactivar en su lugar). Su detalle muestra las fechas de la campaña
 (editar fin/cierre desde ahí afecta a TODA la campaña). El **detalle de campaña**
@@ -2111,6 +2120,15 @@ El proceso de Servicio › Welcome Session de MOSAICO, ajustado a KIDS. Migraci�
   los candidatos). Cada envío queda en `scheduling_welcome_video_envio` (ok o error) y
   uno que falla no frena a los demás. Un envío bueno cuenta como Welcome hecho: sale
   de Reagendamientos y queda "Recibió el video".
+- **"👋 Reagendar Bienvenida" en `/mi-panel` (2026-10-23)**: junto a "Inscripción
+  Clubes", SOLO si el niño está en Reagendamientos sin reagendar y le queda intento
+  (`welcomePorReagendar`, con las MISMAS piezas SQL de la bandeja; el dashboard lo
+  trae como `reagendarBienvenida`). Abre el MISMO `AgendarWelcomeModal` de Servicio
+  con la ruta del alumno, `GET|POST /api/student/welcome` (`panel.alumno`; el niño
+  sale de la SESIÓN, nunca del cuerpo) → `reagendarPropioOpciones`/`reagendarPropio`
+  (contracts), que vuelve a exigir la condición y pasa por `reservarWelcomeTx`
+  (regla, cupo con bloqueo y tope de 2). `agendado_por` = la cuenta del niño;
+  auditoría `scheduling.welcome_agendado` con `desde: "panel_alumno"`.
 - **Lo que NO aplica de MOSAICO**: "promover desde WELCOME" (allá el alumno vive en un
   curso puente; aquí ya está matriculado en su salón).
 - Pruebas: `welcome-integration.test.ts` (perdido → REAGENDADA → tope → video) y

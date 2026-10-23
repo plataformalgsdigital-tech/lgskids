@@ -8,6 +8,7 @@ import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
 import { abrirLibroEnPestana, type CajaLibro } from "@/ui/libro-pestana";
 import { apiFetch, irACambiarClaveSiCorresponde } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
+import { AgendarWelcomeModal } from "../panel/servicio/welcome/AgendarWelcomeModal";
 
 /** Marca que ya se ofreció subir la foto: no se insiste en cada visita. */
 const FOTO_OFRECIDA = "lgs-kids:foto-ofrecida";
@@ -46,6 +47,11 @@ interface Dashboard {
     zoomUrl: string | null;
     asistio: boolean | null;
   } | null;
+  /**
+   * Faltó a su Welcome y le queda intento (está en Servicio › Reagendamientos sin
+   * reagendar): se muestra "Reagendar Bienvenida".
+   */
+  reagendarBienvenida?: { perdidoEl: string; perdidos: number; maximo: number } | null;
   /** Talleres próximos del salón: actividad puntual, no el horario de siempre. */
   talleres?: {
     sessionId: string;
@@ -301,6 +307,10 @@ export default function MiPanelPage() {
   const [verHistorial, setVerHistorial] = useState(false); // modal "Historial de clases"
   const [verAvance, setVerAvance] = useState(false); // modal "Avance" (mapa del curso)
   const [verPerfil, setVerPerfil] = useState(false); // modal "Perfil"
+  // "Reagendar Bienvenida": el modal y el aviso tras reagendar.
+  const [verReagendar, setVerReagendar] = useState(false);
+  const [avisoReagendar, setAvisoReagendar] = useState<string | null>(null);
+  const [version, setVersion] = useState(0); // recarga el panel tras reagendar
   // Modal "Material": se carga al abrirlo, no con el dashboard.
   const [verMaterial, setVerMaterial] = useState(false);
   const [material, setMaterial] = useState<MaterialAlumno | null>(null);
@@ -380,7 +390,7 @@ export default function MiPanelPage() {
     return () => {
       cancelado = true;
     };
-  }, [router]);
+  }, [router, version]);
 
   useEffect(() => {
     let cancelado = false;
@@ -1148,6 +1158,38 @@ export default function MiPanelPage() {
         >
           📅 Inscripción Clubes
         </button>
+
+        {/* Faltó a su Bienvenida: la reagenda él mismo, como Servicio. */}
+        {data.reagendarBienvenida != null && (
+          <button
+            type="button"
+            onClick={() => {
+              setAvisoReagendar(null);
+              setVerReagendar(true);
+            }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              padding: "0.5rem 1.1rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              background: "#ffb300",
+              color: "#3e2700",
+              fontWeight: 800,
+              fontSize: "0.9rem",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            👋 Reagendar Bienvenida
+          </button>
+        )}
+        {avisoReagendar !== null && (
+          <span style={{ color: "#1b5e20", fontWeight: 700, fontSize: "0.85rem" }}>
+            ✅ {avisoReagendar}
+          </span>
+        )}
 
         <div
           style={{
@@ -2519,6 +2561,26 @@ export default function MiPanelPage() {
             <div style={{ padding: "1.25rem" }}>{listaHistorial}</div>
           </div>
         </div>
+      )}
+
+      {/* Modal "Reagendar Bienvenida": el mismo de Servicio, con la ruta del alumno */}
+      {verReagendar && data.reagendarBienvenida != null && (
+        <AgendarWelcomeModal
+          nino={{ childPersonId: "", nombre: data.alumno?.nombre ?? "" }}
+          ruta="/api/student/welcome"
+          titulo="👋 Reagendar Bienvenida"
+          textoBoton="Reagendar"
+          aviso={`No pudiste asistir a tu Bienvenida del ${fechaLarga(data.reagendarBienvenida.perdidoEl)}. Elige otra fecha.`}
+          nota={`Tienes hasta ${String(data.reagendarBienvenida.maximo)} Bienvenidas. La hora está en tu reloj.`}
+          sinOpciones="Por ahora no hay Bienvenidas disponibles para ti. Escríbenos a Soporte y te ayudamos."
+          onCerrar={() => setVerReagendar(false)}
+          onAgendado={() => {
+            setVerReagendar(false);
+            // La nueva fecha aparece en "Mi Welcome" al recargar el panel.
+            setAvisoReagendar("¡Listo! Tu Bienvenida quedó reagendada.");
+            setVersion((v) => v + 1);
+          }}
+        />
       )}
 
       {/* Modal "Material": libro interactivo y libro para descargar, por nivel */}
