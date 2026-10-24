@@ -63,6 +63,8 @@ export interface SessionInfo {
   timezone: string;
   /** Evento compartido entre salones (misma hora, guía y Zoom). */
   grupoId: string | null;
+  /** Club de una TANDA semanal: su rango y cuántas semanas le quedan por delante. */
+  tanda: { id: string; inicio: string; fin: string; futuras: number } | null;
   /** El guía la canceló y administración lo aprobó sin cubrirla: no se dicta. */
   cancelada: boolean;
   /** Evento suelto abierto a otros salones (Agendar): su alcance; null = Todos. */
@@ -102,6 +104,11 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
             s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,
             s.grupo_id AS "grupoId", ${SQL_SESION_CANCELADA("s")} AS cancelada,
+            CASE WHEN tc.id IS NULL THEN NULL ELSE json_build_object(
+              'id', tc.id, 'inicio', tc.inicio::text, 'fin', tc.fin::text,
+              'futuras', (SELECT count(DISTINCT t2.starts_at)::int FROM scheduling_session t2
+                           WHERE t2.tanda_id = tc.id AND t2.starts_at > now()
+                             AND t2.cerrada_en IS NULL)) END AS tanda,
             json_build_object('abierto', s.abierto, 'campaignId', s.alcance_campaign_id,
                               'curso', s.alcance_curso, 'classroomId', s.alcance_classroom_id)
               AS apertura
@@ -114,6 +121,7 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
        LEFT JOIN identity_user g ON g.id = COALESCE(s.guia_user_id, cl.guia_user_id)
        LEFT JOIN scheduling_guia gg ON gg.guia_user_id = g.id
        LEFT JOIN identity_perfil gpf ON gpf.user_id = g.id
+       LEFT JOIN scheduling_tanda_club tc ON tc.id = s.tanda_id
       WHERE s.id = $1`,
     [sessionId],
   );

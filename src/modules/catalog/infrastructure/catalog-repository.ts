@@ -72,6 +72,8 @@ export interface CampaignRow {
   fin: string;
   finalVenta: string;
   cursoInicio: string | null;
+  /** Fin nominal de sus cursos (`final_curso`): el final de una tanda de clubs. */
+  cursoFin: string | null;
   cursos: number;
 }
 
@@ -83,11 +85,13 @@ export async function listCampaigns(): Promise<CampaignRow[]> {
     fin: string;
     finalVenta: string;
     cursoInicio: string | null;
+    cursoFin: string | null;
     cursos: string;
   }>(
     `SELECT c.id, c.nombre, c.inicio::text AS inicio, c.fin::text AS fin,
             c.final_venta::text AS "finalVenta",
             min(cu.inicio)::text AS "cursoInicio",
+            max(cu.final_curso)::text AS "cursoFin",
             count(cu.id)::text AS cursos
        FROM catalog_campaign c
        LEFT JOIN catalog_course cu ON cu.campaign_id = c.id

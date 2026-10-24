@@ -7,6 +7,8 @@ import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { isValidTimeZone, operationalDate, wallTimeToUtc } from "@/platform/time";
+import { diasEntre, fechasTanda, sumarDias } from "../domain/tanda-club";
+import { getHolidayDates } from "../infrastructure/scheduling-repository";
 import {
   DURACION_ADMIN_MAX,
   DURACION_ADMIN_MIN,
@@ -42,7 +44,10 @@ export const DURACIONES_TALLER = [60, 120];
 export const MAX_SALONES_COMPARTIDOS = 3;
 
 export interface EventoCreado {
+  /** El grupo de la (primera) clase compartida, si se dicta en varios salones. */
   grupoId: string | null;
+  /** La tanda, si es un Club que se repite cada semana. */
+  tandaId: string | null;
   sesiones: { id: string; classroomId: string; salon: string }[];
 }
 
@@ -319,6 +324,12 @@ export async function crearEvento(input: {
   zona?: string;
   /** Salones resueltos por `salonesDelAlcance` ("Todos"): sin tope de compartidos. */
   todos?: boolean;
+  /**
+   * Solo CLUB: TANDA — el Club se repite cada semana (el día de `fecha`) entre
+   * el inicio y el final. Cada semana es una sesión (compartida si hay varios
+   * salones); los feriados de cada salón y las fechas ya pasadas se saltan.
+   */
+  tanda?: { inicio: string; fin: string } | null;
   ip?: string | null;
   /** Para crearlo dentro de una transacción ya abierta (aprobar un refuerzo). */
   client?: PoolClient;
@@ -351,6 +362,16 @@ export async function crearEvento(input: {
   if (input.zona !== undefined && !isValidTimeZone(input.zona)) {
     throw new ValidationError(`Zona horaria desconocida: ${input.zona}.`);
   }
+  const tanda = input.tanda ?? null;
+  if (tanda !== null && input.tipo !== "CLUB") {
+    throw new ValidationError("Solo un Club se crea por tanda.");
+  }
+  let semanas = [input.fecha];
+  if (tanda !== null) {
+    const r = fechasTanda({ fecha: input.fecha, inicio: tanda.inicio, fin: tanda.fin });
+    if (r.problema !== null) throw new ValidationError(r.problema);
+    semanas = r.fechas;
+  }
 
   // El enlace de Zoom sale del guía; si no lo tiene, el evento se crea igual
   // pero sin enlace: bloquear la creación por eso sería peor que avisarlo.
@@ -364,16 +385,32 @@ export async function crearEvento(input: {
   if (guia === null) throw new NotFoundError("El guía no existe o está inactivo.");
 
   // Un evento compartido es UNA clase dictada en varios salones: comparte
-  // grupo para que el conteo del guía no la cuente varias veces.
-  const grupoId = salones.length > 1 ? newId() : null;
+  // grupo para que el conteo del guía no la cuente varias veces. En una tanda,
+  // cada SEMANA es su propia clase compartida (su propio grupo).
+  const compartido = salones.length > 1;
+  const tandaId = tanda !== null ? newId() : null;
   const apertura = input.apertura ?? CERRADO;
   const creadas: EventoCreado["sesiones"] = [];
+  let primerGrupo: string | null = null;
 
   const insertar = async (tx: PoolClient) => {
-    const filas: { id: string; nombre: string; timezone: string; cupo: number }[] = [];
+    const filas: {
+      id: string;
+      nombre: string;
+      timezone: string;
+      cupo: number;
+      pais: string;
+    }[] = [];
     for (const classroomId of salones) {
-      const salon = await queryOne<{ id: string; nombre: string; timezone: string; cupo: number }>(
-        `SELECT id, nombre, timezone, cupo FROM scheduling_classroom WHERE id = $1 AND activo`,
+      const salon = await queryOne<{
+        id: string;
+        nombre: string;
+        timezone: string;
+        cupo: number;
+        pais: string;
+      }>(
+        `SELECT id, nombre, timezone, cupo, holiday_country AS pais
+           FROM scheduling_classroom WHERE id = $1 AND activo`,
         [classroomId],
         tx,
       );
@@ -388,41 +425,105 @@ export async function crearEvento(input: {
     // zona de quien la escribe si la manda (evento para "todos" los salones) o,
     // si no, en la del primer salón (ADR-0007). Cada salón guarda su fecha local.
     const [hh, mm] = input.horaLocal.split(":");
-    const [y, m, d] = input.fecha.split("-");
-    const startsAt = wallTimeToUtc(
-      { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
-      input.zona ?? filas[0]?.timezone ?? "UTC",
-    );
+    const zona = input.zona ?? filas[0]?.timezone ?? "UTC";
+    const instante = (fecha: string) => {
+      const [y, m, d] = fecha.split("-");
+      return wallTimeToUtc(
+        { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
+        zona,
+      );
+    };
 
-    const choques = await queryRows<{ nombre: string }>(
-      `SELECT cl.nombre FROM scheduling_session s
-         JOIN scheduling_classroom cl ON cl.id = s.classroom_id
-        WHERE s.classroom_id = ANY($1::uuid[]) AND s.starts_at = $2
-        ORDER BY cl.nombre`,
-      [salones, startsAt],
-      tx,
-    );
-    if (choques.length > 0) {
-      throw new ConflictError(
-        `Ya tiene${choques.length === 1 ? "" : "n"} un evento a esa hora: ${choques.map((c) => c.nombre).join(", ")}.`,
+    // En una tanda, los feriados de CADA salón (su país) se saltan para ese
+    // salón, y lo que ya pasó no se crea.
+    const feriados = new Map<string, Set<string>>();
+    if (tanda !== null) {
+      for (const pais of new Set(filas.map((f) => f.pais))) {
+        feriados.set(
+          pais,
+          new Set(
+            await getHolidayDates(pais, sumarDias(tanda.inicio, -1), sumarDias(tanda.fin, 1), tx),
+          ),
+        );
+      }
+    }
+    const plan: { startsAt: Date; salon: (typeof filas)[number]; fecha: string }[][] = [];
+    for (const semana of semanas) {
+      const startsAt = instante(semana);
+      if (tanda !== null && startsAt.getTime() <= Date.now()) continue;
+      const enSemana = filas
+        .map((salon) => ({ startsAt, salon, fecha: operationalDate(startsAt, salon.timezone) }))
+        .filter((x) => tanda === null || !(feriados.get(x.salon.pais)?.has(x.fecha) ?? false));
+      if (enSemana.length > 0) plan.push(enSemana);
+    }
+    if (plan.length === 0) {
+      throw new ValidationError(
+        "La tanda no deja ninguna semana por delante (todo ya pasó o es feriado).",
       );
     }
 
-    for (const salon of filas) {
+    const choques = await queryRows<{ nombre: string; startsAt: Date }>(
+      `SELECT cl.nombre, s.starts_at AS "startsAt" FROM scheduling_session s
+         JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+        WHERE s.classroom_id = ANY($1::uuid[]) AND s.starts_at = ANY($2::timestamptz[])
+        ORDER BY s.starts_at, cl.nombre`,
+      [salones, plan.map((p) => p[0]?.startsAt)],
+      tx,
+    );
+    if (choques.length > 0) {
+      const ejemplo = choques
+        .slice(0, 5)
+        .map((c) =>
+          tanda !== null
+            ? `${c.nombre} (${operationalDate(new Date(c.startsAt), zona)})`
+            : c.nombre,
+        )
+        .join(", ");
+      throw new ConflictError(
+        `Ya hay ${choques.length === 1 ? "un evento" : `${String(choques.length)} eventos`} a esa hora: ${ejemplo}${choques.length > 5 ? "…" : ""}.`,
+      );
+    }
+
+    if (tandaId !== null && tanda !== null) {
+      await execute(
+        `INSERT INTO scheduling_tanda_club (id, inicio, fin, creado_por)
+         VALUES ($1, $2::date, $3::date, $4)`,
+        [tandaId, tanda.inicio, tanda.fin, input.actorUserId],
+        tx,
+      );
+    }
+
+    for (const enSemana of plan) {
+      const grupoId = compartido ? newId() : null;
+      primerGrupo ??= grupoId;
+      for (const { startsAt, salon, fecha } of enSemana) {
+        await insertarSesion(tx, salon, startsAt, fecha, grupoId);
+      }
+    }
+  };
+
+  const insertarSesion = async (
+    tx: PoolClient,
+    salon: { id: string; nombre: string; cupo: number },
+    startsAt: Date,
+    fecha: string,
+    grupoId: string | null,
+  ) => {
+    {
       const classroomId = salon.id;
       const id = newId();
       await execute(
         `INSERT INTO scheduling_session
            (id, classroom_id, slot_id, tipo, fecha, starts_at, duracion_min, numero,
             guia_user_id, nivel, observaciones, limite_usuarios, grupo_id,
-            abierto, alcance_campaign_id, alcance_curso, alcance_classroom_id)
+            abierto, alcance_campaign_id, alcance_curso, alcance_classroom_id, tanda_id)
          VALUES ($1, $2, NULL, $3::scheduling_slot_tipo, $4::date, $5, $6, 0,
-                 $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                 $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
           id,
           classroomId,
           input.tipo,
-          operationalDate(startsAt, salon.timezone),
+          fecha,
           startsAt,
           input.duracionMin,
           input.guiaUserId,
@@ -434,6 +535,7 @@ export async function crearEvento(input: {
           apertura.abierto ? apertura.campaignId : null,
           apertura.abierto ? apertura.curso : null,
           apertura.abierto ? apertura.classroomId : null,
+          tandaId,
         ],
         tx,
       );
@@ -452,15 +554,16 @@ export async function crearEvento(input: {
       tipo: input.tipo,
       fecha: input.fecha,
       hora: input.horaLocal,
-      salones: creadas.map((c) => c.salon),
-      compartido: grupoId !== null,
+      salones: [...new Set(creadas.map((c) => c.salon))],
+      compartido,
       todos: input.todos === true,
+      ...(tanda !== null && { tandaId, tanda, sesiones: creadas.length }),
       conZoom: guia.zoom_url !== null && guia.zoom_url !== "",
     },
     ip: input.ip ?? null,
   });
 
-  return { grupoId, sesiones: creadas };
+  return { grupoId: primerGrupo, tandaId, sesiones: creadas };
 }
 
 /**
@@ -486,6 +589,12 @@ export async function editarEvento(input: {
   observaciones?: string | null;
   /** Sin esto, la apertura que tenía se conserva. */
   apertura?: AperturaEvento;
+  /**
+   * Club de una TANDA: aplica el cambio a todas sus sesiones FUTURAS sin cerrar
+   * (lo ya dictado no se toca). La fecha nueva corre TODA la tanda los mismos
+   * días; la hora y lo demás se ponen igual en todas.
+   */
+  todaLaTanda?: boolean;
   ip?: string | null;
 }): Promise<{ sesiones: number }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) {
@@ -500,11 +609,18 @@ export async function editarEvento(input: {
   if (input.tipo === "TALLER" && !DURACIONES_TALLER.includes(input.duracionMin)) {
     throw new ValidationError("Un taller dura una o dos horas.");
   }
-  const sesion = await queryOne<{ id: string; slotId: string | null; grupoId: string | null }>(
-    `SELECT id, slot_id AS "slotId", grupo_id AS "grupoId" FROM scheduling_session WHERE id = $1`,
+  const sesion = await queryOne<{
+    id: string;
+    slotId: string | null;
+    grupoId: string | null;
+    tandaId: string | null;
+  }>(
+    `SELECT id, slot_id AS "slotId", grupo_id AS "grupoId", tanda_id AS "tandaId"
+       FROM scheduling_session WHERE id = $1`,
     [input.sessionId],
   );
   if (sesion === null) throw new NotFoundError("El evento no existe.");
+  const enTanda = input.todaLaTanda === true && sesion.tandaId !== null;
   if (sesion.slotId !== null) {
     throw new ConflictError(
       "Esta es una clase del horario del salón: se mueve con una suspensión, no se edita.",
@@ -517,19 +633,19 @@ export async function editarEvento(input: {
   if (guia === null) throw new NotFoundError("El guía no existe o está inactivo.");
 
   const [hh, mm] = input.horaLocal.split(":");
-  const [y, m, d] = input.fecha.split("-");
   let editadas = 0;
   const antes: unknown[] = [];
   await withTransaction(async (tx) => {
-    // El evento y, si es compartido, sus hermanos de grupo.
-    const filas = await queryRows<{
+    // El evento y, si es compartido, sus hermanos de grupo. En "toda la tanda",
+    // además todas las semanas FUTURAS de la tanda que no se hayan cerrado.
+    let filas = await queryRows<{
       id: string;
       classroomId: string;
       salon: string;
       timezone: string;
       cupo: number;
       cerradaEn: string | null;
-      startsAt: string;
+      startsAt: Date;
       guiaUserId: string | null;
     }>(
       `SELECT s.id, s.classroom_id AS "classroomId", cl.nombre AS salon, cl.timezone, cl.cupo,
@@ -537,31 +653,54 @@ export async function editarEvento(input: {
               s.guia_user_id AS "guiaUserId"
          FROM scheduling_session s JOIN scheduling_classroom cl ON cl.id = s.classroom_id
         WHERE s.slot_id IS NULL
-          AND (s.id = $1 OR ($2::uuid IS NOT NULL AND s.grupo_id = $2))
+          AND (s.id = $1 OR ($2::uuid IS NOT NULL AND s.grupo_id = $2)
+               OR ($3::uuid IS NOT NULL AND s.tanda_id = $3 AND s.starts_at > now()
+                   AND s.cerrada_en IS NULL))
+        ORDER BY s.starts_at
         FOR UPDATE OF s`,
-      [sesion.id, sesion.grupoId],
+      [sesion.id, sesion.grupoId, enTanda ? sesion.tandaId : null],
       tx,
     );
+    const editada = filas.find((f) => f.id === sesion.id);
     if (filas.some((f) => f.cerradaEn !== null)) {
       throw new ConflictError("El evento ya se dictó y se cerró: no se puede editar.");
     }
     // UNA clase es UN instante: la hora está escrita en el reloj del salón del
-    // evento que se abrió, y sus hermanos de grupo (quizá en otra zona) la siguen.
-    const zona = filas.find((f) => f.id === sesion.id)?.timezone ?? filas[0]?.timezone ?? "UTC";
-    const startsAt = wallTimeToUtc(
-      { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
-      zona,
+    // evento que se abrió, y sus hermanos (quizá en otra zona) la siguen. La
+    // FECHA nueva corre cada sesión los mismos días que la editada (en una
+    // tanda, toda la serie; en un evento suelto, todos caen en esa fecha).
+    const zona = editada?.timezone ?? filas[0]?.timezone ?? "UTC";
+    const dias = diasEntre(
+      operationalDate(new Date(editada?.startsAt ?? Date.now()), zona),
+      input.fecha,
     );
+    const nuevoInicio = (f: (typeof filas)[number]) => {
+      const [y, m, d] = sumarDias(operationalDate(new Date(f.startsAt), zona), dias).split("-");
+      return wallTimeToUtc(
+        { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
+        zona,
+      );
+    };
+    // Al correr la serie hacia adelante, se mueve primero la última (y al revés)
+    // para no pisar, ni por un instante, la hora de la semana vecina.
+    if (dias > 0) filas = [...filas].reverse();
+    const ids = filas.map((f) => f.id);
+    const movidas: { classroomId: string; desde: Date; hasta: Date }[] = [];
     for (const f of filas) {
+      const startsAt = nuevoInicio(f);
       const choque = await queryOne<{ id: string }>(
-        `SELECT id FROM scheduling_session WHERE classroom_id = $1 AND starts_at = $2 AND id <> $3`,
-        [f.classroomId, startsAt, f.id],
+        `SELECT id FROM scheduling_session
+          WHERE classroom_id = $1 AND starts_at = $2 AND NOT (id = ANY($3::uuid[]))`,
+        [f.classroomId, startsAt, ids],
         tx,
       );
       if (choque !== null) {
-        throw new ConflictError(`${f.salon} ya tiene otro evento a esa hora.`);
+        throw new ConflictError(
+          `${f.salon} ya tiene otro evento el ${operationalDate(startsAt, f.timezone)} a esa hora.`,
+        );
       }
       antes.push({ salon: f.salon, startsAt: f.startsAt, guiaUserId: f.guiaUserId });
+      movidas.push({ classroomId: f.classroomId, desde: new Date(f.startsAt), hasta: startsAt });
       await execute(
         `UPDATE scheduling_session
             SET tipo = $2::scheduling_slot_tipo, fecha = $3::date, starts_at = $4,
@@ -598,15 +737,31 @@ export async function editarEvento(input: {
           tx,
         );
       }
-      // Los niños agendados de otros salones van atados a (salón, instante):
-      // si el evento cambia de hora, se mudan con él.
+      editadas++;
+    }
+    // Los niños agendados de otros salones van atados a (salón, instante): si el
+    // evento cambia de hora, se mudan con él. En UNA sentencia, para que en una
+    // serie corrida una semana el agendado no salte de semana en semana.
+    if (movidas.some((x) => x.desde.getTime() !== x.hasta.getTime())) {
       await execute(
-        `UPDATE scheduling_agendado SET starts_at = $3
-          WHERE classroom_id = $1 AND starts_at = $2 AND estado = 'ACTIVA'`,
-        [f.classroomId, f.startsAt, startsAt],
+        `UPDATE scheduling_agendado g SET starts_at = m.hasta
+           FROM unnest($1::uuid[], $2::timestamptz[], $3::timestamptz[]) AS m(classroom_id, desde, hasta)
+          WHERE g.classroom_id = m.classroom_id AND g.starts_at = m.desde AND g.estado = 'ACTIVA'`,
+        [
+          movidas.map((x) => x.classroomId),
+          movidas.map((x) => x.desde),
+          movidas.map((x) => x.hasta),
+        ],
         tx,
       );
-      editadas++;
+    }
+    // La tanda corre con sus semanas.
+    if (enTanda && dias !== 0) {
+      await execute(
+        `UPDATE scheduling_tanda_club SET inicio = inicio + $2::int, fin = fin + $2::int WHERE id = $1`,
+        [sesion.tandaId, dias],
+        tx,
+      );
     }
   });
 
@@ -625,6 +780,7 @@ export async function editarEvento(input: {
         guiaUserId: input.guiaUserId,
       },
       sesiones: editadas,
+      ...(enTanda && { tandaId: sesion.tandaId, todaLaTanda: true }),
     },
     ip: input.ip ?? null,
   });

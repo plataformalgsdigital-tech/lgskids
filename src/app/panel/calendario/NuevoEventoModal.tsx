@@ -50,7 +50,23 @@ interface CampaniaOpcion {
   id: string;
   nombre: string;
   estado: string;
+  cursoInicio: string | null;
+  cursoFin: string | null;
 }
+
+/**
+ * La tanda de clubs por defecto: el inicio y el fin de los cursos de la campaña
+ * EN MATRÍCULA o, si no hay, de la ACTIVA (la lista viene de la más reciente a
+ * la más antigua). Se puede cambiar en el formulario.
+ */
+function tandaPorDefecto(lista: CampaniaOpcion[]): { inicio: string; fin: string; de: string } {
+  const c =
+    lista.find((x) => x.estado === "EN_MATRICULA" && x.cursoInicio !== null) ??
+    lista.find((x) => x.estado === "ACTIVA" && x.cursoInicio !== null);
+  return { inicio: c?.cursoInicio ?? "", fin: c?.cursoFin ?? "", de: c?.nombre ?? "" };
+}
+
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 /**
  * Sesión extra, club o taller ABIERTO a niños de otros salones (Academic
@@ -106,6 +122,8 @@ export type EventoEditable =
       observaciones: string | null;
       salon: string;
       compartido: boolean;
+      /** Club de una tanda semanal: se puede editar esa sesión o toda la tanda. */
+      tanda: { id: string; inicio: string; fin: string; futuras: number } | null;
       apertura: AperturaEvento;
     }
   | {
@@ -273,6 +291,14 @@ export function NuevoEventoModal({
   const [apertura, setApertura] = useState<AperturaEvento>(
     editar?.clase === "suelto" ? editar.apertura : APERTURA_CERRADA,
   );
+  // TANDA de clubs: el Club se repite cada semana entre estas dos fechas.
+  const [tandaInicio, setTandaInicio] = useState("");
+  const [tandaFin, setTandaFin] = useState("");
+  const [tandaDe, setTandaDe] = useState("");
+  /** Editando un Club de una tanda: el cambio va a esa sesión o a toda la tanda. */
+  const tandaEditada = editar?.clase === "suelto" ? editar.tanda : null;
+  const [todaLaTanda, setTodaLaTanda] = useState(false);
+  const esTanda = !esAdmin && tipo === "CLUB" && editar === undefined;
 
   const cargarGuias = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/eventos");
@@ -306,7 +332,12 @@ export function NuevoEventoModal({
     async function cargarCampanias() {
       const res = await apiFetch("/api/catalog/campaigns");
       if (res.ok) {
-        setCampaniasLista(((await res.json()) as { campanias: CampaniaOpcion[] }).campanias);
+        const lista = ((await res.json()) as { campanias: CampaniaOpcion[] }).campanias;
+        setCampaniasLista(lista);
+        const t = tandaPorDefecto(lista);
+        setTandaInicio(t.inicio);
+        setTandaFin(t.fin);
+        setTandaDe(t.de);
       }
     }
     void cargarCampanias();
@@ -392,7 +423,8 @@ export function NuevoEventoModal({
       : fecha !== "" &&
         hora !== "" &&
         (salonFijo || salonPrincipal !== "" || salonesFiltrados.length > 0) &&
-        guiaUserId !== "";
+        guiaUserId !== "" &&
+        (!esTanda || (tandaInicio !== "" && tandaFin !== ""));
   const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   async function crear() {
@@ -427,6 +459,7 @@ export function NuevoEventoModal({
               guiaUserId,
               observaciones: observaciones.trim() === "" ? null : observaciones,
               apertura,
+              todaLaTanda: tandaEditada !== null && todaLaTanda,
             }
           : esAdmin
             ? {
@@ -466,6 +499,7 @@ export function NuevoEventoModal({
                 guiaUserId,
                 observaciones: observaciones.trim() === "" ? null : observaciones,
                 apertura,
+                tanda: esTanda ? { inicio: tandaInicio, fin: tandaFin } : null,
               };
       const base = esWelcome
         ? "/api/scheduling/welcomes"
@@ -853,6 +887,105 @@ export function NuevoEventoModal({
               </select>
             </div>
           </div>
+
+          {/* Tanda de clubs: el Club se repite cada semana entre estas fechas. */}
+          {esTanda && (
+            <div
+              style={{
+                padding: "0.8rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1px solid #c5e1a5",
+                background: "#f6fbef",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div
+                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
+                className="ev-dos"
+              >
+                <div>
+                  <label style={rotulo} htmlFor="ev-tanda-inicio">
+                    Inicio tanda de Clubs *
+                  </label>
+                  <input
+                    id="ev-tanda-inicio"
+                    type="date"
+                    value={tandaInicio}
+                    onChange={(e) => setTandaInicio(e.target.value)}
+                    style={campo}
+                  />
+                </div>
+                <div>
+                  <label style={rotulo} htmlFor="ev-tanda-fin">
+                    Final de tanda de clubs *
+                  </label>
+                  <input
+                    id="ev-tanda-fin"
+                    type="date"
+                    value={tandaFin}
+                    onChange={(e) => setTandaFin(e.target.value)}
+                    style={campo}
+                  />
+                </div>
+              </div>
+              <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)", lineHeight: 1.45 }}>
+                El Club se repite cada{" "}
+                <strong>
+                  {fecha !== "" ? DIAS_SEMANA[new Date(`${fecha}T12:00:00`).getDay()] : "semana"}
+                </strong>{" "}
+                a las {hora} entre estas fechas; los feriados de cada salón y las fechas ya pasadas
+                se saltan.
+                {tandaDe !== "" &&
+                  ` Por defecto, el inicio y el fin de los cursos de ${tandaDe}; se pueden cambiar.`}
+              </span>
+            </div>
+          )}
+
+          {/* Editando un Club de una tanda: esa sesión o toda la tanda. */}
+          {tandaEditada !== null && (
+            <div
+              style={{
+                padding: "0.7rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1px solid #c5e1a5",
+                background: "#f6fbef",
+                fontSize: "0.85rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.35rem",
+              }}
+            >
+              <span>
+                Club de una <strong>tanda</strong> del {tandaEditada.inicio} al {tandaEditada.fin}.
+              </span>
+              <label style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
+                <input
+                  type="radio"
+                  name="alcance-tanda"
+                  checked={!todaLaTanda}
+                  onChange={() => setTodaLaTanda(false)}
+                />
+                Solo esta sesión
+              </label>
+              <label style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
+                <input
+                  type="radio"
+                  name="alcance-tanda"
+                  checked={todaLaTanda}
+                  onChange={() => setTodaLaTanda(true)}
+                />
+                Toda la tanda ({tandaEditada.futuras} sesión
+                {tandaEditada.futuras === 1 ? "" : "es"} por delante; las ya dictadas no cambian)
+              </label>
+              {todaLaTanda && (
+                <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+                  Si cambias la fecha, todas las semanas se corren los mismos días.
+                </span>
+              )}
+            </div>
+          )}
 
           {/* El Zoom no se escribe: se hereda del guía. */}
           <div

@@ -1860,6 +1860,23 @@ solo servía para completar la ficha.
   instante sale de una zona (la enviada, o la del salón del evento que se edita) y
   cada salón guarda su FECHA local. Si algún salón ya tiene algo a esa hora no se
   crea en ninguno y el error los nombra. Nivel vacío = "Todos los niveles".
+  **TANDA DE CLUBS (2026-10-23, migración `20261023200000`)**: al crear un **Club**
+  el formulario pide **Inicio tanda de Clubs** y **Final de tanda de clubs** (por
+  defecto, `cursoInicio`/`cursoFin` de la campaña EN MATRÍCULA o, si no hay, de la
+  ACTIVA; `listCampaigns` ganó `cursoFin`; editables) y el Club se REPITE CADA
+  SEMANA, el día de la Fecha elegida, entre las dos (`fechasTanda` en
+  `domain/tanda-club.ts`, con pruebas; máx. 60 semanas; la Fecha tiene que caer
+  dentro). Cada semana es una clase suelta compartida (su propio `grupo_id`) en
+  todos los salones elegidos, todas con `scheduling_session.tanda_id` →
+  `scheduling_tanda_club` (inicio, fin, creado_por). Se saltan los FERIADOS del
+  país de cada salón (solo para ese salón) y las fechas ya pasadas; un choque en
+  cualquier semana no crea nada. **Editar** un Club de una tanda ofrece "Solo esta
+  sesión" o "Toda la tanda" (`editarEvento` con `todaLaTanda`): toma las sesiones
+  FUTURAS sin cerrar, pone hora/guía/etc. iguales y corre todas los mismos días
+  que se movió la editada (también el rango de la tanda); los agendados se mudan
+  en UNA sentencia y la serie se mueve en el orden que evita pisar la semana
+  vecina. `getSessionInfo` devuelve `tanda` (rango y semanas por delante). Prueba:
+  `tanda-club-integration.test.ts`.
 - **Evento ADMINISTRATIVO** (`scheduling_evento_admin` + `…_guia`, `20260828000001`):
   reunión o capacitación cuya audiencia son GUÍAS. Vive en tabla propia a propósito:
   en `scheduling_session` arrastraría lista de matriculados, asistencia y progresión,

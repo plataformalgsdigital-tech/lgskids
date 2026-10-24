@@ -96,6 +96,8 @@ interface Sesion {
   limiteUsuarios: number | null;
   timezone: string;
   grupoId: string | null;
+  /** Club de una tanda semanal. */
+  tanda?: { id: string; inicio: string; fin: string; futuras: number } | null;
   apertura?: AperturaEvento;
   /** Cancelada por el guía y sin reemplazo: no se registra ni se pasa lista. */
   cancelada: boolean;
@@ -900,6 +902,7 @@ export function SesionModal({
                     observaciones: sesion.observaciones,
                     salon: tituloSalon(sesion),
                     compartido: sesion.grupoId !== null,
+                    tanda: sesion.tanda ?? null,
                     apertura: sesion.apertura ?? APERTURA_CERRADA,
                   })
                 }

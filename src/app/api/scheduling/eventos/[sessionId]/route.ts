@@ -17,6 +17,8 @@ const editarSchema = z.object({
   guiaUserId: z.uuid(),
   observaciones: z.string().max(1000).nullish(),
   apertura: ESQUEMA_APERTURA.optional(),
+  // Club de una tanda: aplicar a todas sus sesiones futuras.
+  todaLaTanda: z.boolean().optional(),
 });
 
 /**
@@ -43,6 +45,7 @@ export const PATCH = handlerWithAuth(async (request, auth, context) => {
       guiaUserId: body.guiaUserId,
       observaciones: body.observaciones ?? null,
       ...(body.apertura !== undefined && { apertura: body.apertura }),
+      todaLaTanda: body.todaLaTanda === true,
       ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     }),
   );

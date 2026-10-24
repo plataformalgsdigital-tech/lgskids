@@ -108,6 +108,11 @@ export const MAPA_TABLAS: Record<string, EntradaMapa> = {
     para: "Los bloques (día y hora) de cada horario del catálogo.",
     pantalla: "Mantenimiento Académico › Horarios",
   },
+  scheduling_tanda_club: {
+    tema: "Calendario y salones",
+    para: "Tandas de clubs: un Club que se repite cada semana entre un inicio y un final; sus sesiones la referencian (tanda_id).",
+    pantalla: "Calendario › Evento académico › Club",
+  },
   scheduling_agendado: {
     tema: "Calendario y salones",
     para: "Niños agendados a una sesión de OTRO salón (recuperación, club, taller abierto).",

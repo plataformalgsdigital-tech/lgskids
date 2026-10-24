@@ -29,6 +29,8 @@ export interface CampaignListItem {
   fin: string;
   finalVenta: string;
   cursoInicio: string | null;
+  /** Fin nominal de sus cursos (`final_curso`). */
+  cursoFin: string | null;
   estado: EstadoCampania;
   cursos: number;
 }

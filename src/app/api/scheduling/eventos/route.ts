@@ -48,6 +48,13 @@ const crearSchema = z.object({
     .optional(),
   // Zona IANA de quien escribe la hora (la manda el evento para "todos").
   zona: z.string().min(1).max(64).optional(),
+  // Solo Club: se repite cada semana entre el inicio y el final de la tanda.
+  tanda: z
+    .object({
+      inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Inicio de tanda YYYY-MM-DD."),
+      fin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Final de tanda YYYY-MM-DD."),
+    })
+    .nullish(),
   tipo: z.enum(["SESION", "CLUB", "TALLER"]),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe ser YYYY-MM-DD."),
   horaLocal: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "La hora debe ser HH:MM."),
@@ -70,6 +77,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
     classroomIds:
       body.todos !== undefined ? await salonesDelAlcance(body.todos) : body.classroomIds,
     todos: body.todos !== undefined,
+    tanda: body.tanda ?? null,
     ...(body.zona !== undefined && { zona: body.zona }),
     tipo: body.tipo,
     fecha: body.fecha,
