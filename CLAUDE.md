@@ -387,7 +387,11 @@ Migración `20260921100000_cuentas_usuario`.
   - la unicidad la resuelve `INSERT … ON CONFLICT (username) DO NOTHING RETURNING`
     con hasta 25 intentos: dos altas simultáneas con el mismo nombre no chocan.
     La clave se devuelve UNA vez (`Cache-Control: no-store`) y la cuenta nace con
-    `debe_cambiar_password`.
+    `debe_cambiar_password`, **salvo la del ALUMNO** (2026-10-27, decisión del
+    negocio: entra con la clave que recibe; `provisionarUsuarioAlumno` pasa
+    `debeCambiarClave: false`). La migración `20261027100000` apagó la marca en
+    todas las cuentas de alumno existentes (ligadas a una persona y sin otro rol).
+    Restablecer la clave desde el panel la sigue encendiendo, también al alumno.
 - **Dónde van los demás datos de cada tipo de usuario** (`identity_user` solo
   guarda la cuenta):
   - **alumno** → `people_person` (lo llena el contrato);

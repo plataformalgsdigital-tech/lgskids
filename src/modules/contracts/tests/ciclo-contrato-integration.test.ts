@@ -101,12 +101,14 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
     // El correo de la cuenta es el del apoderado (2026-10-21), marcado familiar:
     // lo comparten los hermanos y no choca con el índice de correo único.
     expect(credenciales?.correo).toBe("papa@example.com");
-    const cuenta = await queryOne<{ familiar: boolean; sintetico: boolean }>(
-      `SELECT email_familiar AS familiar, email_sintetico AS sintetico
+    // Y nace SIN "cambiar clave al entrar" (2026-10-27): entra con la que recibe.
+    const cuenta = await queryOne<{ familiar: boolean; sintetico: boolean; debe: boolean }>(
+      `SELECT email_familiar AS familiar, email_sintetico AS sintetico,
+              debe_cambiar_password AS debe
          FROM identity_user WHERE username = $1`,
       [credenciales?.username],
     );
-    expect(cuenta).toEqual({ familiar: true, sintetico: false });
+    expect(cuenta).toEqual({ familiar: true, sintetico: false, debe: false });
     expect(credenciales?.passwordInicial.length).toBeGreaterThanOrEqual(10);
 
     // La persona quedó vinculada y con rol alumno de alcance CO.

@@ -25,8 +25,8 @@ export interface CuentaCreada {
  * otro. (Antes se consultaba primero y se insertaba después, y entre las dos
  * cosas otra alta podía llevarse el nombre.)
  *
- * Queda ACTIVA y con "debe cambiar clave" encendido: la clave generada se
- * cambia en el primer ingreso.
+ * Queda ACTIVA y, salvo `debeCambiarClave: false` (el alumno), con "debe
+ * cambiar clave" encendido: la clave generada se cambia en el primer ingreso.
  */
 export async function crearCuentaTx(
   tx: Queryable,
@@ -45,6 +45,11 @@ export async function crearCuentaTx(
      * la transacción (la foto del guía va a almacenamiento, no a la base).
      */
     id?: string;
+    /**
+     * Encender "debe cambiar clave" (por defecto sí). El ALUMNO nace sin la
+     * marca (2026-10-27, decisión del negocio): entra con la clave que recibe.
+     */
+    debeCambiarClave?: boolean;
   },
 ): Promise<CuentaCreada> {
   const passwordInicial = generarPasswordInicial();
@@ -58,7 +63,7 @@ export async function crearCuentaTx(
       `INSERT INTO identity_user
          (id, username, email, email_sintetico, email_familiar, password_hash, password_cifrada,
           estado, debe_cambiar_password, updated_at)
-       VALUES ($1, $2, $3, $4, $7, $5, $6, 'ACTIVO', true, now())
+       VALUES ($1, $2, $3, $4, $7, $5, $6, 'ACTIVO', $8, now())
        ON CONFLICT (username) DO NOTHING
        RETURNING id`,
       [
@@ -69,6 +74,7 @@ export async function crearCuentaTx(
         passwordHash,
         cifrada,
         opciones.emailFamiliar === true,
+        opciones.debeCambiarClave !== false,
       ],
       tx,
     );

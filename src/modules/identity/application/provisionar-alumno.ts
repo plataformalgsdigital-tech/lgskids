@@ -16,7 +16,7 @@ export interface AlumnoProvisionado {
 /**
  * Crea las credenciales de un ALUMNO dentro de la transacción del alta única
  * (la invoca `contracts` al aprobar el contrato). Usuario y clave generados
- * (`crearCuentaTx`).
+ * (`crearCuentaTx`), SIN "cambiar clave al entrar".
  *
  * Correo (2026-10-21): el de la FAMILIA —el del apoderado, como viene de LGS—,
  * marcado `email_familiar` porque los hermanos lo comparten y el índice de
@@ -34,6 +34,8 @@ export async function provisionarUsuarioAlumno(
     email: correo,
     emailSintetico: familiar === null,
     emailFamiliar: familiar !== null,
+    // Sin "cambiar clave al entrar" (2026-10-27): el niño entra con la que recibe.
+    debeCambiarClave: false,
   });
   return { ...cuenta, correo: correo(cuenta.username) };
 }
