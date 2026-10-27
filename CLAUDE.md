@@ -1893,6 +1893,21 @@ solo servía para completar la ficha.
   en UNA sentencia y la serie se mueve en el orden que evita pisar la semana
   vecina. `getSessionInfo` devuelve `tanda` (rango y semanas por delante). Prueba:
   `tanda-club-integration.test.ts`.
+- **LINKS DE CLUBES (2026-10-28, migración `20261028000000`)**: tabla
+  `scheduling_link_club` (nombre, `dia_semana` 0=domingo…6=sábado como
+  `Date.getDay()`, horario TEXTO, link, activo), mantenida en **Sesiones › Links de
+  Clubes** (`/panel/sesiones/links-clubes`, `GET|POST /api/scheduling/links-club` y
+  `PATCH|DELETE …/[id]`; `eventos.crear` + `op.sesiones.links_clubes`). Al crear o
+  editar un **Club**, la casilla "Link diferente al del Advisor" tacha la sala del
+  advisor y ofrece SOLO los links activos del día de la semana de la Fecha
+  (`exigirLinkClubParaFecha` lo vuelve a exigir en el servidor; una tanda repite el
+  día). La sesión guarda la REFERENCIA (`scheduling_session.link_club_id`, ON DELETE
+  RESTRICT), no una copia: corregir el enlace lo corrige en todas sus sesiones. Ese
+  link MANDA sobre la sala del guía en toda lectura del Zoom de UNA sesión
+  (`SQL_LINK_CLUB` en agenda, detalle, `getSessionInfo`, historial, panel del niño;
+  copiado en la "Siguiente clase" de people, que no puede importar scheduling). Un
+  link en uso no se borra (se desactiva) ni cambia de día si tiene sesiones por
+  delante. Pruebas: `link-club.test.ts` y `link-club-integration.test.ts`.
 - **Evento ADMINISTRATIVO** (`scheduling_evento_admin` + `…_guia`, `20260828000001`):
   reunión o capacitación cuya audiencia son GUÍAS. Vive en tabla propia a propósito:
   en `scheduling_session` arrastraría lista de matriculados, asistencia y progresión,

@@ -113,6 +113,11 @@ export const MAPA_TABLAS: Record<string, EntradaMapa> = {
     para: "Tandas de clubs: un Club que se repite cada semana entre un inicio y un final; sus sesiones la referencian (tanda_id).",
     pantalla: "Calendario › Evento académico › Club",
   },
+  scheduling_link_club: {
+    tema: "Calendario y salones",
+    para: "Links de Clubes: salas propias de los Clubs (nombre, día de la semana, horario y link), distintas de la del advisor; la sesión del Club la referencia (link_club_id).",
+    pantalla: "Sesiones › Links de Clubes",
+  },
   scheduling_agendado: {
     tema: "Calendario y salones",
     para: "Niños agendados a una sesión de OTRO salón (recuperación, club, taller abierto).",

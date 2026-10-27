@@ -8,6 +8,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors
 import { newId } from "@/platform/ids";
 import { isValidTimeZone, operationalDate, wallTimeToUtc } from "@/platform/time";
 import { diasEntre, fechasTanda, sumarDias } from "../domain/tanda-club";
+import { exigirLinkClubParaFecha } from "./link-club";
 import { getHolidayDates } from "../infrastructure/scheduling-repository";
 import {
   DURACION_ADMIN_MAX,
@@ -330,6 +331,11 @@ export async function crearEvento(input: {
    * salones); los feriados de cada salón y las fechas ya pasadas se saltan.
    */
   tanda?: { inicio: string; fin: string } | null;
+  /**
+   * Solo CLUB: "Link diferente al del Advisor" — un link de `scheduling_link_club`
+   * del MISMO día de la semana que `fecha`. Manda sobre la sala del guía.
+   */
+  linkClubId?: string | null;
   ip?: string | null;
   /** Para crearlo dentro de una transacción ya abierta (aprobar un refuerzo). */
   client?: PoolClient;
@@ -365,6 +371,10 @@ export async function crearEvento(input: {
   const tanda = input.tanda ?? null;
   if (tanda !== null && input.tipo !== "CLUB") {
     throw new ValidationError("Solo un Club se crea por tanda.");
+  }
+  const linkClubId = input.linkClubId ?? null;
+  if (linkClubId !== null && input.tipo !== "CLUB") {
+    throw new ValidationError("Solo un Club lleva un link diferente al del advisor.");
   }
   let semanas = [input.fecha];
   if (tanda !== null) {
@@ -419,6 +429,9 @@ export async function crearEvento(input: {
       }
       filas.push(salon);
     }
+    // El link del Club: activo y del día de la semana de la fecha (en una tanda
+    // todas las semanas caen ese mismo día).
+    if (linkClubId !== null) await exigirLinkClubParaFecha(linkClubId, input.fecha, tx);
 
     // UNA clase es UN instante, aunque se dicte en salones de zonas distintas
     // (el guía no puede estar en dos horas a la vez). La hora es de PARED en la
@@ -516,9 +529,10 @@ export async function crearEvento(input: {
         `INSERT INTO scheduling_session
            (id, classroom_id, slot_id, tipo, fecha, starts_at, duracion_min, numero,
             guia_user_id, nivel, observaciones, limite_usuarios, grupo_id,
-            abierto, alcance_campaign_id, alcance_curso, alcance_classroom_id, tanda_id)
+            abierto, alcance_campaign_id, alcance_curso, alcance_classroom_id, tanda_id,
+            link_club_id)
          VALUES ($1, $2, NULL, $3::scheduling_slot_tipo, $4::date, $5, $6, 0,
-                 $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+                 $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
         [
           id,
           classroomId,
@@ -536,6 +550,7 @@ export async function crearEvento(input: {
           apertura.abierto ? apertura.curso : null,
           apertura.abierto ? apertura.classroomId : null,
           tandaId,
+          linkClubId,
         ],
         tx,
       );
@@ -558,7 +573,8 @@ export async function crearEvento(input: {
       compartido,
       todos: input.todos === true,
       ...(tanda !== null && { tandaId, tanda, sesiones: creadas.length }),
-      conZoom: guia.zoom_url !== null && guia.zoom_url !== "",
+      ...(linkClubId !== null && { linkClubId }),
+      conZoom: linkClubId !== null || (guia.zoom_url !== null && guia.zoom_url !== ""),
     },
     ip: input.ip ?? null,
   });
@@ -595,6 +611,11 @@ export async function editarEvento(input: {
    * días; la hora y lo demás se ponen igual en todas.
    */
   todaLaTanda?: boolean;
+  /**
+   * Link propio del Club: un id, null = vuelve a la sala del advisor; sin esto
+   * se conserva el que tenía. Un evento que deja de ser Club lo pierde.
+   */
+  linkClubId?: string | null;
   ip?: string | null;
 }): Promise<{ sesiones: number }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) {
@@ -632,10 +653,16 @@ export async function editarEvento(input: {
   );
   if (guia === null) throw new NotFoundError("El guía no existe o está inactivo.");
 
+  if (input.tipo !== "CLUB" && input.linkClubId !== undefined && input.linkClubId !== null) {
+    throw new ValidationError("Solo un Club lleva un link diferente al del advisor.");
+  }
   const [hh, mm] = input.horaLocal.split(":");
   let editadas = 0;
   const antes: unknown[] = [];
   await withTransaction(async (tx) => {
+    if (input.tipo === "CLUB" && input.linkClubId !== undefined && input.linkClubId !== null) {
+      await exigirLinkClubParaFecha(input.linkClubId, input.fecha, tx);
+    }
     // El evento y, si es compartido, sus hermanos de grupo. En "toda la tanda",
     // además todas las semanas FUTURAS de la tanda que no se hayan cerrado.
     let filas = await queryRows<{
@@ -720,6 +747,14 @@ export async function editarEvento(input: {
         ],
         tx,
       );
+      // El link del Club: el que se eligió, o ninguno si deja de ser Club.
+      if (input.linkClubId !== undefined || input.tipo !== "CLUB") {
+        await execute(
+          `UPDATE scheduling_session SET link_club_id = $2 WHERE id = $1`,
+          [f.id, input.tipo === "CLUB" ? (input.linkClubId ?? null) : null],
+          tx,
+        );
+      }
       if (input.apertura !== undefined) {
         const a = input.apertura;
         await execute(
@@ -778,6 +813,7 @@ export async function editarEvento(input: {
         hora: input.horaLocal,
         duracionMin: input.duracionMin,
         guiaUserId: input.guiaUserId,
+        ...(input.linkClubId !== undefined && { linkClubId: input.linkClubId }),
       },
       sesiones: editadas,
       ...(enTanda && { tandaId: sesion.tandaId, todaLaTanda: true }),

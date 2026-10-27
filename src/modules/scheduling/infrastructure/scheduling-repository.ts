@@ -42,6 +42,17 @@ const GUIA_EFECTIVO = `COALESCE(s.guia_user_id, cl.guia_user_id)`;
  */
 export const SALA_ZOOM = `COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url)`;
 
+/**
+ * El link PROPIO de un Club (`scheduling_link_club`, 2026-10-28) de la sesión
+ * `alias`, o NULL. Cuando lo tiene, manda sobre la sala del guía: va primero en
+ * el COALESCE de toda lectura del enlace de UNA sesión.
+ */
+export const SQL_LINK_CLUB = (alias: string) =>
+  `(SELECT NULLIF(TRIM(lc.link), '') FROM scheduling_link_club lc WHERE lc.id = ${alias}.link_club_id)`;
+
+/** Sala de UNA sesión `s`: su link de Club y, si no tiene, `SALA_ZOOM`. */
+const SALA_SESION = `COALESCE(${SQL_LINK_CLUB("s")}, ${SALA_ZOOM})`;
+
 // ============================================================
 // Catálogo de horarios (mantenimiento centralizado por tipo de curso)
 // ============================================================
@@ -549,7 +560,7 @@ export async function agendaSesiones(
             cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
             ${NOMBRE_GUIA} AS guia, gu.id AS "guiaUserId",
             s.starts_at AS "startsAt", cl.holiday_country AS pais,
-            ${SALA_ZOOM} AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
+            ${SALA_SESION} AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
             (SELECT count(*) FROM enrollment_enrollment e
               WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA'))::int AS ocupados,
             (SELECT count(*) FROM attendance_attendance a
@@ -645,7 +656,7 @@ export async function detalleSesion(sessionId: string): Promise<SesionDetalle | 
             to_char(s.starts_at AT TIME ZONE cl.timezone, 'HH24:MI') AS "horaLocal",
             s.numero, s.duracion_min AS "duracionMin",
             cl.id AS "classroomId", cl.nombre AS salon, cl.cupo, cl.timezone,
-            cl.holiday_country AS "holidayCountry", ${SALA_ZOOM} AS "meetingUrl",
+            cl.holiday_country AS "holidayCountry", ${SALA_SESION} AS "meetingUrl",
             cu.id AS "courseId", cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
             gu.id AS "guiaUserId", ${NOMBRE_GUIA} AS "guiaNombre",
             (s.guia_user_id IS NOT NULL

@@ -19,6 +19,8 @@ const editarSchema = z.object({
   apertura: ESQUEMA_APERTURA.optional(),
   // Club de una tanda: aplicar a todas sus sesiones futuras.
   todaLaTanda: z.boolean().optional(),
+  // Club: link propio (null = la sala del advisor); sin el campo, se conserva.
+  linkClubId: z.uuid().nullable().optional(),
 });
 
 /**
@@ -46,6 +48,7 @@ export const PATCH = handlerWithAuth(async (request, auth, context) => {
       observaciones: body.observaciones ?? null,
       ...(body.apertura !== undefined && { apertura: body.apertura }),
       todaLaTanda: body.todaLaTanda === true,
+      ...(body.linkClubId !== undefined && { linkClubId: body.linkClubId }),
       ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     }),
   );

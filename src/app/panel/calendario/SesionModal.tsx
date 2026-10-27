@@ -99,6 +99,8 @@ interface Sesion {
   /** Club de una tanda semanal. */
   tanda?: { id: string; inicio: string; fin: string; futuras: number } | null;
   apertura?: AperturaEvento;
+  /** Club con link propio (Links de Clubes): manda sobre la sala del advisor. */
+  linkClubId?: string | null;
   /** Cancelada por el guía y sin reemplazo: no se registra ni se pasa lista. */
   cancelada: boolean;
 }
@@ -904,6 +906,7 @@ export function SesionModal({
                     compartido: sesion.grupoId !== null,
                     tanda: sesion.tanda ?? null,
                     apertura: sesion.apertura ?? APERTURA_CERRADA,
+                    linkClubId: sesion.linkClubId ?? null,
                   })
                 }
               >

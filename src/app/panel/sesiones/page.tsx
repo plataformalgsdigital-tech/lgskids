@@ -48,6 +48,14 @@ const TARJETAS: Tarjeta[] = [
     op: "op.sesiones.eventos_admin",
   },
   {
+    titulo: "Links de Clubes",
+    desc: "Salas de Zoom propias de los Clubs (nombre, día, horario y link), distintas de la del advisor.",
+    emoji: "🔗",
+    color: "#2e7d32",
+    href: "/panel/sesiones/links-clubes",
+    op: "op.sesiones.links_clubes",
+  },
+  {
     titulo: "Suspensiones",
     desc: "Suspender una sesión con motivo y regenerar el salón. Hoy se hace desde el calendario.",
     emoji: "⛔",

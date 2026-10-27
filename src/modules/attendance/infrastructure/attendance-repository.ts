@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import { SQL_SECUENCIA_LECCIONES } from "@/modules/catalog";
-import { SQL_ORDINAL_CLASE, SQL_SESION_CANCELADA } from "@/modules/scheduling";
+import { SQL_LINK_CLUB, SQL_ORDINAL_CLASE, SQL_SESION_CANCELADA } from "@/modules/scheduling";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { newId } from "@/platform/ids";
 
@@ -65,6 +65,8 @@ export interface SessionInfo {
   grupoId: string | null;
   /** Club de una TANDA semanal: su rango y cuántas semanas le quedan por delante. */
   tanda: { id: string; inicio: string; fin: string; futuras: number } | null;
+  /** Club con link propio (Links de Clubes): su `meetingUrl` sale de ahí. */
+  linkClubId: string | null;
   /** El guía la canceló y administración lo aprobó sin cubrirla: no se dicta. */
   cancelada: boolean;
   /** Evento suelto abierto a otros salones (Agendar): su alcance; null = Todos. */
@@ -82,8 +84,11 @@ const NOMBRE_GUIA = `COALESCE(
               NULLIF(TRIM(CONCAT_WS(' ', gpf.nombres, gpf.apellidos)), ''),
               g.username)`;
 
-/** Sala de Zoom del guía efectivo (`gg`) y, si no tiene, la del salón. */
-const SALA_ZOOM = `COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url)`;
+/**
+ * Sala de la sesión `s`: el link propio del Club (si lo tiene), si no la del
+ * guía efectivo (`gg`) y, si no tiene, la del salón.
+ */
+const SALA_ZOOM = `COALESCE(${SQL_LINK_CLUB("s")}, NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url)`;
 
 export async function getSessionInfo(sessionId: string): Promise<SessionInfo | null> {
   return queryOne<SessionInfo>(
@@ -104,6 +109,7 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
             s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,
             s.grupo_id AS "grupoId", ${SQL_SESION_CANCELADA("s")} AS cancelada,
+            s.link_club_id AS "linkClubId",
             CASE WHEN tc.id IS NULL THEN NULL ELSE json_build_object(
               'id', tc.id, 'inicio', tc.inicio::text, 'fin', tc.fin::text,
               'futuras', (SELECT count(DISTINCT t2.starts_at)::int FROM scheduling_session t2

@@ -33,6 +33,16 @@ interface Guia {
   zoomUrl: string | null;
 }
 
+/** Un link de la tabla Links de Clubes (Sesiones › Links de Clubes). */
+interface LinkClub {
+  id: string;
+  nombre: string;
+  /** 0 = domingo … 6 = sábado, como `Date.getDay()`. */
+  diaSemana: number;
+  horario: string;
+  link: string;
+}
+
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"] as const;
 
 /** Aforo por defecto del evento interno: no cuelga de un salón del que heredar cupo. */
@@ -125,6 +135,8 @@ export type EventoEditable =
       /** Club de una tanda semanal: se puede editar esa sesión o toda la tanda. */
       tanda: { id: string; inicio: string; fin: string; futuras: number } | null;
       apertura: AperturaEvento;
+      /** Club con link propio (Links de Clubes) en vez de la sala del advisor. */
+      linkClubId: string | null;
     }
   | {
       clase: "admin";
@@ -299,6 +311,17 @@ export function NuevoEventoModal({
   const tandaEditada = editar?.clase === "suelto" ? editar.tanda : null;
   const [todaLaTanda, setTodaLaTanda] = useState(false);
   const esTanda = !esAdmin && tipo === "CLUB" && editar === undefined;
+  // "Link diferente al del Advisor": solo Club; se elige de Links de Clubes
+  // entre los del día de la semana de la fecha.
+  const esClub = !esAdmin && tipo === "CLUB";
+  const [linksClub, setLinksClub] = useState<LinkClub[]>([]);
+  const linkInicial = editar?.clase === "suelto" ? editar.linkClubId : null;
+  const [linkPropio, setLinkPropio] = useState(linkInicial !== null);
+  const [linkClubId, setLinkClubId] = useState(linkInicial ?? "");
+  const diaFecha = fecha !== "" ? new Date(`${fecha}T12:00:00`).getDay() : -1;
+  const linksDelDia = linksClub.filter((l) => l.diaSemana === diaFecha);
+  const linkElegido = linksDelDia.find((l) => l.id === linkClubId) ?? null;
+  const usaLinkClub = esClub && linkPropio;
 
   const cargarGuias = useCallback(async () => {
     const res = await apiFetch("/api/scheduling/eventos");
@@ -308,8 +331,10 @@ export function NuevoEventoModal({
       tiposAdmin: TipoAdmin[];
       duracionAdmin: { min: number; max: number };
       duracionesTaller: number[];
+      linksClub: LinkClub[];
     };
     setGuias(d.guias);
+    setLinksClub(d.linksClub);
     setTiposAdmin(d.tiposAdmin);
     if (esAdmin && d.tiposAdmin.length > 0) {
       setTipo((actual) =>
@@ -424,7 +449,10 @@ export function NuevoEventoModal({
         hora !== "" &&
         (salonFijo || salonPrincipal !== "" || salonesFiltrados.length > 0) &&
         guiaUserId !== "" &&
-        (!esTanda || (tandaInicio !== "" && tandaFin !== ""));
+        (!esTanda || (tandaInicio !== "" && tandaFin !== "")) &&
+        (!usaLinkClub || linkElegido !== null);
+  /** El link que se manda: el elegido si es un Club con link propio; si no, ninguno. */
+  const linkEnviado = usaLinkClub ? (linkElegido?.id ?? null) : null;
   const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   async function crear() {
@@ -460,6 +488,7 @@ export function NuevoEventoModal({
               observaciones: observaciones.trim() === "" ? null : observaciones,
               apertura,
               todaLaTanda: tandaEditada !== null && todaLaTanda,
+              linkClubId: linkEnviado,
             }
           : esAdmin
             ? {
@@ -500,6 +529,7 @@ export function NuevoEventoModal({
                 observaciones: observaciones.trim() === "" ? null : observaciones,
                 apertura,
                 tanda: esTanda ? { inicio: tandaInicio, fin: tandaFin } : null,
+                linkClubId: linkEnviado,
               };
       const base = esWelcome
         ? "/api/scheduling/welcomes"
@@ -987,17 +1017,85 @@ export function NuevoEventoModal({
             </div>
           )}
 
-          {/* El Zoom no se escribe: se hereda del guía. */}
+          {/* Club: "Link diferente al del Advisor", de la tabla Links de Clubes y
+              solo los del día de la semana de la fecha. */}
+          {esClub && (
+            <div
+              style={{
+                padding: "0.7rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1px solid #c5cae9",
+                background: "#f5f6ff",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <label
+                style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 700 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={linkPropio}
+                  onChange={(e) => setLinkPropio(e.target.checked)}
+                />
+                Link diferente al del Advisor
+              </label>
+              {linkPropio && (
+                <>
+                  <select
+                    aria-label="Link del Club"
+                    value={linkElegido?.id ?? ""}
+                    onChange={(e) => setLinkClubId(e.target.value)}
+                    style={campo}
+                  >
+                    <option value="">
+                      {linksDelDia.length === 0
+                        ? `No hay links para los ${diaFecha >= 0 ? (DIAS_SEMANA[diaFecha] ?? "") : "—"}`
+                        : "Seleccionar link"}
+                    </option>
+                    {linksDelDia.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.nombre} · {l.horario}
+                      </option>
+                    ))}
+                  </select>
+                  <span
+                    style={{ fontSize: "0.78rem", color: "var(--texto-suave)", lineHeight: 1.45 }}
+                  >
+                    {linkElegido !== null ? (
+                      <>
+                        Enlace:{" "}
+                        <strong style={{ wordBreak: "break-all" }}>{linkElegido.link}</strong>
+                      </>
+                    ) : (
+                      <>
+                        Se ofrecen los links de los{" "}
+                        <strong>{diaFecha >= 0 ? DIAS_SEMANA[diaFecha] : "—"}</strong> (el día de la
+                        fecha del Club). Se cargan en Sesiones › Links de Clubes.
+                      </>
+                    )}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* El Zoom no se escribe: se hereda del guía (o del link del Club). */}
           <div
             style={{
               padding: "0.6rem 0.8rem",
               borderRadius: "0.6rem",
               background: "#fafbfe",
               fontSize: "0.85rem",
+              ...(usaLinkClub && { opacity: 0.45, textDecoration: "line-through" }),
             }}
+            aria-disabled={usaLinkClub}
           >
-            <span style={{ fontWeight: 700 }}>🔗 Link de Zoom:</span>{" "}
-            {guia === null ? (
+            <span style={{ fontWeight: 700 }}>🔗 Link de Zoom del advisor:</span>{" "}
+            {usaLinkClub ? (
+              <span>no se usa: el Club va con su propio link</span>
+            ) : guia === null ? (
               <span style={{ color: "var(--texto-suave)" }}>elige un guía para verlo</span>
             ) : guia.zoomUrl !== null && guia.zoomUrl !== "" ? (
               <span>{guia.zoomUrl}</span>

@@ -386,7 +386,11 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
        LEFT JOIN identity_perfil gpf ON gpf.user_id = gu.id
        LEFT JOIN LATERAL (
          SELECT s.starts_at, s.tipo::text AS tipo, s.duracion_min,
-                COALESCE(NULLIF(TRIM(sg.zoom_url), ''), scl.meeting_url) AS url,
+                -- El link propio del Club manda (SQL_LINK_CLUB de scheduling, que
+                -- people no puede importar); si no, la sala del guía o la del salón.
+                COALESCE((SELECT NULLIF(TRIM(lc.link), '') FROM scheduling_link_club lc
+                           WHERE lc.id = s.link_club_id),
+                         NULLIF(TRIM(sg.zoom_url), ''), scl.meeting_url) AS url,
                 COALESCE(NULLIF(TRIM(CONCAT_WS(' ', sg.nombres, sg.apellidos)), ''),
                          NULLIF(TRIM(CONCAT_WS(' ', spf.nombres, spf.apellidos)), ''),
                          su.username) AS guia

@@ -173,6 +173,15 @@ export {
   SQL_SESION_CANCELADA,
 } from "./application/cancelacion";
 export type { Cancelacion, FilaCancelacion, EstadoCancelacion } from "./application/cancelacion";
+export {
+  listarLinksClub,
+  crearLinkClub,
+  editarLinkClub,
+  eliminarLinkClub,
+} from "./application/link-club";
+export type { LinkClub } from "./application/link-club";
+export { DIAS_SEMANA } from "./domain/link-club";
+export { SQL_LINK_CLUB } from "./infrastructure/scheduling-repository";
 export { sesionesServicio } from "./application/servicio";
 export type { SesionServicio, EstadoSesionServicio } from "./application/servicio";
 export {

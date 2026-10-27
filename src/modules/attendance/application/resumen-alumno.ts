@@ -1,3 +1,4 @@
+import { SQL_LINK_CLUB } from "@/modules/scheduling";
 import { queryOne, queryRows } from "@/platform/db/query";
 
 /** Resumen de asistencia y agenda del propio niño (para su panel). */
@@ -143,8 +144,10 @@ export async function agendaProximas(
             COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''),
                      NULLIF(TRIM(CONCAT_WS(' ', gp.nombres, gp.apellidos)), ''),
                      gu.username) AS guia,
-            -- La sala del guía de ESA sesión (un reemplazo dicta desde la suya).
-            COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url) AS "meetingUrl"
+            -- El link propio del Club; si no, la sala del guía de ESA sesión (un
+            -- reemplazo dicta desde la suya) y, si no, la del salón.
+            COALESCE(${SQL_LINK_CLUB("s")}, NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url)
+              AS "meetingUrl"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        -- El guía de la SESIÓN (reemplazo de un día, evento suelto) y, si no

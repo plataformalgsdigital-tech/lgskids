@@ -11,6 +11,7 @@ import {
   crearEvento,
   salonesDelAlcance,
   guiasConZoom,
+  listarLinksClub,
 } from "@/modules/scheduling";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
@@ -32,6 +33,8 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     tiposAdmin: TIPOS_EVENTO_ADMIN,
     duracionAdmin: { min: DURACION_ADMIN_MIN, max: DURACION_ADMIN_MAX },
     duracionesTaller: DURACIONES_TALLER,
+    // Links de Clubes ACTIVOS: el formulario ofrece los del día de la fecha.
+    linksClub: (await listarLinksClub()).filter((l) => l.activo),
   });
 });
 
@@ -64,6 +67,8 @@ const crearSchema = z.object({
   guiaUserId: z.uuid(),
   observaciones: z.string().max(1000).nullish(),
   apertura: ESQUEMA_APERTURA.optional(),
+  // Solo Club: "Link diferente al del Advisor", de la tabla Links de Clubes.
+  linkClubId: z.uuid().nullish(),
 });
 
 /** POST — crea el evento (uno por salón si se comparte entre cursos). */
@@ -88,6 +93,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
     guiaUserId: body.guiaUserId,
     observaciones: body.observaciones ?? null,
     ...(body.apertura !== undefined && { apertura: body.apertura }),
+    linkClubId: body.linkClubId ?? null,
     ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
   });
   return json(resultado, { status: 201 });

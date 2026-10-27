@@ -124,6 +124,9 @@ export const OPCIONES_MENU = [
   ]),
   op("menu.sesiones", "op.sesiones.suspensiones", "Suspensiones", ["salones.gestionar"]),
   op("menu.sesiones", "op.sesiones.feriados", "Feriados", ["salones.gestionar"]),
+  op("menu.sesiones", "op.sesiones.links_clubes", "Links de Clubes: crear, editar y desactivar", [
+    "eventos.crear",
+  ]),
 
   // ── Académica › Mantenimiento Académico ───────────────────────────────
   op("menu.mantenimiento", "op.mant.contenido", "Gestión de Contenido", ["catalogo.ver"]),
