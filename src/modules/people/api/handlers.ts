@@ -127,7 +127,7 @@ export const detalleNinoHandler = handlerWithAuth(async (_request, auth, context
   // solo pinta el botón; la ruta de la clave lo vuelve a exigir.
   return json({
     nino: await obtenerDetalleNino(id),
-    puedeVerClaves: profile.esSuperadmin,
+    puedeVerClaves: profile.puedeVerClaves,
     // El botón de WhatsApp: la ruta del envío lo vuelve a exigir.
     // Las opciones de la ficha (Roles › Operación › Kids).
     puedeEnviarMensajes: profile.hasPermission("op.kids.whatsapp_acceso"),

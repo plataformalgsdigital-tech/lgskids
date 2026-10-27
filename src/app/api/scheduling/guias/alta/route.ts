@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PERMISOS, ROLES, getAccessProfile } from "@/modules/access";
+import { PERMISOS, ROLES, exigirPuedeOtorgarRol, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
 import { MIMES_FOTO_GUIA, crearGuia } from "@/modules/scheduling";
 import { ValidationError } from "@/platform/errors";
@@ -35,7 +35,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
   profile.requireOpcion("op.usuarios.guia");
-  profile.requirePuedeOtorgarRol(ROLES.GUIA);
+  await exigirPuedeOtorgarRol(profile, ROLES.GUIA);
 
   const form = await request.formData().catch(() => null);
   if (form === null) throw new ValidationError("Envía el formulario como multipart/form-data.");

@@ -52,9 +52,26 @@ describe("quién administra la cuenta de quién (clave, 'debe cambiar clave')", 
   });
 
   it("un coordinador no puede restablecer la clave de un admin (y entrar como él)", () => {
-    expect(() => coordinador.requirePuedeGestionarCuentaDe(["alumno"])).not.toThrow();
-    expect(() => coordinador.requirePuedeGestionarCuentaDe(["admin"])).toThrow(ForbiddenError);
-    expect(() => admin.requirePuedeGestionarCuentaDe(["superadmin"])).toThrow(ForbiddenError);
-    expect(() => superadmin.requirePuedeGestionarCuentaDe(["superadmin"])).not.toThrow();
+    const de = (rol: string) => perfil(rol, []);
+    expect(() => coordinador.requirePuedeGestionarCuentaDe(de("alumno"))).not.toThrow();
+    expect(() => coordinador.requirePuedeGestionarCuentaDe(de("admin"))).toThrow(ForbiddenError);
+    expect(() => admin.requirePuedeGestionarCuentaDe(de("superadmin"))).toThrow(ForbiddenError);
+    expect(() => superadmin.requirePuedeGestionarCuentaDe(de("superadmin"))).not.toThrow();
+  });
+});
+
+describe("«Ver clave» (usuarios.ver_clave)", () => {
+  const conClave = perfil("servicio", ["usuarios.ver_clave"]);
+
+  it("lo tiene el superadmin por rol y otro rol solo si se lo marcaron", () => {
+    expect(superadmin.puedeVerClaves).toBe(true);
+    expect(admin.puedeVerClaves).toBe(false);
+    expect(conClave.puedeVerClaves).toBe(true);
+  });
+
+  it("la cuenta de quien ve claves solo la administra un superadmin", () => {
+    // Si no, un admin le restablecería la clave, entraría como él y vería claves.
+    expect(() => admin.requirePuedeGestionarCuentaDe(conClave)).toThrow(ForbiddenError);
+    expect(() => superadmin.requirePuedeGestionarCuentaDe(conClave)).not.toThrow();
   });
 });

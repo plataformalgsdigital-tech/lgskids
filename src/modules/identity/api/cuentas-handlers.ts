@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PERMISOS, ROLES, getAccessProfile } from "@/modules/access";
+import { PERMISOS, ROLES, exigirPuedeOtorgarRol, getAccessProfile } from "@/modules/access";
 import { ForbiddenError, ValidationError } from "@/platform/errors";
 import { handler, handlerWithAuth, json } from "@/platform/http/handler";
 import { crearUsuarioStaff } from "../application/crear-usuario";
@@ -35,7 +35,7 @@ async function idDe(context: Contexto): Promise<string> {
 async function exigirGestionarCuenta(actorId: string, userId: string) {
   const [actor, otro] = await Promise.all([getAccessProfile(actorId), getAccessProfile(userId)]);
   actor.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
-  actor.requirePuedeGestionarCuentaDe(otro.roleCodes);
+  actor.requirePuedeGestionarCuentaDe(otro);
   return actor;
 }
 
@@ -76,7 +76,7 @@ export const usuarioCrearHandler = handlerWithAuth(async (request, auth) => {
   }
   // El rol inicial pasa por la MISMA regla que asignarlo después: antes
   // `usuarios.gestionar` bastaba para crear un admin o un superadmin.
-  profile.requirePuedeOtorgarRol(body.roleCode);
+  await exigirPuedeOtorgarRol(profile, body.roleCode);
   const resultado = await crearUsuarioStaff({
     actorUserId: auth.userId,
     nombres: body.nombres,
@@ -113,7 +113,7 @@ export const usuariosListarHandler = handlerWithAuth(async (request, auth) => {
     limite: q.limit ?? 100,
     // Solo decide si la pantalla muestra "Ver clave"; el servidor lo vuelve a
     // exigir al consultar.
-    puedeVerClaves: profile.esSuperadmin,
+    puedeVerClaves: profile.puedeVerClaves,
   });
 });
 
@@ -196,15 +196,15 @@ export const usuarioRestablecerClaveHandler = handlerWithAuth(async (request, au
 });
 
 /**
- * GET /api/identity/users/[id]/clave — consulta la clave. SOLO el ROL
- * superadmin (ningún permiso editable en el panel la concede) y queda
+ * GET /api/identity/users/[id]/clave — consulta la clave: el superadmin o
+ * quien tenga `usuarios.ver_clave` (que solo un superadmin marca u otorga). Queda
  * auditada.
  */
 export const usuarioConsultarClaveHandler = handlerWithAuth(async (request, auth, context) => {
   const userId = await idDe(context);
   const profile = await getAccessProfile(auth.userId);
-  if (!profile.esSuperadmin) {
-    throw new ForbiddenError("Solo el superadmin puede consultar claves.");
+  if (!profile.puedeVerClaves) {
+    throw new ForbiddenError("No tienes permiso para ver claves.");
   }
   return json(
     await consultarClave({ actorUserId: auth.userId, userId, ip: clientIp(request) }),

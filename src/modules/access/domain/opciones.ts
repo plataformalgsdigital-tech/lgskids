@@ -305,6 +305,12 @@ export const OPCIONES_MENU = [
     'Restablecer clave, "cambiar al entrar" y solicitudes de clave',
     ["usuarios.gestionar"],
   ),
+  op(
+    "menu.usuarios",
+    "usuarios.ver_clave",
+    "Ver clave de las cuentas (solo un superadmin lo marca u otorga)",
+    [],
+  ),
   op("menu.usuarios", "op.usuarios.editar", "Editar datos de la cuenta", ["usuarios.gestionar"]),
   op("menu.usuarios", "op.usuarios.estado", "Inactivar y reactivar cuentas", [
     "usuarios.gestionar",

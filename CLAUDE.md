@@ -193,7 +193,8 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   **Ficha del niño** (`/panel/personas/[id]`, 2026-10-02): "Datos personales" va en
   tres líneas fijas —identidad · correo (dos columnas, porque el sintético es largo
   y se montaba sobre el teléfono), teléfono y plataforma · usuario y clave—. La
-  clave se ve con "Ver clave" SOLO si quien mira es superadmin (la respuesta trae
+  clave se ve con "Ver clave" SOLO si quien mira es superadmin o tiene
+  `usuarios.ver_clave` (la respuesta trae
   `puedeVerClaves` y `userId`; la ruta de la bóveda lo vuelve a exigir). El guía
   sale por su NOMBRE (`scheduling_guia`), no por el usuario generado.
   **El encabezado dice dónde va (2026-10-15)**: una línea "Curso · Nivel · Lección"
@@ -407,9 +408,17 @@ Migración `20260921100000_cuentas_usuario`.
     entorno: robar la base no alcanza. Sin llave, la bóveda queda apagada: no se
     guardan copias y "Ver clave" responde `BOVEDA_APAGADA`;
   - el login SIGUE verificando contra el hash argon2id; la copia nunca autentica;
-  - consultarla exige el ROL superadmin (`profile.esSuperadmin`), no un permiso.
-    Ningún permiso editable en el panel la concede, así que un admin con todos
-    los permisos tampoco la ve;
+  - consultarla exige el ROL superadmin **o el permiso `usuarios.ver_clave`**
+    (`profile.puedeVerClaves`; desde 2026-10-27, migración `20261027000000`, que lo
+    da SOLO al superadmin; la matriz del seed no se lo da al admin). Para que nadie
+    se lo dé a sí mismo hay tres frenos: solo un superadmin lo MARCA o lo QUITA en un
+    rol (`actualizarPermisosDeRol`), solo un superadmin OTORGA o quita un rol que lo
+    tenga (`exigirPuedeOtorgarRol`, que usan todas las puertas que dan roles), y la
+    CUENTA de quien lo tiene solo la administra un superadmin
+    (`requirePuedeGestionarCuentaDe(otro)`: si no, restablecerle la clave y entrar
+    como él daría el permiso). Sin marcarlo, un admin con todos los demás permisos
+    sigue sin ver claves. Pruebas: `otorgar-roles.test.ts` y
+    `ver-clave-integration.test.ts`;
   - cada consulta queda en la auditoría (`identity.clave_consultada`);
   - se guarda copia en el alta, en el restablecimiento y cuando el usuario cambia
     su propia clave (`changePassword`, vía `BovedaClavesPort`).

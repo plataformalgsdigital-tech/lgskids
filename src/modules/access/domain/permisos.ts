@@ -46,6 +46,14 @@ export const PERMISOS = {
    * y la matriz del seed no se lo da al admin. Se otorga a otro rol en el panel.
    */
   SESIONES_SOLICITAR_REPETICION: "sesiones.solicitar_repeticion",
+  /**
+   * "Ver clave" de cualquier cuenta (la bóveda, 2026-10-27). Antes era solo del
+   * ROL superadmin; ahora se puede marcar en otro rol, con tres frenos para que
+   * nadie se lo dé a sí mismo: solo un superadmin lo marca en un rol, solo un
+   * superadmin otorga un rol que lo tenga, y la cuenta de quien lo tiene solo la
+   * administra un superadmin. La matriz del seed no se lo da al admin.
+   */
+  USUARIOS_VER_CLAVE: "usuarios.ver_clave",
   /** Servicio › Casos de atención: ver la bandeja y los casos. */
   CASOS_VER: "casos.ver",
   /** Asignar, contactar, anotar, cerrar y abrir casos desde la bandeja. */
@@ -166,7 +174,9 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
   superadmin: [...Object.values(PERMISOS), ...CODIGOS_OP],
   // Todo, salvo lo que el negocio reservó por ahora al superadmin.
   admin: [
-    ...Object.values(PERMISOS).filter((p) => p !== PERMISOS.SESIONES_SOLICITAR_REPETICION),
+    ...Object.values(PERMISOS).filter(
+      (p) => p !== PERMISOS.SESIONES_SOLICITAR_REPETICION && p !== PERMISOS.USUARIOS_VER_CLAVE,
+    ),
     ...CODIGOS_OP,
   ],
   coordinador: conOpciones([

@@ -17,8 +17,8 @@ const USUARIO_SISTEMA = "sistema-lgs";
 /**
  * Administración de la CUENTA de otro usuario desde el panel. QUIÉN puede
  * hacerlo (según los roles del otro) lo decide la ruta con
- * `requirePuedeGestionarCuentaDe`; consultar la clave, además, es solo del
- * ROL superadmin (`esSuperadmin`).
+ * `requirePuedeGestionarCuentaDe`; consultar la clave, además, exige ser
+ * superadmin o tener `usuarios.ver_clave` (`puedeVerClaves`).
  */
 
 async function cuenta(userId: string): Promise<{ username: string }> {

@@ -14,7 +14,12 @@ export {
 } from "./application/get-access-profile";
 export { AccessProfile } from "./application/profile";
 export { asignarRol, asignarRolTx, quitarRol } from "./application/asignar-rol";
-export { crearRol, permisosDeRol, actualizarPermisosDeRol } from "./application/gestionar-roles";
+export {
+  crearRol,
+  permisosDeRol,
+  actualizarPermisosDeRol,
+  exigirPuedeOtorgarRol,
+} from "./application/gestionar-roles";
 export type { PermisosDeRol } from "./application/gestionar-roles";
 export {
   PERMISOS,

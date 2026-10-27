@@ -1,8 +1,9 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { withTransaction } from "@/platform/db/transaction";
-import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
-import { ROLES, SECCIONES_MENU } from "../domain/permisos";
-import { accessRepository, invalidateAllProfiles } from "./get-access-profile";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/platform/errors";
+import { PERMISOS, ROLES, SECCIONES_MENU } from "../domain/permisos";
+import { accessRepository, getAccessProfile, invalidateAllProfiles } from "./get-access-profile";
+import type { AccessProfile } from "./profile";
 import {
   getPermissionsCatalog,
   getRolePermissionCodes,
@@ -106,6 +107,23 @@ export async function permisosDeRol(roleCode: string): Promise<PermisosDeRol> {
   };
 }
 
+/**
+ * Lanza si `actor` no puede otorgar (o quitar) `roleCode`: la regla de siempre
+ * (`requirePuedeOtorgarRol`) y, si el rol lleva «Ver clave», ser superadmin.
+ * La usan TODAS las puertas que dan un rol.
+ */
+export async function exigirPuedeOtorgarRol(actor: AccessProfile, roleCode: string): Promise<void> {
+  actor.requirePuedeOtorgarRol(roleCode);
+  if (
+    !actor.esSuperadmin &&
+    (await getRolePermissionCodes(roleCode)).includes(PERMISOS.USUARIOS_VER_CLAVE)
+  ) {
+    throw new ForbiddenError(
+      `El rol '${roleCode}' puede ver claves: solo un superadmin lo otorga o lo quita.`,
+    );
+  }
+}
+
 /** Reemplaza los permisos del rol por los marcados. Auditado. */
 export async function actualizarPermisosDeRol(input: {
   actorUserId: string;
@@ -123,6 +141,17 @@ export async function actualizarPermisosDeRol(input: {
   for (const permiso of input.permisos) {
     if (!catalogo.has(permiso)) {
       throw new ValidationError(`Permiso desconocido: ${permiso}.`);
+    }
+  }
+  // "Ver clave" solo lo marca o lo quita un superadmin: con `roles.asignar`
+  // alguien se lo daría a su propio rol.
+  const teniaVerClave = (await getRolePermissionCodes(input.roleCode)).includes(
+    PERMISOS.USUARIOS_VER_CLAVE,
+  );
+  if (teniaVerClave !== input.permisos.includes(PERMISOS.USUARIOS_VER_CLAVE)) {
+    const actor = await getAccessProfile(input.actorUserId);
+    if (!actor.esSuperadmin) {
+      throw new ForbiddenError("Solo un superadmin puede marcar o quitar «Ver clave» en un rol.");
     }
   }
 

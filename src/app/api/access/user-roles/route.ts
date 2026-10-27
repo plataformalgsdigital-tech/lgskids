@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { PERMISOS, asignarRol, getAccessProfile, quitarRol } from "@/modules/access";
+import {
+  PERMISOS,
+  asignarRol,
+  exigirPuedeOtorgarRol,
+  getAccessProfile,
+  quitarRol,
+} from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
@@ -24,7 +30,7 @@ export const POST = handlerWithAuth(async (request, auth) => {
   const body = bodySchema.parse(await request.json());
   // `roles.asignar` no alcanza para TODO: la llave maestra solo la da otro
   // superadmin (antes un admin podía otorgársela a cualquiera).
-  profile.requirePuedeOtorgarRol(body.roleCode);
+  await exigirPuedeOtorgarRol(profile, body.roleCode);
   await asignarRol({
     actorUserId: auth.userId,
     userId: body.userId,
@@ -48,8 +54,8 @@ export const DELETE = handlerWithAuth(async (request, auth) => {
   ]);
   profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
   profile.requireOpcion("op.usuarios.roles");
-  profile.requirePuedeOtorgarRol(body.roleCode);
-  profile.requirePuedeGestionarCuentaDe(otro.roleCodes);
+  await exigirPuedeOtorgarRol(profile, body.roleCode);
+  profile.requirePuedeGestionarCuentaDe(otro);
   await quitarRol({
     actorUserId: auth.userId,
     userId: body.userId,

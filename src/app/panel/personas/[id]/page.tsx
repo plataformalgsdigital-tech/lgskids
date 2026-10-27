@@ -398,7 +398,7 @@ export default function DetalleNinoPage() {
                     "— sin login —"
                   ) : !puedeVerClaves ? (
                     <span style={{ color: "var(--texto-suave)", fontWeight: 400 }}>
-                      •••••• (solo superadmin)
+                      •••••• (sin permiso para ver claves)
                     </span>
                   ) : (
                     <span

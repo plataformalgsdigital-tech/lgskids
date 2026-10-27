@@ -128,7 +128,7 @@ export const buscarEstudiantesHandler = handlerWithAuth(async (request, auth) =>
     estudiantes: await buscarEstudiantes({ q, countryScope: auth.countryScope }),
     // Solo deciden qué botones ofrece la pantalla; el servidor lo vuelve a exigir.
     puedeAprobar: profile.hasPermission("op.contratos.aprobar"),
-    puedeVerClaves: profile.esSuperadmin,
+    puedeVerClaves: profile.puedeVerClaves,
   });
 });
 

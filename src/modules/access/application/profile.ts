@@ -85,6 +85,14 @@ export class AccessProfile {
     return this.roleCodes.includes(ROLES.SUPERADMIN);
   }
 
+  /**
+   * ¿Puede ver la clave de una cuenta (la bóveda)? El superadmin siempre; otro
+   * rol, solo si un superadmin le marcó `usuarios.ver_clave`.
+   */
+  get puedeVerClaves(): boolean {
+    return this.esSuperadmin || this.hasPermission(PERMISOS.USUARIOS_VER_CLAVE);
+  }
+
   private cumple(requisito: RequisitoOtorgar): boolean {
     if (requisito === "superadmin") return this.esSuperadmin;
     if (requisito === "roles.asignar") return this.hasPermission(PERMISOS.ROLES_ASIGNAR);
@@ -101,9 +109,15 @@ export class AccessProfile {
     }
   }
 
-  /** Lanza si no puede administrar la cuenta de alguien con esos roles. */
-  requirePuedeGestionarCuentaDe(rolesDelOtro: readonly string[]): void {
-    const requisito = requisitoParaGestionarCuenta(rolesDelOtro);
+  /**
+   * Lanza si no puede administrar la cuenta de `otro`. Quien puede ver claves
+   * cuenta como superadmin: restablecer su clave y entrar como él daría el
+   * permiso a quien no lo tiene.
+   */
+  requirePuedeGestionarCuentaDe(otro: AccessProfile): void {
+    const requisito: RequisitoOtorgar = otro.hasPermission(PERMISOS.USUARIOS_VER_CLAVE)
+      ? "superadmin"
+      : requisitoParaGestionarCuenta(otro.roleCodes);
     if (!this.cumple(requisito)) {
       throw new ForbiddenError("No puedes administrar la cuenta de este usuario.", {
         details: { requiere: requisito },
