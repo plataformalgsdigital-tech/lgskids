@@ -639,7 +639,10 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
   de niveles→Stages. El banner del curso ya no lleva texto (va en un encabezado
   aparte, 16:9) y hace lightbox al clic. **Mis próximas clases** vive en la columna
   derecha y muestra la **ventana de 14 días** (`agendaProximas(classroom, dias=14)`,
-  incluye clubes). **Pie** con soporte por WhatsApp (Soporte Usuario/Académico/
+  incluye clubes). **La clase EN CURSO sigue en la agenda hasta que TERMINA**
+  (2026-10-27, `starts_at + duracion_min > now()`): antes salía al empezar y el niño
+  perdía el enlace de Zoom en plena clase —"Sesión próxima" saltaba a la siguiente—;
+  prueba `attendance/tests/agenda-alumno-integration.test.ts`. **Pie** con soporte por WhatsApp (Soporte Usuario/Académico/
   Finanzas; números en la constante `SOPORTE`, hoy placeholder). El rótulo de arriba a
   la derecha dice **nivel · unidad · lección** (2026-09-23): las dos últimas van a la
   par —el nivel tiene 4 lecciones y el mapa 4 unidades, y la isla ya marca como vistas

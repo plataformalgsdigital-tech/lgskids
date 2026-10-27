@@ -126,7 +126,8 @@ export async function comentariosDeGuia(
 
 /**
  * Próximas sesiones del salón (agenda del niño) dentro de una ventana de días
- * —por defecto las DOS SEMANAS siguientes—, con el guía. Incluye TODOS los
+ * —por defecto las DOS SEMANAS siguientes—, con el guía, desde la que está EN
+ * CURSO (la que aún no termina, como la "Siguiente clase" de la ficha). Incluye TODOS los
  * tipos (sesiones y clubes/talleres); no filtra por tipo.
  */
 export async function agendaProximas(
@@ -155,7 +156,10 @@ export async function agendaProximas(
              OR EXISTS (SELECT 1 FROM scheduling_agendado a
                          WHERE a.child_person_id = $3 AND a.estado = 'ACTIVA'
                            AND a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at))
-        AND s.starts_at >= now()
+        -- La que está EN CURSO sigue en la agenda hasta que termina: la ventana
+        -- de Zoom permite entrar y reconectarse con la clase empezada, y
+        -- quitarla al empezar dejaba al niño sin el enlace en plena clase.
+        AND s.starts_at + make_interval(mins => s.duracion_min) > now()
         AND s.starts_at < now() + ($2 || ' days')::interval
       ORDER BY s.starts_at
       LIMIT 60`,
