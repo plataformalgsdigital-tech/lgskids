@@ -10,6 +10,7 @@ import {
 import { bootstrapIdentity } from "@/modules/identity";
 import { NotFoundError } from "@/platform/errors";
 import { handlerWithAuth } from "@/platform/http/handler";
+import { origenPublico } from "@/platform/http/origen";
 import { alcanceDelAlumno } from "../alcance";
 
 bootstrapIdentity();
@@ -54,6 +55,6 @@ export const GET = handlerWithAuth(async (request, auth, context) => {
   }
   return respuestaMaterial(id, material, {
     descargar: request.nextUrl.searchParams.get("descargar") === "1",
-    origen: request.nextUrl.origin,
+    origen: origenPublico(request),
   });
 });

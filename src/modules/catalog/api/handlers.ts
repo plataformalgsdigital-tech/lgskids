@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { descargarArchivo } from "@/modules/files";
 import { handler, handlerWithAuth, json } from "@/platform/http/handler";
+import { origenPublico } from "@/platform/http/origen";
 import { NotFoundError, ValidationError } from "@/platform/errors";
 import {
   arteAsignado,
@@ -570,9 +571,10 @@ export const materialEliminarHandler = handlerWithAuth(async (request, auth) => 
  *
  * El HTML sale con el puente inyectado y la CSP de la caja (origen opaco, sin
  * red, solo enmarcable por la plataforma). Su única salida es la ruta de SUS
- * videos, `<origen>/api/material/<id>/`: `origen` es el de la petición, para
- * que la CSP nombre el mismo sitio que ve el navegador (localhost, la IP de la
- * red o el dominio). El PDF, en línea o como descarga.
+ * videos y audios, `<origen>/api/material/<id>/`: `origen` es el que ve el
+ * navegador (`origenPublico`: localhost, la IP de la red o el dominio), NO
+ * `nextUrl.origin`, que detrás del proxy es el puerto del contenedor. El PDF,
+ * en línea o como descarga.
  * Los bytes de un id no cambian nunca —reemplazar crea otro archivo—, de ahí
  * la caché inmutable: 30 MB se bajan una vez por dispositivo.
  */
@@ -612,7 +614,7 @@ export const materialVerHandler = handlerWithAuth(async (request, auth, context)
   if (material === null) throw new NotFoundError("El material no existe.");
   return respuestaMaterial(id, material, {
     descargar: request.nextUrl.searchParams.get("descargar") === "1",
-    origen: request.nextUrl.origin,
+    origen: origenPublico(request),
   });
 });
 

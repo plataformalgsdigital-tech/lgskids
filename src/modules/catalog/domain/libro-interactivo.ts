@@ -35,8 +35,10 @@ import { PUENTE_VOZ } from "./voz-libro";
  * no le llegaría nunca. La versión viaja en la URL del libro (`?p=`) y cambia
  * la clave de la caché. Subirla cada vez que cambie `PUENTE_ALMACEN`.
  * 2 = voces del libro (2026-10-28).
+ * 3 = la CSP nombra el dominio público y no el puerto del contenedor: el libro
+ *     cacheado con la versión 2 bloqueaba sus audios (2026-10-28).
  */
-export const VERSION_PUENTE = "2";
+export const VERSION_PUENTE = "3";
 
 /** La URL del libro con la versión del puente (ver `VERSION_PUENTE`). */
 export function urlLibroConPuente(url: string): string {
