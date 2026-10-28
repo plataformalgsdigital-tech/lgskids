@@ -635,8 +635,10 @@ export async function editarEvento(input: {
     slotId: string | null;
     grupoId: string | null;
     tandaId: string | null;
+    linkClubId: string | null;
   }>(
-    `SELECT id, slot_id AS "slotId", grupo_id AS "grupoId", tanda_id AS "tandaId"
+    `SELECT id, slot_id AS "slotId", grupo_id AS "grupoId", tanda_id AS "tandaId",
+            link_club_id AS "linkClubId"
        FROM scheduling_session WHERE id = $1`,
     [input.sessionId],
   );
@@ -661,7 +663,14 @@ export async function editarEvento(input: {
   const antes: unknown[] = [];
   await withTransaction(async (tx) => {
     if (input.tipo === "CLUB" && input.linkClubId !== undefined && input.linkClubId !== null) {
-      await exigirLinkClubParaFecha(input.linkClubId, input.fecha, tx);
+      // El que ya tenía vale aunque se haya desactivado: cambiar el advisor (o la
+      // hora) de un Club con link propio no le cambia el link.
+      await exigirLinkClubParaFecha(
+        input.linkClubId,
+        input.fecha,
+        tx,
+        input.linkClubId === sesion.linkClubId,
+      );
     }
     // El evento y, si es compartido, sus hermanos de grupo. En "toda la tanda",
     // además todas las semanas FUTURAS de la tanda que no se hayan cerrado.

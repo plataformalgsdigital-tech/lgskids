@@ -128,11 +128,16 @@ export async function eliminarLinkClub(input: {
 /**
  * Exige que el link sirva para un Club en esa fecha (activo y del mismo día).
  * Lo usan crear y editar el evento, dentro de su transacción.
+ *
+ * `yaLoTenia`: el Club ya usaba ESE link. Entonces vale aunque se haya
+ * desactivado — desactivar solo deja de ofrecerlo a clubes nuevos; editar el
+ * Club (por ejemplo, cambiarle el advisor) no puede obligar a cambiarle el link.
  */
 export async function exigirLinkClubParaFecha(
   linkClubId: string,
   fecha: string,
   tx?: PoolClient,
+  yaLoTenia = false,
 ): Promise<void> {
   const link = await queryOne<{ nombre: string; diaSemana: number; activo: boolean }>(
     `SELECT nombre, dia_semana AS "diaSemana", activo FROM scheduling_link_club WHERE id = $1`,
@@ -140,6 +145,6 @@ export async function exigirLinkClubParaFecha(
     tx,
   );
   if (link === null) throw new NotFoundError("El link del Club no existe.");
-  const problema = problemaLinkParaFecha(link, fecha);
+  const problema = problemaLinkParaFecha({ ...link, activo: link.activo || yaLoTenia }, fecha);
   if (problema !== null) throw new ValidationError(problema);
 }

@@ -1907,7 +1907,12 @@ solo servía para completar la ficha.
   (`SQL_LINK_CLUB` en agenda, detalle, `getSessionInfo`, historial, panel del niño;
   copiado en la "Siguiente clase" de people, que no puede importar scheduling). Un
   link en uso no se borra (se desactiva) ni cambia de día si tiene sesiones por
-  delante. Pruebas: `link-club.test.ts` y `link-club-integration.test.ts`.
+  delante. **Cambiar el advisor** (Cambiar guía, editar, cubrir una cancelación): un
+  Club CON link propio lo conserva —el link vive en la sesión, no en el guía—; uno
+  SIN link toma la sala del advisor nuevo. Desactivar un link solo deja de
+  ofrecerlo a clubes NUEVOS: el Club que ya lo tenía lo conserva al editarse
+  (`exigirLinkClubParaFecha` con `yaLoTenia`, y el formulario lo sigue mostrando).
+  Pruebas: `link-club.test.ts` y `link-club-integration.test.ts`.
 - **Evento ADMINISTRATIVO** (`scheduling_evento_admin` + `…_guia`, `20260828000001`):
   reunión o capacitación cuya audiencia son GUÍAS. Vive en tabla propia a propósito:
   en `scheduling_session` arrastraría lista de matriculados, asistencia y progresión,

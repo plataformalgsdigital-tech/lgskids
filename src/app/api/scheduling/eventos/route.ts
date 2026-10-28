@@ -33,8 +33,9 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     tiposAdmin: TIPOS_EVENTO_ADMIN,
     duracionAdmin: { min: DURACION_ADMIN_MIN, max: DURACION_ADMIN_MAX },
     duracionesTaller: DURACIONES_TALLER,
-    // Links de Clubes ACTIVOS: el formulario ofrece los del día de la fecha.
-    linksClub: (await listarLinksClub()).filter((l) => l.activo),
+    // Links de Clubes: el formulario ofrece los ACTIVOS del día de la fecha, y
+    // el que ya tenía el Club que se edita aunque se haya desactivado.
+    linksClub: await listarLinksClub(),
   });
 });
 

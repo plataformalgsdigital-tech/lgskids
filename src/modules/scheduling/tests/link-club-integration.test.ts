@@ -5,7 +5,7 @@ import { execute, queryOne } from "@/platform/db/query";
 import { ConflictError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { crearEvento, editarEvento } from "../application/crear-evento";
-import { crearSalon } from "../application/gestion-salones";
+import { cambiarGuiaDeSesion, crearSalon } from "../application/gestion-salones";
 import { crearLinkClub, editarLinkClub, eliminarLinkClub } from "../application/link-club";
 import { detalleSesion } from "../infrastructure/scheduling-repository";
 
@@ -24,6 +24,8 @@ describe.runIf(RUN)("links de clubes (integración)", () => {
   let viernes: string;
   let sabado: string;
   const URL_VIERNES = `https://zoom.us/j/9${Date.now().toString().slice(-9)}`;
+  const guiaA = newId();
+  const guiaB = newId();
 
   beforeAll(async () => {
     actor = (
@@ -76,6 +78,7 @@ describe.runIf(RUN)("links de clubes (integración)", () => {
     await execute(`DELETE FROM scheduling_classroom WHERE id = $1`, [salon]);
     await execute(`DELETE FROM catalog_campaign WHERE id = $1`, [campaignId]);
     await execute(`DELETE FROM scheduling_link_club WHERE id = ANY($1)`, [[viernes, sabado]]);
+    await execute(`DELETE FROM identity_user WHERE id = ANY($1)`, [[guiaA, guiaB]]);
     await closePool();
   });
 
@@ -134,5 +137,77 @@ describe.runIf(RUN)("links de clubes (integración)", () => {
     // Sin uso, se borra.
     await eliminarLinkClub({ id: sabado, actorUserId: actor });
     sabado = viernes;
+  });
+
+  it("cambiar el advisor: con link propio el link se queda; sin él, el link cambia", async () => {
+    const zoomA = `https://zoom.us/j/7${Date.now().toString().slice(-9)}`;
+    const zoomB = `https://zoom.us/j/8${Date.now().toString().slice(-9)}`;
+    for (const [id, zoom] of [
+      [guiaA, zoomA],
+      [guiaB, zoomB],
+    ] as const) {
+      await execute(
+        `INSERT INTO identity_user (id, username, password_hash, updated_at)
+         VALUES ($1, $2, 'x', now())`,
+        [id, `it-linkclub-${id.slice(0, 8)}`],
+      );
+      await execute(`INSERT INTO scheduling_guia (guia_user_id, zoom_url) VALUES ($1, $2)`, [
+        id,
+        zoom,
+      ]);
+    }
+    const URL_CLUB = `https://zoom.us/j/6${Date.now().toString().slice(-9)}`;
+    const propio = (
+      await crearLinkClub({
+        actorUserId: actor,
+        nombre: "IT Club advisor",
+        diaSemana: 5,
+        horario: "18:00 - 19:00",
+        link: URL_CLUB,
+      })
+    ).id;
+    sabado = propio; // para que afterAll lo borre
+    const base = {
+      actorUserId: actor,
+      classroomIds: [salon],
+      tipo: "CLUB" as const,
+      fecha: "2027-02-12", // viernes
+      duracionMin: 60,
+      guiaUserId: guiaA,
+    };
+    const conLink = (await crearEvento({ ...base, horaLocal: "18:00", linkClubId: propio }))
+      .sesiones[0]?.id as string;
+    const sinLink = (await crearEvento({ ...base, horaLocal: "19:00" })).sesiones[0]?.id as string;
+    expect((await detalleSesion(conLink))?.salon.meetingUrl).toBe(URL_CLUB);
+    expect((await detalleSesion(sinLink))?.salon.meetingUrl).toBe(zoomA);
+
+    // "Cambiar guía" del modal.
+    await cambiarGuiaDeSesion({ actorUserId: actor, sessionId: conLink, guiaUserId: guiaB });
+    await cambiarGuiaDeSesion({ actorUserId: actor, sessionId: sinLink, guiaUserId: guiaB });
+    expect((await detalleSesion(conLink))?.salon.meetingUrl).toBe(URL_CLUB);
+    expect((await detalleSesion(sinLink))?.salon.meetingUrl).toBe(zoomB);
+
+    // Editar el Club para cambiarle el advisor, con el link ya DESACTIVADO: se conserva.
+    await editarLinkClub({
+      id: propio,
+      actorUserId: actor,
+      nombre: "IT Club advisor",
+      diaSemana: 5,
+      horario: "18:00 - 19:00",
+      link: URL_CLUB,
+      activo: false,
+    });
+    await editarEvento({
+      ...base,
+      sessionId: conLink,
+      horaLocal: "18:00",
+      guiaUserId: guiaA,
+      linkClubId: propio,
+    });
+    expect((await detalleSesion(conLink))?.salon.meetingUrl).toBe(URL_CLUB);
+    // Pero un Club nuevo ya no lo puede tomar.
+    await expect(
+      crearEvento({ ...base, horaLocal: "20:00", linkClubId: propio }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 });

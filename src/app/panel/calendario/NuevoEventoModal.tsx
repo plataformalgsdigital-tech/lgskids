@@ -41,6 +41,7 @@ interface LinkClub {
   diaSemana: number;
   horario: string;
   link: string;
+  activo: boolean;
 }
 
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"] as const;
@@ -319,7 +320,11 @@ export function NuevoEventoModal({
   const [linkPropio, setLinkPropio] = useState(linkInicial !== null);
   const [linkClubId, setLinkClubId] = useState(linkInicial ?? "");
   const diaFecha = fecha !== "" ? new Date(`${fecha}T12:00:00`).getDay() : -1;
-  const linksDelDia = linksClub.filter((l) => l.diaSemana === diaFecha);
+  // Los activos del día, más el que ya tenía el Club que se edita aunque se
+  // haya desactivado: cambiarle el advisor no puede obligar a cambiarle el link.
+  const linksDelDia = linksClub.filter(
+    (l) => l.diaSemana === diaFecha && (l.activo || l.id === linkInicial),
+  );
   const linkElegido = linksDelDia.find((l) => l.id === linkClubId) ?? null;
   const usaLinkClub = esClub && linkPropio;
 
@@ -1057,6 +1062,7 @@ export function NuevoEventoModal({
                     {linksDelDia.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.nombre} · {l.horario}
+                        {l.activo ? "" : " (desactivado: se conserva en este Club)"}
                       </option>
                     ))}
                   </select>
