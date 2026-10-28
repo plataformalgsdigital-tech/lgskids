@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
-import { abrirLibroEnPestana, type CajaLibro } from "@/ui/libro-pestana";
+import { abrirLibroEnPestana, type CajaLibro, type VocesLibro } from "@/ui/libro-pestana";
 import { ConOpcion } from "@/ui/ConOpcion";
 import { SoloSi } from "@/ui/SoloSi";
 
@@ -17,6 +17,10 @@ interface Resumen {
   subidoEn: string;
   /** Solo el interactivo: base con token de SUS videos. */
   videosBase?: string | null;
+  /** Solo el interactivo: su URL con la versión del puente. */
+  url?: string;
+  /** Solo el interactivo: audios de ElevenLabs e intervenciones. */
+  voces?: VocesLibro | null;
 }
 interface Casilla {
   parada: number;
@@ -119,11 +123,12 @@ function MaterialAlumnoPageContenido() {
   function verLibro(libro: Resumen) {
     if (estado === null) return;
     const abierto = abrirLibroEnPestana({
-      url: `/api/catalog/material/${libro.id}`,
+      url: libro.url ?? `/api/catalog/material/${libro.id}`,
       caja: estado.libro,
       claveProgreso: `lgs-material:equipo:${libro.id}`,
       videosBase: libro.videosBase ?? null,
       autorizacion: estado.autorizacionPrevia,
+      voces: libro.voces ?? null,
     });
     if (!abierto) {
       setMsg({

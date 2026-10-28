@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
-import { abrirLibroEnPestana, type CajaLibro } from "@/ui/libro-pestana";
+import { abrirLibroEnPestana, type CajaLibro, type VocesLibro } from "@/ui/libro-pestana";
 import { apiFetch, irACambiarClaveSiCorresponde } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 import { AgendarWelcomeModal } from "../panel/servicio/welcome/AgendarWelcomeModal";
@@ -256,6 +256,8 @@ interface MaterialAlumno {
     interactivoUrl: string | null;
     /** Base con token de los videos del libro (`videos/7-1.mp4` sale de ahí). */
     videosBase: string | null;
+    /** Audios de ElevenLabs e intervenciones de los personajes del libro. */
+    voces: VocesLibro | null;
     /** Unidades que su guía le abrió en clase (0 = Welcome). */
     misiones: { parada: number; etiqueta: string }[];
     /** Lo mismo, ya armado para que lo lea el libro. */
@@ -437,7 +439,13 @@ export default function MiPanelPage() {
    * por el puente (ver `@/ui/libro-pestana`), así que esta pestaña debe seguir
    * abierta para que se guarde.
    */
-  function abrirLibro(nivel: string, url: string, videosBase: string | null, autorizacion: string) {
+  function abrirLibro(
+    nivel: string,
+    url: string,
+    videosBase: string | null,
+    autorizacion: string,
+    voces: VocesLibro | null,
+  ) {
     if (material === null) return;
     setLibroMsg(
       abrirLibroEnPestana({
@@ -446,6 +454,7 @@ export default function MiPanelPage() {
         claveProgreso: claveProgresoLibro(material.alumno, nivel),
         videosBase,
         autorizacion,
+        voces,
       })
         ? null
         : "Tu navegador bloqueó la ventana del libro. Permite las ventanas emergentes de este sitio y vuelve a intentarlo.",
@@ -2742,6 +2751,7 @@ export default function MiPanelPage() {
                               n.interactivoUrl ?? "",
                               n.videosBase,
                               n.autorizacion,
+                              n.voces,
                             )
                           }
                           style={{

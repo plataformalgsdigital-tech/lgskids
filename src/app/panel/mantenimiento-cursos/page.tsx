@@ -80,6 +80,14 @@ const TARJETAS: Tarjeta[] = [
     op: "op.mant.videos",
   },
   {
+    titulo: "Voces del libro",
+    desc: "Audios de ElevenLabs para lo que lee el libro interactivo (guía, Simba, Rooky y Dodo) y las frases de los personajes por página.",
+    emoji: "🔊",
+    color: "var(--lgs-amarillo)",
+    href: "/panel/mantenimiento-cursos/voces",
+    op: "op.mant.voces",
+  },
+  {
     titulo: "Enlaces de juegos",
     desc: "Los juegos de cada unidad. El niño los abre al tocar “Unidad N” en el mapa de su isla.",
     emoji: "🎮",

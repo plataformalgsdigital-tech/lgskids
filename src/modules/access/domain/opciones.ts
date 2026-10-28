@@ -177,6 +177,15 @@ export const OPCIONES_MENU = [
   op("menu.mantenimiento", "op.mant.videos_subir", "Subir, publicar y borrar videos", [
     "catalogo.gestionar",
   ]),
+  op("menu.mantenimiento", "op.mant.voces", "Voces del libro (consulta y escucha)", [
+    "catalogo.ver",
+  ]),
+  op(
+    "menu.mantenimiento",
+    "op.mant.voces_generar",
+    "Generar voces (gasta créditos de ElevenLabs) e intervenciones de los personajes",
+    ["catalogo.gestionar"],
+  ),
   op("menu.mantenimiento", "op.mant.juegos", "Enlaces de juegos (consulta)", ["catalogo.ver"]),
   op("menu.mantenimiento", "op.mant.juegos_editar", "Ubicar los juegos en la lámina", [
     "catalogo.gestionar",

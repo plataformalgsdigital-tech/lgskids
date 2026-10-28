@@ -50,7 +50,17 @@ function leerProgreso(clave: string): Record<string, string> {
 }
 
 /**
- * El `name` con el que arranca el libro: `{v:2, datos, videos}` tras el prefijo.
+ * Las voces del libro, tal como las arma el servidor (`vocesParaLibro`): qué
+ * frases tienen audio y las intervenciones de los personajes. El panel solo
+ * las pasa.
+ */
+export interface VocesLibro {
+  disponibles: string[];
+  intervenciones: { pagina: number; texto: string; nombre: string; imagen: string }[];
+}
+
+/**
+ * El `name` con el que arranca el libro: `{v:2, datos, videos, voces}` tras el prefijo.
  *
  * Los espacios van escapados como ` `. El nombre de una ventana no debe
  * llevar espacios en blanco, y el progreso SÍ los tiene (el diario del niño es
@@ -62,12 +72,13 @@ export function nombreLibro(
   videosBase: string | null,
   /** Lo que el guía le abrió, ya armado por el servidor. */
   autorizacion: string | null,
+  voces: VocesLibro | null = null,
 ): string {
   const progreso = leerProgreso(claveProgreso);
   // La autorización manda SIEMPRE la del servidor: se pisa la que hubiera
   // quedado guardada de la vez anterior (el libro devuelve todo su almacén).
   if (autorizacion !== null) progreso[caja.claveAutorizaciones] = autorizacion;
-  const datos = JSON.stringify({ v: 2, datos: progreso, videos: videosBase });
+  const datos = JSON.stringify({ v: 2, datos: progreso, videos: videosBase, voces });
   return caja.prefijo + datos.replace(/ /g, "\\u0020");
 }
 
@@ -113,6 +124,8 @@ export function abrirLibroEnPestana(opciones: {
   videosBase: string | null;
   /** Unidades abiertas por el guía; null = no se entrega ninguna (vista previa). */
   autorizacion?: string | null;
+  /** Audios de ElevenLabs e intervenciones de los personajes. */
+  voces?: VocesLibro | null;
 }): boolean {
   const ventana = window.open(
     opciones.url,
@@ -121,6 +134,7 @@ export function abrirLibroEnPestana(opciones: {
       opciones.claveProgreso,
       opciones.videosBase,
       opciones.autorizacion ?? null,
+      opciones.voces ?? null,
     ),
   );
   if (ventana === null) return false;

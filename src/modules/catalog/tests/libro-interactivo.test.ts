@@ -153,8 +153,8 @@ describe("puente de almacenamiento", () => {
     almacen.setItem("k", "v");
     almacen.setItem("n", 5 as unknown as string); // localStorage guarda texto
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { k: "v", n: "5" } });
-    // La recarga conserva también la base de los videos.
-    expect(ventana["name"]).toBe(v2({ datos: { k: "v", n: "5" }, videos: base }));
+    // La recarga conserva también la base de los videos (y las voces).
+    expect(ventana["name"]).toBe(v2({ datos: { k: "v", n: "5" }, videos: base, voces: null }));
 
     almacen.removeItem("k");
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { n: "5" } });
@@ -171,7 +171,7 @@ describe("puente de almacenamiento", () => {
   it("si ya no hay panel, el libro sigue: el progreso queda en su window.name", () => {
     const { ventana, almacen } = montar(v2({ datos: {}, videos: null }), "solo");
     expect(() => almacen.setItem("k", "v")).not.toThrow();
-    expect(ventana["name"]).toBe(v2({ datos: { k: "v" }, videos: null }));
+    expect(ventana["name"]).toBe(v2({ datos: { k: "v" }, videos: null, voces: null }));
   });
 
   it("descarta lo que no sea texto y sobrevive a un window.name ajeno o roto", () => {

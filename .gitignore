@@ -63,3 +63,6 @@ prisma/*.db
 
 # TypeScript
 tsconfig.tsbuildinfo
+
+# Capturas del navegador de Playwright MCP (pueden traer páginas con sesión iniciada)
+/.playwright-mcp/

@@ -27,6 +27,22 @@
  * (la voz de Emma) sigue disponible.
  */
 
+import { PUENTE_VOZ } from "./voz-libro";
+
+/**
+ * Versión del puente. El libro se sirve con caché INMUTABLE (sus bytes no
+ * cambian), así que el navegador del niño no vuelve a pedirlo: un puente nuevo
+ * no le llegaría nunca. La versión viaja en la URL del libro (`?p=`) y cambia
+ * la clave de la caché. Subirla cada vez que cambie `PUENTE_ALMACEN`.
+ * 2 = voces del libro (2026-10-28).
+ */
+export const VERSION_PUENTE = "2";
+
+/** La URL del libro con la versión del puente (ver `VERSION_PUENTE`). */
+export function urlLibroConPuente(url: string): string {
+  return `${url}${url.includes("?") ? "&" : "?"}p=${VERSION_PUENTE}`;
+}
+
 /** Prefijo de `window.name` con el que el panel entrega el progreso guardado. */
 export const PREFIJO_NOMBRE_LIBRO = "lgs-material:";
 
@@ -106,6 +122,8 @@ export function cspLibro(baseVideos: string | null): string {
  *   diseño llega autorizada: desde la caja el navegador NO manda la cookie de
  *   sesión. Solo se aceptan rutas del propio sitio (`/…`, nunca `//otro`), y la
  *   CSP (`base-uri`) lo vuelve a exigir.
+ * - `voces` (2026-10-28): qué frases tienen audio y las intervenciones de los
+ *   personajes; las usa `PUENTE_VOZ` (ver `voz-libro.ts`), que corre aquí mismo.
  * Un `window.name` antiguo (solo el progreso, sin `v`) se sigue entendiendo.
  *
  * `sessionStorage` también se sustituye (en memoria, sin guardar): en un origen
@@ -113,16 +131,17 @@ export function cspLibro(baseVideos: string | null): string {
  * try/catch se caería entero.
  */
 export const PUENTE_ALMACEN = `(function(){
-var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},d={},base=null;
+var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},d={},base=null,voces=null;
 function propio(o,k){return Object.prototype.hasOwnProperty.call(o,k);}
 function textos(o){var r={};if(o&&typeof o==="object"){for(var k in o){if(propio(o,k)&&typeof o[k]==="string"){r[k]=o[k];}}}return r;}
 try{var n=window.name;if(n&&n.indexOf(P)===0){var o=JSON.parse(n.slice(P.length));
-if(o&&o.v===2){d=textos(o.datos);var b=o.videos;if(typeof b==="string"&&b.charAt(0)==="/"&&b.charAt(1)!=="/"){base=b;}}
+if(o&&o.v===2){d=textos(o.datos);var b=o.videos;if(typeof b==="string"&&b.charAt(0)==="/"&&b.charAt(1)!=="/"){base=b;}
+if(o.voces&&typeof o.voces==="object"){voces=o.voces;}}
 else{d=textos(o);}}}catch(e){}
 if(base){try{var e=document.createElement("base");e.href=base;var h=document.head||document.documentElement;h.insertBefore(e,h.firstChild);}catch(x){}}
 function panel(){try{if(window.parent&&window.parent!==window)return window.parent;}catch(e){}
 try{if(window.opener)return window.opener;}catch(e){}return null;}
-function avisar(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base});}catch(e){}
+function avisar(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base,voces:voces});}catch(e){}
 try{var w=panel();if(w)w.postMessage({tipo:T,datos:d},"*");}catch(e){}}
 function almacen(m,guardar){var s={
 getItem:function(k){k=String(k);return propio(m,k)?m[k]:null;},
@@ -133,6 +152,7 @@ key:function(i){var ks=Object.keys(m);return i>=0&&i<ks.length?ks[i]:null;}};
 Object.defineProperty(s,"length",{get:function(){return Object.keys(m).length;}});return s;}
 try{Object.defineProperty(window,"localStorage",{value:almacen(d,true),configurable:true});}catch(e){}
 try{Object.defineProperty(window,"sessionStorage",{value:almacen({},false),configurable:true});}catch(e){}
+${PUENTE_VOZ}
 })();`;
 
 /** Hasta dónde se busca el <head>: está al principio, no en los 30 MB de base64. */

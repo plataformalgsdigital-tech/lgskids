@@ -113,6 +113,16 @@ export const MAPA_TABLAS: Record<string, EntradaMapa> = {
     para: "Tandas de clubs: un Club que se repite cada semana entre un inicio y un final; sus sesiones la referencian (tanda_id).",
     pantalla: "Calendario › Evento académico › Club",
   },
+  catalog_libro_voz: {
+    tema: "Contenido académico",
+    para: "Voces del libro: un audio de ElevenLabs por frase que lee el libro interactivo (por curso·nivel), con quién la dice y su estado (pendiente, generado, error).",
+    pantalla: "Mantenimiento Académico › Voces del libro",
+  },
+  catalog_libro_intervencion: {
+    tema: "Contenido académico",
+    para: "Frases de los personajes (Simba, Rooky, Dodo, la guía) que aparecen al abrir una página del libro interactivo: instrucciones y ánimo.",
+    pantalla: "Mantenimiento Académico › Voces del libro",
+  },
   scheduling_link_club: {
     tema: "Calendario y salones",
     para: "Links de Clubes: salas propias de los Clubs (nombre, día de la semana, horario y link), distintas de la del advisor; la sesión del Club la referencia (link_club_id).",

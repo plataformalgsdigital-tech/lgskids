@@ -972,6 +972,60 @@ videos}` (`videos` = base con token de sus videos; el formato viejo, solo `datos
     `video-libro-integration.test.ts` con ffmpeg REAL y clips sintéticos (compresión,
     publicar, reemplazar soltando el archivo, nunca agrandar, error legible, interrumpido).
     Usa YOUNGSTER·ULTIMATE y páginas ≥ 900 para no tocar material vivo.
+- **Voces del libro (2026-10-28, ElevenLabs)**: los libros de diseño leen en voz alta
+  con `speechSynthesis` y SOLO con "Microsoft Zira" (política `zira-only-v1`), que
+  existe únicamente en Windows: en iPad, Android o Mac no sonaban. Ahora cada frase se
+  genera UNA vez con ElevenLabs con la voz de quien la dice y el libro la reproduce
+  como MP3. Migración `20261028100000_voces_libro`; reglas en `catalog/domain/voz-libro.ts`.
+  - **Voces** (`VOZ_PERSONAJE`): guía/Emma = `vGfq3y2g8QTWjuUhrNYc` (Yuria, la que
+    pidió el negocio); Simba = Paula Paw `iukn3a1vSSNFmdi5NZS4`; Rooky = Teddy Twinkle
+    `XjGYkUkzth8BPs29fmcV`; Dodo = Berty `VE5rsMNTeE1frCCSXNIC`. Yuria y Berty NO están
+    disponibles en el plan Free. Cambiar una voz exige regenerar sus audios.
+    `ELEVENLABS_API_KEY` (secreto) y `ELEVENLABS_MODELO` (por defecto
+    `eleven_multilingual_v2`) en el entorno; sin clave no se genera nada.
+  - **Qué se genera** (`frasesDelLibro`): se evalúa el objeto `D` del libro en un
+    contexto VACÍO con tope de 2 s. JUNIOR (`D.units`+`D.pages`): la historia de cada
+    unidad entera y frase por frase (la escena la dice de a una), el `lead` de cada
+    página con la voz de su `who` (guide/simba/rooky/dodo), el "Say it!" y las tarjetas;
+    YOUNGSTER (`D.lessons`): vocabulario, diálogo sin nombres, lectura y `D.listening`.
+    Más los `speak('…')` escritos a mano. Lo que el libro arma en tiempo de ejecución
+    (`speak(word)`) no se genera y lo dice la voz del dispositivo. Rookie: Junior 233
+    frases/3.669 caracteres (+ intervenciones), Youngster 225/7.566.
+  - **Tablas**: `catalog_libro_voz` (una fila por curso·nivel·clave: personaje, texto,
+    origen LIBRO|INTERVENCION, estado PENDIENTE|GENERADO|ERROR, `file_id`, voz y modelo)
+    y `catalog_libro_intervencion` (frases EXTRA de los personajes por página, sembradas
+    para JUNIOR·ROOKIE: 25 de instrucciones y ánimo en inglés A1).
+  - **La clave** de cada audio sale del TEXTO normalizado (FNV-1a ×2 → 16 hex,
+    `FUNCION_CLAVE_ES5`): la MISMA función, en ES5, la ejecutan el servidor (vía `vm`) y
+    el libro, así que no pueden separarse. Una frase repetida se genera una vez, con la
+    voz de quien aparece primero (los personajes van antes).
+  - **Dentro del libro** (`PUENTE_VOZ`, corre en el puente con `voces` del
+    `window.name`): sustituye `speechSynthesis` y `SpeechSynthesisUtterance`; si la
+    frase tiene audio suena `audios/<clave>.mp3` (la `<base>` con token de los videos lo
+    autoriza: `GET /api/material/[id]/t/[token]/audios/[clave].mp3`, sin sesión, mismo
+    token), si no, la voz en inglés del DISPOSITIVO. `getVoices()` presenta una voz
+    llamada "Microsoft Zira" porque es lo único que los libros aceptan: es un disfraz.
+    **Intervenciones**: envuelve `openPage` (la función de los libros de Junior) al
+    cargar y, en la página (la que ve el niño = índice + 1), dibuja al personaje bajo el
+    `.content h2` con su dibujo de `D.assets` (la caja no admite imágenes de fuera) y
+    dice la frase. YOUNGSTER no tiene `openPage`: ahí solo cambia la voz.
+  - **`VERSION_PUENTE`** (`?p=` en la URL del libro, `urlLibroConPuente`): el HTML se
+    sirve con caché INMUTABLE, así que un puente nuevo no le llegaría al niño que ya
+    abrió el libro. **Súbela cada vez que cambie `PUENTE_ALMACEN`.**
+  - **Pantalla** Mantenimiento Académico › **Voces del libro**
+    (`/panel/mantenimiento-cursos/voces`; `op.mant.voces` con `catalogo.ver`, generar y
+    editar con `op.mant.voces_generar` + `catalogo.gestionar`): voces por personaje,
+    "Revisar el libro (sin gastar)" que registra lo que falta y dice cuántos caracteres
+    costará, "Generar voces" (`POST /api/catalog/material/voces`, `after()`, DE A UNA),
+    escuchar y ↻ regenerar cada audio, y el CRUD de las frases de los personajes
+    (`/api/catalog/material/intervenciones`). Lo GENERADO no se vuelve a pagar; si
+    ElevenLabs dice que no hay créditos, clave mala o voz no permitida, se DETIENE
+    (`ErrorElevenLabs.detener`) en vez de fallar frase por frase.
+  - Pruebas: `voz-libro.test.ts` (clave, frases, y la voz ejecutada sobre una ventana
+    falsa: MP3, respaldo del dispositivo, intervención) y `voz-libro-integration.test.ts`
+    (preparar, generar con la voz de cada uno, no repagar, cortar sin créditos).
+    Verificado con el libro REAL de Junior en Chrome: voz reconocida, burbuja de Rooky
+    en la página 1, MP3 del lead al pulsar "Escuchar", sin errores.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:
   la `nota_privada` de la misma fila es del equipo y NUNCA viaja al panel del niño.

@@ -59,7 +59,18 @@ export {
   MENSAJE_ALMACEN_LIBRO,
   CLAVE_AUTORIZACIONES_LIBRO,
   valorAutorizacionesLibro,
+  urlLibroConPuente,
 } from "./domain/libro-interactivo";
+export {
+  vocesLibroEstadoHandler,
+  vocesLibroAccionHandler,
+  vozLibroEscucharHandler,
+  vozLibroServirHandler,
+  intervencionCrearHandler,
+  intervencionEditarHandler,
+  intervencionEliminarHandler,
+} from "./api/voz-handlers";
+export { vocesParaLibro } from "./application/voz-libro";
 export {
   autorizarMisiones,
   autorizacionParaLibro,

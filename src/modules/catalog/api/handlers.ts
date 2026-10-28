@@ -27,9 +27,11 @@ import {
   PREFIJO_NOMBRE_LIBRO,
   cspLibro,
   inyectarPuente,
+  urlLibroConPuente,
   valorAutorizacionesLibro,
 } from "../domain/libro-interactivo";
 import { baseVideosLibro } from "../application/video-libro";
+import { vocesParaLibro } from "../application/voz-libro";
 import { PARADAS, paradaValida } from "../domain/unidad-mapa";
 import {
   descargarAvisoLoginPublico,
@@ -477,16 +479,26 @@ export const materialEstadoHandler = handlerWithAuth(async (_request, auth) => {
   return json({
     tamanoMaximo: TAMANO_MAXIMO_MATERIAL,
     cursos: Object.fromEntries(
-      Object.entries(cursos).map(([curso, filas]) => [
-        curso,
-        filas.map((f) => ({
-          ...f,
-          interactivo:
-            f.interactivo === null
-              ? null
-              : { ...f.interactivo, videosBase: baseVideosLibro(f.interactivo.id) },
-        })),
-      ]),
+      await Promise.all(
+        Object.entries(cursos).map(async ([curso, filas]) => [
+          curso,
+          await Promise.all(
+            filas.map(async (f) => ({
+              ...f,
+              interactivo:
+                f.interactivo === null
+                  ? null
+                  : {
+                      ...f.interactivo,
+                      // La URL con la versión del puente (ver `VERSION_PUENTE`).
+                      url: urlLibroConPuente(`/api/catalog/material/${f.interactivo.id}`),
+                      videosBase: baseVideosLibro(f.interactivo.id),
+                      voces: await vocesParaLibro(curso, f.nivel),
+                    },
+            })),
+          ),
+        ]),
+      ),
     ),
     libro: {
       prefijo: PREFIJO_NOMBRE_LIBRO,

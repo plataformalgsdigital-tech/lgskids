@@ -76,6 +76,15 @@ const envSchema = z.object({
   WHAPI_TOKEN: z.string().min(10).optional(),
 
   /**
+   * ElevenLabs (2026-10-28): genera los audios de los libros interactivos (la
+   * voz de la guía y de los personajes). Sin la clave no se genera nada y el
+   * libro usa la voz del dispositivo. El modelo es configurable para poder
+   * cambiar de calidad/precio sin desplegar código.
+   */
+  ELEVENLABS_API_KEY: z.string().min(10).optional(),
+  ELEVENLABS_MODELO: z.string().min(3).default("eleven_multilingual_v2"),
+
+  /**
    * Clave de servicio para el intake desde LGS (Fase B). Si está ausente, la
    * puerta de servicio queda CERRADA (todo 401). Mínimo 16 caracteres.
    */

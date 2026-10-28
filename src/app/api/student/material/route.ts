@@ -11,6 +11,8 @@ import {
   materialVigente,
   misionesAutorizadas,
   todasLasUnidades,
+  urlLibroConPuente,
+  vocesParaLibro,
 } from "@/modules/catalog";
 import { bootstrapIdentity } from "@/modules/identity";
 import { handlerWithAuth, json } from "@/platform/http/handler";
@@ -78,7 +80,11 @@ export const GET = handlerWithAuth(async (_request, auth) => {
       return {
         nivel,
         actual: nivel === actual,
-        interactivoUrl: interactivo !== null ? url(interactivo.id) : null,
+        // Con la versión del puente: el libro se cachea para siempre y sin ella
+        // un puente nuevo (p. ej. las voces) no le llegaría.
+        interactivoUrl: interactivo !== null ? urlLibroConPuente(url(interactivo.id)) : null,
+        // Qué frases tienen audio de ElevenLabs y las frases de los personajes.
+        voces: interactivo !== null ? await vocesParaLibro(curso, nivel) : null,
         // El camino abierto: el Welcome y todo lo que hay hasta la unidad más
         // alta que le abrió su guía (quien va en la 3 conserva la 1 y la 2).
         // La lista lleva el nombre ya escrito, para que el panel no repita la
