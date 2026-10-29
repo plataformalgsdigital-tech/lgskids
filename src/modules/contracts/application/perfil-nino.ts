@@ -14,6 +14,7 @@ import {
   welcomePorReagendar,
   welcomesDisponibles,
   type Agendado,
+  type ClubSemana,
   type ContextoNino,
   type OpcionAgenda,
   type TipoAgenda,
@@ -595,15 +596,16 @@ async function contextoPropio(childPersonId: string): Promise<ContextoNino | nul
 }
 
 /** Los clubes de la semana en curso que le corresponden al niño. */
-export async function clubesPropios(childPersonId: string): Promise<OpcionAgenda[]> {
+export async function clubesPropios(childPersonId: string): Promise<ClubSemana[]> {
   const nino = await contextoPropio(childPersonId);
   return nino === null ? [] : clubesDeLaSemana(nino);
 }
 
 /**
- * El NIÑO se inscribe en un club: la MISMA reserva de coordinación (regla, cupo
- * con bloqueo y choque), sin sobrecupo —un club lleno no admite a nadie más—.
- * Queda agendado por su propia cuenta.
+ * El NIÑO se inscribe en un club: la MISMA inscripción de coordinación (regla,
+ * cupo con bloqueo y choque), sin sobrecupo —un club lleno no admite a nadie
+ * más—. Queda en la lista de TODAS las sesiones que le quedan al club, inscrito
+ * por su propia cuenta; con 2 faltas seguidas sale (`retirarClubesPorFaltas`).
  */
 export async function inscribirClubPropio(input: {
   userId: string;
@@ -625,7 +627,7 @@ export async function inscribirClubPropio(input: {
   return { startsAt: r.startsAt };
 }
 
-/** El niño se borra de un club al que se inscribió (solo antes de que empiece). */
+/** El niño sale de un club al que se inscribió: libera las sesiones que faltan. */
 export async function cancelarClubPropio(input: {
   userId: string;
   childPersonId: string;

@@ -1,12 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { listaDeSesion } from "@/modules/attendance";
+import { listaDeSesion, marcarAsistencia } from "@/modules/attendance";
 import { crearCampania } from "@/modules/catalog";
 import { crearNino } from "@/modules/people";
-import { crearEvento, crearSalon, editarEvento } from "@/modules/scheduling";
+import {
+  crearEvento,
+  crearSalon,
+  editarEvento,
+  retirarClubesPorFaltas,
+} from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
-import { execute, queryOne } from "@/platform/db/query";
+import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { aprobarContrato, crearContrato } from "../application/gestion-contratos";
@@ -71,6 +76,7 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     pais?: "CL" | "CO" | "EC" | "PE" | null;
     nivel?: string | null;
     duracionMin?: number;
+    tanda?: { inicio: string; fin: string };
   }) => {
     const r = await crearEvento({
       actorUserId: actor,
@@ -81,6 +87,7 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       duracionMin: o.duracionMin ?? 60,
       limiteUsuarios: o.limite ?? null,
       nivel: o.nivel ?? null,
+      tanda: o.tanda ?? null,
       guiaUserId: actor,
       apertura: {
         abierto: o.abierto ?? true,
@@ -91,8 +98,60 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       },
     });
     const id = r.sesiones[0]!.id;
-    eventos.push(id);
+    eventos.push(...r.sesiones.map((s) => s.id));
     return id;
+  };
+
+  const sumarDiasA = (fecha: string, dias: number) => {
+    const d = new Date(`${fecha}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+  };
+
+  /** Inscripción del niño en la tanda de una sesión (la última, sea cual sea su estado). */
+  const inscripcionDe = (sessionId: string) =>
+    queryOne<{ id: string; estado: string; finMotivo: string | null }>(
+      `SELECT i.id, i.estado, i.fin_motivo AS "finMotivo"
+         FROM scheduling_club_inscripcion i
+         JOIN scheduling_session s ON s.tanda_id = i.tanda_id
+        WHERE s.id = $1 AND i.child_person_id = $2
+        ORDER BY i.inscrito_en DESC LIMIT 1`,
+      [sessionId, ninoId],
+    );
+
+  /** Las semanas de una tanda en las que el niño está en la lista. */
+  const semanasEnLista = async (sessionId: string) =>
+    (
+      await queryOne<{ n: number }>(
+        `SELECT count(*)::int AS n FROM scheduling_agendado g
+           JOIN scheduling_session s ON s.classroom_id = g.classroom_id AND s.starts_at = g.starts_at
+          WHERE g.child_person_id = $2 AND g.estado = 'ACTIVA'
+            AND s.tanda_id = (SELECT tanda_id FROM scheduling_session WHERE id = $1)`,
+        [sessionId, ninoId],
+      )
+    )?.n ?? 0;
+
+  /**
+   * Lleva al pasado las primeras `n` semanas de una tanda (sesión y agendados a
+   * la vez: el agendado va atado a salón + instante) para poder "pasarles lista".
+   */
+  const alPasado = async (sessionId: string, n: number): Promise<string[]> => {
+    const semanas = await queryRows<{ id: string; classroomId: string; startsAt: Date }>(
+      `SELECT s.id, s.classroom_id AS "classroomId", s.starts_at AS "startsAt"
+         FROM scheduling_session s
+        WHERE s.tanda_id = (SELECT tanda_id FROM scheduling_session WHERE id = $1)
+        ORDER BY s.starts_at LIMIT $2`,
+      [sessionId, n],
+    );
+    for (const [i, s] of semanas.entries()) {
+      const nuevo = new Date(Date.now() - (n - i) * 86_400_000);
+      await execute(
+        `UPDATE scheduling_agendado SET starts_at = $3 WHERE classroom_id = $1 AND starts_at = $2`,
+        [s.classroomId, s.startsAt, nuevo],
+      );
+      await execute(`UPDATE scheduling_session SET starts_at = $2 WHERE id = $1`, [s.id, nuevo]);
+    }
+    return semanas.map((s) => s.id);
   };
 
   const agendar = (tipo: "SESION" | "CLUB" | "TALLER" | "REGULAR", id: string, extra = {}) =>
@@ -184,6 +243,7 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
   });
 
   afterAll(async () => {
+    await execute(`DELETE FROM attendance_attendance WHERE child_person_id = $1`, [ninoId]);
     await execute(`DELETE FROM scheduling_agendado WHERE child_person_id = ANY($1)`, [
       [ninoId, apoderadoId],
     ]);
@@ -322,6 +382,92 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     expect((await clubesPropios(ninoId)).find((c) => c.id === esteClub)?.agendadoId).toBeNull();
   });
 
+  it("un CLUB de su salón es de inscritos: no está en la lista hasta que se inscribe", async () => {
+    const fecha = diaEn(new Date(Date.now() + 13 * 86_400_000));
+    const club = await nuevoEvento({ salon: salonA, fecha, hora: "07:30", abierto: false });
+    expect((await listaDeSesion(club)).lista.some((f) => f.childPersonId === ninoId)).toBe(false);
+    const op = await opcionesAgendaNino({
+      childPersonId: ninoId,
+      countryScope: null,
+      tipo: "CLUB",
+      fecha,
+    });
+    expect(op.find((o) => o.id === club)?.enSuLista).toBe(false);
+    await agendar("CLUB", club);
+    const lista = (await listaDeSesion(club)).lista;
+    const fila = lista.find((f) => f.childPersonId === ninoId);
+    // Inscrito de SU salón: está en la lista, pero no "viene de otro salón".
+    expect(fila?.agendado).toBe(false);
+    // Un club de su salón de OTRO nivel no le corresponde.
+    const deOtroNivel = await nuevoEvento({
+      salon: salonA,
+      fecha,
+      hora: "08:45",
+      abierto: false,
+      nivel: "ELITE",
+    });
+    await expect(agendar("CLUB", deOtroNivel)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("TANDA: inscribirse lo deja en todas las semanas; 2 faltas seguidas lo retiran", async () => {
+    const inicio = diaEn(new Date(Date.now() + 2 * 86_400_000));
+    const primera = await nuevoEvento({
+      salon: salonC,
+      fecha: inicio,
+      hora: "06:30",
+      tanda: { inicio, fin: sumarDiasA(inicio, 28) },
+    });
+    await agendar("CLUB", primera);
+    expect(await semanasEnLista(primera)).toBe(5);
+    expect((await inscripcionDe(primera))?.estado).toBe("ACTIVA");
+
+    // Pasan dos semanas y falta a las dos.
+    const [s1, s2] = await alPasado(primera, 2);
+    for (const s of [s1!, s2!]) {
+      await marcarAsistencia({
+        actorUserId: actor,
+        sessionId: s,
+        marcas: [{ childPersonId: ninoId, estado: "AUSENTE" }],
+      });
+    }
+    const ins = await inscripcionDe(primera);
+    expect(ins?.estado).toBe("RETIRADA");
+    expect(ins?.finMotivo).toContain("faltas seguidas");
+    // Las dos ya ocurridas quedan (historial); las 3 que faltan se liberan.
+    expect(await semanasEnLista(primera)).toBe(2);
+    expect((await listaDeSesion(s1!)).lista.some((f) => f.childPersonId === ninoId)).toBe(true);
+  });
+
+  it("una falta JUSTIFICADA corta la racha: no lo retira", async () => {
+    const inicio = diaEn(new Date(Date.now() + 3 * 86_400_000));
+    const primera = await nuevoEvento({
+      salon: salonC,
+      fecha: inicio,
+      hora: "05:45",
+      tanda: { inicio, fin: sumarDiasA(inicio, 21) },
+    });
+    await agendar("CLUB", primera);
+    const [s1, s2] = await alPasado(primera, 2);
+    await marcarAsistencia({
+      actorUserId: actor,
+      sessionId: s1!,
+      marcas: [{ childPersonId: ninoId, estado: "AUSENTE" }],
+    });
+    await marcarAsistencia({
+      actorUserId: actor,
+      sessionId: s2!,
+      marcas: [{ childPersonId: ninoId, estado: "JUSTIFICADO", justificacion: "Enfermo" }],
+    });
+    await retirarClubesPorFaltas([ninoId]);
+    expect((await inscripcionDe(primera))?.estado).toBe("ACTIVA");
+    // Salir por su cuenta libera las semanas que faltan, de una vez.
+    const { agendados } = await agendaDeNino(ninoId, null);
+    const proxima = agendados.find(
+      (x) => x.tipo === "CLUB" && x.startsAt > new Date().toISOString(),
+    );
+    expect(proxima).toBeDefined();
+  });
+
   it("el niño no puede borrar con Inscripción Clubes algo que no es un club", async () => {
     const { agendados } = await agendaDeNino(ninoId, null);
     const regular = agendados.find((x) => x.tipo === "REGULAR");
@@ -398,8 +544,16 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     const { lista } = await listaDeSesion(ev);
     expect(lista.some((f) => f.childPersonId === ninoId)).toBe(true);
 
+    // El de ESTE club: el niño ya tiene otros clubes inscritos de casos anteriores.
+    const movido = await queryOne<{ startsAt: Date }>(
+      `SELECT starts_at AS "startsAt" FROM scheduling_session WHERE id = $1`,
+      [ev],
+    );
     const { agendados } = await agendaDeNino(ninoId, null);
-    const delClub = agendados.find((x) => x.tipo === "CLUB");
+    const delClub = agendados.find(
+      (x) => x.tipo === "CLUB" && x.startsAt === movido?.startsAt.toISOString(),
+    );
+    expect(delClub).toBeDefined();
     await cancelarAgendadoNino({
       actorUserId: actor,
       childPersonId: ninoId,

@@ -11,6 +11,7 @@ import { procesarFinesDePausa, procesarVencimientos } from "../src/modules/contr
 import { sessionService } from "../src/modules/identity";
 import { notificarPremiosPendientes, procesarOutbox } from "../src/modules/notifications";
 import { recalculoGlobal } from "../src/modules/progression";
+import { retirarClubesPorFaltas } from "../src/modules/scheduling";
 import { closePool } from "../src/platform/db/pool";
 import { logger } from "../src/platform/logging/logger";
 
@@ -64,6 +65,16 @@ const tasks: ScheduledTask[] = [
     run: async () => {
       const ninos = await recalculoGlobal();
       logger.info("Recalculo global de progresión", { ninos });
+    },
+  },
+  {
+    // Clubes de inscritos: 2 faltas seguidas → retirado y cupo liberado. Pasar
+    // lista ya lo dispara; esto es la red por si una marca entró por otro lado.
+    name: "scheduling.clubes_retiro_faltas",
+    everyMinutes: 60,
+    run: async () => {
+      const { retiradas } = await retirarClubesPorFaltas();
+      if (retiradas > 0) logger.info("Niños retirados de clubes por faltas", { retiradas });
     },
   },
   {

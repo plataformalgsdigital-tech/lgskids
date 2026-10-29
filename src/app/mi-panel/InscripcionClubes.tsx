@@ -5,8 +5,9 @@ import { apiFetch } from "@/ui/api-fetch";
 
 /**
  * "Inscripción Clubes" del panel del niño (2026-10-29): los clubes de la SEMANA
- * EN CURSO que le corresponden —los de su salón y los abiertos a otros salones
- * cuya campaña, curso, país, salón y nivel coinciden con los suyos (o "Todos")—.
+ * EN CURSO que le corresponden —por la campaña, país, curso, salón y nivel con
+ * que se crearon (o "Todos")—. Inscribirse lo deja en la lista de TODAS las
+ * sesiones que le quedan al club; con 2 faltas seguidas sale y libera el cupo.
  * La regla la decide el servidor (`GET /api/student/clubes`); aquí solo se pinta.
  */
 interface Club {
@@ -25,6 +26,8 @@ interface Club {
   choque: string | null;
   nivel: string | null;
   observaciones: string | null;
+  tanda: { fin: string; restantes: number } | null;
+  retiradoPorFaltas: boolean;
 }
 
 const NIVEL: Record<string, string> = {
@@ -37,6 +40,13 @@ const NIVEL: Record<string, string> = {
 
 const dia = new Intl.DateTimeFormat("es", { weekday: "long", day: "numeric", month: "long" });
 const hora = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" });
+// El fin de la tanda es una FECHA (sin hora): se lee a mediodía UTC para no correrla.
+const finTanda = new Intl.DateTimeFormat("es", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 async function mensajeDeError(res: Response, porDefecto: string): Promise<string> {
   const cuerpo: { error?: { message?: string } } = await res.json().catch(() => ({}));
@@ -92,7 +102,11 @@ export function InscripcionClubesModal({
     if (!res.ok) {
       setError(await mensajeDeError(res, "No pudimos inscribirte."));
     } else {
-      setAviso(`¡Listo! Quedaste inscrito el ${dia.format(new Date(c.startsAt))}.`);
+      setAviso(
+        c.tanda !== null
+          ? `¡Listo! Quedaste inscrito desde el ${dia.format(new Date(c.startsAt))}, cada semana. Recuerda: si faltas dos veces seguidas, saldrás del club.`
+          : `¡Listo! Quedaste inscrito el ${dia.format(new Date(c.startsAt))}.`,
+      );
       onCambio();
     }
     cargar();
@@ -100,7 +114,12 @@ export function InscripcionClubesModal({
 
   async function cancelar(c: Club) {
     if (c.agendadoId === null) return;
-    if (!window.confirm("¿Quieres salir de este club?")) return;
+    if (
+      !window.confirm(
+        "¿Quieres salir de este club? Dejarás tu cupo en todas las sesiones que faltan.",
+      )
+    )
+      return;
     setOcupado(c.id);
     setError(null);
     setAviso(null);
@@ -167,6 +186,22 @@ export function InscripcionClubesModal({
             <h2 style={{ fontSize: "1.15rem", margin: 0 }}>📅 Inscripción Clubes</h2>
             <p style={{ margin: "0.15rem 0 0", fontSize: "0.82rem", color: "var(--texto-suave)" }}>
               Los clubes de esta semana para ti. La hora está en tu reloj.
+            </p>
+            <p
+              role="note"
+              style={{
+                margin: "0.5rem 0 0",
+                padding: "0.5rem 0.7rem",
+                borderRadius: "0.5rem",
+                background: "#fff8e1",
+                border: "1px solid #ffd54f",
+                fontSize: "0.82rem",
+                color: "#5d4300",
+              }}
+            >
+              ⚠️ Al inscribirte quedas en la lista de <b>todas las sesiones</b> que le quedan al
+              club. Si <b>faltas dos veces seguidas</b>, saldrás del club, tu cupo quedará libre y
+              tendrás que inscribirte de nuevo.
             </p>
           </div>
           <button
@@ -247,23 +282,27 @@ export function InscripcionClubesModal({
                               c.nivel !== null
                                 ? `Nivel ${NIVEL[c.nivel] ?? c.nivel}`
                                 : "Todos los niveles",
-                              c.propia ? "De tu salón" : null,
+                              c.tanda !== null
+                                ? `Cada semana hasta el ${finTanda.format(new Date(`${c.tanda.fin}T12:00:00Z`))}`
+                                : "Una sola sesión",
                               `${String(libres)} ${libres === 1 ? "cupo" : "cupos"}`,
                             ]
                               .filter((x) => x !== null)
                               .join(" · ")}
                           </div>
+                          {c.retiradoPorFaltas && (
+                            <div style={{ fontSize: "0.8rem", color: "#b71c1c", fontWeight: 700 }}>
+                              Saliste de este club por dos faltas seguidas. Puedes inscribirte de
+                              nuevo.
+                            </div>
+                          )}
                           {c.choque !== null && !c.enSuLista && (
                             <div style={{ fontSize: "0.8rem", color: "#b26a00", fontWeight: 700 }}>
                               A esa hora ya tienes {c.choque}.
                             </div>
                           )}
                         </div>
-                        {c.propia ? (
-                          <span style={{ color: "#1b5e20", fontWeight: 800, fontSize: "0.85rem" }}>
-                            ✓ Ya estás en la lista
-                          </span>
-                        ) : c.agendadoId !== null ? (
+                        {c.agendadoId !== null ? (
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <span
                               style={{ color: "#1b5e20", fontWeight: 800, fontSize: "0.85rem" }}

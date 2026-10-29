@@ -50,6 +50,19 @@ export const SALA_ZOOM = `COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url
 export const SQL_LINK_CLUB = (alias: string) =>
   `(SELECT NULLIF(TRIM(lc.link), '') FROM scheduling_link_club lc WHERE lc.id = ${alias}.link_club_id)`;
 
+/**
+ * Cuántos niños hay en la LISTA de la sesión `alias`: los matriculados de su
+ * salón —salvo en un CLUB, que es SOLO de inscritos (2026-10-29)— más los
+ * agendados en ella (salón + instante). Es también lo que ocupa su cupo.
+ */
+export const SQL_EN_LISTA = (alias: string) =>
+  `((CASE WHEN ${alias}.tipo = 'CLUB' THEN 0 ELSE
+      (SELECT count(*) FROM enrollment_enrollment e
+        WHERE e.classroom_id = ${alias}.classroom_id AND e.estado IN ('ACTIVA', 'RESERVADA')) END)
+    + (SELECT count(*) FROM scheduling_agendado ag
+        WHERE ag.classroom_id = ${alias}.classroom_id AND ag.starts_at = ${alias}.starts_at
+          AND ag.estado = 'ACTIVA'))::int`;
+
 /** Sala de UNA sesión `s`: su link de Club y, si no tiene, `SALA_ZOOM`. */
 const SALA_SESION = `COALESCE(${SQL_LINK_CLUB("s")}, ${SALA_ZOOM})`;
 
@@ -556,13 +569,13 @@ export async function agendaSesiones(
     `SELECT s.id, s.fecha::text AS fecha,
             to_char(s.starts_at AT TIME ZONE cl.timezone, 'HH24:MI') AS "horaLocal",
             s.tipo::text AS tipo, s.numero,
-            cl.id AS "classroomId", cl.nombre AS salon, cl.cupo,
+            cl.id AS "classroomId", cl.nombre AS salon,
+            COALESCE(s.limite_usuarios, cl.cupo) AS cupo,
             cu.tipo::text AS "cursoTipo", ca.nombre AS campania,
             ${NOMBRE_GUIA} AS guia, gu.id AS "guiaUserId",
             s.starts_at AS "startsAt", cl.holiday_country AS pais,
             ${SALA_SESION} AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
-            (SELECT count(*) FROM enrollment_enrollment e
-              WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA'))::int AS ocupados,
+            ${SQL_EN_LISTA("s")} AS ocupados,
             (SELECT count(*) FROM attendance_attendance a
               WHERE a.session_id = s.id AND a.estado = 'PRESENTE')::int AS asistieron
        FROM scheduling_session s

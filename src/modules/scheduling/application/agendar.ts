@@ -12,7 +12,11 @@ import {
   type TipoAgenda,
   type Tramo,
 } from "../domain/agenda";
-import { JOIN_NOMBRE_GUIA, NOMBRE_GUIA } from "../infrastructure/scheduling-repository";
+import {
+  JOIN_NOMBRE_GUIA,
+  NOMBRE_GUIA,
+  SQL_EN_LISTA,
+} from "../infrastructure/scheduling-repository";
 import { SQL_SESION_CANCELADA } from "./cancelacion";
 import { reservarWelcomeTx, welcomesDisponibles } from "./welcome";
 
@@ -92,14 +96,6 @@ async function salonDelNino(classroomId: string, q?: Queryable): Promise<SalonNi
   return s;
 }
 
-/** Ocupados de una sesión: los matriculados del salón (como el cupo) + los agendados. */
-const SQL_OCUPADOS = `(
-  (SELECT count(*) FROM enrollment_enrollment e
-    WHERE e.classroom_id = s.classroom_id AND e.estado IN ('ACTIVA', 'RESERVADA'))
-  + (SELECT count(*) FROM scheduling_agendado a
-      WHERE a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at AND a.estado = 'ACTIVA')
-)::int`;
-
 interface FilaSesion {
   id: string;
   tipo: string;
@@ -117,6 +113,7 @@ interface FilaSesion {
   agendadoId: string | null;
   nivel: string | null;
   observaciones: string | null;
+  tandaId: string | null;
 }
 
 /**
@@ -154,8 +151,10 @@ async function sesionesElegibles(
   } else {
     v.push(input.tipo);
     conds.push(`s.slot_id IS NULL`, `s.tipo::text = $${String(v.length)}`);
-    // Su propio salón, o abierto con un alcance que le coincide (NULL = Todos).
-    conds.push(`(s.classroom_id = $1 OR (s.abierto
+    // Su propio salón (un CLUB, además, de su nivel o de todos), o abierto con un
+    // alcance que le coincide (NULL = Todos).
+    conds.push(`((s.classroom_id = $1 AND (s.tipo <> 'CLUB' OR s.nivel IS NULL OR s.nivel = $6))
+       OR (s.abierto
        AND (s.alcance_campaign_id IS NULL OR s.alcance_campaign_id = $2)
        AND (s.alcance_curso IS NULL OR s.alcance_curso = $3)
        AND (s.alcance_pais IS NULL OR s.alcance_pais = $5)
@@ -187,7 +186,7 @@ async function sesionesElegibles(
             s.classroom_id AS "classroomId", s.grupo_id AS "grupoId", cl.nombre AS salon,
             cl.timezone, ca.nombre AS campania, ${NOMBRE_GUIA} AS guia,
             ${input.tipo === "REGULAR" ? "cl.cupo" : "COALESCE(s.limite_usuarios, cl.cupo)"} AS limite,
-            ${SQL_OCUPADOS} AS ocupados, s.nivel, s.observaciones,
+            ${SQL_EN_LISTA("s")} AS ocupados, s.nivel, s.observaciones, s.tanda_id AS "tandaId",
             (SELECT a.id FROM scheduling_agendado a
               WHERE a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at
                 AND a.child_person_id = $4 AND a.estado = 'ACTIVA' LIMIT 1) AS "agendadoId",
@@ -205,26 +204,41 @@ async function sesionesElegibles(
   );
 }
 
+/** Un evento COMPARTIDO (una fila por salón, mismo `grupo_id`) es UNA clase. */
+function porGrupo<T extends { id: string; grupoId: string | null }>(filas: T[]): T[][] {
+  const grupos = new Map<string, T[]>();
+  for (const f of filas) {
+    const clave = f.grupoId ?? f.id;
+    grupos.set(clave, [...(grupos.get(clave) ?? []), f]);
+  }
+  return [...grupos.values()];
+}
+
 /**
- * Agrupa las filas de un evento COMPARTIDO (una por salón, mismo `grupo_id`) en
- * una sola opción: es UNA clase. La fila representante es la del salón del niño
- * si está, si no la primera; cupo y ocupados suman los de todos sus salones.
+ * Cupo de UNA clase compartida. Una sesión suelta o un taller suma el de sus
+ * salones (cada salón trae a los suyos); un CLUB es de inscritos y su "Límite
+ * de usuarios" es el del club entero, repetido en cada salón: se toma una vez.
+ */
+function cupoDeGrupo(tipo: string, g: { limite: number; ocupados: number }[]) {
+  const ocupados = g.reduce((n, f) => n + f.ocupados, 0);
+  const limite =
+    tipo === "CLUB" ? Math.max(...g.map((f) => f.limite)) : g.reduce((n, f) => n + f.limite, 0);
+  return { limite, ocupados };
+}
+
+/**
+ * Agrupa las filas de un evento COMPARTIDO en una sola opción. La fila
+ * representante es la del salón del niño si está, si no la primera.
  */
 function agrupar(
   filas: FilaSesion[],
   tipo: Exclude<TipoAgenda, "WELCOME">,
   salonNino: string,
 ): (OpcionAgenda & { tramo: Tramo })[] {
-  const grupos = new Map<string, FilaSesion[]>();
-  for (const f of filas) {
-    const clave = f.grupoId ?? f.id;
-    grupos.set(clave, [...(grupos.get(clave) ?? []), f]);
-  }
-  return [...grupos.values()].map((g) => {
+  return porGrupo(filas).map((g) => {
     const propia = g.find((f) => f.classroomId === salonNino);
     const rep = propia ?? g[0]!;
-    const limite = g.reduce((n, f) => n + f.limite, 0);
-    const ocupados = g.reduce((n, f) => n + f.ocupados, 0);
+    const { limite, ocupados } = cupoDeGrupo(tipo, g);
     const agendadoId = g.find((f) => f.agendadoId !== null)?.agendadoId ?? null;
     return {
       tipo,
@@ -237,7 +251,8 @@ function agrupar(
       limite,
       ocupados,
       lleno: estaLleno(limite, ocupados),
-      enSuLista: propia !== undefined || agendadoId !== null,
+      // Un CLUB es de inscritos: dictarse en su salón no lo pone en la lista.
+      enSuLista: (tipo !== "CLUB" && propia !== undefined) || agendadoId !== null,
       propia: propia !== undefined,
       agendadoId,
       choque: null,
@@ -267,6 +282,8 @@ async function compromisos(
             s.starts_at AS "startsAt", s.duracion_min AS "duracionMin"
        FROM scheduling_session s JOIN scheduling_classroom cl ON cl.id = s.classroom_id
       WHERE s.classroom_id = $1 AND s.starts_at BETWEEN $3 AND $4
+        -- Un club de su salón no lo compromete si no se inscribió (ese va abajo).
+        AND s.tipo <> 'CLUB'
         AND NOT ${SQL_SESION_CANCELADA("s")}
      UNION ALL
      SELECT s.id, 'lo agendado en ' || cl.nombre, s.starts_at, s.duracion_min
@@ -380,14 +397,24 @@ async function conChoques(
   });
 }
 
+/** Un club de la semana, con lo que dura y cómo le fue al niño con él. */
+export interface ClubSemana extends OpcionAgenda {
+  /** Si es de una tanda: hasta cuándo va y cuántas sesiones le quedan. */
+  tanda: { fin: string; restantes: number } | null;
+  /** Su última inscripción en este club terminó RETIRADA por faltas. */
+  retiradoPorFaltas: boolean;
+}
+
 /**
  * Inscripción Clubes del panel del ALUMNO: los clubes de la SEMANA EN CURSO
  * (lunes a domingo en el reloj de su salón, de ahora en adelante) que le
- * corresponden — los de su salón y los ABIERTOS cuyo alcance y nivel coinciden
- * con los suyos—. La MISMA regla de Academic management › Agendar
- * (`sesionesElegibles`), así que la lista no ofrece algo que inscribir rechace.
+ * corresponden — los que se dictan en su salón (por la campaña, país, curso y
+ * salón con que se crearon) y son de su nivel o de todos, y los ABIERTOS a
+ * otros salones cuyo alcance coincide—. La MISMA regla de Academic management ›
+ * Agendar (`sesionesElegibles`), así que la lista no ofrece algo que inscribir
+ * rechace.
  */
-export async function clubesDeLaSemana(nino: ContextoNino): Promise<OpcionAgenda[]> {
+export async function clubesDeLaSemana(nino: ContextoNino): Promise<ClubSemana[]> {
   const salon = await salonDelNino(nino.classroomId);
   const filas = await sesionesElegibles(undefined, {
     salon,
@@ -396,7 +423,47 @@ export async function clubesDeLaSemana(nino: ContextoNino): Promise<OpcionAgenda
     tipo: "CLUB",
     semana: true,
   });
-  return conChoques(agrupar(filas, "CLUB", salon.classroomId), salon, nino.childPersonId);
+  const opciones = await conChoques(
+    agrupar(filas, "CLUB", salon.classroomId),
+    salon,
+    nino.childPersonId,
+  );
+  const extra = await queryRows<{
+    id: string;
+    fin: string | null;
+    restantes: number;
+    agendadoId: string | null;
+    retirado: boolean;
+  }>(
+    `SELECT s.id, t.fin::text AS fin,
+            (SELECT count(DISTINCT t2.starts_at)::int FROM scheduling_session t2
+              WHERE t2.tanda_id = s.tanda_id AND t2.starts_at > now()) AS restantes,
+            -- Inscrito en el club aunque ESTA semana se le haya saltado (chocaba).
+            (SELECT g.id FROM scheduling_club_inscripcion i
+               JOIN scheduling_agendado g ON g.inscripcion_id = i.id AND g.estado = 'ACTIVA'
+              WHERE i.child_person_id = $2 AND i.estado = 'ACTIVA'
+                AND (i.tanda_id = s.tanda_id OR i.sesion_id = s.id) AND g.starts_at > now()
+              ORDER BY g.starts_at LIMIT 1) AS "agendadoId",
+            COALESCE((SELECT i.estado = 'RETIRADA' FROM scheduling_club_inscripcion i
+                       WHERE i.child_person_id = $2
+                         AND (i.tanda_id = s.tanda_id OR i.sesion_id = s.id)
+                       ORDER BY i.inscrito_en DESC LIMIT 1), false) AS retirado
+       FROM scheduling_session s LEFT JOIN scheduling_tanda_club t ON t.id = s.tanda_id
+      WHERE s.id = ANY($1)`,
+    [opciones.map((o) => o.id), nino.childPersonId],
+  );
+  const porId = new Map(extra.map((e) => [e.id, e]));
+  return opciones.map((o) => {
+    const e = porId.get(o.id);
+    const agendadoId = o.agendadoId ?? e?.agendadoId ?? null;
+    return {
+      ...o,
+      agendadoId,
+      enSuLista: agendadoId !== null,
+      tanda: e?.fin != null ? { fin: e.fin, restantes: e.restantes } : null,
+      retiradoPorFaltas: agendadoId === null && e?.retirado === true,
+    };
+  });
 }
 
 export interface Agendado {
@@ -542,6 +609,17 @@ export async function agendarNino(input: {
         details: { tipo: "sobrecupo", limite: opcion.limite, ocupados: opcion.ocupados },
       });
     }
+    // Un CLUB no se agenda de a una sesión: se INSCRIBE en todas las que le quedan.
+    if (input.tipo === "CLUB") {
+      const r = await inscribirEnClubTx(tx, {
+        salon,
+        childPersonId: input.nino.childPersonId,
+        rep: filas.find((f) => f.id === opcion.id)!,
+        actorUserId: input.actorUserId,
+        sobrecupoPor,
+      });
+      return { startsAt: opcion.startsAt, sobrecupo: r.sobrecupo };
+    }
     // El niño queda en la sesión representante (la del grupo que se eligió).
     const rep = filas.find((f) => f.id === opcion.id)!;
     await execute(
@@ -578,7 +656,10 @@ export async function agendarNino(input: {
   return resultado;
 }
 
-/** Lo que se le agendó al niño fuera de su salón y todavía no ocurre. */
+/**
+ * Lo que se le agendó al niño fuera de su salón y todavía no ocurre. Un CLUB
+ * inscrito son muchas semanas: se muestra UNA vez, con la próxima.
+ */
 export async function agendadosDeNino(childPersonId: string): Promise<Agendado[]> {
   const filas = await queryRows<{
     id: string;
@@ -587,18 +668,25 @@ export async function agendadosDeNino(childPersonId: string): Promise<Agendado[]
     salon: string;
     vigente: boolean;
   }>(
-    `SELECT a.id, a.tipo, a.starts_at AS "startsAt", cl.nombre AS salon,
-            EXISTS (SELECT 1 FROM scheduling_session s
-                     WHERE s.classroom_id = a.classroom_id AND s.starts_at = a.starts_at) AS vigente
-       FROM scheduling_agendado a JOIN scheduling_classroom cl ON cl.id = a.classroom_id
-      WHERE a.child_person_id = $1 AND a.estado = 'ACTIVA' AND a.starts_at > now() - interval '1 day'
-      ORDER BY a.starts_at`,
+    `SELECT * FROM (
+       SELECT DISTINCT ON (COALESCE(a.inscripcion_id, a.id))
+              a.id, a.tipo, a.starts_at AS "startsAt", cl.nombre AS salon,
+              EXISTS (SELECT 1 FROM scheduling_session s
+                       WHERE s.classroom_id = a.classroom_id AND s.starts_at = a.starts_at) AS vigente
+         FROM scheduling_agendado a JOIN scheduling_classroom cl ON cl.id = a.classroom_id
+        WHERE a.child_person_id = $1 AND a.estado = 'ACTIVA'
+          AND a.starts_at > now() - interval '1 day'
+        ORDER BY COALESCE(a.inscripcion_id, a.id), a.starts_at
+     ) x ORDER BY x."startsAt"`,
     [childPersonId],
   );
   return filas.map((f) => ({ ...f, startsAt: new Date(f.startsAt).toISOString() }));
 }
 
-/** Cancela algo agendado (no se borra: queda quién y cuándo). */
+/**
+ * Cancela algo agendado (no se borra: queda quién y cuándo). Si es una semana de
+ * un CLUB inscrito, cancela la INSCRIPCIÓN: salen todas las semanas que faltan.
+ */
 export async function cancelarAgendado(input: {
   actorUserId: string;
   childPersonId: string;
@@ -611,20 +699,260 @@ export async function cancelarAgendado(input: {
   ip?: string | null;
 }): Promise<void> {
   const tipo = input.soloFuturoDeTipo ?? null;
-  const n = await execute(
-    `UPDATE scheduling_agendado
-        SET estado = 'CANCELADA', cancelado_por = $3, cancelado_en = now()
-      WHERE id = $1 AND child_person_id = $2 AND estado = 'ACTIVA'
-        AND ($4::text IS NULL OR (tipo::text = $4 AND starts_at > now()))`,
-    [input.agendadoId, input.childPersonId, input.actorUserId, tipo],
-  );
-  if (n === 0) throw new NotFoundError("No hay nada agendado con ese id.");
+  const inscripcionId = await withTransaction(async (tx) => {
+    const fila = await queryOne<{ inscripcionId: string | null }>(
+      `SELECT inscripcion_id AS "inscripcionId" FROM scheduling_agendado
+        WHERE id = $1 AND child_person_id = $2 AND estado = 'ACTIVA'
+          AND ($3::text IS NULL OR (tipo::text = $3 AND starts_at > now()))
+        FOR UPDATE`,
+      [input.agendadoId, input.childPersonId, tipo],
+      tx,
+    );
+    if (fila === null) throw new NotFoundError("No hay nada agendado con ese id.");
+    if (fila.inscripcionId !== null) {
+      await terminarInscripcionTx(tx, {
+        inscripcionId: fila.inscripcionId,
+        estado: "CANCELADA",
+        porUserId: input.actorUserId,
+        motivo: null,
+      });
+    } else {
+      await execute(
+        `UPDATE scheduling_agendado
+            SET estado = 'CANCELADA', cancelado_por = $2, cancelado_en = now()
+          WHERE id = $1`,
+        [input.agendadoId, input.actorUserId],
+        tx,
+      );
+    }
+    return fila.inscripcionId;
+  });
   await registrarAuditoria({
     actorUserId: input.actorUserId,
-    accion: "scheduling.agendado_cancelado",
+    accion:
+      inscripcionId !== null
+        ? "scheduling.club_inscripcion_cancelada"
+        : "scheduling.agendado_cancelado",
     entidad: "people_person",
     entidadId: input.childPersonId,
-    payload: { agendadoId: input.agendadoId },
+    payload: { agendadoId: input.agendadoId, inscripcionId },
     ip: input.ip ?? null,
   });
+}
+
+// —— Clubes de INSCRITOS (2026-10-29) ————————————————————————————————————
+
+/** Faltas SEGUIDAS (AUSENTE; la justificada no cuenta) que retiran de un club. */
+export const FALTAS_PARA_RETIRO = 2;
+
+interface SemanaClub {
+  id: string;
+  grupoId: string | null;
+  classroomId: string;
+  startsAt: string;
+  duracionMin: number;
+  limite: number;
+  ocupados: number;
+  /** Ya está agendado esa semana (en cualquiera de sus salones). */
+  yaEsta: boolean;
+}
+
+/**
+ * INSCRIBE al niño en un club: en la sesión elegida y, si es de una TANDA, en
+ * todas las semanas que le quedan. Cada semana es un `scheduling_agendado` con
+ * la inscripción, en el salón del niño si el club se dicta ahí y si no, en el
+ * mismo salón de la sesión elegida. Va dentro de la transacción de
+ * `agendarNino`, que ya comprobó regla, choque y cupo de la sesión elegida; aquí
+ * se bloquean y se miden las demás semanas: si alguna está llena, no se
+ * inscribe (salvo sobrecupo autorizado), y una semana que choca con algo suyo se
+ * salta.
+ */
+async function inscribirEnClubTx(
+  tx: Queryable,
+  input: {
+    salon: SalonNino;
+    childPersonId: string;
+    rep: FilaSesion;
+    actorUserId: string;
+    sobrecupoPor: string | null;
+  },
+): Promise<{ inscripcionId: string; semanas: number; sobrecupo: boolean }> {
+  const { rep } = input;
+  if (rep.tandaId !== null) {
+    const viva = await queryOne<{ id: string }>(
+      `SELECT id FROM scheduling_club_inscripcion
+        WHERE child_person_id = $1 AND tanda_id = $2 AND estado = 'ACTIVA'`,
+      [input.childPersonId, rep.tandaId],
+      tx,
+    );
+    if (viva !== null) throw new ConflictError("Ya está inscrito en ese club.");
+  }
+  // Las semanas: la elegida y, en una tanda, las que siguen.
+  const filas = await queryRows<SemanaClub>(
+    `SELECT s.id, s.grupo_id AS "grupoId", s.classroom_id AS "classroomId",
+            s.starts_at AS "startsAt", s.duracion_min AS "duracionMin",
+            COALESCE(s.limite_usuarios, cl.cupo) AS limite, ${SQL_EN_LISTA("s")} AS ocupados,
+            EXISTS (SELECT 1 FROM scheduling_agendado a
+                     WHERE a.child_person_id = $3 AND a.estado = 'ACTIVA'
+                       AND a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at) AS "yaEsta"
+       FROM scheduling_session s JOIN scheduling_classroom cl ON cl.id = s.classroom_id
+      WHERE s.tipo = 'CLUB' AND NOT ${SQL_SESION_CANCELADA("s")}
+        AND (s.id = $1 OR ($2::uuid IS NOT NULL AND s.tanda_id = $2 AND s.starts_at >= $4))
+      ORDER BY s.starts_at, cl.nombre
+      FOR UPDATE OF s`,
+    [rep.id, rep.tandaId, input.childPersonId, rep.startsAt],
+    tx,
+  );
+  const semanas = porGrupo(filas)
+    .map((g) => {
+      const elegida =
+        g.find((f) => f.classroomId === input.salon.classroomId) ??
+        g.find((f) => f.classroomId === rep.classroomId) ??
+        g[0]!;
+      return { elegida, g, ...cupoDeGrupo("CLUB", g), yaEsta: g.some((f) => f.yaEsta) };
+    })
+    .sort(
+      (a, b) => new Date(a.elegida.startsAt).getTime() - new Date(b.elegida.startsAt).getTime(),
+    );
+
+  const llena = semanas.find((s) => estaLleno(s.limite, s.ocupados));
+  if (llena !== undefined && input.sobrecupoPor === null) {
+    throw new ConflictError("Ese club ya no tiene cupos.", {
+      details: { tipo: "sobrecupo", limite: llena.limite, ocupados: llena.ocupados },
+    });
+  }
+
+  // Lo que ya tiene en todo el rango, para saltar las semanas que chocan.
+  const tiene =
+    semanas.length === 0
+      ? []
+      : await compromisos(
+          tx,
+          input.salon,
+          input.childPersonId,
+          new Date(new Date(semanas[0]!.elegida.startsAt).getTime() - DIA_MS),
+          new Date(new Date(semanas.at(-1)!.elegida.startsAt).getTime() + 2 * DIA_MS),
+        );
+
+  const inscripcionId = newId();
+  await execute(
+    `INSERT INTO scheduling_club_inscripcion
+       (id, child_person_id, tanda_id, sesion_id, classroom_id, inscrito_por,
+        sobrecupo_autorizado_por)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      inscripcionId,
+      input.childPersonId,
+      rep.tandaId,
+      rep.id,
+      rep.classroomId,
+      input.actorUserId,
+      llena !== undefined ? input.sobrecupoPor : null,
+    ],
+    tx,
+  );
+  let creadas = 0;
+  for (const s of semanas) {
+    if (s.yaEsta) continue;
+    const t = tramo(s.elegida.startsAt, s.elegida.duracionMin);
+    // La semana elegida ya se comprobó; en las demás, lo que choca se salta.
+    if (s.elegida.id !== rep.id && tiene.some((c) => seSolapan(c.tramo, t))) continue;
+    await execute(
+      `INSERT INTO scheduling_agendado
+         (id, classroom_id, starts_at, child_person_id, tipo, agendado_por,
+          sobrecupo_autorizado_por, inscripcion_id)
+       VALUES ($1, $2, $3, $4, 'CLUB', $5, $6, $7)`,
+      [
+        newId(),
+        s.elegida.classroomId,
+        s.elegida.startsAt,
+        input.childPersonId,
+        input.actorUserId,
+        estaLleno(s.limite, s.ocupados) ? input.sobrecupoPor : null,
+        inscripcionId,
+      ],
+      tx,
+    );
+    creadas++;
+  }
+  return { inscripcionId, semanas: creadas, sobrecupo: llena !== undefined };
+}
+
+/**
+ * Termina una inscripción: libera el cupo de las semanas que FALTAN (las ya
+ * ocurridas se quedan: son el historial de su asistencia) y la deja como
+ * registro, con quién (NULL = el sistema), cuándo y por qué.
+ */
+async function terminarInscripcionTx(
+  tx: Queryable,
+  input: {
+    inscripcionId: string;
+    estado: "CANCELADA" | "RETIRADA";
+    porUserId: string | null;
+    motivo: string | null;
+  },
+): Promise<void> {
+  await execute(
+    `UPDATE scheduling_club_inscripcion
+        SET estado = $2, fin_en = now(), fin_por = $3, fin_motivo = $4
+      WHERE id = $1 AND estado = 'ACTIVA'`,
+    [input.inscripcionId, input.estado, input.porUserId, input.motivo],
+    tx,
+  );
+  await execute(
+    `UPDATE scheduling_agendado
+        SET estado = 'CANCELADA', cancelado_por = $2, cancelado_en = now()
+      WHERE inscripcion_id = $1 AND estado = 'ACTIVA' AND starts_at > now()`,
+    [input.inscripcionId, input.porUserId],
+    tx,
+  );
+}
+
+/**
+ * La regla de los clubes: con DOS faltas SEGUIDAS se RETIRA al niño y se libera
+ * su cupo. Mira las últimas sesiones ya MARCADAS de cada inscripción viva (una
+ * sesión sin marca no cuenta ni a favor ni en contra: el guía no pasó lista) y
+ * retira si las dos últimas son AUSENTE; una JUSTIFICADA corta la racha.
+ * La disparan pasar lista (`marcarAsistencia`) y el worker, como red.
+ */
+export async function retirarClubesPorFaltas(
+  childPersonIds?: string[],
+): Promise<{ retiradas: number }> {
+  const candidatas = await queryRows<{ id: string; childPersonId: string; tandaId: string | null }>(
+    `SELECT i.id, i.child_person_id AS "childPersonId", i.tanda_id AS "tandaId"
+       FROM scheduling_club_inscripcion i
+      WHERE i.estado = 'ACTIVA'
+        AND ($1::uuid[] IS NULL OR i.child_person_id = ANY($1))
+        AND (SELECT count(*) FILTER (WHERE u.estado = 'AUSENTE') = $2
+                AND count(*) = $2
+               FROM (SELECT at.estado::text AS estado
+                       FROM scheduling_agendado g
+                       JOIN scheduling_session s
+                         ON s.classroom_id = g.classroom_id AND s.starts_at = g.starts_at
+                       JOIN attendance_attendance at
+                         ON at.session_id = s.id AND at.child_person_id = g.child_person_id
+                      WHERE g.inscripcion_id = i.id AND g.estado = 'ACTIVA'
+                        AND s.starts_at <= now()
+                      ORDER BY s.starts_at DESC
+                      LIMIT $2) u)`,
+    [childPersonIds ?? null, FALTAS_PARA_RETIRO],
+  );
+  for (const c of candidatas) {
+    await withTransaction((tx) =>
+      terminarInscripcionTx(tx, {
+        inscripcionId: c.id,
+        estado: "RETIRADA",
+        porUserId: null,
+        motivo: `${String(FALTAS_PARA_RETIRO)} faltas seguidas`,
+      }),
+    );
+    await registrarAuditoria({
+      actorUserId: null,
+      accion: "scheduling.club_retirado_por_faltas",
+      entidad: "people_person",
+      entidadId: c.childPersonId,
+      payload: { inscripcionId: c.id, tandaId: c.tandaId, faltas: FALTAS_PARA_RETIRO },
+    });
+  }
+  return { retiradas: candidatas.length };
 }

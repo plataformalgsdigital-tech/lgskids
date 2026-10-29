@@ -2196,18 +2196,42 @@ y `DELETE …/agenda/[agendadoId]`.
   `holiday_country` del salón del niño; campo "País" en la apertura del modal) y el
   `nivel` del evento (NULL = todos los niveles). Rige para coordinación y para el niño:
   es la MISMA `sesionesElegibles`.
+- **CLUBES DE INSCRITOS (2026-10-29, decisión del negocio)**: la lista de un CLUB ya
+  NO sale de la matrícula del salón —ni siquiera en un club de su propio salón—: es
+  SOLO de inscritos. Quién VE un club es lo que dice su creación: se dicta en los
+  salones de su campaña/país/curso/salón ("Todos" = todos los activos) y es de su
+  NIVEL o de todos; más los ABIERTOS a otros salones con alcance que coincide.
+  - **Inscribirse = toda la tanda**: `scheduling_club_inscripcion` (migración
+    `20261029000000_clubes_alumno`) y un `scheduling_agendado` por cada semana que
+    le queda (con `inscripcion_id`), en su salón si el club se dicta ahí. Así la
+    lista, el cupo, "Mis próximas clases", la Siguiente clase y la asistencia usan el
+    camino que ya existía. Agendar un CLUB desde la ficha también inscribe
+    (`agendarNino` → `inscribirEnClubTx`). Si alguna semana está llena no se inscribe
+    (salvo sobrecupo autorizado); una semana que choca con algo suyo se salta.
+  - **`SQL_EN_LISTA`** (scheduling) es LA cuenta de la lista de una sesión
+    (matrícula salvo en CLUB + agendados): cupo del agendar, calendario y tablero.
+    `getRosterConPais`, `agendaProximas`, la siguiente clase, `historialDeNino`,
+    `compromisos` y los casos excluyen el CLUB de su salón si no está inscrito. El
+    cupo de un club compartido es su "Límite de usuarios" UNA vez (no la suma de
+    salones).
+  - **2 faltas SEGUIDAS = retirado** (`retirarClubesPorFaltas`, `FALTAS_PARA_RETIRO`):
+    las dos últimas sesiones MARCADAS de la inscripción en AUSENTE (una JUSTIFICADA
+    corta la racha; una sin marcar no cuenta). Se dispara al pasar lista de un CLUB
+    (`marcarAsistencia`) y en el worker cada hora. Retirar = inscripción RETIRADA con
+    `fin_motivo` y sin actor, auditoría `scheduling.club_retirado_por_faltas`, y se
+    cancelan SOLO las semanas que faltan (las pasadas quedan como historial).
+  - Salir (él o coordinación, `cancelarAgendado` sobre cualquier semana) deja la
+    inscripción CANCELADA y libera lo que falta.
 - **Inscripción Clubes en `/mi-panel` (2026-10-29)**: el botón verde (antes solo
   bajaba a "Mis próximas clases") abre `InscripcionClubes.tsx`: los CLUBES de la
   **semana en curso** (lunes a domingo en el reloj de SU salón, de ahora en adelante)
-  que le corresponden —los de su salón ("✓ Ya estás en la lista", no se cancelan:
-  salen de la matrícula) y los ABIERTOS cuyo alcance y nivel coinciden—, con
-  "Inscribirme" y "Cancelar". `GET|POST|DELETE /api/student/clubes` (`panel.alumno`;
-  el niño sale de la SESIÓN) → `clubesPropios` / `inscribirClubPropio` /
-  `cancelarClubPropio` (contracts) → `clubesDeLaSemana` y `agendarNino` (la misma
-  reserva con bloqueo, cupo y choque; SIN sobrecupo). El niño solo cancela lo suyo
-  que sea CLUB y aún no empiece (`cancelarAgendado` con `soloFuturoDeTipo`).
-  `agendado_por` = la cuenta del niño. Es la TERCERA excepción al modelo de
-  cohortes, decidida por el negocio.
+  que le corresponden, con hasta cuándo va la tanda, "Inscribirme" y "Cancelar", y
+  en el encabezado el aviso de la regla de las 2 faltas. `GET|POST|DELETE
+/api/student/clubes` (`panel.alumno`; el niño sale de la SESIÓN) → `clubesPropios`
+  / `inscribirClubPropio` / `cancelarClubPropio` (contracts) → `clubesDeLaSemana` y
+  `agendarNino` (SIN sobrecupo). El niño solo cancela lo suyo que sea CLUB y aún no
+  empiece (`soloFuturoDeTipo`). `inscrito_por` = la cuenta del niño. Es la TERCERA
+  excepción al modelo de cohortes. Pruebas en `contracts/tests/agendar-integration.test.ts`.
 
 ## Servicio › Welcome (como MOSAICO, 2026-10-14)
 

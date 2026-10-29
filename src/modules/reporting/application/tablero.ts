@@ -1,3 +1,4 @@
+import { SQL_EN_LISTA } from "@/modules/scheduling";
 import { queryOne, queryRows } from "@/platform/db/query";
 
 /**
@@ -101,9 +102,7 @@ export async function clasesDeHoy(guiaUserId: string | null, limite = 12): Promi
   values.push(limite);
   return queryRows<ClaseDeHoy>(
     `SELECT s.id AS "sessionId", cl.nombre AS salon, s.tipo::text AS tipo,
-            s.starts_at AS "startsAt",
-            (SELECT count(*) FROM enrollment_enrollment e
-              WHERE e.classroom_id = cl.id AND e.estado = 'ACTIVA')::int AS inscritos,
+            s.starts_at AS "startsAt", ${SQL_EN_LISTA("s")} AS inscritos,
             (SELECT count(*) FROM attendance_attendance a
               WHERE a.session_id = s.id)::int AS marcadas
        FROM scheduling_session s
@@ -143,14 +142,15 @@ export async function sesionesSinMarcar(
   values.push(limite);
   return queryRows<SesionSinMarcar>(
     `SELECT s.id AS "sessionId", cl.nombre AS salon, s.fecha::text AS fecha,
-            (SELECT count(*) FROM enrollment_enrollment e
-              WHERE e.classroom_id = cl.id AND e.estado = 'ACTIVA')::int AS inscritos
+            ${SQL_EN_LISTA("s")} AS inscritos
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
       WHERE cl.activo
         AND s.starts_at < now()
         AND s.starts_at >= now() - ($1::int * INTERVAL '1 day')
         AND NOT EXISTS (SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id)
+        -- Un club sin inscritos no deja lista por pasar.
+        AND (s.tipo <> 'CLUB' OR ${SQL_EN_LISTA("s")} > 0)
         ${filtroGuia}
       ORDER BY s.starts_at DESC
       LIMIT $${String(values.length)}`,
@@ -185,6 +185,7 @@ export async function resumenGuia(guiaUserId: string): Promise<ResumenGuia> {
             AND s3.starts_at < now()
             AND s3.starts_at >= now() - INTERVAL '14 days'
             AND NOT EXISTS (SELECT 1 FROM attendance_attendance a WHERE a.session_id = s3.id)
+            AND (s3.tipo <> 'CLUB' OR ${SQL_EN_LISTA("s3")} > 0)
        ), 0)::int AS "sesionesSinMarcar"
      FROM scheduling_classroom cl
      LEFT JOIN enrollment_enrollment e ON e.classroom_id = cl.id

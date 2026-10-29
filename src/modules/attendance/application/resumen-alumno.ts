@@ -44,7 +44,9 @@ export async function resumenAsistencia(
        count(*) FILTER (WHERE a.estado = 'PRESENTE')::text AS asistidas,
        count(*) FILTER (WHERE a.estado = 'AUSENTE')::text AS ausentes,
        count(*) FILTER (WHERE a.estado = 'JUSTIFICADO')::text AS justificadas,
-       (SELECT count(*) FROM scheduling_session WHERE classroom_id = $2)::text AS total
+       -- Los clubes no: son de inscritos, no de todo el salón.
+       (SELECT count(*) FROM scheduling_session
+         WHERE classroom_id = $2 AND tipo <> 'CLUB')::text AS total
      FROM attendance_attendance a
     WHERE a.child_person_id = $1`,
     [childPersonId, classroomId],
@@ -155,7 +157,8 @@ export async function agendaProximas(
        LEFT JOIN identity_user gu ON gu.id = COALESCE(s.guia_user_id, cl.guia_user_id)
        LEFT JOIN scheduling_guia gg ON gg.guia_user_id = gu.id
        LEFT JOIN people_person gp ON gp.user_id = gu.id
-      WHERE (s.classroom_id = $1
+      -- Su salón (un CLUB solo si se inscribió) o lo que se le agendó.
+      WHERE ((s.classroom_id = $1 AND s.tipo <> 'CLUB')
              OR EXISTS (SELECT 1 FROM scheduling_agendado a
                          WHERE a.child_person_id = $3 AND a.estado = 'ACTIVA'
                            AND a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at))

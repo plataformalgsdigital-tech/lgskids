@@ -107,8 +107,10 @@ export {
   agendarNino,
   agendadosDeNino,
   cancelarAgendado,
+  retirarClubesPorFaltas,
+  FALTAS_PARA_RETIRO,
 } from "./application/agendar";
-export type { OpcionAgenda, Agendado, ContextoNino } from "./application/agendar";
+export type { OpcionAgenda, Agendado, ContextoNino, ClubSemana } from "./application/agendar";
 export {
   TIPOS_AGENDA,
   ETIQUETA_TIPO_AGENDA,
@@ -182,7 +184,7 @@ export {
 } from "./application/link-club";
 export type { LinkClub } from "./application/link-club";
 export { DIAS_SEMANA } from "./domain/link-club";
-export { SQL_LINK_CLUB } from "./infrastructure/scheduling-repository";
+export { SQL_LINK_CLUB, SQL_EN_LISTA } from "./infrastructure/scheduling-repository";
 export { sesionesServicio } from "./application/servicio";
 export type { SesionServicio, EstadoSesionServicio } from "./application/servicio";
 export {

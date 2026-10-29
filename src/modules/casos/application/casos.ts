@@ -321,9 +321,14 @@ export async function exigirReporteDesdeSesion(input: {
   childPersonId: string;
   puedeGestionarSalones: boolean;
 }): Promise<{ guiaUserId: string | null }> {
-  const s = await queryOne<{ guia: string | null; classroomId: string; startsAt: string }>(
+  const s = await queryOne<{
+    guia: string | null;
+    classroomId: string;
+    startsAt: string;
+    club: boolean;
+  }>(
     `SELECT COALESCE(s.guia_user_id, cl.guia_user_id) AS guia, s.classroom_id AS "classroomId",
-            s.starts_at AS "startsAt"
+            s.starts_at AS "startsAt", (s.tipo = 'CLUB') AS club
        FROM scheduling_session s JOIN scheduling_classroom cl ON cl.id = s.classroom_id
       WHERE s.id = $1`,
     [input.sessionId],
@@ -333,14 +338,15 @@ export async function exigirReporteDesdeSesion(input: {
     throw new ForbiddenError("Solo puedes reportar casos de tus propias sesiones.");
   }
   const enLista = await queryOne<{ ok: boolean }>(
-    // Su salón, o agendado en ESTA sesión desde otro (Academic management › Agendar).
+    // Su salón (no en un CLUB: es de inscritos), o agendado en ESTA sesión.
     `SELECT true AS ok FROM enrollment_enrollment
       WHERE classroom_id = $1 AND child_person_id = $2 AND estado IN ('ACTIVA', 'RESERVADA')
+        AND NOT $4::boolean
      UNION ALL
      SELECT true FROM scheduling_agendado
       WHERE classroom_id = $1 AND child_person_id = $2 AND starts_at = $3 AND estado = 'ACTIVA'
       LIMIT 1`,
-    [s.classroomId, input.childPersonId, s.startsAt],
+    [s.classroomId, input.childPersonId, s.startsAt, s.club],
   );
   if (enLista === null) {
     throw new ValidationError("El niño no está en la lista de ese salón.");

@@ -172,11 +172,18 @@ export async function historialDeNino(childPersonId: string): Promise<FilaHistor
              WHERE e.child_person_id = $1 AND e.estado <> 'RESERVADA'
           ),
           sesiones AS (
+            -- Un CLUB de su salón no es suyo si no se inscribió (2026-10-29).
             SELECT s.id FROM scheduling_session s
               JOIN ventanas v ON v.classroom_id = s.classroom_id
-             WHERE s.starts_at <= now()
+             WHERE s.starts_at <= now() AND s.tipo <> 'CLUB'
                AND s.starts_at + make_interval(mins => s.duracion_min) >= v.desde
                AND s.starts_at <= v.hasta
+            UNION
+            -- Lo que se le agendó (clubes inscritos, recuperaciones), ya empezado.
+            SELECT s.id FROM scheduling_agendado g
+              JOIN scheduling_session s
+                ON s.classroom_id = g.classroom_id AND s.starts_at = g.starts_at
+             WHERE g.child_person_id = $1 AND g.estado = 'ACTIVA' AND s.starts_at <= now()
             UNION
             SELECT a.session_id FROM attendance_attendance a WHERE a.child_person_id = $1
           )
@@ -226,6 +233,8 @@ export interface RosterConPais {
  * Roster DERIVADO de matrículas activas, con el país del contrato de cada niño,
  * MÁS los niños de otros salones agendados en ESTA sesión (salón + instante: la
  * reserva sobrevive a la regeneración del horario). Sin `startsAt`, solo el salón.
+ * Un CLUB es SOLO de inscritos (2026-10-29): su lista son los agendados, aunque
+ * sean del mismo salón (ver `SQL_EN_LISTA`).
  */
 export async function getRosterConPais(
   classroomId: string,
@@ -240,8 +249,14 @@ export async function getRosterConPais(
          JOIN contracts_contract c ON c.id = e.contract_id
          LEFT JOIN identity_user u ON u.id = p.user_id
         WHERE e.classroom_id = $1 AND e.estado = 'ACTIVA'
+          AND NOT EXISTS (SELECT 1 FROM scheduling_session cs
+                           WHERE cs.classroom_id = $1 AND cs.starts_at = $2 AND cs.tipo = 'CLUB')
        UNION ALL
-       SELECT p.id, p.nombres, p.apellidos, u.username, p.country_code, true
+       -- "agendado" = viene de OTRO salón (el inscrito de un club de su salón, no).
+       SELECT p.id, p.nombres, p.apellidos, u.username, p.country_code,
+              NOT EXISTS (SELECT 1 FROM enrollment_enrollment pe
+                           WHERE pe.child_person_id = p.id AND pe.classroom_id = $1
+                             AND pe.estado = 'ACTIVA')
          FROM scheduling_agendado a
          JOIN people_person p ON p.id = a.child_person_id
          LEFT JOIN identity_user u ON u.id = p.user_id

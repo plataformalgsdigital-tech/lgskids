@@ -400,7 +400,8 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
            LEFT JOIN scheduling_guia sg ON sg.guia_user_id = su.id
            LEFT JOIN identity_perfil spf ON spf.user_id = su.id
           -- Su salón, o lo que se le AGENDÓ en otro (Academic management › Agendar).
-          WHERE (s.classroom_id = cl.id
+          -- Un CLUB es de inscritos: de su salón solo si se inscribió.
+          WHERE ((s.classroom_id = cl.id AND s.tipo <> 'CLUB')
                  OR EXISTS (SELECT 1 FROM scheduling_agendado a
                              WHERE a.child_person_id = p.id AND a.estado = 'ACTIVA'
                                AND a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at))

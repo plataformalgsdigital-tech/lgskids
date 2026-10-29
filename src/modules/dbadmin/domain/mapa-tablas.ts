@@ -130,8 +130,13 @@ export const MAPA_TABLAS: Record<string, EntradaMapa> = {
   },
   scheduling_agendado: {
     tema: "Calendario y salones",
-    para: "Niños agendados a una sesión de OTRO salón (recuperación, club, taller abierto).",
+    para: "Niños agendados a una sesión que no les toca por su matrícula: recuperación, taller abierto, y cada semana de un CLUB inscrito (con su inscripcion_id).",
     pantalla: "Ficha del niño › Academic management › Agendar",
+  },
+  scheduling_club_inscripcion: {
+    tema: "Calendario y salones",
+    para: "Inscripciones de niños a un Club (su tanda entera): ACTIVA, CANCELADA (él o coordinación) o RETIRADA por 2 faltas seguidas, con quién, cuándo y por qué. La lista del Club son solo los inscritos.",
+    pantalla: "Panel del niño › Inscripción Clubes · Ficha del niño › Agendar",
   },
   scheduling_cancelacion: {
     tema: "Calendario y salones",

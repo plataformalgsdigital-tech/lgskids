@@ -1,5 +1,6 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { recalcularProgresion } from "@/modules/progression";
+import { retirarClubesPorFaltas } from "@/modules/scheduling";
 import { withTransaction } from "@/platform/db/transaction";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/platform/errors";
 import {
@@ -220,6 +221,10 @@ export async function marcarAsistencia(input: {
   // asistencia dispara el recálculo de progresión de cada niño afectado.
   for (const childPersonId of new Set(input.marcas.map((m) => m.childPersonId))) {
     await recalcularProgresion(childPersonId);
+  }
+  // Clubes de inscritos: con 2 faltas seguidas el niño sale y libera su cupo.
+  if (sesion.tipo === "CLUB") {
+    await retirarClubesPorFaltas([...new Set(input.marcas.map((m) => m.childPersonId))]);
   }
 
   const conteos = input.marcas.reduce<Record<string, number>>((acc, m) => {
