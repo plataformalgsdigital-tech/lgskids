@@ -632,7 +632,9 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
     autenticado (arte curricular, no dato de menores). El dashboard resuelve
     `imagenCursoUrl` según el nivel actual; si falta, banner de color por nivel.
 - **Nav superior + modales (2026-08-26, estilo MOSAICO)**: bajo el encabezado hay
-  una barra (`NAV_ITEMS`) con botón verde **Inscripción Clubes** y accesos
+  una barra (`NAV_ITEMS`) con botón verde **Inscripción Clubes** (abre la
+  inscripción a los clubes de la semana desde 2026-10-29, ver "Agendar desde la
+  ficha") y accesos
   Actividades/Recursos/Material/**Historial**/**Avance**/**¿Cómo voy?**/Instructivos/
   Perfil. **¿Cómo voy?**, **Historial**, **Avance** y **Material** abren MODAL (no viven
   en el cuerpo); el resto es acceso futuro. "¿Cómo voy?" = progreso del nivel + acordeón
@@ -2189,6 +2191,23 @@ y `DELETE …/agenda/[agendadoId]`.
   y en la caja "Siguiente clase" de su ficha. La lista lo marca "agendado (de otro salón)".
 - Auditoría `scheduling.nino_agendado` y `scheduling.agendado_cancelado`. Pruebas:
   `scheduling/tests/agenda.test.ts` y `contracts/tests/agendar-integration.test.ts`.
+- **El alcance del evento ABIERTO suma PAÍS y NIVEL (2026-10-29, migración
+  `20261029000000_clubes_alumno`)**: `scheduling_session.alcance_pais` (el
+  `holiday_country` del salón del niño; campo "País" en la apertura del modal) y el
+  `nivel` del evento (NULL = todos los niveles). Rige para coordinación y para el niño:
+  es la MISMA `sesionesElegibles`.
+- **Inscripción Clubes en `/mi-panel` (2026-10-29)**: el botón verde (antes solo
+  bajaba a "Mis próximas clases") abre `InscripcionClubes.tsx`: los CLUBES de la
+  **semana en curso** (lunes a domingo en el reloj de SU salón, de ahora en adelante)
+  que le corresponden —los de su salón ("✓ Ya estás en la lista", no se cancelan:
+  salen de la matrícula) y los ABIERTOS cuyo alcance y nivel coinciden—, con
+  "Inscribirme" y "Cancelar". `GET|POST|DELETE /api/student/clubes` (`panel.alumno`;
+  el niño sale de la SESIÓN) → `clubesPropios` / `inscribirClubPropio` /
+  `cancelarClubPropio` (contracts) → `clubesDeLaSemana` y `agendarNino` (la misma
+  reserva con bloqueo, cupo y choque; SIN sobrecupo). El niño solo cancela lo suyo
+  que sea CLUB y aún no empiece (`cancelarAgendado` con `soloFuturoDeTipo`).
+  `agendado_por` = la cuenta del niño. Es la TERCERA excepción al modelo de
+  cohortes, decidida por el negocio.
 
 ## Servicio › Welcome (como MOSAICO, 2026-10-14)
 

@@ -7,6 +7,7 @@ import {
   agendadosDeNino,
   agendarNino,
   cancelarAgendado,
+  clubesDeLaSemana,
   opcionesAgenda,
   reservarWelcomeTx,
   welcomeDeNino,
@@ -578,6 +579,66 @@ export async function reagendarPropio(input: {
     ip: input.ip ?? null,
   });
   return welcomeDeNino(input.childPersonId);
+}
+
+// —— Inscripción Clubes (panel del ALUMNO) ——————————————————————————————————
+
+/** El niño de la sesión, visto desde Inscripción Clubes. */
+async function contextoPropio(childPersonId: string): Promise<ContextoNino | null> {
+  const matricula = await matriculaDeNino(childPersonId);
+  if (matricula === null) return null;
+  return {
+    childPersonId,
+    classroomId: matricula.classroomId,
+    nivel: await nivelDeNino(childPersonId),
+  };
+}
+
+/** Los clubes de la semana en curso que le corresponden al niño. */
+export async function clubesPropios(childPersonId: string): Promise<OpcionAgenda[]> {
+  const nino = await contextoPropio(childPersonId);
+  return nino === null ? [] : clubesDeLaSemana(nino);
+}
+
+/**
+ * El NIÑO se inscribe en un club: la MISMA reserva de coordinación (regla, cupo
+ * con bloqueo y choque), sin sobrecupo —un club lleno no admite a nadie más—.
+ * Queda agendado por su propia cuenta.
+ */
+export async function inscribirClubPropio(input: {
+  userId: string;
+  childPersonId: string;
+  sessionId: string;
+  ip?: string | null;
+}): Promise<{ startsAt: string }> {
+  const nino = await contextoPropio(input.childPersonId);
+  if (nino === null) throw new ConflictError("No tienes matrícula activa.");
+  const r = await agendarNino({
+    actorUserId: input.userId,
+    nino,
+    tipo: "CLUB",
+    id: input.sessionId,
+    autorizarSobrecupo: false,
+    puedeSobrecupo: false,
+    ip: input.ip ?? null,
+  });
+  return { startsAt: r.startsAt };
+}
+
+/** El niño se borra de un club al que se inscribió (solo antes de que empiece). */
+export async function cancelarClubPropio(input: {
+  userId: string;
+  childPersonId: string;
+  agendadoId: string;
+  ip?: string | null;
+}): Promise<void> {
+  await cancelarAgendado({
+    actorUserId: input.userId,
+    childPersonId: input.childPersonId,
+    agendadoId: input.agendadoId,
+    soloFuturoDeTipo: "CLUB",
+    ip: input.ip ?? null,
+  });
 }
 
 // —— Agendar (Academic management) ———————————————————————————————————————

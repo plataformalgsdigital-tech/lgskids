@@ -81,21 +81,31 @@ const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "vier
 
 /**
  * Sesión extra, club o taller ABIERTO a niños de otros salones (Academic
- * management › Agendar): se les puede agendar si coinciden con su campaña,
- * curso y salón; null = "Todos". Cerrado, su lista son solo sus salones.
+ * management › Agendar, e Inscripción Clubes del propio niño): se les ofrece si
+ * coinciden con su campaña, curso, país y salón, y con el nivel del evento;
+ * null = "Todos". Cerrado, su lista son solo sus salones.
  */
 export interface AperturaEvento {
   abierto: boolean;
   campaignId: string | null;
   curso: "JUNIOR" | "YOUNGSTER" | null;
+  pais: "CL" | "CO" | "EC" | "PE" | null;
   classroomId: string | null;
 }
 export const APERTURA_CERRADA: AperturaEvento = {
   abierto: false,
   campaignId: null,
   curso: null,
+  pais: null,
   classroomId: null,
 };
+
+const PAISES_APERTURA = [
+  ["CL", "Chile"],
+  ["CO", "Colombia"],
+  ["EC", "Ecuador"],
+  ["PE", "Perú"],
+] as const;
 
 /**
  * Un evento YA creado que se abre para EDITAR. Cada clase guarda con su propia
@@ -1199,7 +1209,7 @@ export function NuevoEventoModal({
                   checked={apertura.abierto}
                   onChange={(e) => setApertura({ ...apertura, abierto: e.target.checked })}
                 />
-                Abierto a niños de otros salones (se agendan desde su ficha)
+                Abierto a niños de otros salones (se inscriben en su panel o desde su ficha)
               </label>
               {apertura.abierto && (
                 <div
@@ -1263,6 +1273,33 @@ export function NuevoEventoModal({
                       <option value="">Todos</option>
                       <option value="JUNIOR">Junior</option>
                       <option value="YOUNGSTER">Youngster</option>
+                    </select>
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      fontSize: "0.82rem",
+                    }}
+                  >
+                    <span style={{ fontWeight: 700 }}>País</span>
+                    <select
+                      value={apertura.pais ?? ""}
+                      onChange={(e) =>
+                        setApertura({
+                          ...apertura,
+                          pais: PAISES_APERTURA.find(([c]) => c === e.target.value)?.[0] ?? null,
+                        })
+                      }
+                      style={campo}
+                    >
+                      <option value="">Todos</option>
+                      {PAISES_APERTURA.map(([c, n]) => (
+                        <option key={c} value={c}>
+                          {n}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label

@@ -103,6 +103,7 @@ export {
 export type { AperturaEvento } from "./application/crear-evento";
 export {
   opcionesAgenda,
+  clubesDeLaSemana,
   agendarNino,
   agendadosDeNino,
   cancelarAgendado,

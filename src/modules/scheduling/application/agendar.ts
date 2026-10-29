@@ -21,8 +21,8 @@ import { reservarWelcomeTx, welcomesDisponibles } from "./welcome";
  *
  * La lista de una clase sigue saliendo de las matrículas del salón (regla de
  * cohortes); agendar SUMA a un niño de otro salón a UNA sesión concreta:
- *  - una sesión extra, un club o un taller ABIERTO cuyo alcance (campaña, curso
- *    y salón, NULL = "Todos") coincide con el del niño;
+ *  - una sesión extra, un club o un taller ABIERTO cuyo alcance (campaña, curso,
+ *    país y salón, NULL = "Todos") y cuyo NIVEL coinciden con los del niño;
  *  - una CLASE REGULAR de otro salón de su MISMA campaña y curso (recuperación);
  *  - un WELCOME, con la reserva de siempre (`reservarWelcomeTx`).
  * Lo de su propio salón ya lo tiene: se muestra como "en su lista".
@@ -47,6 +47,8 @@ interface SalonNino {
   campaignId: string;
   curso: string;
   timezone: string;
+  /** País del salón (su calendario de feriados). */
+  pais: string;
 }
 
 export interface OpcionAgenda {
@@ -64,16 +66,23 @@ export interface OpcionAgenda {
   lleno: boolean;
   /** Ya está en esa lista: su salón, o ya agendado. */
   enSuLista: boolean;
+  /** Es de SU salón (no se cancela: la lista sale de su matrícula). */
+  propia: boolean;
+  /** Lo agendado ahí, si lo está (es lo que se cancela). */
+  agendadoId: string | null;
   /** Qué tiene ya a esa hora, si choca. */
   choque: string | null;
   /** Zona del salón (para la hora de pared). */
   timezone: string | null;
+  /** Nivel del evento (null = todos) y su descripción. */
+  nivel: string | null;
+  observaciones: string | null;
 }
 
 async function salonDelNino(classroomId: string, q?: Queryable): Promise<SalonNino> {
   const s = await queryOne<SalonNino>(
     `SELECT cl.id AS "classroomId", cu.campaign_id AS "campaignId", cu.tipo::text AS curso,
-            cl.timezone
+            cl.timezone, cl.holiday_country::text AS pais
        FROM scheduling_classroom cl JOIN catalog_course cu ON cu.id = cl.course_id
       WHERE cl.id = $1`,
     [classroomId],
@@ -104,8 +113,10 @@ interface FilaSesion {
   guia: string | null;
   limite: number;
   ocupados: number;
-  /** Ya agendado ahí. */
-  agendado: boolean;
+  /** Lo agendado ahí para este niño, si lo está. */
+  agendadoId: string | null;
+  nivel: string | null;
+  observaciones: string | null;
 }
 
 /**
@@ -118,8 +129,12 @@ async function sesionesElegibles(
   input: {
     salon: SalonNino;
     childPersonId: string;
+    /** Su nivel: el evento abierto de un nivel solo es para ese nivel. */
+    nivel: string;
     tipo: Exclude<TipoAgenda, "WELCOME">;
     fecha?: string;
+    /** La SEMANA en curso (lunes a domingo en el reloj de su salón). */
+    semana?: boolean;
     sessionId?: string;
   },
 ): Promise<FilaSesion[]> {
@@ -128,6 +143,8 @@ async function sesionesElegibles(
     input.salon.campaignId,
     input.salon.curso,
     input.childPersonId,
+    input.salon.pais,
+    input.nivel,
   ];
   const conds: string[] = [`s.starts_at > now()`, `NOT ${SQL_SESION_CANCELADA("s")}`, `cl.activo`];
   if (input.tipo === "REGULAR") {
@@ -141,11 +158,19 @@ async function sesionesElegibles(
     conds.push(`(s.classroom_id = $1 OR (s.abierto
        AND (s.alcance_campaign_id IS NULL OR s.alcance_campaign_id = $2)
        AND (s.alcance_curso IS NULL OR s.alcance_curso = $3)
-       AND (s.alcance_classroom_id IS NULL OR s.alcance_classroom_id = $1)))`);
+       AND (s.alcance_pais IS NULL OR s.alcance_pais = $5)
+       AND (s.alcance_classroom_id IS NULL OR s.alcance_classroom_id = $1)
+       AND (s.nivel IS NULL OR s.nivel = $6)))`);
   }
   if (input.sessionId !== undefined) {
     v.push(input.sessionId);
     conds.push(`s.id = $${String(v.length)}`);
+  } else if (input.semana === true) {
+    v.push(input.salon.timezone);
+    const tz = `$${String(v.length)}`;
+    conds.push(
+      `s.starts_at < ((date_trunc('week', now() AT TIME ZONE ${tz}) + interval '7 days') AT TIME ZONE ${tz})`,
+    );
   } else if (input.fecha !== undefined) {
     // El día en el reloj del salón del NIÑO: es el que mira quien agenda.
     v.push(input.fecha, input.salon.timezone);
@@ -154,17 +179,19 @@ async function sesionesElegibles(
     );
   }
   return queryRows<FilaSesion>(
-    // `$1::uuid` aparece siempre aquí: en las clases regulares el salón del niño
-    // no filtra, y sin uso postgres no sabría su tipo.
+    // `$1::uuid`, `$5` y `$6` aparecen siempre aquí: en las clases regulares el
+    // salón, el país y el nivel del niño no filtran, y sin uso postgres no
+    // sabría su tipo.
     `SELECT s.id, s.tipo::text AS tipo, s.starts_at AS "startsAt", s.duracion_min AS "duracionMin",
             (s.classroom_id = $1::uuid) AS propia,
             s.classroom_id AS "classroomId", s.grupo_id AS "grupoId", cl.nombre AS salon,
             cl.timezone, ca.nombre AS campania, ${NOMBRE_GUIA} AS guia,
             ${input.tipo === "REGULAR" ? "cl.cupo" : "COALESCE(s.limite_usuarios, cl.cupo)"} AS limite,
-            ${SQL_OCUPADOS} AS ocupados,
-            EXISTS (SELECT 1 FROM scheduling_agendado a
-                     WHERE a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at
-                       AND a.child_person_id = $4 AND a.estado = 'ACTIVA') AS agendado
+            ${SQL_OCUPADOS} AS ocupados, s.nivel, s.observaciones,
+            (SELECT a.id FROM scheduling_agendado a
+              WHERE a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at
+                AND a.child_person_id = $4 AND a.estado = 'ACTIVA' LIMIT 1) AS "agendadoId",
+            $5::text AS "_pais", $6::text AS "_nivel"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course cu ON cu.id = cl.course_id
@@ -198,6 +225,7 @@ function agrupar(
     const rep = propia ?? g[0]!;
     const limite = g.reduce((n, f) => n + f.limite, 0);
     const ocupados = g.reduce((n, f) => n + f.ocupados, 0);
+    const agendadoId = g.find((f) => f.agendadoId !== null)?.agendadoId ?? null;
     return {
       tipo,
       id: rep.id,
@@ -209,9 +237,13 @@ function agrupar(
       limite,
       ocupados,
       lleno: estaLleno(limite, ocupados),
-      enSuLista: propia !== undefined || g.some((f) => f.agendado),
+      enSuLista: propia !== undefined || agendadoId !== null,
+      propia: propia !== undefined,
+      agendadoId,
       choque: null,
       timezone: rep.timezone,
+      nivel: rep.nivel,
+      observaciones: rep.observaciones,
       tramo: tramo(rep.startsAt, rep.duracionMin),
     };
   });
@@ -310,29 +342,61 @@ export async function opcionesAgenda(input: {
         ocupados: w.inscritos,
         lleno: estaLleno(w.limiteUsuarios, w.inscritos),
         enSuLista: actual?.welcomeId === w.id,
+        propia: false,
+        agendadoId: null,
         choque: null,
         timezone: null,
+        nivel: w.nivel,
+        observaciones: w.observaciones,
         tramo: tramo(w.startsAt, w.duracionMin),
       }));
   } else {
     const filas = await sesionesElegibles(undefined, {
       salon,
       childPersonId: input.nino.childPersonId,
+      nivel: input.nino.nivel,
       tipo: input.tipo,
       fecha: input.fecha,
     });
     opciones = agrupar(filas, input.tipo, salon.classroomId);
   }
+  return conChoques(opciones, salon, input.nino.childPersonId);
+}
+
+/** Marca los choques con lo que ya tiene y quita el tramo (es de uso interno). */
+async function conChoques(
+  opciones: (OpcionAgenda & { tramo: Tramo })[],
+  salon: SalonNino,
+  childPersonId: string,
+): Promise<OpcionAgenda[]> {
   if (opciones.length === 0) return [];
   const desde = new Date(Math.min(...opciones.map((o) => o.tramo.inicio)) - DIA_MS);
   const hasta = new Date(Math.max(...opciones.map((o) => o.tramo.fin)) + DIA_MS);
-  const tiene = await compromisos(undefined, salon, input.nino.childPersonId, desde, hasta);
-  // El tramo es de uso interno (choques): no viaja a la pantalla.
+  const tiene = await compromisos(undefined, salon, childPersonId, desde, hasta);
   return marcarChoques(opciones, tiene).map((o) => {
     const { tramo: interno, ...visible } = o;
     void interno;
     return visible;
   });
+}
+
+/**
+ * Inscripción Clubes del panel del ALUMNO: los clubes de la SEMANA EN CURSO
+ * (lunes a domingo en el reloj de su salón, de ahora en adelante) que le
+ * corresponden — los de su salón y los ABIERTOS cuyo alcance y nivel coinciden
+ * con los suyos—. La MISMA regla de Academic management › Agendar
+ * (`sesionesElegibles`), así que la lista no ofrece algo que inscribir rechace.
+ */
+export async function clubesDeLaSemana(nino: ContextoNino): Promise<OpcionAgenda[]> {
+  const salon = await salonDelNino(nino.classroomId);
+  const filas = await sesionesElegibles(undefined, {
+    salon,
+    childPersonId: nino.childPersonId,
+    nivel: nino.nivel,
+    tipo: "CLUB",
+    semana: true,
+  });
+  return conChoques(agrupar(filas, "CLUB", salon.classroomId), salon, nino.childPersonId);
 }
 
 export interface Agendado {
@@ -429,6 +493,7 @@ export async function agendarNino(input: {
         ? await sesionesElegibles(tx, {
             salon,
             childPersonId: input.nino.childPersonId,
+            nivel: input.nino.nivel,
             tipo: input.tipo,
             sessionId: input.id,
           })
@@ -444,6 +509,7 @@ export async function agendarNino(input: {
                 sesionesElegibles(tx, {
                   salon,
                   childPersonId: input.nino.childPersonId,
+                  nivel: input.nino.nivel,
                   tipo: input.tipo as Exclude<TipoAgenda, "WELCOME">,
                   sessionId: h.id,
                 }),
@@ -537,13 +603,20 @@ export async function cancelarAgendado(input: {
   actorUserId: string;
   childPersonId: string;
   agendadoId: string;
+  /**
+   * El propio niño (Inscripción Clubes): solo lo de ESE tipo y que aún no
+   * empieza. Coordinación cancela cualquier cosa.
+   */
+  soloFuturoDeTipo?: TipoAgenda;
   ip?: string | null;
 }): Promise<void> {
+  const tipo = input.soloFuturoDeTipo ?? null;
   const n = await execute(
     `UPDATE scheduling_agendado
         SET estado = 'CANCELADA', cancelado_por = $3, cancelado_en = now()
-      WHERE id = $1 AND child_person_id = $2 AND estado = 'ACTIVA'`,
-    [input.agendadoId, input.childPersonId, input.actorUserId],
+      WHERE id = $1 AND child_person_id = $2 AND estado = 'ACTIVA'
+        AND ($4::text IS NULL OR (tipo::text = $4 AND starts_at > now()))`,
+    [input.agendadoId, input.childPersonId, input.actorUserId, tipo],
   );
   if (n === 0) throw new NotFoundError("No hay nada agendado con ese id.");
   await registrarAuditoria({

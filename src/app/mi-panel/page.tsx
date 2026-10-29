@@ -9,6 +9,7 @@ import { abrirLibroEnPestana, type CajaLibro, type VocesLibro } from "@/ui/libro
 import { apiFetch, irACambiarClaveSiCorresponde } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 import { AgendarWelcomeModal } from "../panel/servicio/welcome/AgendarWelcomeModal";
+import { InscripcionClubesModal } from "./InscripcionClubes";
 
 /** Marca que ya se ofreció subir la foto: no se insiste en cada visita. */
 const FOTO_OFRECIDA = "lgs-kids:foto-ofrecida";
@@ -311,6 +312,7 @@ export default function MiPanelPage() {
   const [verPerfil, setVerPerfil] = useState(false); // modal "Perfil"
   // "Reagendar Bienvenida": el modal y el aviso tras reagendar.
   const [verReagendar, setVerReagendar] = useState(false);
+  const [verClubes, setVerClubes] = useState(false);
   const [avisoReagendar, setAvisoReagendar] = useState<string | null>(null);
   const [version, setVersion] = useState(0); // recarga el panel tras reagendar
   // Modal "Material": se carga al abrirlo, no con el dashboard.
@@ -1149,7 +1151,7 @@ export default function MiPanelPage() {
       >
         <button
           type="button"
-          onClick={() => document.getElementById("agenda")?.scrollIntoView({ behavior: "smooth" })}
+          onClick={() => setVerClubes(true)}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -2570,6 +2572,15 @@ export default function MiPanelPage() {
             <div style={{ padding: "1.25rem" }}>{listaHistorial}</div>
           </div>
         </div>
+      )}
+
+      {/* Modal "Inscripción Clubes": los clubes de la semana que le corresponden */}
+      {verClubes && (
+        <InscripcionClubesModal
+          onCerrar={() => setVerClubes(false)}
+          // Lo inscrito aparece en "Mis próximas clases".
+          onCambio={() => setVersion((v) => v + 1)}
+        />
       )}
 
       {/* Modal "Reagendar Bienvenida": el mismo de Servicio, con la ruta del alumno */}

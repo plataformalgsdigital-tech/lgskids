@@ -254,13 +254,16 @@ export async function guardarFichaGuia(input: {
 
 /**
  * Un evento suelto ABIERTO admite niños de otros salones (Academic management ›
- * Agendar) si coinciden con su campaña, curso y salón; null = "Todos". Cerrado,
- * su lista son solo los niños de los salones donde se dicta.
+ * Agendar, y el propio niño en Inscripción Clubes) si coinciden con su campaña,
+ * curso, país y salón —y con el NIVEL del evento—; null = "Todos". Cerrado, su
+ * lista son solo los niños de los salones donde se dicta.
  */
 export interface AperturaEvento {
   abierto: boolean;
   campaignId: string | null;
   curso: "JUNIOR" | "YOUNGSTER" | null;
+  /** País del salón del niño (su calendario de feriados). */
+  pais: "CL" | "CO" | "EC" | "PE" | null;
   classroomId: string | null;
 }
 
@@ -268,6 +271,7 @@ const CERRADO: AperturaEvento = {
   abierto: false,
   campaignId: null,
   curso: null,
+  pais: null,
   classroomId: null,
 };
 
@@ -276,6 +280,8 @@ export const ESQUEMA_APERTURA = z.object({
   abierto: z.boolean(),
   campaignId: z.uuid().nullable(),
   curso: z.enum(["JUNIOR", "YOUNGSTER"]).nullable(),
+  // Opcional: una pantalla anterior al país lo omite y vale "Todos".
+  pais: z.enum(["CL", "CO", "EC", "PE"]).nullable().default(null),
   classroomId: z.uuid().nullable(),
 });
 
@@ -530,9 +536,9 @@ export async function crearEvento(input: {
            (id, classroom_id, slot_id, tipo, fecha, starts_at, duracion_min, numero,
             guia_user_id, nivel, observaciones, limite_usuarios, grupo_id,
             abierto, alcance_campaign_id, alcance_curso, alcance_classroom_id, tanda_id,
-            link_club_id)
+            link_club_id, alcance_pais)
          VALUES ($1, $2, NULL, $3::scheduling_slot_tipo, $4::date, $5, $6, 0,
-                 $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+                 $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
         [
           id,
           classroomId,
@@ -551,6 +557,7 @@ export async function crearEvento(input: {
           apertura.abierto ? apertura.classroomId : null,
           tandaId,
           linkClubId,
+          apertura.abierto ? apertura.pais : null,
         ],
         tx,
       );
@@ -769,7 +776,7 @@ export async function editarEvento(input: {
         await execute(
           `UPDATE scheduling_session
               SET abierto = $2, alcance_campaign_id = $3, alcance_curso = $4,
-                  alcance_classroom_id = $5
+                  alcance_classroom_id = $5, alcance_pais = $6
             WHERE id = $1`,
           [
             f.id,
@@ -777,6 +784,7 @@ export async function editarEvento(input: {
             a.abierto ? a.campaignId : null,
             a.abierto ? a.curso : null,
             a.abierto ? a.classroomId : null,
+            a.abierto ? a.pais : null,
           ],
           tx,
         );

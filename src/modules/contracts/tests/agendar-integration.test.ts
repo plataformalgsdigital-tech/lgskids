@@ -7,13 +7,16 @@ import { crearEvento, crearSalon, editarEvento } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
-import { AppError, ConflictError, ForbiddenError } from "@/platform/errors";
+import { AppError, ConflictError, ForbiddenError, NotFoundError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { aprobarContrato, crearContrato } from "../application/gestion-contratos";
 import {
   agendaDeNino,
   agendarParaNino,
   cancelarAgendadoNino,
+  cancelarClubPropio,
+  clubesPropios,
+  inscribirClubPropio,
   opcionesAgendaNino,
 } from "../application/perfil-nino";
 
@@ -65,6 +68,9 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     limite?: number;
     abierto?: boolean;
     curso?: "JUNIOR" | "YOUNGSTER" | null;
+    pais?: "CL" | "CO" | "EC" | "PE" | null;
+    nivel?: string | null;
+    duracionMin?: number;
   }) => {
     const r = await crearEvento({
       actorUserId: actor,
@@ -72,13 +78,15 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       tipo: o.tipo ?? "CLUB",
       fecha: o.fecha,
       horaLocal: o.hora,
-      duracionMin: 60,
+      duracionMin: o.duracionMin ?? 60,
       limiteUsuarios: o.limite ?? null,
+      nivel: o.nivel ?? null,
       guiaUserId: actor,
       apertura: {
         abierto: o.abierto ?? true,
         campaignId: campaniaId,
         curso: o.curso ?? null,
+        pais: o.pais ?? null,
         classroomId: null,
       },
     });
@@ -243,6 +251,84 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     expect(ids).toContain(abierto);
     expect(ids).not.toContain(cerrado);
     expect(ids).not.toContain(otroCurso);
+  });
+
+  it("el PAÍS y el NIVEL del evento abierto también deciden (null = todos)", async () => {
+    const fecha = diaEn(new Date(Date.now() + 11 * 86_400_000));
+    const suPais = await nuevoEvento({ salon: salonC, fecha, hora: "13:00", pais: "CO" });
+    const otroPais = await nuevoEvento({ salon: salonC, fecha, hora: "14:00", pais: "CL" });
+    const suNivel = await nuevoEvento({ salon: salonC, fecha, hora: "15:00", nivel: "ROOKIE" });
+    const otroNivel = await nuevoEvento({ salon: salonC, fecha, hora: "16:00", nivel: "ELITE" });
+    const ids = (
+      await opcionesAgendaNino({ childPersonId: ninoId, countryScope: null, tipo: "CLUB", fecha })
+    ).map((o) => o.id);
+    expect(ids).toContain(suPais);
+    expect(ids).not.toContain(otroPais);
+    expect(ids).toContain(suNivel);
+    expect(ids).not.toContain(otroNivel);
+    await expect(agendar("CLUB", otroPais)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("Inscripción Clubes: el niño ve los de ESTA semana, se inscribe y se borra", async () => {
+    // Un club dentro de unos minutos (esta semana, salvo el domingo a medianoche)
+    // y otro dentro de ocho días (la semana que viene).
+    const pronto = new Date(Date.now() + 20 * 60_000);
+    const pared = new Intl.DateTimeFormat("en-GB", {
+      timeZone: ZONA,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(pronto);
+    const esteClub = await nuevoEvento({
+      salon: salonC,
+      fecha: diaEn(pronto),
+      hora: pared,
+      duracionMin: 15,
+    });
+    const otraSemana = await nuevoEvento({
+      salon: salonC,
+      fecha: diaEn(new Date(Date.now() + 8 * 86_400_000)),
+      hora: "07:00",
+    });
+    const lunes = (d: Date) => {
+      const f = new Date(`${diaEn(d)}T00:00:00Z`);
+      f.setUTCDate(f.getUTCDate() - ((f.getUTCDay() + 6) % 7));
+      return f.toISOString().slice(0, 10);
+    };
+    const mismaSemana = lunes(pronto) === lunes(new Date());
+
+    const lista = await clubesPropios(ninoId);
+    expect(lista.some((c) => c.id === otraSemana)).toBe(false);
+    const club = lista.find((c) => c.id === esteClub);
+    if (!mismaSemana) {
+      expect(club).toBeUndefined();
+      return;
+    }
+    expect(club?.enSuLista).toBe(false);
+    if (club?.choque !== null) return; // justo a la hora de su clase: no se inscribe
+    await inscribirClubPropio({ userId: actor, childPersonId: ninoId, sessionId: esteClub });
+    const inscrito = (await clubesPropios(ninoId)).find((c) => c.id === esteClub);
+    expect(inscrito?.agendadoId).not.toBeNull();
+    expect(inscrito?.propia).toBe(false);
+    expect((await listaDeSesion(esteClub)).lista.some((f) => f.childPersonId === ninoId)).toBe(
+      true,
+    );
+    // Solo se borra de un CLUB: lo agendado de otro tipo no lo toca el niño.
+    await cancelarClubPropio({
+      userId: actor,
+      childPersonId: ninoId,
+      agendadoId: inscrito?.agendadoId ?? "",
+    });
+    expect((await clubesPropios(ninoId)).find((c) => c.id === esteClub)?.agendadoId).toBeNull();
+  });
+
+  it("el niño no puede borrar con Inscripción Clubes algo que no es un club", async () => {
+    const { agendados } = await agendaDeNino(ninoId, null);
+    const regular = agendados.find((x) => x.tipo === "REGULAR");
+    expect(regular).toBeDefined();
+    await expect(
+      cancelarClubPropio({ userId: actor, childPersonId: ninoId, agendadoId: regular?.id ?? "" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("lo que choca con su clase se muestra marcado y no se deja agendar", async () => {

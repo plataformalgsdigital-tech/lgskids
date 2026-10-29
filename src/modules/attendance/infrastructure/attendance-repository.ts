@@ -74,6 +74,7 @@ export interface SessionInfo {
     abierto: boolean;
     campaignId: string | null;
     curso: "JUNIOR" | "YOUNGSTER" | null;
+    pais: "CL" | "CO" | "EC" | "PE" | null;
     classroomId: string | null;
   };
 }
@@ -116,7 +117,8 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
                            WHERE t2.tanda_id = tc.id AND t2.starts_at > now()
                              AND t2.cerrada_en IS NULL)) END AS tanda,
             json_build_object('abierto', s.abierto, 'campaignId', s.alcance_campaign_id,
-                              'curso', s.alcance_curso, 'classroomId', s.alcance_classroom_id)
+                              'curso', s.alcance_curso, 'pais', s.alcance_pais,
+                              'classroomId', s.alcance_classroom_id)
               AS apertura
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
