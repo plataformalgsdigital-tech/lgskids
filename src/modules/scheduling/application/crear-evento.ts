@@ -987,6 +987,106 @@ function validarEventoAdmin(input: DatosEventoAdmin): { startsAt: Date; guias: s
  * audiencia nueva REEMPLAZA a la anterior: los que siguen conservan su marca de
  * asistencia; los que salen dejan de verlo.
  */
+/**
+ * CANCELA un evento creado a mano (sesión extra, club, taller, refuerzo): lo
+ * borra del calendario en todos sus salones si es compartido y, en un Club de
+ * TANDA con `todaLaTanda`, también las semanas que siguen. Las sesiones del
+ * HORARIO no: esas se suspenden (corren al final del curso). Se rechaza si
+ * alguna ya se registró, tiene asistencia o tiene una repetición pedida —ahí ya
+ * hay historia que se perdería—. Los niños agendados quedan CANCELADOS (no se
+ * borran: queda quién y cuándo), y al cancelar la tanda entera también sus
+ * inscripciones.
+ */
+export async function eliminarEvento(input: {
+  actorUserId: string;
+  sessionId: string;
+  todaLaTanda?: boolean;
+  ip?: string | null;
+}): Promise<{ sesiones: number }> {
+  const sesion = await queryOne<{
+    slotId: string | null;
+    grupoId: string | null;
+    tandaId: string | null;
+    startsAt: Date;
+  }>(
+    `SELECT slot_id AS "slotId", grupo_id AS "grupoId", tanda_id AS "tandaId",
+            starts_at AS "startsAt"
+       FROM scheduling_session WHERE id = $1`,
+    [input.sessionId],
+  );
+  if (sesion === null) throw new NotFoundError("El evento no existe.");
+  if (sesion.slotId !== null) {
+    throw new ValidationError(
+      "Es una clase del horario del salón: no se cancela, se suspende ese día.",
+    );
+  }
+  const enTanda = input.todaLaTanda === true && sesion.tandaId !== null;
+
+  const borradas = await withTransaction(async (tx) => {
+    const filas = await queryRows<{
+      id: string;
+      classroomId: string;
+      startsAt: Date;
+      historia: boolean;
+    }>(
+      `SELECT s.id, s.classroom_id AS "classroomId", s.starts_at AS "startsAt",
+              (s.cerrada_en IS NOT NULL
+               OR EXISTS (SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id)
+               OR EXISTS (SELECT 1 FROM scheduling_repeticion r WHERE r.session_id = s.id))
+                AS historia
+         FROM scheduling_session s
+        WHERE s.id = $1
+           OR ($2::uuid IS NOT NULL AND s.grupo_id = $2)
+           OR ($3::uuid IS NOT NULL AND s.tanda_id = $3 AND s.starts_at >= $4)
+        FOR UPDATE`,
+      [input.sessionId, sesion.grupoId, enTanda ? sesion.tandaId : null, sesion.startsAt],
+      tx,
+    );
+    if (filas.some((f) => f.historia)) {
+      throw new ConflictError(
+        enTanda
+          ? "Alguna sesión de la tanda ya se registró o tiene asistencia: cancela solo las que faltan, una por una."
+          : "El evento ya se registró o tiene asistencia: no se puede cancelar.",
+      );
+    }
+    for (const f of filas) {
+      await execute(
+        `UPDATE scheduling_agendado
+            SET estado = 'CANCELADA', cancelado_por = $3, cancelado_en = now()
+          WHERE classroom_id = $1 AND starts_at = $2 AND estado = 'ACTIVA'`,
+        [f.classroomId, f.startsAt, input.actorUserId],
+        tx,
+      );
+    }
+    if (enTanda) {
+      await execute(
+        `UPDATE scheduling_club_inscripcion
+            SET estado = 'CANCELADA', fin_en = now(), fin_por = $2,
+                fin_motivo = 'Se canceló el club'
+          WHERE tanda_id = $1 AND estado = 'ACTIVA'`,
+        [sesion.tandaId, input.actorUserId],
+        tx,
+      );
+    }
+    await execute(
+      `DELETE FROM scheduling_session WHERE id = ANY($1)`,
+      [filas.map((f) => f.id)],
+      tx,
+    );
+    return filas.length;
+  });
+
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.evento_cancelado",
+    entidad: "scheduling_session",
+    entidadId: input.sessionId,
+    payload: { sesiones: borradas, todaLaTanda: enTanda, tandaId: sesion.tandaId },
+    ip: input.ip ?? null,
+  });
+  return { sesiones: borradas };
+}
+
 export async function editarEventoAdmin(
   input: DatosEventoAdmin & { id: string },
 ): Promise<{ id: string; guias: number }> {

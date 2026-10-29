@@ -24,7 +24,8 @@ import {
 } from "./agenda-comun";
 import { AgendaDia } from "./AgendaDia";
 import { FiltrosCalendario } from "./FiltrosCalendario";
-import { SesionModal } from "./SesionModal";
+import { QuitarEventoModal } from "./QuitarEventoModal";
+import { SesionModal, cargarEventoEditable } from "./SesionModal";
 import { NuevoEventoModal, type EventoEditable, type SalonOpcion } from "./NuevoEventoModal";
 import { WelcomeModal } from "./WelcomeModal";
 
@@ -184,8 +185,20 @@ function CalendarioSalones({
   const puedeEditarAcademico = puede("op.calendario.evento_academico");
   const puedeEditarAdmin = puede("op.calendario.evento_admin");
   const puedeAgenda = puede("op.calendario.vista_agenda");
+  const puedeSuspender = puede("op.calendario.suspender");
   const [editando, setEditando] = useState<EventoEditable | null>(null);
   const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
+  // ✕ de la Agenda: cancelar un evento o suspender una clase del horario.
+  const [quitando, setQuitando] = useState<AgendaSesion | null>(null);
+  const [avisoAgenda, setAvisoAgenda] = useState<string | null>(null);
+
+  /** ✏️ de la Agenda: el evento se trae completo antes de abrir el formulario. */
+  async function abrirEdicionSesion(id: string) {
+    setErrorEdicion(null);
+    const ev = await cargarEventoEditable(id);
+    if (typeof ev === "string") setErrorEdicion(ev);
+    else setEditando(ev);
+  }
 
   /** El evento administrativo se trae completo (audiencia incluida) antes de editarlo. */
   async function abrirEdicionAdmin(id: string) {
@@ -355,6 +368,28 @@ function CalendarioSalones({
           onSesion={setSesionAbierta}
           onWelcome={setWelcomeAbierto}
           onAdmin={puedeEditarAdmin ? (id) => void abrirEdicionAdmin(id) : null}
+          onEditarSesion={puedeEditarAcademico ? (id) => void abrirEdicionSesion(id) : null}
+          onQuitarSesion={(s) => {
+            setAvisoAgenda(null);
+            setQuitando(s);
+          }}
+          puedeQuitar={(s) => (s.esEvento ? puedeEditarAcademico : puedeSuspender)}
+        />
+      )}
+      {avisoAgenda !== null && modo === "dia" && (
+        <p role="status" style={{ marginTop: "0.6rem", color: "#1b5e20", fontWeight: 700 }}>
+          ✅ {avisoAgenda}
+        </p>
+      )}
+      {quitando !== null && (
+        <QuitarEventoModal
+          sesion={quitando}
+          onCerrar={() => setQuitando(null)}
+          onHecho={(aviso) => {
+            setQuitando(null);
+            setAvisoAgenda(aviso);
+            setRecarga((n) => n + 1);
+          }}
         />
       )}
 
@@ -796,18 +831,7 @@ function CalendarioSalones({
       {/* Evento en MODAL: reemplaza la navegación a /calendario/sesion/[id],
           que sigue viva como enlace profundo. */}
       {sesionAbierta !== null && (
-        <SesionModal
-          sessionId={sesionAbierta}
-          onCerrar={() => setSesionAbierta(null)}
-          onEditar={
-            puedeEditarAcademico
-              ? (ev) => {
-                  setSesionAbierta(null);
-                  setEditando(ev);
-                }
-              : undefined
-          }
-        />
+        <SesionModal sessionId={sesionAbierta} onCerrar={() => setSesionAbierta(null)} />
       )}
 
       {welcomeAbierto !== null && (

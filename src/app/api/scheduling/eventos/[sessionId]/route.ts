@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
-import { ESQUEMA_APERTURA, editarEvento } from "@/modules/scheduling";
+import { ESQUEMA_APERTURA, editarEvento, eliminarEvento } from "@/modules/scheduling";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
 bootstrapIdentity();
@@ -49,6 +49,26 @@ export const PATCH = handlerWithAuth(async (request, auth, context) => {
       ...(body.apertura !== undefined && { apertura: body.apertura }),
       todaLaTanda: body.todaLaTanda === true,
       ...(body.linkClubId !== undefined && { linkClubId: body.linkClubId }),
+      ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    }),
+  );
+});
+
+/**
+ * DELETE — CANCELA un evento creado a mano (en todos sus salones si es
+ * compartido; `?todaLaTanda=1` en un Club de tanda, también las semanas que
+ * siguen). Las clases del horario no: se suspenden. `eventos.crear`.
+ */
+export const DELETE = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.EVENTOS_CREAR);
+  profile.requireOpcion("op.calendario.evento_academico");
+  const sessionId = z.uuid().parse((await context.params)["sessionId"]);
+  return json(
+    await eliminarEvento({
+      actorUserId: auth.userId,
+      sessionId,
+      todaLaTanda: request.nextUrl.searchParams.get("todaLaTanda") === "1",
       ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     }),
   );

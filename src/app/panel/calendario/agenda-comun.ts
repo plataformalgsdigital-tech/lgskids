@@ -24,6 +24,10 @@ export interface AgendaSesion {
   meetingUrl: string | null;
   asistieron: number;
   cerrada: boolean;
+  /** Creado a mano (sin horario): se edita y se cancela; la clase del horario se suspende. */
+  esEvento: boolean;
+  /** Club de una tanda semanal. */
+  tandaId: string | null;
 }
 
 export interface FiltrosAgenda {

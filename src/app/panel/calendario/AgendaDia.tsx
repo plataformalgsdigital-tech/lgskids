@@ -111,6 +111,21 @@ function Contador(props: { icono: string; titulo: string; valor: number; color: 
   );
 }
 
+/** Botón de ícono de la tarjeta (✏️ / ✕). */
+function icono(color: string): CSSProperties {
+  return {
+    border: "none",
+    background: "transparent",
+    color,
+    fontSize: "1rem",
+    fontWeight: 800,
+    lineHeight: 1,
+    padding: "0.25rem 0.4rem",
+    borderRadius: "0.4rem",
+    cursor: "pointer",
+  };
+}
+
 function Tarjeta(props: {
   color: ColorCampania;
   onClick?: (() => void) | undefined;
@@ -157,6 +172,12 @@ export function AgendaDia(props: {
   onSesion: (id: string) => void;
   onWelcome: (id: string) => void;
   onAdmin: ((id: string) => void) | null;
+  /** ✏️ de un evento creado a mano (null = sin permiso). */
+  onEditarSesion: ((id: string) => void) | null;
+  /** ✕: cancelar un evento o suspender una clase del horario (el padre decide si puede). */
+  onQuitarSesion: ((s: AgendaSesion) => void) | null;
+  /** Quién puede cada ✕: los eventos y las clases del horario tienen permisos distintos. */
+  puedeQuitar: (s: AgendaSesion) => boolean;
 }) {
   type Item =
     | { clase: "sesion"; hora: string; s: AgendaSesion }
@@ -373,6 +394,40 @@ export function AgendaDia(props: {
                           </span>
                           {s.cerrada && (
                             <span style={chip("#e8f5e9", "#1b5e20")}>✔ registrada</span>
+                          )}
+                          {/* Editar / cancelar o suspender, como en la agenda de LGS. Lo
+                              ya registrado no se toca. */}
+                          {!s.cerrada && (
+                            <span style={{ marginLeft: "auto", display: "flex", gap: "0.2rem" }}>
+                              {s.esEvento && props.onEditarSesion !== null && (
+                                <button
+                                  type="button"
+                                  title="Editar evento"
+                                  aria-label="Editar evento"
+                                  style={icono("#1e40af")}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    props.onEditarSesion?.(s.id);
+                                  }}
+                                >
+                                  ✏️
+                                </button>
+                              )}
+                              {props.onQuitarSesion !== null && props.puedeQuitar(s) && (
+                                <button
+                                  type="button"
+                                  title={s.esEvento ? "Cancelar evento" : "Suspender este día"}
+                                  aria-label={s.esEvento ? "Cancelar evento" : "Suspender este día"}
+                                  style={icono("#c62828")}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    props.onQuitarSesion?.(s);
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </span>
                           )}
                         </div>
                         <div>

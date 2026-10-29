@@ -123,6 +123,37 @@ function tituloSalon(s: Sesion): string {
   return [s.campania, curso, salon].filter((p) => p !== null && p !== "").join(" · ");
 }
 
+/**
+ * Lo que el formulario necesita para EDITAR un evento creado a mano. Lo usa el
+ * ✏️ de la tarjeta de la Agenda (2026-10-29: antes era un botón de este modal).
+ * Devuelve el mensaje de error si no se pudo leer.
+ */
+export async function cargarEventoEditable(sessionId: string): Promise<EventoEditable | string> {
+  const res = await apiFetch(`/api/attendance/sessions/${sessionId}`);
+  if (!res.ok) {
+    const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
+    return c.error?.message ?? "No se pudo abrir el evento.";
+  }
+  const { sesion } = (await res.json()) as { sesion: Sesion };
+  return {
+    clase: "suelto",
+    id: sesion.id,
+    tipo: sesion.tipo,
+    startsAt: sesion.startsAt,
+    timezone: sesion.timezone,
+    duracionMin: sesion.duracionMin,
+    guiaUserId: sesion.guiaUserId,
+    nivel: sesion.nivel,
+    limiteUsuarios: sesion.limiteUsuarios,
+    observaciones: sesion.observaciones,
+    salon: tituloSalon(sesion),
+    compartido: sesion.grupoId !== null,
+    tanda: sesion.tanda ?? null,
+    apertura: sesion.apertura ?? APERTURA_CERRADA,
+    linkClubId: sesion.linkClubId ?? null,
+  };
+}
+
 /** "Sesión 3 · Lección 3": el catálogo escribe "Leccion 3", sin tilde. */
 function tituloSesion(s: Sesion): string {
   if (s.tipo === "CLUB") return "Club";
@@ -205,20 +236,7 @@ const FICHA_VACIA = {
   requiereAtencion: false,
 };
 
-export function SesionModal({
-  sessionId,
-  onCerrar,
-  onEditar,
-}: {
-  sessionId: string;
-  onCerrar: () => void;
-  /**
-   * Abre el formulario en modo edición. Solo llega con `eventos.crear`, y solo
-   * aplica a lo creado a mano en el calendario: las sesiones del horario se
-   * mueven suspendiendo o regenerando.
-   */
-  onEditar?: ((evento: EventoEditable) => void) | undefined;
-}) {
+export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerrar: () => void }) {
   const [sesion, setSesion] = useState<Sesion | null>(null);
   const [lista, setLista] = useState<Fila[]>([]);
   const [repeticiones, setRepeticiones] = useState<Repeticion[]>([]);
@@ -242,8 +260,6 @@ export function SesionModal({
   const [horaReal, setHoraReal] = useState("");
   const [notaSesion, setNotaSesion] = useState("");
   const [confirmoSinNadie, setConfirmoSinNadie] = useState(false);
-  const [suspendiendo, setSuspendiendo] = useState(false);
-  const [motivoSuspension, setMotivoSuspension] = useState("");
   // Contenido del curso: libros, material y recursos.
   const [contenido, setContenido] = useState<CursoRef[] | null>(null);
   const [pestana, setPestana] = useState<"material_usuario" | "material_guia" | "recursos" | null>(
@@ -540,29 +556,6 @@ export function SesionModal({
       setAviso("Guía de esta sesión actualizado. Las demás sesiones no cambian.");
       setCambiandoGuia(false);
       await cargar();
-    } finally {
-      setOcupado(false);
-    }
-  }
-
-  async function suspenderDia() {
-    if (sesion === null) return;
-    setOcupado(true);
-    setError(null);
-    try {
-      const res = await apiFetch(`/api/scheduling/classrooms/${sesion.classroomId}/suspend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fecha: sesion.fecha, motivo: motivoSuspension.trim() }),
-      });
-      if (!res.ok) {
-        const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
-        setError(c.error?.message ?? "No se pudo suspender.");
-        return;
-      }
-      setAviso("Día suspendido. La sesión se corrió al final del curso.");
-      setSuspendiendo(false);
-      setMotivoSuspension("");
     } finally {
       setOcupado(false);
     }
@@ -885,44 +878,7 @@ export function SesionModal({
                 🔓 Abrir misión
               </button>
             )}
-            {onEditar !== undefined && sesion !== null && sesion.esEvento && !cerrada && (
-              <button
-                type="button"
-                style={boton}
-                disabled={ocupado}
-                onClick={() =>
-                  onEditar({
-                    clase: "suelto",
-                    id: sesion.id,
-                    tipo: sesion.tipo,
-                    startsAt: sesion.startsAt,
-                    timezone: sesion.timezone,
-                    duracionMin: sesion.duracionMin,
-                    guiaUserId: sesion.guiaUserId,
-                    nivel: sesion.nivel,
-                    limiteUsuarios: sesion.limiteUsuarios,
-                    observaciones: sesion.observaciones,
-                    salon: tituloSalon(sesion),
-                    compartido: sesion.grupoId !== null,
-                    tanda: sesion.tanda ?? null,
-                    apertura: sesion.apertura ?? APERTURA_CERRADA,
-                    linkClubId: sesion.linkClubId ?? null,
-                  })
-                }
-              >
-                ✏️ Editar evento
-              </button>
-            )}
-            {puede("op.calendario.suspender") && (
-              <button
-                type="button"
-                style={boton}
-                disabled={ocupado}
-                onClick={() => setSuspendiendo((v) => !v)}
-              >
-                ⏸ Suspender este día
-              </button>
-            )}
+            {/* Editar, cancelar o suspender viven en la tarjeta de la Agenda (✏️ y ✕). */}
             <span style={{ flex: 1 }} />
             {puede("op.calendario.contenido") && (
               <>
@@ -1270,40 +1226,6 @@ export function SesionModal({
                   Cancelar
                 </button>
               </div>
-            </section>
-          )}
-
-          {suspendiendo && (
-            <section style={{ ...caja, borderColor: "var(--lgs-magenta)" }}>
-              <h3 style={{ fontSize: "0.9rem", fontWeight: 800, marginBottom: "0.5rem" }}>
-                Suspender este día
-              </h3>
-              <p
-                style={{ fontSize: "0.8rem", color: "var(--texto-suave)", marginBottom: "0.5rem" }}
-              >
-                La sesión se corre AL FINAL del curso: el total no cambia y `final_curso` no se
-                reescribe.
-              </p>
-              <input
-                value={motivoSuspension}
-                onChange={(e) => setMotivoSuspension(e.target.value)}
-                placeholder="Motivo (obligatorio)"
-                style={{
-                  width: "100%",
-                  padding: "0.55rem",
-                  borderRadius: "0.5rem",
-                  border: "1.5px solid #d8dce6",
-                  fontSize: "0.88rem",
-                }}
-              />
-              <button
-                type="button"
-                style={{ ...botonPrimario, marginTop: "0.5rem", background: "var(--lgs-magenta)" }}
-                disabled={ocupado || motivoSuspension.trim() === ""}
-                onClick={() => void suspenderDia()}
-              >
-                Suspender
-              </button>
             </section>
           )}
 

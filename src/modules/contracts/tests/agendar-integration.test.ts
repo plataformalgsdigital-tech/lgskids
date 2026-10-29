@@ -7,12 +7,19 @@ import {
   crearEvento,
   crearSalon,
   editarEvento,
+  eliminarEvento,
   retirarClubesPorFaltas,
 } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
-import { AppError, ConflictError, ForbiddenError, NotFoundError } from "@/platform/errors";
+import {
+  AppError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from "@/platform/errors";
 import { newId } from "@/platform/ids";
 import { aprobarContrato, crearContrato } from "../application/gestion-contratos";
 import {
@@ -418,7 +425,14 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       tanda: { inicio, fin: sumarDiasA(inicio, 28) },
     });
     await agendar("CLUB", primera);
-    expect(await semanasEnLista(primera)).toBe(5);
+    // Todas las semanas de la tanda (sin contar las que un feriado del salón saltó).
+    const semanas = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM scheduling_session
+        WHERE tanda_id = (SELECT tanda_id FROM scheduling_session WHERE id = $1)`,
+      [primera],
+    );
+    expect(semanas?.n).toBeGreaterThanOrEqual(3);
+    expect(await semanasEnLista(primera)).toBe(semanas?.n);
     expect((await inscripcionDe(primera))?.estado).toBe("ACTIVA");
 
     // Pasan dos semanas y falta a las dos.
@@ -466,6 +480,45 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       (x) => x.tipo === "CLUB" && x.startsAt > new Date().toISOString(),
     );
     expect(proxima).toBeDefined();
+  });
+
+  it("CANCELAR evento: toda la tanda sale del calendario y cancela inscripciones", async () => {
+    const inicio = diaEn(new Date(Date.now() + 4 * 86_400_000));
+    const primera = await nuevoEvento({
+      salon: salonC,
+      fecha: inicio,
+      hora: "05:15",
+      tanda: { inicio, fin: sumarDiasA(inicio, 35) },
+    });
+    await agendar("CLUB", primera);
+    const tanda = (
+      await queryOne<{ t: string }>(`SELECT tanda_id AS t FROM scheduling_session WHERE id = $1`, [
+        primera,
+      ])
+    )?.t;
+    // Las semanas que la tanda tiene de verdad (los feriados del salón se saltan).
+    const antes = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM scheduling_session WHERE tanda_id = $1`,
+      [tanda],
+    );
+    expect(antes?.n).toBeGreaterThan(1);
+    const r = await eliminarEvento({ actorUserId: actor, sessionId: primera, todaLaTanda: true });
+    expect(r.sesiones).toBe(antes?.n);
+    const quedan = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM scheduling_session WHERE tanda_id = $1`,
+      [tanda],
+    );
+    expect(quedan?.n).toBe(0);
+    const ins = await queryOne<{ estado: string }>(
+      `SELECT estado FROM scheduling_club_inscripcion WHERE tanda_id = $1 AND child_person_id = $2`,
+      [tanda, ninoId],
+    );
+    expect(ins?.estado).toBe("CANCELADA");
+    // Una clase del HORARIO no se cancela: se suspende.
+    const regular = await proximaDe(salonA);
+    await expect(
+      eliminarEvento({ actorUserId: actor, sessionId: regular.id }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("el niño no puede borrar con Inscripción Clubes algo que no es un club", async () => {

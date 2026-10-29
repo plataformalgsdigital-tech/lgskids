@@ -1778,7 +1778,16 @@ solo servía para completar la ficha.
   una sola hora, la del navegador: una sesión de las 17:00 de un salón chileno se
   leía "15:00" desde Colombia sin decir de qué país era. El Welcome también la muestra.
 - Un evento abre **MODAL** (`calendario/SesionModal.tsx`), no una página. El nombre
-  del guía SIEMPRE se ve; "Cambiar guía" y "Suspender" solo con `salones.gestionar`.
+  del guía SIEMPRE se ve; "Cambiar guía" solo con `salones.gestionar`.
+  **Editar / cancelar / suspender viven en la tarjeta de la AGENDA (2026-10-29, como
+  LGS)**, no en el modal: ✏️ edita un evento creado a mano (`cargarEventoEditable` →
+  el formulario de siempre) y ✕ abre `QuitarEventoModal`: un evento suelto se
+  CANCELA (`DELETE /api/scheduling/eventos/[id]` → `eliminarEvento`, en todos sus
+  salones; en un Club de tanda, "solo esta" o "toda la tanda", que cancela también
+  las inscripciones; se rechaza con registro, asistencia o repetición pedida, y los
+  agendados quedan CANCELADOS) y una clase del HORARIO se SUSPENDE ese día. Permisos:
+  `op.calendario.evento_academico` y `op.calendario.suspender`. Lo registrado no
+  muestra íconos. Prueba en `contracts/tests/agendar-integration.test.ts`.
   **Encabezado (2026-10-02)**: a la izquierda `CAMPAÑA · CURSO · Salón NN`, a la
   derecha `Nivel X · Sesión N · Lección N` en una sola línea. "Información del evento" lleva
   fecha, hora, cupo e inscritos, guía (con "Cambiar guía") y enlace; la caja

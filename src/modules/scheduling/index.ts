@@ -133,6 +133,7 @@ export {
   editarEventoAdmin,
   detalleEventoAdmin,
   editarEvento,
+  eliminarEvento,
   eventosAdmin,
   audienciaEventoAdmin,
   marcarAsistenciaEventoAdmin,
