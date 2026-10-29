@@ -2202,7 +2202,9 @@ y `DELETE …/agenda/[agendadoId]`.
   salones de su campaña/país/curso/salón ("Todos" = todos los activos) y es de su
   NIVEL o de todos; más los ABIERTOS a otros salones con alcance que coincide.
   - **Inscribirse = toda la tanda**: `scheduling_club_inscripcion` (migración
-    `20261029000000_clubes_alumno`) y un `scheduling_agendado` por cada semana que
+    `20261029100000_clubes_inscritos`; NO se amplió la `…000000`, que ya estaba
+    aplicada en producción: `migrate deploy` no vuelve a correr una migración
+    aplicada) y un `scheduling_agendado` por cada semana que
     le queda (con `inscripcion_id`), en su salón si el club se dicta ahí. Así la
     lista, el cupo, "Mis próximas clases", la Siguiente clase y la asistencia usan el
     camino que ya existía. Agendar un CLUB desde la ficha también inscribe
