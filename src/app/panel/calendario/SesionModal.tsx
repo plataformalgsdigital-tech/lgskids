@@ -105,6 +105,8 @@ interface Sesion {
   cancelada: boolean;
   /** Evento SUSPENDIDO desde la Agenda: su motivo. */
   suspensionMotivo?: string | null;
+  /** Club UNO para varios salones: a quién es (en vez del salón anfitrión). */
+  alcanceEtiqueta?: string | null;
 }
 
 const NIVEL_UI: Record<string, string> = {
@@ -117,6 +119,8 @@ const NIVEL_UI: Record<string, string> = {
 
 /** "OCTUBRE2026 · JUNIOR · Salón 04": el salón ya se llama "JUNIOR Salón 04". */
 function tituloSalon(s: Sesion): string {
+  // UN club para varios salones: a quién es, no el salón que lo hospeda.
+  if (s.alcanceEtiqueta != null) return s.alcanceEtiqueta;
   const curso = s.cursoTipo ?? "";
   const salon =
     curso !== "" && s.salon.toUpperCase().startsWith(`${curso} `)

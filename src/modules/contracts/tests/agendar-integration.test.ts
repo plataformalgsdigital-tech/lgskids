@@ -483,6 +483,41 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     expect(proxima).toBeDefined();
   });
 
+  it("CLUB para 'Todos': UN solo evento con su alcance, que ven e inscriben todos", async () => {
+    const fecha = diaEn(new Date(Date.now() + 7 * 86_400_000));
+    const r = await crearEvento({
+      actorUserId: actor,
+      classroomIds: [salonA, salonB],
+      todos: true,
+      alcanceClub: { campaignId: campaniaId, pais: "CO", curso: "JUNIOR" },
+      zona: ZONA,
+      tipo: "CLUB",
+      fecha,
+      horaLocal: "04:15",
+      duracionMin: 60,
+      guiaUserId: actor,
+    });
+    // Una sola sesión, no una por salón.
+    expect(r.sesiones).toHaveLength(1);
+    const club = r.sesiones[0]!.id;
+    eventos.push(club);
+    const s = await queryOne<{ abierto: boolean; curso: string | null; pais: string | null }>(
+      `SELECT abierto, alcance_curso AS curso, alcance_pais AS pais FROM scheduling_session WHERE id = $1`,
+      [club],
+    );
+    expect(s).toEqual({ abierto: true, curso: "JUNIOR", pais: "CO" });
+    // El niño (salón A) lo ve y se inscribe en ESE evento.
+    const op = await opcionesAgendaNino({
+      childPersonId: ninoId,
+      countryScope: null,
+      tipo: "CLUB",
+      fecha,
+    });
+    expect(op.some((o) => o.id === club)).toBe(true);
+    await agendar("CLUB", club);
+    expect((await listaDeSesion(club)).lista.some((f) => f.childPersonId === ninoId)).toBe(true);
+  });
+
   it("SUSPENDER evento: sigue en el calendario, sin lista ni registro; se reactiva", async () => {
     const fecha = diaEn(new Date(Date.now() + 6 * 86_400_000));
     const ev = await nuevoEvento({ salon: salonC, fecha, hora: "04:45" });

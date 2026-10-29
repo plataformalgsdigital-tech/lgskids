@@ -411,12 +411,19 @@ export function AgendaDia(props: {
                           }}
                         >
                           <span style={chip(tipo.bg, tipo.fg)}>{tipo.texto}</span>
-                          <span style={chip("white", color.fg)}>{s.campania}</span>
-                          <strong style={{ color: color.fg }}>{s.salon}</strong>
-                          <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
-                            {s.cursoTipo === "JUNIOR" ? "Junior" : "Youngster"} ·{" "}
-                            {PAIS_CORTO[s.pais] ?? s.pais}
-                          </span>
+                          {s.alcance !== null ? (
+                            // UN club para varios salones: su alcance, no el anfitrión.
+                            <strong style={{ color: color.fg }}>{s.alcance.etiqueta}</strong>
+                          ) : (
+                            <>
+                              <span style={chip("white", color.fg)}>{s.campania}</span>
+                              <strong style={{ color: color.fg }}>{s.salon}</strong>
+                              <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>
+                                {s.cursoTipo === "JUNIOR" ? "Junior" : "Youngster"} ·{" "}
+                                {PAIS_CORTO[s.pais] ?? s.pais}
+                              </span>
+                            </>
+                          )}
                           {s.cerrada && (
                             <span style={chip("#e8f5e9", "#1b5e20")}>✔ registrada</span>
                           )}

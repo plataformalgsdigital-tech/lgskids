@@ -550,6 +550,8 @@ export interface AgendaItem {
   /** Evento SUSPENDIDO desde la Agenda (sigue en el calendario, no se dicta). */
   suspendida: boolean;
   motivoSuspension: string | null;
+  /** Club UNO para varios salones: su alcance y la etiqueta que lo describe. */
+  alcance: { etiqueta: string; curso: string | null } | null;
 }
 
 /**
@@ -565,7 +567,10 @@ export async function agendaSesiones(
   let extra = "";
   if (filtros?.campaignId !== undefined && filtros.campaignId !== "") {
     values.push(filtros.campaignId);
-    extra += ` AND cu.campaign_id = $${values.length}`;
+    // Un club con alcance sale en toda campaña que cubra, no solo en la del anfitrión.
+    extra += ` AND (cu.campaign_id = $${values.length}
+                    OR (s.abierto AND (s.alcance_campaign_id IS NULL
+                                       OR s.alcance_campaign_id = $${values.length})))`;
   }
   if (filtros?.guiaUserId !== undefined && filtros.guiaUserId !== "") {
     values.push(filtros.guiaUserId);
@@ -583,6 +588,13 @@ export async function agendaSesiones(
             ${SALA_SESION} AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
             (s.slot_id IS NULL) AS "esEvento", s.tanda_id AS "tandaId",
             (s.suspendida_en IS NOT NULL) AS suspendida, s.suspension_motivo AS "motivoSuspension",
+            CASE WHEN s.abierto THEN json_build_object(
+              'etiqueta', concat_ws(' · ',
+                 COALESCE(ac.nombre, 'Todas las campañas'),
+                 COALESCE(initcap(s.alcance_curso), 'Todos los cursos'),
+                 COALESCE(s.alcance_pais, 'Todos los países'),
+                 COALESCE(acl.nombre, 'Todos los salones')),
+              'curso', s.alcance_curso) END AS alcance,
             ${SQL_EN_LISTA("s")} AS ocupados,
             (SELECT count(*) FROM attendance_attendance a
               WHERE a.session_id = s.id AND a.estado = 'PRESENTE')::int AS asistieron
@@ -590,6 +602,8 @@ export async function agendaSesiones(
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course cu ON cu.id = cl.course_id
        JOIN catalog_campaign ca ON ca.id = cu.campaign_id
+       LEFT JOIN catalog_campaign ac ON ac.id = s.alcance_campaign_id
+       LEFT JOIN scheduling_classroom acl ON acl.id = s.alcance_classroom_id
        -- El EFECTIVO: si ese día lo cubre un reemplazo, es el que va en la agenda.
        LEFT JOIN identity_user gu ON gu.id = ${GUIA_EFECTIVO}
        ${JOIN_NOMBRE_GUIA}

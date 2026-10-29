@@ -83,6 +83,8 @@ export const POST = handlerWithAuth(async (request, auth) => {
     classroomIds:
       body.todos !== undefined ? await salonesDelAlcance(body.todos) : body.classroomIds,
     todos: body.todos !== undefined,
+    // Un Club para "Todos" es UN evento con su alcance, no una copia por salón.
+    ...(body.tipo === "CLUB" && body.todos !== undefined && { alcanceClub: body.todos }),
     tanda: body.tanda ?? null,
     ...(body.zona !== undefined && { zona: body.zona }),
     tipo: body.tipo,

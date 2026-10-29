@@ -314,9 +314,10 @@ export function NuevoEventoModal({
   const [apertura, setApertura] = useState<AperturaEvento>(
     editar?.clase === "suelto" ? editar.apertura : APERTURA_CERRADA,
   );
-  // Un CLUB no lleva apertura: quién puede inscribirse ya lo dicen su campaña,
-  // país, curso, salón y nivel (se dicta en esos salones y es de inscritos).
-  const aperturaEnviada = tipo === "CLUB" ? APERTURA_CERRADA : apertura;
+  // Un CLUB no lleva apertura en el formulario: quién puede inscribirse lo dicen
+  // su campaña, país, curso, salón y nivel. Con "Todos" el servidor lo guarda como
+  // UN evento con ese alcance; al editar no se manda, para conservarlo.
+  const aperturaEnviada = tipo === "CLUB" ? undefined : apertura;
   // TANDA de clubs: el Club se repite cada semana entre estas dos fechas.
   const [tandaInicio, setTandaInicio] = useState("");
   const [tandaFin, setTandaFin] = useState("");

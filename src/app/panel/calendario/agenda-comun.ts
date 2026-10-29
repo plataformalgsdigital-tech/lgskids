@@ -31,6 +31,11 @@ export interface AgendaSesion {
   /** Evento SUSPENDIDO desde la Agenda (sigue en el calendario, no se dicta). */
   suspendida: boolean;
   motivoSuspension: string | null;
+  /**
+   * Club UNO para varios salones: su alcance (null = "Todos" en cada campo) y la
+   * etiqueta que se muestra en vez del salón anfitrión. null = evento de su salón.
+   */
+  alcance: { etiqueta: string; curso: string | null } | null;
 }
 
 export interface FiltrosAgenda {
@@ -51,8 +56,12 @@ export function hayFiltros(f: FiltrosAgenda): boolean {
 export function filtrarSesiones(sesiones: AgendaSesion[], f: FiltrosAgenda): AgendaSesion[] {
   return sesiones.filter(
     (s) =>
-      (f.curso === "" || s.cursoTipo === f.curso) &&
-      (f.salon === "" || s.classroomId === f.salon) &&
+      // Un club con alcance vale para todo curso/salón que cubra, no solo el anfitrión.
+      (f.curso === "" ||
+        (s.alcance !== null
+          ? s.alcance.curso === null || s.alcance.curso === f.curso
+          : s.cursoTipo === f.curso)) &&
+      (f.salon === "" || s.alcance !== null || s.classroomId === f.salon) &&
       (f.guia === "" || s.guia === f.guia) &&
       (f.hora === "" || s.horaLocal === f.hora),
   );
@@ -74,11 +83,13 @@ export function opcionesDeFiltros(sesiones: AgendaSesion[]): {
   const guias = new Set<string>();
   const horas = new Set<string>();
   for (const s of sesiones) {
-    salones.set(s.classroomId, {
-      id: s.classroomId,
-      etiqueta: `${s.campania} · ${s.salon}`,
-      curso: s.cursoTipo,
-    });
+    // El salón anfitrión de un club con alcance no es "su" salón: no se ofrece.
+    if (s.alcance === null)
+      salones.set(s.classroomId, {
+        id: s.classroomId,
+        etiqueta: `${s.campania} · ${s.salon}`,
+        curso: s.cursoTipo,
+      });
     if (s.guia !== null) guias.add(s.guia);
     horas.add(s.horaLocal);
   }

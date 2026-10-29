@@ -643,7 +643,9 @@ function CalendarioSalones({
                         <span style={{ ...linea, fontWeight: 800 }}>
                           {s.horaLocal}{" "}
                           {s.tipo === "CLUB" ? "Club " : s.tipo === "TALLER" ? "Taller " : ""}
-                          {s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"} · {s.salon}
+                          {s.alcance !== null
+                            ? s.alcance.etiqueta
+                            : `${s.cursoTipo === "JUNIOR" ? "Jr" : "Yg"} · ${s.salon}`}
                         </span>
                         <span style={{ ...linea, opacity: 0.85 }}>{s.guia ?? "Sin guía"}</span>
                         <span style={{ ...linea, opacity: 0.85 }}>
@@ -810,7 +812,7 @@ function CalendarioSalones({
                           {s.cursoTipo === "JUNIOR" ? "Junior" : "Youngster"}
                         </span>{" "}
                         {s.tipo === "CLUB" ? "Club · " : ""}
-                        {s.salon}
+                        {s.alcance?.etiqueta ?? s.salon}
                         {s.guia !== null && (
                           <span style={{ color: "var(--texto-suave)", fontSize: "0.8rem" }}>
                             {" "}

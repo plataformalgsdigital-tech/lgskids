@@ -72,6 +72,8 @@ export interface SessionInfo {
   cancelada: boolean;
   /** Evento suspendido desde la Agenda: su motivo (null = no está suspendido). */
   suspensionMotivo: string | null;
+  /** Evento ABIERTO (p. ej. un Club para "Todos"): a quién es. */
+  alcanceEtiqueta: string | null;
   /** Evento suelto abierto a otros salones (Agendar): su alcance; null = Todos. */
   apertura: {
     abierto: boolean;
@@ -106,7 +108,13 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             ${NOMBRE_GUIA} AS guia,
             (s.guia_user_id IS NOT NULL
               AND s.guia_user_id IS DISTINCT FROM cl.guia_user_id) AS "guiaSoloEstaSesion",
-            ${SALA_ZOOM} AS "meetingUrl", cl.cupo,
+            ${SALA_ZOOM} AS "meetingUrl", COALESCE(s.limite_usuarios, cl.cupo) AS cupo,
+            -- Club UNO para varios salones: a quién es, en vez del salón anfitrión.
+            CASE WHEN s.abierto THEN concat_ws(' · ',
+                   COALESCE(ac.nombre, 'Todas las campañas'),
+                   COALESCE(initcap(s.alcance_curso), 'Todos los cursos'),
+                   COALESCE(s.alcance_pais, 'Todos los países'),
+                   COALESCE(acl.nombre, 'Todos los salones')) END AS "alcanceEtiqueta",
             s.cerrada_por AS "cerradaPor", s.cerrada_en::text AS "cerradaEn",
             ca.nombre AS campania, co.tipo::text AS "cursoTipo",
             sec.leccion, sec.nivel AS "leccionNivel", ord.n::int AS "claseNumero",
@@ -134,6 +142,8 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
        LEFT JOIN scheduling_guia gg ON gg.guia_user_id = g.id
        LEFT JOIN identity_perfil gpf ON gpf.user_id = g.id
        LEFT JOIN scheduling_tanda_club tc ON tc.id = s.tanda_id
+       LEFT JOIN catalog_campaign ac ON ac.id = s.alcance_campaign_id
+       LEFT JOIN scheduling_classroom acl ON acl.id = s.alcance_classroom_id
       WHERE s.id = $1`,
     [sessionId],
   );

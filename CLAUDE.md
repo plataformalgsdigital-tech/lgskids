@@ -2218,6 +2218,19 @@ y `DELETE …/agenda/[agendadoId]`.
   SOLO de inscritos. Quién VE un club es lo que dice su creación: se dicta en los
   salones de su campaña/país/curso/salón ("Todos" = todos los activos) y es de su
   NIVEL o de todos; más los ABIERTOS a otros salones con alcance que coincide.
+  - **Un Club para "Todos" es UN evento** (2026-10-29, migración
+    `20261029300000_club_unico`): `crearEvento` con `alcanceClub` (la ruta lo pasa
+    cuando el tipo es CLUB y viene `todos`) NO lo copia en cada salón: crea UNA
+    sesión por semana en un salón ANFITRIÓN (el primero por nombre libre a esa
+    hora) con `abierto` y el alcance (campaña, curso, país; NULL = todos). Lo ven e
+    inscriben todos los niños que caen en el alcance (rama "abierto" de
+    `sesionesElegibles`), hay UNA lista y el guía pasa lista una vez. El calendario,
+    la Agenda y el modal muestran el ALCANCE ("Todas las campañas · Junior · CO ·
+    Todos los salones"), no el anfitrión, y el filtro de campaña/curso lo incluye.
+    El formulario de un Club no manda `apertura` (al editar se conserva el alcance).
+    La migración unió las copias ya creadas: grupos de CLUB de más de 3 salones sin
+    historia, con el alcance deducido de sus salones y los inscritos movidos al
+    anfitrión.
   - **Inscribirse = toda la tanda**: `scheduling_club_inscripcion` (migración
     `20261029100000_clubes_inscritos`; NO se amplió la `…000000`, que ya estaba
     aplicada en producción: `migrate deploy` no vuelve a correr una migración

@@ -332,6 +332,16 @@ export async function crearEvento(input: {
   /** Salones resueltos por `salonesDelAlcance` ("Todos"): sin tope de compartidos. */
   todos?: boolean;
   /**
+   * Solo CLUB con "Todos": el alcance con que se creó (null = Todos). El Club se
+   * guarda UNA vez con ese alcance —no una copia por salón— y lo ven e inscriben
+   * los niños de todos los salones que caen en él.
+   */
+  alcanceClub?: {
+    campaignId: string | null;
+    pais: "CL" | "CO" | "EC" | "PE" | null;
+    curso: "JUNIOR" | "YOUNGSTER" | null;
+  };
+  /**
    * Solo CLUB: TANDA — el Club se repite cada semana (el día de `fecha`) entre
    * el inicio y el final. Cada semana es una sesión (compartida si hay varios
    * salones); los feriados de cada salón y las fechas ya pasadas se saltan.
@@ -403,9 +413,22 @@ export async function crearEvento(input: {
   // Un evento compartido es UNA clase dictada en varios salones: comparte
   // grupo para que el conteo del guía no la cuente varias veces. En una tanda,
   // cada SEMANA es su propia clase compartida (su propio grupo).
-  const compartido = salones.length > 1;
+  // Un CLUB para "Todos" es UN solo evento (2026-10-29): no se copia en cada
+  // salón; se guarda una vez, en un salón ANFITRIÓN, con su alcance, y lo ven e
+  // inscriben los niños de todos los salones que caen en él (`sesionesElegibles`).
+  const clubUnico = input.tipo === "CLUB" && input.alcanceClub !== undefined;
+  let compartido = salones.length > 1 && !clubUnico;
   const tandaId = tanda !== null ? newId() : null;
-  const apertura = input.apertura ?? CERRADO;
+  const apertura: AperturaEvento =
+    clubUnico && input.alcanceClub !== undefined
+      ? {
+          abierto: true,
+          campaignId: input.alcanceClub.campaignId,
+          curso: input.alcanceClub.curso,
+          pais: input.alcanceClub.pais,
+          classroomId: null,
+        }
+      : (input.apertura ?? CERRADO);
   const creadas: EventoCreado["sesiones"] = [];
   let primerGrupo: string | null = null;
 
@@ -453,6 +476,30 @@ export async function crearEvento(input: {
       );
     };
 
+    // Club ÚNICO: el anfitrión es el primer salón (por nombre) que no tiene nada a
+    // esa hora en ninguna semana. Solo presta su id; quién lo ve lo dice el alcance.
+    if (clubUnico) {
+      const instantes = semanas.map(instante);
+      const ocupados = new Set(
+        (
+          await queryRows<{ classroomId: string }>(
+            `SELECT DISTINCT classroom_id AS "classroomId" FROM scheduling_session
+              WHERE classroom_id = ANY($1::uuid[]) AND starts_at = ANY($2::timestamptz[])`,
+            [salones, instantes],
+            tx,
+          )
+        ).map((f) => f.classroomId),
+      );
+      const anfitrion = [...filas]
+        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+        .find((f) => !ocupados.has(f.id));
+      if (anfitrion === undefined) {
+        throw new ConflictError("Todos los salones de ese alcance ya tienen algo a esa hora.");
+      }
+      filas.splice(0, filas.length, anfitrion);
+      compartido = false;
+    }
+
     // En una tanda, los feriados de CADA salón (su país) se saltan para ese
     // salón, y lo que ya pasó no se crea.
     const feriados = new Map<string, Set<string>>();
@@ -486,7 +533,7 @@ export async function crearEvento(input: {
          JOIN scheduling_classroom cl ON cl.id = s.classroom_id
         WHERE s.classroom_id = ANY($1::uuid[]) AND s.starts_at = ANY($2::timestamptz[])
         ORDER BY s.starts_at, cl.nombre`,
-      [salones, plan.map((p) => p[0]?.startsAt)],
+      [filas.map((f) => f.id), plan.map((p) => p[0]?.startsAt)],
       tx,
     );
     if (choques.length > 0) {
