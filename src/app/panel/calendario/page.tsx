@@ -10,7 +10,7 @@ import {
   type FormEvent,
 } from "react";
 import { apiFetch } from "@/ui/api-fetch";
-import { fechaLocal, horaLocal } from "@/ui/fecha-local";
+import { fechaLocal, hora24, horaLocal } from "@/ui/fecha-local";
 import { usePermisos } from "@/ui/permisos";
 import {
   COLOR_NEUTRO,
@@ -245,7 +245,17 @@ function CalendarioSalones({
       );
       if (res.ok) {
         const data: { sesiones: AgendaSesion[] } = await res.json();
-        setSesiones(data.sesiones);
+        // Cada quien ve la hora y el DÍA en SU reloj (el del navegador): una
+        // sesión de las 17:00 de Chile se ve a las 15:00 desde Colombia. La hora
+        // del salón se conserva para el CSV.
+        setSesiones(
+          data.sesiones.map((s) => ({
+            ...s,
+            horaSalon: s.horaLocal,
+            horaLocal: hora24(s.startsAt),
+            fecha: fechaLocal(s.startsAt),
+          })),
+        );
       } else {
         setSesiones([]);
       }

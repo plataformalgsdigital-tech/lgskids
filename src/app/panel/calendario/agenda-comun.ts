@@ -7,8 +7,13 @@
 export interface AgendaSesion {
   id: string;
   fecha: string;
-  /** Hora de PARED del salón (la de su país). */
+  /**
+   * Hora en el reloj de QUIEN MIRA (el calendario la convierte al cargar; el
+   * servidor la manda en la del salón). Con ella se agrupa, se ordena y se filtra.
+   */
   horaLocal: string;
+  /** Hora de PARED del salón (la de su país), para el CSV. */
+  horaSalon?: string;
   tipo: string;
   numero: number;
   classroomId: string;

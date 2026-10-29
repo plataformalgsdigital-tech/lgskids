@@ -98,7 +98,7 @@ export function FiltrosCalendario(props: {
         opciones={props.opciones.guias.map((g) => ({ valor: g, texto: g }))}
       />
       <Filtro
-        etiqueta="Hora (del salón)"
+        etiqueta="Hora (tu reloj)"
         valor={f.hora}
         onCambio={(v) => poner({ hora: v })}
         todos="Todas"

@@ -19,6 +19,12 @@ export function fechaLocal(iso: string | Date): string {
   return `${String(d.getFullYear())}-${mes}-${dia}`;
 }
 
+/** `HH:MM` de 24 horas del instante, en la zona del navegador (ordenable como texto). */
+export function hora24(iso: string | Date): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 /** `HH:MM` del instante, en la zona del navegador. */
 export function horaLocal(iso: string | Date): string {
   const d = typeof iso === "string" ? new Date(iso) : iso;

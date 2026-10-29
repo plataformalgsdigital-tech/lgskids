@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { descargarCsv } from "@/ui/csv";
-import { horaLocal } from "@/ui/fecha-local";
+import { hora24 } from "@/ui/fecha-local";
 import { referenciaHoraria } from "@/ui/hora-paises";
 import { COLOR_NEUTRO, PAIS_CORTO, type AgendaSesion, type ColorCampania } from "./agenda-comun";
 import type { AccionAgenda } from "./QuitarEventoModal";
@@ -209,8 +209,8 @@ export function AgendaDia(props: {
     | { clase: "welcome"; hora: string; w: WelcomeAgenda }
     | { clase: "admin"; hora: string; a: AdminAgenda };
   const items: Item[] = [
-    ...props.admins.map((a) => ({ clase: "admin" as const, hora: horaLocal(a.startsAt), a })),
-    ...props.welcomes.map((w) => ({ clase: "welcome" as const, hora: horaLocal(w.startsAt), w })),
+    ...props.admins.map((a) => ({ clase: "admin" as const, hora: hora24(a.startsAt), a })),
+    ...props.welcomes.map((w) => ({ clase: "welcome" as const, hora: hora24(w.startsAt), w })),
     ...props.sesiones.map((s) => ({ clase: "sesion" as const, hora: s.horaLocal, s })),
   ];
   const porHora = new Map<string, Item[]>();
@@ -226,6 +226,7 @@ export function AgendaDia(props: {
       `agenda-${props.fecha}`,
       [
         "Fecha",
+        "Hora (tu reloj)",
         "Hora del salón",
         "Hora Chile",
         "Hora Col/Ecu/Perú",
@@ -246,6 +247,7 @@ export function AgendaDia(props: {
         return [
           s.fecha,
           s.horaLocal,
+          s.horaSalon ?? s.horaLocal,
           r.chile,
           r.colombia,
           s.tipo,
@@ -298,7 +300,7 @@ export function AgendaDia(props: {
               Agenda del {fechaLarga(props.fecha)}
             </h2>
             <p style={{ margin: "0.15rem 0 0", fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-              {items.length} evento(s) · las sesiones van en la hora de su salón
+              {items.length} evento(s) · todas las horas van en tu reloj
             </p>
           </div>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
@@ -367,8 +369,9 @@ export function AgendaDia(props: {
                             <strong>{a.titulo ?? a.tipo}</strong>
                           </div>
                           <div style={{ color: "var(--texto-suave)" }}>
-                            {horaLocal(a.startsAt)} (tu hora) · {a.duracionMin / 60} h · {a.guias}{" "}
-                            guía(s)
+                            {hora24(a.startsAt)} (tu hora) · {referenciaHoraria(a.startsAt).chile}{" "}
+                            Chile · {referenciaHoraria(a.startsAt).colombia} Col/Ecu/Perú ·{" "}
+                            {a.duracionMin / 60} h · {a.guias} guía(s)
                           </div>
                         </Tarjeta>
                       );
@@ -390,8 +393,9 @@ export function AgendaDia(props: {
                             Advisor: <strong>{w.guia}</strong>
                           </div>
                           <div style={{ color: "var(--texto-suave)" }}>
-                            Agendados: {w.inscritos}/{w.limiteUsuarios} · 🕐 {r.chile} Chile ·{" "}
-                            {r.colombia} Col/Ecu/Perú
+                            Agendados: {w.inscritos}/{w.limiteUsuarios} · 🕐 Tu hora{" "}
+                            <strong>{hora24(w.startsAt)}</strong> · {r.chile} Chile · {r.colombia}{" "}
+                            Col/Ecu/Perú
                           </div>
                         </Tarjeta>
                       );
@@ -499,7 +503,9 @@ export function AgendaDia(props: {
                             Asistieron: <strong style={{ color: "#15803d" }}>{s.asistieron}</strong>
                           </span>
                           <span>
-                            🕐 {r.chile} Chile · {r.colombia} Col/Ecu/Perú
+                            {/* La de quien mira, y la de Chile y Colombia (el desfase cambia en el año). */}
+                            🕐 Tu hora <strong>{s.horaLocal}</strong> · {r.chile} Chile ·{" "}
+                            {r.colombia} Col/Ecu/Perú
                           </span>
                           {s.meetingUrl !== null && (
                             <a
