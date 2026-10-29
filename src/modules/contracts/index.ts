@@ -54,6 +54,7 @@ export {
   agendarWelcomeNino,
   reagendarPropio,
   clubesPropios,
+  clubActualPropio,
   inscribirClubPropio,
   cancelarClubPropio,
   reagendarPropioOpciones,

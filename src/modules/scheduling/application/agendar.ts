@@ -778,14 +778,21 @@ async function inscribirEnClubTx(
   },
 ): Promise<{ inscripcionId: string; semanas: number; sobrecupo: boolean }> {
   const { rep } = input;
-  if (rep.tandaId !== null) {
-    const viva = await queryOne<{ id: string }>(
-      `SELECT id FROM scheduling_club_inscripcion
-        WHERE child_person_id = $1 AND tanda_id = $2 AND estado = 'ACTIVA'`,
-      [input.childPersonId, rep.tandaId],
-      tx,
+  // UN club a la vez (decisión del negocio): el candado por niño evita que dos
+  // inscripciones simultáneas pasen las dos la comprobación.
+  await execute(
+    `SELECT pg_advisory_xact_lock(hashtext('club:' || $1::text))`,
+    [input.childPersonId],
+    tx,
+  );
+  const actual = await clubVigente(input.childPersonId, tx);
+  if (actual !== null) {
+    throw new ConflictError(
+      actual.tandaId !== null && actual.tandaId === rep.tandaId
+        ? "Ya está inscrito en ese club."
+        : "Ya está inscrito en un club. Un niño solo puede estar en un club a la vez: primero debe salir del que tiene.",
+      { details: { tipo: "un_club", agendadoId: actual.agendadoId } },
     );
-    if (viva !== null) throw new ConflictError("Ya está inscrito en ese club.");
   }
   // Las semanas: la elegida y, en una tanda, las que siguen.
   const filas = await queryRows<SemanaClub>(
@@ -876,6 +883,39 @@ async function inscribirEnClubTx(
     creadas++;
   }
   return { inscripcionId, semanas: creadas, sobrecupo: llena !== undefined };
+}
+
+/** El club en que el niño está inscrito HOY (con sesiones por delante), si alguno. */
+export interface ClubVigente {
+  inscripcionId: string;
+  tandaId: string | null;
+  /** Su próxima sesión (la que se usa para salir del club). */
+  agendadoId: string;
+  startsAt: string;
+  observaciones: string | null;
+}
+
+/**
+ * UN niño, UN club (2026-10-29): la inscripción ACTIVA que todavía tiene
+ * sesiones por delante. Una inscripción cuyo club ya terminó no cuenta.
+ */
+export async function clubVigente(
+  childPersonId: string,
+  q?: Queryable,
+): Promise<ClubVigente | null> {
+  const fila = await queryOne<ClubVigente>(
+    `SELECT i.id AS "inscripcionId", i.tanda_id AS "tandaId", g.id AS "agendadoId",
+            g.starts_at AS "startsAt", s.observaciones
+       FROM scheduling_club_inscripcion i
+       JOIN scheduling_agendado g ON g.inscripcion_id = i.id AND g.estado = 'ACTIVA'
+       LEFT JOIN scheduling_session s
+         ON s.classroom_id = g.classroom_id AND s.starts_at = g.starts_at
+      WHERE i.child_person_id = $1 AND i.estado = 'ACTIVA' AND g.starts_at > now()
+      ORDER BY g.starts_at LIMIT 1`,
+    [childPersonId],
+    q,
+  );
+  return fila === null ? null : { ...fila, startsAt: new Date(fila.startsAt).toISOString() };
 }
 
 /**

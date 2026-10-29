@@ -2254,6 +2254,13 @@ y `DELETE …/agenda/[agendadoId]`.
     cancelan SOLO las semanas que faltan (las pasadas quedan como historial).
   - Salir (él o coordinación, `cancelarAgendado` sobre cualquier semana) deja la
     inscripción CANCELADA y libera lo que falta.
+  - **UN niño, UN club** (2026-10-29, decisión del negocio): `inscribirEnClubTx`
+    rechaza (409, `details.tipo = "un_club"`) si ya tiene un club VIGENTE
+    (`clubVigente`: inscripción ACTIVA con sesiones por delante; la de un club ya
+    terminado no cuenta), con un candado por niño (`pg_advisory_xact_lock`) contra
+    dos inscripciones simultáneas. Vale también desde la ficha. El diálogo del niño
+    recibe `actual` y muestra "Ya estás inscrito en un club" con "Salir de este
+    club"; los demás dicen "Solo puedes estar en un club".
 - **Inscripción Clubes en `/mi-panel` (2026-10-29)**: el botón verde (antes solo
   bajaba a "Mis próximas clases") abre `InscripcionClubes.tsx`: los CLUBES de la
   **semana en curso** (lunes a domingo en el reloj de SU salón, de ahora en adelante)

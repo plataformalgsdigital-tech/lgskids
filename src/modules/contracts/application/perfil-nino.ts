@@ -8,6 +8,7 @@ import {
   agendarNino,
   cancelarAgendado,
   clubesDeLaSemana,
+  clubVigente,
   opcionesAgenda,
   reservarWelcomeTx,
   welcomeDeNino,
@@ -15,6 +16,7 @@ import {
   welcomesDisponibles,
   type Agendado,
   type ClubSemana,
+  type ClubVigente,
   type ContextoNino,
   type OpcionAgenda,
   type TipoAgenda,
@@ -599,6 +601,11 @@ async function contextoPropio(childPersonId: string): Promise<ContextoNino | nul
 export async function clubesPropios(childPersonId: string): Promise<ClubSemana[]> {
   const nino = await contextoPropio(childPersonId);
   return nino === null ? [] : clubesDeLaSemana(nino);
+}
+
+/** El club en que el niño ya está (UN niño, UN club), o null. */
+export async function clubActualPropio(childPersonId: string): Promise<ClubVigente | null> {
+  return clubVigente(childPersonId);
 }
 
 /**

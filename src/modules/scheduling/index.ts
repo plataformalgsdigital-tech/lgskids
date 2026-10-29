@@ -108,9 +108,16 @@ export {
   agendadosDeNino,
   cancelarAgendado,
   retirarClubesPorFaltas,
+  clubVigente,
   FALTAS_PARA_RETIRO,
 } from "./application/agendar";
-export type { OpcionAgenda, Agendado, ContextoNino, ClubSemana } from "./application/agendar";
+export type {
+  OpcionAgenda,
+  Agendado,
+  ContextoNino,
+  ClubSemana,
+  ClubVigente,
+} from "./application/agendar";
 export {
   TIPOS_AGENDA,
   ETIQUETA_TIPO_AGENDA,

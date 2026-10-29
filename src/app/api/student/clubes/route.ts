@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
-import { cancelarClubPropio, clubesPropios, inscribirClubPropio } from "@/modules/contracts";
+import {
+  cancelarClubPropio,
+  clubActualPropio,
+  clubesPropios,
+  inscribirClubPropio,
+} from "@/modules/contracts";
 import { bootstrapIdentity } from "@/modules/identity";
 import { findPersonByUserId } from "@/modules/people";
 import { NotFoundError } from "@/platform/errors";
@@ -25,7 +30,10 @@ const ip = (request: Request) =>
 export const GET = handlerWithAuth(async (_request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.PANEL_ALUMNO);
-  return json({ clubes: await clubesPropios(await ninoDeSesion(auth.userId)) });
+  const nino = await ninoDeSesion(auth.userId);
+  // `actual`: el club en que ya está (UN niño, UN club), aunque no sea de esta semana.
+  const [clubes, actual] = await Promise.all([clubesPropios(nino), clubActualPropio(nino)]);
+  return json({ clubes, actual });
 });
 
 export const POST = handlerWithAuth(async (request, auth) => {

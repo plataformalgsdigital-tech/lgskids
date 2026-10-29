@@ -30,6 +30,13 @@ interface Club {
   retiradoPorFaltas: boolean;
 }
 
+/** El club en que ya está inscrito (aunque su próxima sesión no sea esta semana). */
+interface ClubActual {
+  agendadoId: string;
+  startsAt: string;
+  observaciones: string | null;
+}
+
 const NIVEL: Record<string, string> = {
   ROOKIE: "Rookie",
   CHAMPION: "Champion",
@@ -62,6 +69,8 @@ export function InscripcionClubesModal({
   onCambio: () => void;
 }) {
   const [clubes, setClubes] = useState<Club[] | null>(null);
+  // El club en que ya está: UN niño, UN club.
+  const [actual, setActual] = useState<ClubActual | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -80,8 +89,11 @@ export function InscripcionClubesModal({
         setClubes([]);
         return;
       }
-      const cuerpo = (await res.json()) as { clubes: Club[] };
-      if (!cancelado) setClubes(cuerpo.clubes);
+      const cuerpo = (await res.json()) as { clubes: Club[]; actual: ClubActual | null };
+      if (!cancelado) {
+        setClubes(cuerpo.clubes);
+        setActual(cuerpo.actual);
+      }
     }
     void traer();
     return () => {
@@ -112,21 +124,21 @@ export function InscripcionClubesModal({
     cargar();
   }
 
-  async function cancelar(c: Club) {
-    if (c.agendadoId === null) return;
+  /** Sale del club (cualquier sesión suya lo identifica: sale de todas las que faltan). */
+  async function cancelar(agendadoId: string | null) {
+    if (agendadoId === null) return;
     if (
       !window.confirm(
         "¿Quieres salir de este club? Dejarás tu cupo en todas las sesiones que faltan.",
       )
     )
       return;
-    setOcupado(c.id);
+    setOcupado(agendadoId);
     setError(null);
     setAviso(null);
-    const res = await apiFetch(
-      `/api/student/clubes?agendadoId=${encodeURIComponent(c.agendadoId)}`,
-      { method: "DELETE" },
-    );
+    const res = await apiFetch(`/api/student/clubes?agendadoId=${encodeURIComponent(agendadoId)}`, {
+      method: "DELETE",
+    });
     setOcupado(null);
     if (!res.ok) {
       setError(await mensajeDeError(res, "No pudimos cancelar tu inscripción."));
@@ -228,6 +240,45 @@ export function InscripcionClubesModal({
           {aviso !== null && (
             <p style={{ margin: 0, color: "#1b5e20", fontWeight: 700 }}>✅ {aviso}</p>
           )}
+          {actual !== null && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                flexWrap: "wrap",
+                padding: "0.6rem 0.8rem",
+                borderRadius: "0.6rem",
+                background: "#e8f5e9",
+                border: "1px solid #a5d6a7",
+                fontSize: "0.85rem",
+              }}
+            >
+              <span style={{ flex: "1 1 16rem" }}>
+                ✅ Ya estás inscrito en un club
+                {actual.observaciones !== null ? ` (${actual.observaciones})` : ""}: tu próxima
+                sesión es el {dia.format(new Date(actual.startsAt))} a las{" "}
+                {hora.format(new Date(actual.startsAt))}. <b>Solo puedes estar en un club</b>: para
+                cambiarte, primero sal de este.
+              </span>
+              <button
+                type="button"
+                disabled={ocupado !== null}
+                onClick={() => void cancelar(actual.agendadoId)}
+                style={{
+                  padding: "0.4rem 0.75rem",
+                  borderRadius: "0.5rem",
+                  border: "1px solid #e57373",
+                  background: "white",
+                  color: "#b71c1c",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Salir de este club
+              </button>
+            </div>
+          )}
           {error !== null && (
             <p style={{ margin: 0, color: "#b71c1c", fontWeight: 700 }}>⚠️ {error}</p>
           )}
@@ -312,7 +363,7 @@ export function InscripcionClubesModal({
                             <button
                               type="button"
                               disabled={ocupado !== null}
-                              onClick={() => void cancelar(c)}
+                              onClick={() => void cancelar(c.agendadoId)}
                               style={{
                                 padding: "0.4rem 0.75rem",
                                 borderRadius: "0.5rem",
@@ -326,6 +377,17 @@ export function InscripcionClubesModal({
                               Cancelar
                             </button>
                           </div>
+                        ) : actual !== null ? (
+                          // UN niño, UN club: ya está en otro.
+                          <span
+                            style={{
+                              color: "var(--texto-suave)",
+                              fontWeight: 700,
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            Solo puedes estar en un club
+                          </span>
                         ) : (
                           <button
                             type="button"

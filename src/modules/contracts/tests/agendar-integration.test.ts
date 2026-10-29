@@ -28,6 +28,7 @@ import {
   agendarParaNino,
   cancelarAgendadoNino,
   cancelarClubPropio,
+  clubActualPropio,
   clubesPropios,
   inscribirClubPropio,
   opcionesAgendaNino,
@@ -162,8 +163,31 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     return semanas.map((s) => s.id);
   };
 
-  const agendar = (tipo: "SESION" | "CLUB" | "TALLER" | "REGULAR", id: string, extra = {}) =>
-    agendarParaNino({
+  /**
+   * Agenda (o inscribe). UN niño, UN club: para probar cada caso por separado,
+   * antes de inscribirlo en un club se lo saca del que tuviera (`dejarClubes`).
+   */
+  const agendar = async (
+    tipo: "SESION" | "CLUB" | "TALLER" | "REGULAR",
+    id: string,
+    extra = {},
+    dejarClubes = true,
+  ) => {
+    if (tipo === "CLUB" && dejarClubes) {
+      await execute(
+        `UPDATE scheduling_agendado SET estado = 'CANCELADA'
+          WHERE child_person_id = $1 AND estado = 'ACTIVA' AND starts_at > now()
+            AND inscripcion_id IN (SELECT id FROM scheduling_club_inscripcion
+                                    WHERE child_person_id = $1 AND estado = 'ACTIVA')`,
+        [ninoId],
+      );
+      await execute(
+        `UPDATE scheduling_club_inscripcion SET estado = 'CANCELADA'
+          WHERE child_person_id = $1 AND estado = 'ACTIVA'`,
+        [ninoId],
+      );
+    }
+    return agendarParaNino({
       actorUserId: actor,
       childPersonId: ninoId,
       countryScope: null,
@@ -173,6 +197,7 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       puedeSobrecupo: false,
       ...extra,
     });
+  };
 
   beforeAll(async () => {
     campaniaId = (
@@ -516,6 +541,27 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
     expect(op.some((o) => o.id === club)).toBe(true);
     await agendar("CLUB", club);
     expect((await listaDeSesion(club)).lista.some((f) => f.childPersonId === ninoId)).toBe(true);
+  });
+
+  it("UN niño, UN club: con uno vigente no se inscribe en otro hasta salir", async () => {
+    const fecha = diaEn(new Date(Date.now() + 8 * 86_400_000));
+    const primero = await nuevoEvento({ salon: salonC, fecha, hora: "03:00" });
+    const segundo = await nuevoEvento({ salon: salonC, fecha, hora: "06:00", duracionMin: 15 });
+    await agendar("CLUB", primero);
+    const rechazo = await agendar("CLUB", segundo, {}, false).catch((e: unknown) => e);
+    expect(rechazo).toBeInstanceOf(ConflictError);
+    expect((rechazo as AppError).details).toMatchObject({ tipo: "un_club" });
+    // Sale del primero y ya puede.
+    const vigente = await clubActualPropio(ninoId);
+    expect(vigente?.agendadoId).toBeDefined();
+    await cancelarClubPropio({
+      userId: actor,
+      childPersonId: ninoId,
+      agendadoId: vigente?.agendadoId ?? "",
+    });
+    expect(await clubActualPropio(ninoId)).toBeNull();
+    await agendar("CLUB", segundo, {}, false);
+    expect((await clubActualPropio(ninoId))?.startsAt).toBeDefined();
   });
 
   it("SUSPENDER evento: sigue en el calendario, sin lista ni registro; se reactiva", async () => {
