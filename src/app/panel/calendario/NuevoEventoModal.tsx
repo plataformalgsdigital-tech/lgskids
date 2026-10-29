@@ -310,10 +310,13 @@ export function NuevoEventoModal({
   // Welcome para niños que entran con el curso YA andando: no exige ser antes
   // del inicio. Se marca solo al elegir una campaña que ya no está en matrícula.
   const [enMarcha, setEnMarcha] = useState(editar?.clase === "welcome" ? editar.enMarcha : false);
-  // Sesión/Club/Taller abiertos a otros salones (Academic management › Agendar).
+  // Sesión/Taller abiertos a otros salones (Academic management › Agendar).
   const [apertura, setApertura] = useState<AperturaEvento>(
     editar?.clase === "suelto" ? editar.apertura : APERTURA_CERRADA,
   );
+  // Un CLUB no lleva apertura: quién puede inscribirse ya lo dicen su campaña,
+  // país, curso, salón y nivel (se dicta en esos salones y es de inscritos).
+  const aperturaEnviada = tipo === "CLUB" ? APERTURA_CERRADA : apertura;
   // TANDA de clubs: el Club se repite cada semana entre estas dos fechas.
   const [tandaInicio, setTandaInicio] = useState("");
   const [tandaFin, setTandaFin] = useState("");
@@ -501,7 +504,7 @@ export function NuevoEventoModal({
               limiteUsuarios: limite === "" ? null : Number(limite),
               guiaUserId,
               observaciones: observaciones.trim() === "" ? null : observaciones,
-              apertura,
+              apertura: aperturaEnviada,
               todaLaTanda: tandaEditada !== null && todaLaTanda,
               linkClubId: linkEnviado,
             }
@@ -542,7 +545,7 @@ export function NuevoEventoModal({
                 limiteUsuarios: limite === "" ? null : Number(limite),
                 guiaUserId,
                 observaciones: observaciones.trim() === "" ? null : observaciones,
-                apertura,
+                apertura: aperturaEnviada,
                 tanda: esTanda ? { inicio: tandaInicio, fin: tandaFin } : null,
                 linkClubId: linkEnviado,
               };
@@ -1140,7 +1143,9 @@ export function NuevoEventoModal({
               <strong>🏫 Todos los salones.</strong>{" "}
               {salonesFiltrados.length === 0
                 ? "Ningún salón coincide con esa campaña, país y curso."
-                : `Se crea como UNA sola clase (misma hora, guía y Zoom) en los ${String(salonesFiltrados.length)} salón${salonesFiltrados.length === 1 ? "" : "es"} de esa campaña, país y curso que estén activos; cada uno la ve en su lista.`}{" "}
+                : tipo === "CLUB"
+                  ? `Se crea como UN solo Club (misma hora, guía y Zoom) para los ${String(salonesFiltrados.length)} salón${salonesFiltrados.length === 1 ? "" : "es"} de esa campaña, país y curso que estén activos: sus niños lo ven en "Inscripción Clubes" y entran a la lista al inscribirse.`
+                  : `Se crea como UNA sola clase (misma hora, guía y Zoom) en los ${String(salonesFiltrados.length)} salón${salonesFiltrados.length === 1 ? "" : "es"} de esa campaña, país y curso que estén activos; cada uno la ve en su lista.`}{" "}
               La hora va en tu reloj ({zonaNavegador}): cada salón la ve en su propia hora. Si algún
               salón ya tiene un evento a esa hora, no se crea y se dice cuál.
             </div>
@@ -1190,7 +1195,7 @@ export function NuevoEventoModal({
 
           {/* Abierto a otros salones: lo agenda coordinación desde la ficha del
               niño (Academic management › Agendar), si coincide con el alcance. */}
-          {!esAdmin && !esWelcome && (
+          {!esAdmin && !esWelcome && tipo !== "CLUB" && (
             <div
               style={{
                 padding: "0.8rem 0.9rem",
