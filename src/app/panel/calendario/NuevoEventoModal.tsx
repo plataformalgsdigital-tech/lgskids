@@ -434,13 +434,8 @@ export function NuevoEventoModal({
   // que coincidan (los resuelve el servidor).
   const libre = (valor: string) => valor === "";
   const campanias = [...new Set(salones.map((s) => s.campania))];
-  const paises = [
-    ...new Set(
-      salones
-        .filter((s) => libre(campania) || s.campania === campania)
-        .map((s) => s.holidayCountry),
-    ),
-  ];
+  // El país va primero en el formulario: se ofrecen todos, sin depender de la campaña.
+  const paises = [...new Set(salones.map((s) => s.holidayCountry))].sort();
   const cursos = [
     ...new Set(
       salones
@@ -553,7 +548,8 @@ export function NuevoEventoModal({
                       // La hora va en el reloj del país elegido o, con "Todos", en el de quien la escribe.
                       zona: zonaHora,
                     }
-                  : { classroomIds: seleccionados }),
+                  : // Salones elegidos: la misma regla del aviso (país elegido o tu reloj).
+                    { classroomIds: seleccionados, zona: zonaHora }),
                 tipo,
                 fecha,
                 horaLocal: hora,
@@ -699,6 +695,54 @@ export function NuevoEventoModal({
             </div>
           )}
 
+          {/* El PAÍS va primero: fija en qué reloj se escribe la hora (un Club de
+              Chile a las 18:00 se escribe 18:00). */}
+          {!salonFijo && (
+            <div>
+              <label style={rotulo} htmlFor="ev-pais">
+                País
+              </label>
+              <select
+                id="ev-pais"
+                value={pais}
+                onChange={(e) => {
+                  setPais(e.target.value);
+                  setCurso("");
+                  setSalonPrincipal("");
+                  setExtras([]);
+                }}
+                style={campo}
+              >
+                <option value="">Todos los países</option>
+                {paises.map((p) => (
+                  <option key={p} value={p}>
+                    {ZONA_PAIS[p]?.nombre ?? p}
+                  </option>
+                ))}
+              </select>
+              {!esAdmin && (
+                <p
+                  role="note"
+                  style={{
+                    margin: "0.35rem 0 0",
+                    padding: "0.45rem 0.65rem",
+                    borderRadius: "0.5rem",
+                    background: "#e3f2fd",
+                    border: "1px solid #90caf9",
+                    color: "#0d47a1",
+                    fontSize: "0.84rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  🕐{" "}
+                  {ZONA_PAIS[pais] !== undefined
+                    ? `Se creará el evento con la hora de ${ZONA_PAIS[pais].nombre}: escribe la hora tal como es en ${ZONA_PAIS[pais].nombre}.`
+                    : `Se creará el evento con TU hora (${zonaNavegador}): escribe la hora de tu reloj.`}
+                </p>
+              )}
+            </div>
+          )}
+
           <div
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.7rem" }}
             className="ev-tres"
@@ -718,10 +762,14 @@ export function NuevoEventoModal({
             <div>
               <label style={rotulo} htmlFor="ev-hora">
                 Hora *{/* En qué reloj se escribe: el del país elegido o el de quien escribe. */}
-                {(todosLosSalones || esWelcome) && ZONA_PAIS[pais] !== undefined && (
+                {!esAdmin && !salonFijo && (
                   <span style={{ fontWeight: 600, color: "#1565c0" }}>
                     {" "}
-                    (hora de {ZONA_PAIS[pais].nombre})
+                    (
+                    {ZONA_PAIS[pais] !== undefined
+                      ? `hora de ${ZONA_PAIS[pais].nombre}`
+                      : "tu hora"}
+                    )
                   </span>
                 )}
               </label>
@@ -813,7 +861,7 @@ export function NuevoEventoModal({
                         )?.estado;
                         setEnMarcha(estado !== undefined && estado !== "EN_MATRICULA");
                       }
-                      setPais("");
+                      // El país se elige ANTES (fija el reloj de la hora): no se borra.
                       setCurso("");
                       setSalonPrincipal("");
                       setExtras([]);
@@ -828,29 +876,6 @@ export function NuevoEventoModal({
                         campaniasLista.find((x) => x.nombre === c)?.estado === "EN_MATRICULA"
                           ? " (en matrícula)"
                           : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={rotulo} htmlFor="ev-pais">
-                    País
-                  </label>
-                  <select
-                    id="ev-pais"
-                    value={pais}
-                    onChange={(e) => {
-                      setPais(e.target.value);
-                      setCurso("");
-                      setSalonPrincipal("");
-                      setExtras([]);
-                    }}
-                    style={campo}
-                  >
-                    <option value="">Todos los países</option>
-                    {paises.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
                       </option>
                     ))}
                   </select>

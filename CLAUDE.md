@@ -1761,7 +1761,12 @@ solo servía para completar la ficha.
   **Agenda** del día son el MISMO componente (`CalendarioSalones` con `modo`), así que
   comparten datos y filtros. Filtros **Campaña** (va al servidor), **Curso, Salón,
   Advisor y Hora** (en pantalla, cada uno con "Todos"; `FiltrosCalendario.tsx` y
-  `agenda-comun.ts`). **Desde 2026-10-29 todo va en el reloj de QUIEN MIRA**: el calendario convierte al cargar la hora y el DÍA de cada sesión (/ sobre ; la del salón queda en para el CSV), así que celdas, Agenda, orden y filtro de Hora van en su reloj, y cada tarjeta dice "Tu hora · Chile · Col/Ecu/Perú". Al CREAR un evento para un país, la hora se escribe en el reloj de ESE país ( en ).
+  `agenda-comun.ts`). **Desde 2026-10-29 todo va en el reloj de QUIEN MIRA**: el calendario convierte al cargar la hora y el DÍA de cada sesión (`hora24` /
+  `fechaLocal` sobre `startsAt`; la del salón queda en `horaSalon` para el CSV), así
+  que celdas, Agenda, orden y filtro de Hora van en su reloj, y cada tarjeta dice
+  "Tu hora · Chile · Col/Ecu/Perú". Al CREAR un evento para un país, la hora se
+  escribe en el reloj de ESE país (`ZONA_PAIS` en `NuevoEventoModal`), y el País va
+  PRIMERO en el formulario para fijar ese reloj antes de escribir la hora.
   Con Curso/Salón/Hora puestos se ocultan Welcome y administrativos (no son de un
   salón); con Advisor quedan los Welcome de ese guía. Las celdas del mes son más
   grandes (tarjetas de tres líneas: hora y salón · advisor · inscritos y asistieron,
