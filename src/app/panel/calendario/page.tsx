@@ -16,6 +16,7 @@ import {
   COLOR_NEUTRO,
   SIN_FILTROS,
   coloresPorCampania,
+  ordenarCampaniasPorMes,
   filtrarSesiones,
   opcionesDeFiltros,
   type AgendaSesion,
@@ -268,7 +269,7 @@ function CalendarioSalones({
     [campanias, sesiones],
   );
   const campaniasDelMes = useMemo(
-    () => [...new Set(sesionesFiltradas.map((s) => s.campania))].sort(),
+    () => ordenarCampaniasPorMes([...new Set(sesionesFiltradas.map((s) => s.campania))]),
     [sesionesFiltradas],
   );
 

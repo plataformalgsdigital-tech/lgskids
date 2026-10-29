@@ -111,6 +111,49 @@ export function coloresPorCampania(nombres: string[]): Map<string, ColorCampania
   return mapa;
 }
 
+const MESES_CAMPANIA = [
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE",
+];
+
+/**
+ * El mes y el año que dice el NOMBRE de la campaña ("AGOSTO2026" → 2026·08;
+ * también "SETIEMBRE"). Sin mes reconocible, null: va al final.
+ */
+function mesDeCampania(nombre: string): number | null {
+  const n = nombre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace("SETIEMBRE", "SEPTIEMBRE");
+  const mes = MESES_CAMPANIA.findIndex((m) => n.includes(m));
+  if (mes < 0) return null;
+  const anio = Number(/(\d{4})/.exec(n)?.[1] ?? 0);
+  return anio * 12 + mes;
+}
+
+/** Las campañas en orden de mes (enero a diciembre, año por año). */
+export function ordenarCampaniasPorMes(nombres: string[]): string[] {
+  return [...nombres].sort((a, b) => {
+    const ma = mesDeCampania(a);
+    const mb = mesDeCampania(b);
+    if (ma !== null && mb !== null && ma !== mb) return ma - mb;
+    if (ma === null && mb !== null) return 1;
+    if (mb === null && ma !== null) return -1;
+    return a.localeCompare(b);
+  });
+}
+
 export const COLOR_NEUTRO: ColorCampania = { bg: "#eceff1", borde: "#90a4ae", fg: "#37474f" };
 
 export const PAIS_CORTO: Record<string, string> = {
