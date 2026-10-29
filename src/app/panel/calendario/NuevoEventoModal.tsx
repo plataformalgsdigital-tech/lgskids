@@ -100,6 +100,14 @@ export const APERTURA_CERRADA: AperturaEvento = {
   classroomId: null,
 };
 
+/** Reloj de cada país (el de sus salones), para escribir la hora en él. */
+const ZONA_PAIS: Record<string, { zona: string; nombre: string }> = {
+  CL: { zona: "America/Santiago", nombre: "Chile" },
+  CO: { zona: "America/Bogota", nombre: "Colombia" },
+  EC: { zona: "America/Guayaquil", nombre: "Ecuador" },
+  PE: { zona: "America/Lima", nombre: "Perú" },
+};
+
 const PAISES_APERTURA = [
   ["CL", "Chile"],
   ["CO", "Colombia"],
@@ -473,6 +481,14 @@ export function NuevoEventoModal({
   /** El link que se manda: el elegido si es un Club con link propio; si no, ninguno. */
   const linkEnviado = usaLinkClub ? (linkElegido?.id ?? null) : null;
   const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Con un PAÍS elegido, la hora se escribe en el reloj de ESE país (un Club de
+  // Chile a las 18:00 se crea poniendo 18:00, se escriba desde donde se escriba);
+  // con "Todos los países", en el reloj de quien la escribe.
+  const zonaHora = ZONA_PAIS[pais]?.zona ?? zonaNavegador;
+  const relojHora =
+    ZONA_PAIS[pais] !== undefined
+      ? `hora de ${ZONA_PAIS[pais].nombre}`
+      : `tu reloj (${zonaNavegador})`;
 
   async function crear() {
     setOcupado(true);
@@ -482,7 +498,7 @@ export function NuevoEventoModal({
         ? {
             fecha,
             horaLocal: hora,
-            zona: zonaNavegador,
+            zona: zonaHora,
             duracionMin: duracion,
             guiaUserId,
             campaignId: campaniasLista.find((c) => c.nombre === campania)?.id ?? null,
@@ -534,8 +550,8 @@ export function NuevoEventoModal({
                         pais: pais === "" ? null : pais,
                         curso: curso === "" ? null : curso,
                       },
-                      // Puede cruzar países: la hora va en el reloj de quien la escribe.
-                      zona: zonaNavegador,
+                      // La hora va en el reloj del país elegido o, con "Todos", en el de quien la escribe.
+                      zona: zonaHora,
                     }
                   : { classroomIds: seleccionados }),
                 tipo,
@@ -701,7 +717,13 @@ export function NuevoEventoModal({
             </div>
             <div>
               <label style={rotulo} htmlFor="ev-hora">
-                Hora *
+                Hora *{/* En qué reloj se escribe: el del país elegido o el de quien escribe. */}
+                {(todosLosSalones || esWelcome) && ZONA_PAIS[pais] !== undefined && (
+                  <span style={{ fontWeight: 600, color: "#1565c0" }}>
+                    {" "}
+                    (hora de {ZONA_PAIS[pais].nombre})
+                  </span>
+                )}
               </label>
               <input
                 id="ev-hora"
@@ -1147,8 +1169,8 @@ export function NuevoEventoModal({
                 : tipo === "CLUB"
                   ? `Se crea como UN solo Club (misma hora, guía y Zoom) para los ${String(salonesFiltrados.length)} salón${salonesFiltrados.length === 1 ? "" : "es"} de esa campaña, país y curso que estén activos: sus niños lo ven en "Inscripción Clubes" y entran a la lista al inscribirse.`
                   : `Se crea como UNA sola clase (misma hora, guía y Zoom) en los ${String(salonesFiltrados.length)} salón${salonesFiltrados.length === 1 ? "" : "es"} de esa campaña, país y curso que estén activos; cada uno la ve en su lista.`}{" "}
-              La hora va en tu reloj ({zonaNavegador}): cada salón la ve en su propia hora. Si algún
-              salón ya tiene un evento a esa hora, no se crea y se dice cuál.
+              La hora va en {relojHora}: cada salón la ve en su propia hora. Si algún salón ya tiene
+              un evento a esa hora, no se crea y se dice cuál.
             </div>
           )}
 
@@ -1163,10 +1185,10 @@ export function NuevoEventoModal({
                 lineHeight: 1.45,
               }}
             >
-              <strong>👋 Welcome.</strong> La hora va en tu reloj ({zonaNavegador}); cada niño la
-              verá en su propia hora. Lo agendan los niños{" "}
-              {nivel === "" ? "de cualquier nivel" : `de nivel ${nivel}`} al crear su perfil (o
-              coordinación desde su ficha). Campaña, país, curso, salón y nivel vacíos = todos.
+              <strong>👋 Welcome.</strong> La hora va en {relojHora}; cada niño la verá en su propia
+              hora. Lo agendan los niños {nivel === "" ? "de cualquier nivel" : `de nivel ${nivel}`}{" "}
+              al crear su perfil (o coordinación desde su ficha). Campaña, país, curso, salón y
+              nivel vacíos = todos.
               <label
                 style={{
                   display: "flex",
