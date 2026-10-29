@@ -28,6 +28,9 @@ export interface AgendaSesion {
   esEvento: boolean;
   /** Club de una tanda semanal. */
   tandaId: string | null;
+  /** Evento SUSPENDIDO desde la Agenda (sigue en el calendario, no se dicta). */
+  suspendida: boolean;
+  motivoSuspension: string | null;
 }
 
 export interface FiltrosAgenda {

@@ -24,7 +24,7 @@ import {
 } from "./agenda-comun";
 import { AgendaDia } from "./AgendaDia";
 import { FiltrosCalendario } from "./FiltrosCalendario";
-import { QuitarEventoModal } from "./QuitarEventoModal";
+import { QuitarEventoModal, type AccionAgenda } from "./QuitarEventoModal";
 import { SesionModal, cargarEventoEditable } from "./SesionModal";
 import { NuevoEventoModal, type EventoEditable, type SalonOpcion } from "./NuevoEventoModal";
 import { WelcomeModal } from "./WelcomeModal";
@@ -188,8 +188,10 @@ function CalendarioSalones({
   const puedeSuspender = puede("op.calendario.suspender");
   const [editando, setEditando] = useState<EventoEditable | null>(null);
   const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
-  // ✕ de la Agenda: cancelar un evento o suspender una clase del horario.
-  const [quitando, setQuitando] = useState<AgendaSesion | null>(null);
+  // ✕ ⏸ ▶ de la Agenda: la sesión y la acción, a confirmar en su diálogo.
+  const [quitando, setQuitando] = useState<{ sesion: AgendaSesion; accion: AccionAgenda } | null>(
+    null,
+  );
   const [avisoAgenda, setAvisoAgenda] = useState<string | null>(null);
 
   /** ✏️ de la Agenda: el evento se trae completo antes de abrir el formulario. */
@@ -369,11 +371,15 @@ function CalendarioSalones({
           onWelcome={setWelcomeAbierto}
           onAdmin={puedeEditarAdmin ? (id) => void abrirEdicionAdmin(id) : null}
           onEditarSesion={puedeEditarAcademico ? (id) => void abrirEdicionSesion(id) : null}
-          onQuitarSesion={(s) => {
+          onAccionSesion={(s, accion) => {
             setAvisoAgenda(null);
-            setQuitando(s);
+            setQuitando({ sesion: s, accion });
           }}
-          puedeQuitar={(s) => (s.esEvento ? puedeEditarAcademico : puedeSuspender)}
+          // Cancelar un evento es de quien crea eventos; suspender (un evento o
+          // el día de una clase del horario) es de quien suspende.
+          puedeAccion={(s, accion) =>
+            accion === "cancelar" && s.esEvento ? puedeEditarAcademico : puedeSuspender
+          }
         />
       )}
       {avisoAgenda !== null && modo === "dia" && (
@@ -383,7 +389,8 @@ function CalendarioSalones({
       )}
       {quitando !== null && (
         <QuitarEventoModal
-          sesion={quitando}
+          sesion={quitando.sesion}
+          accion={quitando.accion}
           onCerrar={() => setQuitando(null)}
           onHecho={(aviso) => {
             setQuitando(null);

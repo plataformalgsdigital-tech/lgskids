@@ -547,6 +547,9 @@ export interface AgendaItem {
   /** Creado a mano (sin horario): se edita y se cancela; la clase del horario se suspende. */
   esEvento: boolean;
   tandaId: string | null;
+  /** Evento SUSPENDIDO desde la Agenda (sigue en el calendario, no se dicta). */
+  suspendida: boolean;
+  motivoSuspension: string | null;
 }
 
 /**
@@ -579,6 +582,7 @@ export async function agendaSesiones(
             s.starts_at AS "startsAt", cl.holiday_country AS pais,
             ${SALA_SESION} AS "meetingUrl", (s.cerrada_en IS NOT NULL) AS cerrada,
             (s.slot_id IS NULL) AS "esEvento", s.tanda_id AS "tandaId",
+            (s.suspendida_en IS NOT NULL) AS suspendida, s.suspension_motivo AS "motivoSuspension",
             ${SQL_EN_LISTA("s")} AS ocupados,
             (SELECT count(*) FROM attendance_attendance a
               WHERE a.session_id = s.id AND a.estado = 'PRESENTE')::int AS asistieron

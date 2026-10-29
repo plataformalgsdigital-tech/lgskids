@@ -370,10 +370,12 @@ export async function listarCancelaciones(filtros: {
 }
 
 /**
- * SQL: ¿la sesión `alias` quedó CANCELADA sin que nadie la cubriera? Es lo que
- * impide registrarla o pasar lista, y lo que la saca de las horas dictadas.
+ * SQL: ¿la sesión `alias` NO SE DICTA? Quedó CANCELADA sin que nadie la cubriera,
+ * o es un evento SUSPENDIDO desde la Agenda (`suspendida_en`, 2026-10-29). Es lo
+ * que impide registrarla o pasar lista, y lo que la saca de las horas dictadas.
  */
-export const SQL_SESION_CANCELADA = (alias: string) => `EXISTS (
+export const SQL_SESION_CANCELADA = (alias: string) => `(${alias}.suspendida_en IS NOT NULL
+  OR EXISTS (
   SELECT 1 FROM scheduling_cancelacion cx
    WHERE cx.session_id = ${alias}.id AND cx.estado = 'APROBADA'
-     AND cx.reemplazo_guia_user_id IS NULL)`;
+     AND cx.reemplazo_guia_user_id IS NULL))`;

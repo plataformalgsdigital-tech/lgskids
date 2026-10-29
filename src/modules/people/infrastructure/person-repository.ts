@@ -405,6 +405,7 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
                  OR EXISTS (SELECT 1 FROM scheduling_agendado a
                              WHERE a.child_person_id = p.id AND a.estado = 'ACTIVA'
                                AND a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at))
+            AND s.suspendida_en IS NULL
             AND s.starts_at + make_interval(mins => s.duracion_min) > now()
             -- Cancelada sin reemplazo: no se dicta (mismo criterio que
             -- SQL_SESION_CANCELADA de scheduling, que people no puede importar).

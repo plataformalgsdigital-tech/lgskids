@@ -68,7 +68,7 @@ export async function cerrarSesion(input: {
   }
   if (sesion.cancelada) {
     throw new ConflictError(
-      "Esta sesión está CANCELADA (el guía avisó y administración la canceló sin reemplazo).",
+      "Esta sesión no se dicta: está SUSPENDIDA o CANCELADA sin reemplazo. No se registra.",
     );
   }
   if (new Date(sesion.starts_at).getTime() > Date.now()) {

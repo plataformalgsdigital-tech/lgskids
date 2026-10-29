@@ -1087,6 +1087,80 @@ export async function eliminarEvento(input: {
   return { sesiones: borradas };
 }
 
+/**
+ * SUSPENDE (o reactiva) un evento creado a mano, en todos sus salones si es
+ * compartido. NO lo borra: queda en el calendario marcado, con quién, cuándo y
+ * por qué; mientras esté suspendido no se pasa lista ni se registra y no cuenta
+ * como dictado (`SQL_SESION_CANCELADA`). Los inscritos siguen inscritos —en un
+ * Club, esa semana no les cuenta como falta: no hay marca—. Una clase del
+ * HORARIO no: esa se suspende corriéndola al final del curso.
+ */
+export async function suspenderEvento(input: {
+  actorUserId: string;
+  sessionId: string;
+  /** null = reactivar. */
+  motivo: string | null;
+  ip?: string | null;
+}): Promise<{ sesiones: number }> {
+  const motivo = input.motivo?.trim() ?? null;
+  if (motivo !== null && motivo === "") {
+    throw new ValidationError("El motivo de la suspensión es obligatorio.");
+  }
+  const sesion = await queryOne<{ slotId: string | null; grupoId: string | null }>(
+    `SELECT slot_id AS "slotId", grupo_id AS "grupoId" FROM scheduling_session WHERE id = $1`,
+    [input.sessionId],
+  );
+  if (sesion === null) throw new NotFoundError("El evento no existe.");
+  if (sesion.slotId !== null) {
+    throw new ValidationError(
+      "Es una clase del horario del salón: se suspende el día y corre al final del curso.",
+    );
+  }
+  const n = await withTransaction(async (tx) => {
+    const filas = await queryRows<{ id: string; historia: boolean }>(
+      `SELECT s.id,
+              (s.cerrada_en IS NOT NULL
+               OR EXISTS (SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id))
+                AS historia
+         FROM scheduling_session s
+        WHERE s.id = $1 OR ($2::uuid IS NOT NULL AND s.grupo_id = $2)
+        FOR UPDATE`,
+      [input.sessionId, sesion.grupoId],
+      tx,
+    );
+    if (motivo !== null && filas.some((f) => f.historia)) {
+      throw new ConflictError("El evento ya se registró o tiene asistencia: no se suspende.");
+    }
+    return execute(
+      motivo === null
+        ? `UPDATE scheduling_session
+              SET suspendida_en = NULL, suspendida_por = NULL, suspension_motivo = NULL
+            WHERE id = ANY($1) AND suspendida_en IS NOT NULL`
+        : `UPDATE scheduling_session
+              SET suspendida_en = now(), suspendida_por = $2, suspension_motivo = $3
+            WHERE id = ANY($1) AND suspendida_en IS NULL`,
+      motivo === null
+        ? [filas.map((f) => f.id)]
+        : [filas.map((f) => f.id), input.actorUserId, motivo],
+      tx,
+    );
+  });
+  if (n === 0) {
+    throw new ConflictError(
+      motivo === null ? "El evento no está suspendido." : "El evento ya estaba suspendido.",
+    );
+  }
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: motivo === null ? "scheduling.evento_reactivado" : "scheduling.evento_suspendido",
+    entidad: "scheduling_session",
+    entidadId: input.sessionId,
+    payload: { sesiones: n, motivo },
+    ip: input.ip ?? null,
+  });
+  return { sesiones: n };
+}
+
 export async function editarEventoAdmin(
   input: DatosEventoAdmin & { id: string },
 ): Promise<{ id: string; guias: number }> {

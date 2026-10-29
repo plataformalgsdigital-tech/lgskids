@@ -165,6 +165,8 @@ export async function agendaProximas(
         -- La que está EN CURSO sigue en la agenda hasta que termina: la ventana
         -- de Zoom permite entrar y reconectarse con la clase empezada, y
         -- quitarla al empezar dejaba al niño sin el enlace en plena clase.
+        -- Un evento SUSPENDIDO no se dicta: no va en su agenda.
+        AND s.suspendida_en IS NULL
         AND s.starts_at + make_interval(mins => s.duracion_min) > now()
         AND s.starts_at < now() + ($2 || ' days')::interval
       ORDER BY s.starts_at

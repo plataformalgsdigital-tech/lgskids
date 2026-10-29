@@ -8,6 +8,7 @@ import {
   crearSalon,
   editarEvento,
   eliminarEvento,
+  suspenderEvento,
   retirarClubesPorFaltas,
 } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
@@ -480,6 +481,44 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       (x) => x.tipo === "CLUB" && x.startsAt > new Date().toISOString(),
     );
     expect(proxima).toBeDefined();
+  });
+
+  it("SUSPENDER evento: sigue en el calendario, sin lista ni registro; se reactiva", async () => {
+    const fecha = diaEn(new Date(Date.now() + 6 * 86_400_000));
+    const ev = await nuevoEvento({ salon: salonC, fecha, hora: "04:45" });
+    await agendar("CLUB", ev);
+    await suspenderEvento({ actorUserId: actor, sessionId: ev, motivo: "Guía enfermo" });
+    const s = await queryOne<{ motivo: string | null }>(
+      `SELECT suspension_motivo AS motivo FROM scheduling_session WHERE id = $1`,
+      [ev],
+    );
+    expect(s?.motivo).toBe("Guía enfermo");
+    await expect(
+      marcarAsistencia({
+        actorUserId: actor,
+        sessionId: ev,
+        marcas: [{ childPersonId: ninoId, estado: "PRESENTE" }],
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    // Ya no se le ofrece para agendar: no se dicta.
+    const op = await opcionesAgendaNino({
+      childPersonId: ninoId,
+      countryScope: null,
+      tipo: "CLUB",
+      fecha,
+    });
+    expect(op.some((o) => o.id === ev)).toBe(false);
+    await suspenderEvento({ actorUserId: actor, sessionId: ev, motivo: null });
+    await marcarAsistencia({
+      actorUserId: actor,
+      sessionId: ev,
+      marcas: [{ childPersonId: ninoId, estado: "PRESENTE" }],
+    });
+    // Una clase del HORARIO no se suspende así.
+    const regular = await proximaDe(salonA);
+    await expect(
+      suspenderEvento({ actorUserId: actor, sessionId: regular.id, motivo: "x" }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("CANCELAR evento: toda la tanda sale del calendario y cancela inscripciones", async () => {

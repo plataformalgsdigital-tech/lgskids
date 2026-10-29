@@ -68,7 +68,10 @@ export interface SessionInfo {
   /** Club con link propio (Links de Clubes): su `meetingUrl` sale de ahí. */
   linkClubId: string | null;
   /** El guía la canceló y administración lo aprobó sin cubrirla: no se dicta. */
+  /** No se dicta: cancelada sin reemplazo o SUSPENDIDA (con su motivo abajo). */
   cancelada: boolean;
+  /** Evento suspendido desde la Agenda: su motivo (null = no está suspendido). */
+  suspensionMotivo: string | null;
   /** Evento suelto abierto a otros salones (Agendar): su alcance; null = Todos. */
   apertura: {
     abierto: boolean;
@@ -110,6 +113,7 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
             s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,
             s.grupo_id AS "grupoId", ${SQL_SESION_CANCELADA("s")} AS cancelada,
+            s.suspension_motivo AS "suspensionMotivo",
             s.link_club_id AS "linkClubId",
             CASE WHEN tc.id IS NULL THEN NULL ELSE json_build_object(
               'id', tc.id, 'inicio', tc.inicio::text, 'fin', tc.fin::text,

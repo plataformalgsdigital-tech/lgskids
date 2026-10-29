@@ -97,11 +97,13 @@ export async function sesionesServicio(f: {
               to_char(s.starts_at AT TIME ZONE cl.timezone, 'HH24:MI') AS hora,
               s.tipo::text AS tipo, ca.nombre AS campania, co.tipo::text AS curso,
               cl.nombre AS salon, cl.holiday_country AS pais, ${NOMBRE_GUIA} AS guia,
-              CASE WHEN ${SQL_SESION_CANCELADA("s")} THEN 'CANCELADA'
+              CASE WHEN s.suspendida_en IS NOT NULL THEN 'SUSPENDIDA'
+                   WHEN ${SQL_SESION_CANCELADA("s")} THEN 'CANCELADA'
                    WHEN s.cerrada_en IS NOT NULL THEN 'REALIZADA'
                    WHEN s.starts_at + make_interval(mins => s.duracion_min) > now() THEN 'PROGRAMADA'
                    ELSE 'NO_REALIZADA' END AS estado,
-              CASE WHEN cx.id IS NOT NULL THEN cx.motivo ELSE s.nota_sesion END AS detalle,
+              CASE WHEN s.suspendida_en IS NOT NULL THEN s.suspension_motivo
+                   WHEN cx.id IS NOT NULL THEN cx.motivo ELSE s.nota_sesion END AS detalle,
               CASE WHEN cx.id IS NULL THEN NULL ELSE
                 (SELECT COALESCE(NULLIF(TRIM(CONCAT_WS(' ', g2.nombres, g2.apellidos)), ''), u2.username)
                    FROM identity_user u2 LEFT JOIN scheduling_guia g2 ON g2.guia_user_id = u2.id

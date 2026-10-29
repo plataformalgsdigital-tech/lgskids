@@ -103,6 +103,8 @@ interface Sesion {
   linkClubId?: string | null;
   /** Cancelada por el guía y sin reemplazo: no se registra ni se pasa lista. */
   cancelada: boolean;
+  /** Evento SUSPENDIDO desde la Agenda: su motivo. */
+  suspensionMotivo?: string | null;
 }
 
 const NIVEL_UI: Record<string, string> = {
@@ -707,6 +709,23 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
             </p>
           )}
           {aviso !== null && <p style={{ color: "#1b5e20", fontWeight: 600 }}>{aviso}</p>}
+          {sesion?.suspensionMotivo != null && (
+            <p
+              role="status"
+              style={{
+                margin: 0,
+                padding: "0.6rem 0.8rem",
+                borderRadius: "0.6rem",
+                background: "#fff3e0",
+                border: "1px solid #fb8c00",
+                color: "#7c3a00",
+                fontWeight: 600,
+              }}
+            >
+              ⏸ Evento SUSPENDIDO: {sesion.suspensionMotivo}. No se pasa lista ni se registra; se
+              reactiva desde la Agenda.
+            </p>
+          )}
 
           {/* ── Información del evento (con el guía) ────────────── */}
           <section style={caja}>
@@ -837,7 +856,11 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
                 type="button"
                 style={botonPrimario}
                 disabled={ocupado || cerrada || sesion?.cancelada === true}
-                title={sesion?.cancelada === true ? "La sesión está cancelada" : undefined}
+                title={
+                  sesion?.cancelada === true
+                    ? "La sesión está suspendida o cancelada: no se registra"
+                    : undefined
+                }
                 onClick={abrirRegistro}
               >
                 ✔ Registrar sesión

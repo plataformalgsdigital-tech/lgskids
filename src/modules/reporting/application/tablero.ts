@@ -149,6 +149,7 @@ export async function sesionesSinMarcar(
         AND s.starts_at < now()
         AND s.starts_at >= now() - ($1::int * INTERVAL '1 day')
         AND NOT EXISTS (SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id)
+        AND s.suspendida_en IS NULL
         -- Un club sin inscritos no deja lista por pasar.
         AND (s.tipo <> 'CLUB' OR ${SQL_EN_LISTA("s")} > 0)
         ${filtroGuia}
@@ -185,6 +186,7 @@ export async function resumenGuia(guiaUserId: string): Promise<ResumenGuia> {
             AND s3.starts_at < now()
             AND s3.starts_at >= now() - INTERVAL '14 days'
             AND NOT EXISTS (SELECT 1 FROM attendance_attendance a WHERE a.session_id = s3.id)
+            AND s3.suspendida_en IS NULL
             AND (s3.tipo <> 'CLUB' OR ${SQL_EN_LISTA("s3")} > 0)
        ), 0)::int AS "sesionesSinMarcar"
      FROM scheduling_classroom cl

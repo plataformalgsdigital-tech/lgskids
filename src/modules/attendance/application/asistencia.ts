@@ -184,7 +184,7 @@ export async function marcarAsistencia(input: {
   if (sesion === null) throw new NotFoundError("La sesión no existe.");
   // Cancelada sin reemplazo: no se dictó, así que nadie "faltó" ni "asistió".
   if (sesion.cancelada) {
-    throw new ValidationError("La sesión está cancelada: no se pasa lista.");
+    throw new ValidationError("La sesión está suspendida o cancelada: no se pasa lista.");
   }
 
   const roster = new Set(

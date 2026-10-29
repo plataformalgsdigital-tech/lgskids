@@ -1785,9 +1785,17 @@ solo servía para completar la ficha.
   CANCELA (`DELETE /api/scheduling/eventos/[id]` → `eliminarEvento`, en todos sus
   salones; en un Club de tanda, "solo esta" o "toda la tanda", que cancela también
   las inscripciones; se rechaza con registro, asistencia o repetición pedida, y los
-  agendados quedan CANCELADOS) y una clase del HORARIO se SUSPENDE ese día. Permisos:
-  `op.calendario.evento_academico` y `op.calendario.suspender`. Lo registrado no
-  muestra íconos. Prueba en `contracts/tests/agendar-integration.test.ts`.
+  agendados quedan CANCELADOS) y una clase del HORARIO se SUSPENDE ese día. Además,
+  **⏸ SUSPENDER un evento** (migración `20261029200000_evento_suspendido`,
+  `suspenderEvento`, `POST|DELETE /api/scheduling/eventos/[id]/suspension`): NO lo
+  borra —queda en el calendario con "⏸ suspendido", `suspendida_en/_por` y
+  `suspension_motivo`—; `SQL_SESION_CANCELADA` lo cuenta como "no se dicta", así que
+  no se pasa lista, no se registra, no cuenta como dictado, no se ofrece para agendar
+  ni sale en la agenda del niño ni en "sesiones sin marcar"; Servicio › Sesiones lo
+  muestra SUSPENDIDA con su motivo. Los inscritos siguen inscritos (sin marca no es
+  falta). ▶ lo reactiva. Permisos: cancelar = `op.calendario.evento_academico`;
+  suspender/reactivar = `op.calendario.suspender`. Lo registrado no muestra íconos.
+  Prueba en `contracts/tests/agendar-integration.test.ts`.
   **Encabezado (2026-10-02)**: a la izquierda `CAMPAÑA · CURSO · Salón NN`, a la
   derecha `Nivel X · Sesión N · Lección N` en una sola línea. "Información del evento" lleva
   fecha, hora, cupo e inscritos, guía (con "Cambiar guía") y enlace; la caja

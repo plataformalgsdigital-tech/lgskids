@@ -134,6 +134,7 @@ export {
   detalleEventoAdmin,
   editarEvento,
   eliminarEvento,
+  suspenderEvento,
   eventosAdmin,
   audienciaEventoAdmin,
   marcarAsistenciaEventoAdmin,
