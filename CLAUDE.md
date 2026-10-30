@@ -1971,6 +1971,14 @@ solo servía para completar la ficha.
   en UNA sentencia y la serie se mueve en el orden que evita pisar la semana
   vecina. `getSessionInfo` devuelve `tanda` (rango y semanas por delante). Prueba:
   `tanda-club-integration.test.ts`.
+  **PREVIO de feriados (2026-10-30)**: un Club pedido para el sábado 31-oct (feriado en
+  Chile) nació el 7-nov y "parecía no crearse": se creó tres veces. Ahora el formulario,
+  antes de crear, pide `POST /api/scheduling/eventos/previo` (`previoFeriadosEvento`,
+  mismo cuerpo que el alta) y avisa si la fecha es feriado, cuál será la PRIMERA sesión
+  y qué semanas de la tanda se saltan, por país. Usa la MISMA regla del alta: semanas de
+  `fechasTanda`, mismo instante, feriado de la tabla en la fecha local del salón, lo
+  pasado fuera y, en un Club para "Todos", solo el país del ANFITRIÓN
+  (`elegirAnfitrion`, compartido). Un evento suelto en feriado se avisa pero se crea.
 - **LINKS DE CLUBES (2026-10-28, migración `20261028000000`)**: tabla
   `scheduling_link_club` (nombre, `dia_semana` 0=domingo…6=sábado como
   `Date.getDay()`, horario TEXTO, link, activo), mantenida en **Sesiones › Links de
@@ -2350,6 +2358,11 @@ formulario de crear (`NuevoEventoModal` con `editar`) y el mismo permiso
   esas se mueven con suspensión). Botón "✏️ Editar evento" en `SesionModal`
   (`getSessionInfo` ganó `esEvento`, `duracionMin`, `nivel`, `limiteUsuarios`,
   `timezone`, `grupoId`).
+  **Un Club para varios salones muestra su ALCANCE al editarlo (2026-10-30)**: el
+  formulario escondía País, Campaña y Curso de todo evento suelto ("el salón no
+  cambia"), y en un Club para "Todos" esos campos SON quién lo ve. Ahora se muestran
+  cargados con su alcance, se cambian (va como `apertura` en el PATCH) y el Salón
+  queda fijo en "Todos los salones". La hora se rotula con el reloj de su salón.
 - **Administrativo** (`GET|PATCH /api/scheduling/eventos-admin/[id]` →
   `detalleEventoAdmin`/`editarEventoAdmin`): la audiencia nueva reemplaza a la vieja;
   quien sigue conserva su asistencia. En el calendario la ficha naranja se vuelve

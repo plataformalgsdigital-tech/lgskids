@@ -90,6 +90,7 @@ export {
 export type { RegistroSesion, Repeticion, FilaRefuerzo } from "./application/registro-sesion";
 export {
   crearEvento,
+  previoFeriadosEvento,
   salonesDelAlcance,
   guiasConZoom,
   guardarFichaGuia,
@@ -100,7 +101,7 @@ export {
   DURACIONES_TALLER,
   ESQUEMA_APERTURA,
 } from "./application/crear-evento";
-export type { AperturaEvento } from "./application/crear-evento";
+export type { AperturaEvento, PrevioFeriadosPais } from "./application/crear-evento";
 export {
   opcionesAgenda,
   clubesDeLaSemana,

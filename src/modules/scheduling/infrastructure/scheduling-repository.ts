@@ -408,6 +408,20 @@ export async function getHolidayDates(
   return rows.map((r) => r.fecha);
 }
 
+/** Los feriados de un país en un rango, con su nombre (para avisarlos). */
+export async function getHolidays(
+  countryCode: string,
+  desde: string,
+  hasta: string,
+): Promise<{ fecha: string; nombre: string }[]> {
+  return queryRows<{ fecha: string; nombre: string }>(
+    `SELECT fecha::text AS fecha, nombre FROM scheduling_holiday
+      WHERE country_code = $1 AND fecha BETWEEN $2::date AND $3::date
+      ORDER BY fecha`,
+    [countryCode, desde, hasta],
+  );
+}
+
 export async function upsertHolidays(
   countryCode: string,
   feriados: { fecha: string; nombre: string; fuente: string }[],

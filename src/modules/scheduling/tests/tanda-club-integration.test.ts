@@ -4,7 +4,7 @@ import { closePool } from "@/platform/db/pool";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { ConflictError, ValidationError } from "@/platform/errors";
 import { newId } from "@/platform/ids";
-import { crearEvento, editarEvento } from "../application/crear-evento";
+import { crearEvento, editarEvento, previoFeriadosEvento } from "../application/crear-evento";
 import { crearSalon } from "../application/gestion-salones";
 
 /**
@@ -130,6 +130,36 @@ describe.runIf(RUN)("tanda de clubs (integración)", () => {
       [creado.tandaId],
     );
     expect(tanda).toEqual({ inicio: "2027-01-05", fin: "2027-01-19" });
+  });
+
+  it("el PREVIO avisa el feriado de la fecha, la primera sesión y lo que se salta", async () => {
+    const previo = await previoFeriadosEvento({
+      classroomIds: [chile, colombia],
+      tipo: "CLUB",
+      clubUnico: false,
+      fecha: "2027-01-11", // lunes de Reyes en Colombia
+      horaLocal: "15:00",
+      zona: "America/Bogota",
+      tanda: { inicio: "2027-01-04", fin: "2027-01-25" },
+    });
+    expect(previo.problema).toBeNull();
+    const co = previo.paises.find((p) => p.pais === "CO");
+    const cl = previo.paises.find((p) => p.pais === "CL");
+    expect(co?.feriadoEnFecha).not.toBeNull();
+    expect(co?.saltadas.map((s) => s.fecha)).toEqual(["2027-01-11"]);
+    expect(co?.primera).toBe("2027-01-04");
+    expect(cl).toMatchObject({ feriadoEnFecha: null, saltadas: [], primera: "2027-01-04" });
+
+    // Un evento suelto (sin tanda) no salta el feriado: solo se avisa.
+    const suelto = await previoFeriadosEvento({
+      classroomIds: [colombia],
+      tipo: "TALLER",
+      clubUnico: false,
+      fecha: "2027-01-11",
+      horaLocal: "15:00",
+    });
+    expect(suelto.paises[0]).toMatchObject({ saltadas: [], primera: "2027-01-11" });
+    expect(suelto.paises[0]?.feriadoEnFecha).not.toBeNull();
   });
 
   it("un choque no crea nada y la fecha fuera de la tanda se rechaza", async () => {

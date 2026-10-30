@@ -9,7 +9,7 @@ import { newId } from "@/platform/ids";
 import { isValidTimeZone, operationalDate, wallTimeToUtc } from "@/platform/time";
 import { diasEntre, fechasTanda, sumarDias } from "../domain/tanda-club";
 import { exigirLinkClubParaFecha } from "./link-club";
-import { getHolidayDates } from "../infrastructure/scheduling-repository";
+import { getHolidayDates, getHolidays } from "../infrastructure/scheduling-repository";
 import {
   DURACION_ADMIN_MAX,
   DURACION_ADMIN_MIN,
@@ -479,20 +479,7 @@ export async function crearEvento(input: {
     // Club ÚNICO: el anfitrión es el primer salón (por nombre) que no tiene nada a
     // esa hora en ninguna semana. Solo presta su id; quién lo ve lo dice el alcance.
     if (clubUnico) {
-      const instantes = semanas.map(instante);
-      const ocupados = new Set(
-        (
-          await queryRows<{ classroomId: string }>(
-            `SELECT DISTINCT classroom_id AS "classroomId" FROM scheduling_session
-              WHERE classroom_id = ANY($1::uuid[]) AND starts_at = ANY($2::timestamptz[])`,
-            [salones, instantes],
-            tx,
-          )
-        ).map((f) => f.classroomId),
-      );
-      const anfitrion = [...filas]
-        .sort((a, b) => a.nombre.localeCompare(b.nombre))
-        .find((f) => !ocupados.has(f.id));
+      const anfitrion = await elegirAnfitrion(filas, semanas.map(instante), tx);
       if (anfitrion === undefined) {
         throw new ConflictError("Todos los salones de ese alcance ya tienen algo a esa hora.");
       }
@@ -634,6 +621,128 @@ export async function crearEvento(input: {
   });
 
   return { grupoId: primerGrupo, tandaId, sesiones: creadas };
+}
+
+/**
+ * El salón ANFITRIÓN de un Club para "Todos": el primero por nombre que no tiene
+ * nada a esa hora en ninguna semana. Lo comparten el alta y el previo de feriados
+ * (el Club salta los feriados del país de SU anfitrión, no los de cada salón).
+ */
+async function elegirAnfitrion<T extends { id: string; nombre: string }>(
+  filas: T[],
+  instantes: Date[],
+  tx?: PoolClient,
+): Promise<T | undefined> {
+  const ocupados = new Set(
+    (
+      await queryRows<{ classroomId: string }>(
+        `SELECT DISTINCT classroom_id AS "classroomId" FROM scheduling_session
+          WHERE classroom_id = ANY($1::uuid[]) AND starts_at = ANY($2::timestamptz[])`,
+        [filas.map((f) => f.id), instantes],
+        tx,
+      )
+    ).map((f) => f.classroomId),
+  );
+  return [...filas]
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .find((f) => !ocupados.has(f.id));
+}
+
+export interface PrevioFeriadosPais {
+  pais: string;
+  /** Nombre del feriado si la fecha elegida lo es en ese país; si no, null. */
+  feriadoEnFecha: string | null;
+  /** Primera sesión que de verdad se crea (null = ninguna). */
+  primera: string | null;
+  /** Semanas por delante que se saltan por feriado. */
+  saltadas: { fecha: string; nombre: string }[];
+}
+
+/**
+ * PREVIO de feriados del formulario: con LA MISMA regla del alta —las semanas
+ * de `fechasTanda`, el mismo instante, el feriado del país de cada salón en su
+ * fecha local, lo pasado fuera y, en un Club para "Todos", solo el anfitrión—
+ * dice qué fecha elegida es feriado, cuál es la primera sesión y qué semanas se
+ * saltan. Así el formulario no promete algo distinto de lo que se crea (un Club
+ * pedido para un sábado feriado nace la semana siguiente y parecía no crearse).
+ */
+export async function previoFeriadosEvento(input: {
+  classroomIds: string[];
+  tipo: TipoEvento;
+  /** Club para "Todos": UN evento en un anfitrión. */
+  clubUnico: boolean;
+  fecha: string;
+  horaLocal: string;
+  zona?: string;
+  tanda?: { inicio: string; fin: string } | null;
+}): Promise<{ paises: PrevioFeriadosPais[]; problema: string | null }> {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(input.fecha) ||
+    !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(input.horaLocal)
+  ) {
+    return { paises: [], problema: null };
+  }
+  if (input.zona !== undefined && !isValidTimeZone(input.zona)) {
+    return { paises: [], problema: null };
+  }
+  const tanda = input.tipo === "CLUB" ? (input.tanda ?? null) : null;
+  let semanas = [input.fecha];
+  if (tanda !== null) {
+    const r = fechasTanda({ fecha: input.fecha, inicio: tanda.inicio, fin: tanda.fin });
+    if (r.problema !== null) return { paises: [], problema: r.problema };
+    semanas = r.fechas;
+  }
+  let filas = await queryRows<{ id: string; nombre: string; timezone: string; pais: string }>(
+    `SELECT id, nombre, timezone, holiday_country AS pais
+       FROM scheduling_classroom WHERE id = ANY($1::uuid[]) AND activo`,
+    [[...new Set(input.classroomIds)]],
+  );
+  if (filas.length === 0) return { paises: [], problema: null };
+  const [hh, mm] = input.horaLocal.split(":");
+  const zona = input.zona ?? filas[0]?.timezone ?? "UTC";
+  const instante = (fecha: string) => {
+    const [y, m, d] = fecha.split("-");
+    return wallTimeToUtc(
+      { year: Number(y), month: Number(m), day: Number(d), hour: Number(hh), minute: Number(mm) },
+      zona,
+    );
+  };
+  if (input.clubUnico && input.tipo === "CLUB") {
+    const anfitrion = await elegirAnfitrion(filas, semanas.map(instante));
+    if (anfitrion === undefined) return { paises: [], problema: null };
+    filas = [anfitrion];
+  }
+
+  // Un país = un calendario de feriados; su reloj, el del primer salón de ese país.
+  const porPais = new Map<string, string>();
+  for (const f of filas) if (!porPais.has(f.pais)) porPais.set(f.pais, f.timezone);
+  const desde = sumarDias(semanas[0] ?? input.fecha, -1);
+  const hasta = sumarDias(semanas[semanas.length - 1] ?? input.fecha, 1);
+  const paises: PrevioFeriadosPais[] = [];
+  for (const [pais, timezone] of [...porPais.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const feriados = new Map(
+      (await getHolidays(pais, desde, hasta)).map((f) => [f.fecha, f.nombre] as const),
+    );
+    let primera: string | null = null;
+    const saltadas: { fecha: string; nombre: string }[] = [];
+    for (const semana of semanas) {
+      const startsAt = instante(semana);
+      // Como el alta: en una tanda, lo pasado no se crea (ni se avisa).
+      if (tanda !== null && startsAt.getTime() <= Date.now()) continue;
+      const local = operationalDate(startsAt, timezone);
+      const nombre = feriados.get(local);
+      // Solo la TANDA salta feriados; un evento suelto se crea igual ese día.
+      if (nombre !== undefined && tanda !== null) saltadas.push({ fecha: local, nombre });
+      else primera ??= local;
+    }
+    paises.push({
+      pais,
+      feriadoEnFecha: feriados.get(operationalDate(instante(input.fecha), timezone)) ?? null,
+      primera,
+      saltadas,
+    });
+  }
+  return { paises, problema: null };
 }
 
 /**

@@ -189,6 +189,24 @@ function pared(iso: string, zona?: string): { fecha: string; hora: string } {
   return { fecha: `${p("year")}-${p("month")}-${p("day")}`, hora: `${p("hour")}:${p("minute")}` };
 }
 
+/** Previo de feriados por país (`POST /api/scheduling/eventos/previo`). */
+interface PrevioPais {
+  pais: string;
+  feriadoEnFecha: string | null;
+  primera: string | null;
+  saltadas: { fecha: string; nombre: string }[];
+}
+
+/** "sáb 7 nov 2026": una fecha YYYY-MM-DD legible (a mediodía, sin corrimiento de zona). */
+function fechaLegible(f: string): string {
+  return new Date(`${f}T12:00:00`).toLocaleDateString("es-CL", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 interface TipoAdmin {
   valor: string;
   etiqueta: string;
@@ -272,14 +290,26 @@ export function NuevoEventoModal({
           ? ""
           : "SESION",
   );
+  /**
+   * Club para varios salones ("Todos"): campaña, país y curso son su ALCANCE
+   * —quién lo ve y se inscribe—, así que al editarlo se muestran y se cambian.
+   */
+  const alcanceClub =
+    editar?.clase === "suelto" && editar.tipo === "CLUB" && editar.apertura.abierto
+      ? editar.apertura
+      : null;
   const [campania, setCampania] = useState(
     editar !== undefined && editar.clase !== "suelto" ? (editar.campania ?? "") : "",
   );
   const [pais, setPais] = useState(
-    editar !== undefined && editar.clase !== "suelto" ? (editar.pais ?? "") : "",
+    editar !== undefined && editar.clase !== "suelto"
+      ? (editar.pais ?? "")
+      : (alcanceClub?.pais ?? ""),
   );
   const [curso, setCurso] = useState(
-    editar !== undefined && editar.clase !== "suelto" ? (editar.curso ?? "") : "",
+    editar !== undefined && editar.clase !== "suelto"
+      ? (editar.curso ?? "")
+      : (alcanceClub?.curso ?? ""),
   );
   const [salonPrincipal, setSalonPrincipal] = useState(
     editar !== undefined && editar.clase !== "suelto" ? (editar.classroomId ?? "") : "",
@@ -307,6 +337,15 @@ export function NuevoEventoModal({
   );
   /** Editando un evento suelto: su salón no cambia (se elige al crearlo). */
   const salonFijo = editar?.clase === "suelto";
+  /** Editando un Club para varios salones: se muestran y cambian campaña, país y curso. */
+  const editaAlcance = alcanceClub !== null;
+  const campaniaAlcanceId = alcanceClub?.campaignId ?? null;
+  /** El reloj en que se escribe la hora al editar un evento suelto: el de su salón. */
+  const relojSalon =
+    editar?.clase === "suelto"
+      ? (Object.values(ZONA_PAIS).find((z) => z.zona === editar.timezone)?.nombre ??
+        editar.timezone)
+      : null;
   // Vocabulario y rangos del dominio, servidos por la API.
   const [tiposAdmin, setTiposAdmin] = useState<TipoAdmin[]>([]);
   const [horasAdmin, setHorasAdmin] = useState<number[]>([]);
@@ -390,10 +429,14 @@ export function NuevoEventoModal({
         setTandaInicio(t.inicio);
         setTandaFin(t.fin);
         setTandaDe(t.de);
+        // El alcance guarda el id de la campaña; el formulario la elige por nombre.
+        if (campaniaAlcanceId !== null) {
+          setCampania(lista.find((c) => c.id === campaniaAlcanceId)?.nombre ?? "");
+        }
       }
     }
     void cargarCampanias();
-  }, [esAdmin]);
+  }, [esAdmin, campaniaAlcanceId]);
 
   /** Al pasar a Welcome: campaña en matrícula, todos los países/cursos/salones, Rookie. */
   function elegirTipo(nuevo: string) {
@@ -472,7 +515,9 @@ export function NuevoEventoModal({
         (salonFijo || salonPrincipal !== "" || salonesFiltrados.length > 0) &&
         guiaUserId !== "" &&
         (!esTanda || (tandaInicio !== "" && tandaFin !== "")) &&
-        (!usaLinkClub || linkElegido !== null);
+        (!usaLinkClub || linkElegido !== null) &&
+        // Sin la lista de campañas, el alcance se guardaría como "Todas".
+        (!editaAlcance || campaniasLista.length > 0);
   /** El link que se manda: el elegido si es un Club con link propio; si no, ninguno. */
   const linkEnviado = usaLinkClub ? (linkElegido?.id ?? null) : null;
   const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -484,6 +529,65 @@ export function NuevoEventoModal({
     ZONA_PAIS[pais] !== undefined
       ? `hora de ${ZONA_PAIS[pais].nombre}`
       : `tu reloj (${zonaNavegador})`;
+  const campaignIdElegida = campaniasLista.find((c) => c.nombre === campania)?.id ?? null;
+  /** Dónde se dicta un evento académico nuevo: lo mismo para el alta y el previo. */
+  const destino = todosLosSalones
+    ? {
+        todos: {
+          campaignId: campaignIdElegida,
+          pais: pais === "" ? null : pais,
+          curso: curso === "" ? null : curso,
+        },
+        // La hora va en el reloj del país elegido o, con "Todos", en el de quien la escribe.
+        zona: zonaHora,
+      }
+    : // Salones elegidos: la misma regla del aviso (país elegido o tu reloj).
+      { classroomIds: seleccionados, zona: zonaHora };
+  const tandaEnviada = esTanda ? { inicio: tandaInicio, fin: tandaFin } : null;
+
+  // PREVIO de feriados: antes de crear, el servidor dice con la MISMA regla del
+  // alta si la fecha es feriado, cuál será la primera sesión y qué semanas se
+  // saltan. Un Club pedido para un sábado feriado nacía la semana siguiente y
+  // parecía no haberse creado.
+  const clavePrevio =
+    editar === undefined &&
+    !esAdmin &&
+    !esWelcome &&
+    /^\d{4}-\d{2}-\d{2}$/.test(fecha) &&
+    hora !== "" &&
+    (todosLosSalones || seleccionados.length > 0) &&
+    (!esTanda || (tandaInicio !== "" && tandaFin !== ""))
+      ? JSON.stringify({ ...destino, tipo, fecha, horaLocal: hora, tanda: tandaEnviada })
+      : null;
+  const [previo, setPrevio] = useState<{ clave: string; paises: PrevioPais[] } | null>(null);
+  useEffect(() => {
+    if (clavePrevio === null) return;
+    let vigente = true;
+    const espera = setTimeout(() => {
+      async function pedir(clave: string) {
+        const res = await apiFetch("/api/scheduling/eventos/previo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: clave,
+        });
+        if (!vigente || !res.ok) return;
+        const d = (await res.json()) as { paises: PrevioPais[] };
+        setPrevio({ clave, paises: d.paises });
+      }
+      void pedir(clavePrevio);
+    }, 400);
+    return () => {
+      vigente = false;
+      clearTimeout(espera);
+    };
+  }, [clavePrevio]);
+  // Solo vale el previo de lo que está escrito AHORA en el formulario.
+  const avisosFeriado =
+    previo !== null && previo.clave === clavePrevio
+      ? previo.paises.filter(
+          (p) => p.feriadoEnFecha !== null || p.saltadas.length > 0 || p.primera === null,
+        )
+      : [];
 
   async function crear() {
     setOcupado(true);
@@ -516,7 +620,17 @@ export function NuevoEventoModal({
               limiteUsuarios: limite === "" ? null : Number(limite),
               guiaUserId,
               observaciones: observaciones.trim() === "" ? null : observaciones,
-              apertura: aperturaEnviada,
+              // Club para varios salones: su alcance, con lo que diga el formulario.
+              apertura:
+                alcanceClub !== null
+                  ? {
+                      abierto: true,
+                      campaignId: campaignIdElegida,
+                      curso: curso === "" ? null : curso,
+                      pais: pais === "" ? null : pais,
+                      classroomId: null,
+                    }
+                  : aperturaEnviada,
               todaLaTanda: tandaEditada !== null && todaLaTanda,
               linkClubId: linkEnviado,
             }
@@ -538,18 +652,7 @@ export function NuevoEventoModal({
                 guiaUserIds: audiencia,
               }
             : {
-                ...(todosLosSalones
-                  ? {
-                      todos: {
-                        campaignId: campaniasLista.find((c) => c.nombre === campania)?.id ?? null,
-                        pais: pais === "" ? null : pais,
-                        curso: curso === "" ? null : curso,
-                      },
-                      // La hora va en el reloj del país elegido o, con "Todos", en el de quien la escribe.
-                      zona: zonaHora,
-                    }
-                  : // Salones elegidos: la misma regla del aviso (país elegido o tu reloj).
-                    { classroomIds: seleccionados, zona: zonaHora }),
+                ...destino,
                 tipo,
                 fecha,
                 horaLocal: hora,
@@ -559,7 +662,7 @@ export function NuevoEventoModal({
                 guiaUserId,
                 observaciones: observaciones.trim() === "" ? null : observaciones,
                 apertura: aperturaEnviada,
-                tanda: esTanda ? { inicio: tandaInicio, fin: tandaFin } : null,
+                tanda: tandaEnviada,
                 linkClubId: linkEnviado,
               };
       const base = esWelcome
@@ -675,7 +778,11 @@ export function NuevoEventoModal({
               {editar.clase === "welcome"
                 ? `Tiene ${String(editar.inscritos)} niño${editar.inscritos === 1 ? "" : "s"} agendado${editar.inscritos === 1 ? "" : "s"}: siguen agendados con los cambios. El límite no puede quedar por debajo de esa cifra.`
                 : editar.clase === "suelto"
-                  ? `Salón: ${editar.salon}${editar.compartido ? " (evento compartido: el cambio se aplica en todos sus salones)" : ""}. La lista sale de las matrículas del salón, así que los niños siguen inscritos.`
+                  ? editaAlcance
+                    ? `Club para varios salones (se guarda en ${editar.salon}). Campaña, país, curso y nivel dicen quién lo ve y se inscribe; los niños inscritos siguen inscritos.`
+                    : editar.tipo === "CLUB"
+                      ? `Salón: ${editar.salon}${editar.compartido ? " (compartido: el cambio se aplica en todos sus salones)" : ""}. Los niños inscritos siguen inscritos.`
+                      : `Salón: ${editar.salon}${editar.compartido ? " (evento compartido: el cambio se aplica en todos sus salones)" : ""}. La lista sale de las matrículas del salón, así que los niños siguen inscritos.`
                   : "Los guías que sigan en la audiencia conservan su asistencia; los que se quiten dejan de verlo."}
             </p>
           )}
@@ -697,7 +804,7 @@ export function NuevoEventoModal({
 
           {/* El PAÍS va primero: fija en qué reloj se escribe la hora (un Club de
               Chile a las 18:00 se escribe 18:00). */}
-          {!salonFijo && (
+          {(!salonFijo || editaAlcance) && (
             <div>
               <label style={rotulo} htmlFor="ev-pais">
                 País
@@ -720,7 +827,7 @@ export function NuevoEventoModal({
                   </option>
                 ))}
               </select>
-              {!esAdmin && (
+              {!esAdmin && !salonFijo && (
                 <p
                   role="note"
                   style={{
@@ -762,13 +869,15 @@ export function NuevoEventoModal({
             <div>
               <label style={rotulo} htmlFor="ev-hora">
                 Hora *{/* En qué reloj se escribe: el del país elegido o el de quien escribe. */}
-                {!esAdmin && !salonFijo && (
+                {!esAdmin && (
                   <span style={{ fontWeight: 600, color: "#1565c0" }}>
                     {" "}
                     (
-                    {ZONA_PAIS[pais] !== undefined
-                      ? `hora de ${ZONA_PAIS[pais].nombre}`
-                      : "tu hora"}
+                    {relojSalon !== null
+                      ? `hora de ${relojSalon}`
+                      : ZONA_PAIS[pais] !== undefined
+                        ? `hora de ${ZONA_PAIS[pais].nombre}`
+                        : "tu hora"}
                     )
                   </span>
                 )}
@@ -844,7 +953,7 @@ export function NuevoEventoModal({
                 ))}
               </select>
             </div>
-            {!salonFijo && (
+            {(!salonFijo || editaAlcance) && (
               <>
                 <div>
                   <label style={rotulo} htmlFor="ev-camp">
@@ -909,6 +1018,8 @@ export function NuevoEventoModal({
                     id="ev-salon"
                     value={salonPrincipal}
                     onChange={(e) => setSalonPrincipal(e.target.value)}
+                    // Un Club para varios salones es para todos los de su alcance.
+                    disabled={editaAlcance}
                     style={campo}
                   >
                     <option value="">Todos los salones</option>
@@ -1036,6 +1147,74 @@ export function NuevoEventoModal({
                 {tandaDe !== "" &&
                   ` Por defecto, el inicio y el fin de los cursos de ${tandaDe}; se pueden cambiar.`}
               </span>
+            </div>
+          )}
+
+          {/* Feriados: la fecha elegida, la primera sesión real y las semanas saltadas. */}
+          {avisosFeriado.length > 0 && (
+            <div
+              role="status"
+              style={{
+                padding: "0.7rem 0.9rem",
+                borderRadius: "0.6rem",
+                border: "1px solid #ffb74d",
+                background: "#fff3e0",
+                color: "#6d3b00",
+                fontSize: "0.85rem",
+                lineHeight: 1.5,
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.35rem",
+              }}
+            >
+              {avisosFeriado.map((p) => {
+                const nombrePais = ZONA_PAIS[p.pais]?.nombre ?? p.pais;
+                // La fecha elegida ya se nombra arriba: no se repite entre las saltadas.
+                const otras = p.saltadas.filter((s) => s.fecha !== fecha);
+                return (
+                  <div key={p.pais}>
+                    {p.feriadoEnFecha !== null && (
+                      <div>
+                        ⚠️{" "}
+                        <strong>
+                          El {fechaLegible(fecha)} es feriado en {nombrePais}
+                        </strong>{" "}
+                        ({p.feriadoEnFecha}).{" "}
+                        {esTanda
+                          ? p.primera !== null
+                            ? `Esa semana no hay Club: la primera sesión queda el ${fechaLegible(p.primera)}.`
+                            : "Esa semana no hay Club."
+                          : "El evento se crea igual ese día."}
+                      </div>
+                    )}
+                    {esTanda &&
+                      p.feriadoEnFecha === null &&
+                      p.primera !== null &&
+                      p.primera !== fecha && (
+                        <div>
+                          La primera sesión en {nombrePais} queda el {fechaLegible(p.primera)}.
+                        </div>
+                      )}
+                    {esTanda && p.primera === null && (
+                      <div>
+                        ⚠️ En {nombrePais} la tanda no deja ninguna semana por delante (todo ya pasó
+                        o es feriado).
+                      </div>
+                    )}
+                    {esTanda && otras.length > 0 && (
+                      <div>
+                        Además, la tanda salta {otras.length} semana{otras.length === 1 ? "" : "s"}{" "}
+                        por feriado en {nombrePais}:{" "}
+                        {otras
+                          .slice(0, 6)
+                          .map((s) => `${fechaLegible(s.fecha)} (${s.nombre})`)
+                          .join(", ")}
+                        {otras.length > 6 ? "…" : "."}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 

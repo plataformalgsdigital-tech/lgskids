@@ -153,7 +153,10 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       [sessionId, n],
     );
     for (const [i, s] of semanas.entries()) {
-      const nuevo = new Date(Date.now() - (n - i) * 86_400_000);
+      // Al menos dos días atrás: "hace un día" justo es el borde de la agenda del
+      // niño (`now() - 1 day`), y con el reloj de la base un segundo atrás del de
+      // Node, la última semana "pasada" seguía contando como la próxima.
+      const nuevo = new Date(Date.now() - (n - i + 1) * 86_400_000);
       await execute(
         `UPDATE scheduling_agendado SET starts_at = $3 WHERE classroom_id = $1 AND starts_at = $2`,
         [s.classroomId, s.startsAt, nuevo],
@@ -484,7 +487,10 @@ describe.runIf(RUN)("agendar desde la ficha (integración)", () => {
       salon: salonC,
       fecha: inicio,
       hora: "05:45",
-      tanda: { inicio, fin: sumarDiasA(inicio, 21) },
+      // Cinco semanas: los feriados del país del salón se saltan y, tras pasar
+      // dos al pasado, tiene que quedar alguna por delante (con 3 semanas, una
+      // fecha de corrida con dos lunes feriados la dejaba sin ninguna).
+      tanda: { inicio, fin: sumarDiasA(inicio, 35) },
     });
     await agendar("CLUB", primera);
     const [s1, s2] = await alPasado(primera, 2);
