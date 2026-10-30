@@ -2233,6 +2233,10 @@ y `DELETE …/agenda/[agendadoId]`.
     la Agenda y el modal muestran el ALCANCE ("Todas las campañas · Junior · CO ·
     Todos los salones"), no el anfitrión, y el filtro de campaña/curso lo incluye.
     El formulario de un Club no manda `apertura` (al editar se conserva el alcance).
+    **Lo ve el ADVISOR asignado** (2026-10-29): el calendario del guía
+    (`agendaSesiones` con `guiaUserId`) y su Tablero (clases de hoy, sin marcar)
+    filtran por el guía EFECTIVO de la sesión, no por el del salón —el anfitrión
+    puede ser de otro guía—, y el enlace es el link del Club si lo tiene.
     La migración unió las copias ya creadas: grupos de CLUB de más de 3 salones sin
     historia, con el alcance deducido de sus salones y los inscritos movidos al
     anfitrión.

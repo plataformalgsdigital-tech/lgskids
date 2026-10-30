@@ -7,7 +7,7 @@ import { newId } from "@/platform/ids";
 import { crearEvento, editarEvento } from "../application/crear-evento";
 import { cambiarGuiaDeSesion, crearSalon } from "../application/gestion-salones";
 import { crearLinkClub, editarLinkClub, eliminarLinkClub } from "../application/link-club";
-import { detalleSesion } from "../infrastructure/scheduling-repository";
+import { agendaSesiones, detalleSesion } from "../infrastructure/scheduling-repository";
 
 /**
  * INTEGRACIÓN: LINKS DE CLUBES (2026-10-28). Un Club con "Link diferente al del
@@ -205,6 +205,19 @@ describe.runIf(RUN)("links de clubes (integración)", () => {
       linkClubId: propio,
     });
     expect((await detalleSesion(conLink))?.salon.meetingUrl).toBe(URL_CLUB);
+
+    // El calendario del ADVISOR asignado lo muestra, con el link del Club, aunque
+    // el salón donde vive sea de OTRO guía (el Club para "Todos" va en un anfitrión).
+    await execute(`UPDATE scheduling_classroom SET guia_user_id = $2 WHERE id = $1`, [
+      salon,
+      guiaB,
+    ]);
+    const deA = await agendaSesiones("2027-02-12", "2027-02-12", { guiaUserId: guiaA });
+    expect(deA.find((s) => s.id === conLink)?.meetingUrl).toBe(URL_CLUB);
+    const deB = await agendaSesiones("2027-02-12", "2027-02-12", { guiaUserId: guiaB });
+    expect(deB.some((s) => s.id === conLink)).toBe(false);
+    expect(deB.some((s) => s.id === sinLink)).toBe(true);
+
     // Pero un Club nuevo ya no lo puede tomar.
     await expect(
       crearEvento({ ...base, horaLocal: "20:00", linkClubId: propio }),

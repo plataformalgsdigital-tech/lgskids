@@ -574,7 +574,10 @@ export async function agendaSesiones(
   }
   if (filtros?.guiaUserId !== undefined && filtros.guiaUserId !== "") {
     values.push(filtros.guiaUserId);
-    extra += ` AND cl.guia_user_id = $${values.length}`;
+    // El guía EFECTIVO de la sesión, no el del salón: un Club para "Todos" vive en
+    // un salón anfitrión que puede tener otro guía, y un reemplazo de un día es
+    // del que lo cubre.
+    extra += ` AND ${GUIA_EFECTIVO} = $${values.length}`;
   }
   return queryRows<AgendaItem>(
     `SELECT s.id, s.fecha::text AS fecha,

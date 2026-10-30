@@ -97,7 +97,8 @@ export async function clasesDeHoy(guiaUserId: string | null, limite = 12): Promi
   let filtroGuia = "";
   if (guiaUserId !== null) {
     values.push(guiaUserId);
-    filtroGuia = `AND cl.guia_user_id = $${String(values.length)}`;
+    // Guía EFECTIVO de la sesión (Club en salón anfitrión, reemplazo de un día).
+    filtroGuia = `AND COALESCE(s.guia_user_id, cl.guia_user_id) = $${String(values.length)}`;
   }
   values.push(limite);
   return queryRows<ClaseDeHoy>(
@@ -137,7 +138,7 @@ export async function sesionesSinMarcar(
   let filtroGuia = "";
   if (guiaUserId !== null) {
     values.push(guiaUserId);
-    filtroGuia = `AND cl.guia_user_id = $${String(values.length)}`;
+    filtroGuia = `AND COALESCE(s.guia_user_id, cl.guia_user_id) = $${String(values.length)}`;
   }
   values.push(limite);
   return queryRows<SesionSinMarcar>(
