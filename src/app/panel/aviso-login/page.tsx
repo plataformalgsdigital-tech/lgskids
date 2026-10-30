@@ -381,6 +381,12 @@ function NuevoAviso({ ocupado, onAgregar }: { ocupado: boolean; onAgregar: (f: F
     setPreview(URL.createObjectURL(f));
   }
 
+  /** Descarta la imagen elegida (aún no publicada) sin tocar los avisos existentes. */
+  function descartar() {
+    setArchivo(null);
+    setPreview(null);
+  }
+
   async function agregar() {
     if (archivo === null) return;
     const form = new FormData();
@@ -420,6 +426,17 @@ function NuevoAviso({ ocupado, onAgregar }: { ocupado: boolean; onAgregar: (f: F
         {archivo !== null ? "Elegir otra imagen" : "Elegir imagen"}
         <input type="file" accept="image/jpeg,image/png,image/webp" disabled={ocupado} onChange={elegir} style={{ display: "none" }} />
       </label>
+
+      {archivo !== null && (
+        <button
+          type="button"
+          disabled={ocupado}
+          onClick={descartar}
+          style={{ ...botonChico, color: "#c62828", borderColor: "#f1b5b5", marginLeft: "0.5rem", verticalAlign: "top", marginTop: "0.15rem" }}
+        >
+          Quitar imagen
+        </button>
+      )}
 
       {preview !== null && (
         // eslint-disable-next-line @next/next/no-img-element
