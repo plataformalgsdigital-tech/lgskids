@@ -2560,6 +2560,17 @@ la clave inicial en una alerta y deja "el WhatsApp lo maneja KIDS2026").
   vigente y **no acepta un id de archivo**: si lo aceptara, cualquiera podría pedir
   archivos privados de menores sin sesión. Apagarlo deja de EXPONER la imagen, no
   solo de mostrarla.
+- **Carrusel (2026-10-30)**: hasta 3 avisos (igual que LGS y MOSAICO). Cada uno se
+  agrega, quita (sin tocar los demás), ordena, prende/apaga y programa con fechas
+  `desde`/`hasta` opcionales (inclusive, hora Bogotá). Lista en
+  `platform_config.login_avisos` (JSON `{id, fileId, nombre, activo, orden, desde,
+  hasta}`), interruptor general en `login_aviso_activo`; cada imagen es un archivo de
+  `files` con entidad `login_aviso` y `entidad_id` = id del aviso. La ruta pública de
+  la imagen recibe `?id=` del **aviso** (nunca de archivo) y solo responde si ese aviso
+  está vigente. Sin `login_avisos` guardado, la imagen única de antes (arte
+  `aviso_login`, entidad_id `GLOBAL`) se presenta como el aviso 1. Panel:
+  `GET/PATCH/POST/DELETE /api/catalog/aviso-login`; login: [AvisosLogin](src/app/login/AvisosLogin.tsx).
+  Prueba: `catalog/tests/aviso-login-integration.test.ts`.
 
 ## Pendientes conocidos
 

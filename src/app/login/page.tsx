@@ -2,10 +2,8 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
-
-/** Se recuerda por pestaña: el aviso no vuelve a saltar tras cerrarlo. */
-const AVISO_DESCARTADO = "lgs-kids:aviso-login-descartado";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
+import AvisosLogin from "./AvisosLogin";
 
 /** La URL de la página no cambia mientras está abierta: nada que escuchar. */
 const sinSuscripcion = () => () => {};
@@ -16,7 +14,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
-  const [avisoUrl, setAvisoUrl] = useState<string | null>(null);
   // "¿Olvidaste tu clave?": deja una solicitud al equipo, que restablece la clave
   // y la entrega. La respuesta es la misma exista o no el usuario.
   const [olvido, setOlvido] = useState(false);
@@ -56,29 +53,6 @@ export default function LoginPage() {
     } finally {
       setEnviandoOlvido(false);
     }
-  }
-
-  // Aviso de la pantalla de login: imagen que administración prende/apaga.
-  // Si falla, el login sigue funcionando igual — nunca bloquea el ingreso.
-  useEffect(() => {
-    if (sessionStorage.getItem(AVISO_DESCARTADO) !== null) return;
-    let vigente = true;
-    fetch("/api/public/login-aviso")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { activo?: boolean; url?: string | null } | null) => {
-        if (vigente && data?.activo === true && typeof data.url === "string") {
-          setAvisoUrl(data.url);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      vigente = false;
-    };
-  }, []);
-
-  function cerrarAviso() {
-    setAvisoUrl(null);
-    sessionStorage.setItem(AVISO_DESCARTADO, "1");
   }
 
   async function onSubmit(event: FormEvent) {
@@ -337,86 +311,7 @@ export default function LoginPage() {
         )}
       </form>
 
-      {avisoUrl !== null && (
-        <div
-          onClick={cerrarAviso}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Aviso"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            background: "rgba(8,11,24,0.65)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-            overflowY: "auto",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "relative",
-              width: "100%",
-              maxWidth: "30rem",
-              background: "white",
-              borderRadius: "1rem",
-              overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={cerrarAviso}
-              aria-label="Cerrar aviso"
-              style={{
-                position: "absolute",
-                top: "0.6rem",
-                right: "0.6rem",
-                zIndex: 2,
-                width: "2rem",
-                height: "2rem",
-                borderRadius: "50%",
-                border: "none",
-                background: "white",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-                cursor: "pointer",
-                fontSize: "1rem",
-                lineHeight: 1,
-                color: "#333",
-              }}
-            >
-              ✕
-            </button>
-            {/* La sube administración: se muestra íntegra, sin recortar ni deformar. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={avisoUrl}
-              alt="Aviso"
-              style={{ display: "block", width: "100%", height: "auto" }}
-            />
-            <button
-              type="button"
-              onClick={cerrarAviso}
-              style={{
-                width: "100%",
-                padding: "0.8rem",
-                border: "none",
-                borderTop: "1px solid #eef1f7",
-                background: "white",
-                cursor: "pointer",
-                fontSize: "0.95rem",
-                fontWeight: 600,
-                color: "#374151",
-              }}
-            >
-              Cerrar y continuar al login
-            </button>
-          </div>
-        </div>
-      )}
+      <AvisosLogin />
     </main>
   );
 }

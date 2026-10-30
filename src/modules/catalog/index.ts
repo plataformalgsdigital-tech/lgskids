@@ -32,6 +32,8 @@ export {
   avisoLoginImagenHandler,
   avisoLoginEstadoHandler,
   avisoLoginActivarHandler,
+  avisoLoginAgregarHandler,
+  avisoLoginQuitarHandler,
   hotspotsInfoHandler,
   hotspotsGuardarHandler,
   materialEstadoHandler,

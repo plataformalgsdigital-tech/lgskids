@@ -35,9 +35,17 @@ import { baseVideosLibro } from "../application/video-libro";
 import { vocesParaLibro } from "../application/voz-libro";
 import { PARADAS, paradaValida } from "../domain/unidad-mapa";
 import {
+  MAX_AVISOS_LOGIN,
+  agregarAvisoLogin,
+  avisoVigente,
+  avisosLoginVigentes,
   descargarAvisoLoginPublico,
+  editarAvisosLogin,
   getAvisoLogin,
+  hoyAvisoLogin,
+  quitarAvisoLogin,
   setAvisoLoginActivo,
+  type AvisoLogin,
 } from "../application/aviso-login";
 import { crearCampania } from "../application/crear-campania";
 import { actualizarFechasCampania, eliminarCampania } from "../application/editar-campania";
@@ -658,25 +666,33 @@ export const hotspotsGuardarHandler = handlerWithAuth(async (request, auth) => {
 
 /**
  * GET /api/public/login-aviso — PÚBLICO (sin sesión): lo consume /login.
- * Solo revela si hay aviso prendido y su URL; nunca un id de archivo.
+ * Solo revela los avisos vigentes y sus URLs (por id de AVISO, nunca de archivo).
  */
 export const avisoLoginPublicoHandler = handler(async () => {
-  const aviso = await getAvisoLogin();
-  const visible = aviso.activo && aviso.fileId !== null;
+  const vigentes = await avisosLoginVigentes();
+  const avisos = vigentes.map((a) => ({
+    id: a.id,
+    // `v` = archivo: cambia si se reemplaza la imagen, así el navegador no
+    // muestra una vieja de su caché.
+    url: `/api/public/login-aviso/imagen?id=${encodeURIComponent(a.id)}&v=${a.fileId.slice(0, 8)}`,
+  }));
   return json({
-    activo: visible,
-    url: visible ? "/api/public/login-aviso/imagen" : null,
+    activo: avisos.length > 0,
+    avisos,
+    // Compatibilidad con un login antiguo abierto durante el despliegue.
+    url: avisos[0]?.url ?? null,
   });
 });
 
 /**
- * GET /api/public/login-aviso/imagen — PÚBLICO: sirve la imagen vigente.
- * No recibe id: la ruta resuelve sola cuál es, y solo entrega algo si el
- * aviso está prendido. Así apagarlo deja de EXPONER la imagen, no solo de
- * mostrarla, y no se puede usar para pedir archivos privados.
+ * GET /api/public/login-aviso/imagen?id= — PÚBLICO: sirve la imagen de UN aviso.
+ * Recibe el id del aviso (no de archivo) y solo responde si ese aviso está
+ * vigente. Así apagarlo deja de EXPONER la imagen, no solo de mostrarla, y no
+ * se puede usar para pedir archivos privados.
  */
-export const avisoLoginImagenHandler = handler(async () => {
-  const { meta, bytes } = await descargarAvisoLoginPublico();
+export const avisoLoginImagenHandler = handler(async (request) => {
+  const id = request.nextUrl.searchParams.get("id");
+  const { meta, bytes } = await descargarAvisoLoginPublico(id);
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": meta.mime,
@@ -686,27 +702,95 @@ export const avisoLoginImagenHandler = handler(async () => {
   });
 });
 
-/** GET /api/catalog/aviso-login — estado para el panel (ve también el apagado). */
+/** Estado para el panel: el panel SÍ está autenticado y previsualiza por la ruta de arte. */
+function estadoAvisoPanel(estado: AvisoLogin) {
+  const hoy = hoyAvisoLogin();
+  return {
+    activo: estado.activo,
+    actualizadoEn: estado.actualizadoEn,
+    hoy,
+    max: MAX_AVISOS_LOGIN,
+    avisos: estado.avisos.map((a) => ({
+      id: a.id,
+      nombre: a.nombre,
+      activo: a.activo,
+      orden: a.orden,
+      desde: a.desde,
+      hasta: a.hasta,
+      subidoEn: a.subidoEn,
+      vigente: avisoVigente(a, hoy),
+      url: `/api/catalog/imagen-curso/${a.fileId}`,
+    })),
+  };
+}
+
+async function perfilAvisoLogin(userId: string) {
+  const profile = await getAccessProfile(userId);
+  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
+  profile.requireOpcion("op.admin.aviso_login");
+}
+
+/** GET /api/catalog/aviso-login — estado para el panel (ve también los apagados). */
 export const avisoLoginEstadoHandler = handlerWithAuth(async (_request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
-  const aviso = await getAvisoLogin();
-  return json({
-    activo: aviso.activo,
-    actualizadoEn: aviso.actualizadoEn,
-    // El panel SÍ está autenticado: puede previsualizar por la ruta de arte.
-    url: aviso.fileId !== null ? `/api/catalog/imagen-curso/${aviso.fileId}` : null,
-  });
+  return json(estadoAvisoPanel(await getAvisoLogin()));
 });
 
-const avisoLoginBodySchema = z.object({ activo: z.boolean() });
+const fechaAviso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
+const avisoLoginBodySchema = z.object({
+  activo: z.boolean().optional(),
+  avisos: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        nombre: z.string().max(80).optional(),
+        activo: z.boolean().optional(),
+        desde: fechaAviso,
+        hasta: fechaAviso,
+      }),
+    )
+    .max(MAX_AVISOS_LOGIN)
+    .optional(),
+});
 
-/** PATCH /api/catalog/aviso-login — prende o apaga el aviso. */
+/**
+ * PATCH /api/catalog/aviso-login — { activo } prende/apaga todos los avisos;
+ * { avisos: [...] } guarda orden, nombre, activo y fechas (lista completa).
+ */
 export const avisoLoginActivarHandler = handlerWithAuth(async (request, auth) => {
-  const profile = await getAccessProfile(auth.userId);
-  profile.requirePermission(PERMISOS.CATALOGO_GESTIONAR);
-  profile.requireOpcion("op.admin.aviso_login");
+  await perfilAvisoLogin(auth.userId);
   const body = avisoLoginBodySchema.parse(await request.json());
-  const aviso = await setAvisoLoginActivo(body.activo, auth.userId);
-  return json({ activo: aviso.activo, actualizadoEn: aviso.actualizadoEn });
+  if (body.activo !== undefined) await setAvisoLoginActivo(body.activo, auth.userId);
+  if (body.avisos !== undefined) await editarAvisosLogin(body.avisos, auth.userId);
+  return json(estadoAvisoPanel(await getAvisoLogin()));
+});
+
+/** POST /api/catalog/aviso-login — multipart (archivo, nombre?, desde?, hasta?): agrega un aviso. */
+export const avisoLoginAgregarHandler = handlerWithAuth(async (request, auth) => {
+  await perfilAvisoLogin(auth.userId);
+  const form = await request.formData().catch(() => null);
+  const archivo = form?.get("archivo");
+  if (form === null || !(archivo instanceof File)) {
+    throw new ValidationError("Envía multipart/form-data con 'archivo'.");
+  }
+  const campo = (k: string) => (typeof form.get(k) === "string" ? (form.get(k) as string) : "");
+  const estado = await agregarAvisoLogin({
+    actorUserId: auth.userId,
+    nombreOriginal: archivo.name,
+    mime: archivo.type,
+    bytes: Buffer.from(await archivo.arrayBuffer()),
+    nombre: campo("nombre"),
+    desde: campo("desde"),
+    hasta: campo("hasta"),
+  });
+  return json(estadoAvisoPanel(estado), { status: 201 });
+});
+
+/** DELETE /api/catalog/aviso-login?id= — quita SOLO ese aviso; los demás quedan igual. */
+export const avisoLoginQuitarHandler = handlerWithAuth(async (request, auth) => {
+  await perfilAvisoLogin(auth.userId);
+  const id = request.nextUrl.searchParams.get("id");
+  if (id === null || id === "") throw new ValidationError("Falta el id del aviso.");
+  return json(estadoAvisoPanel(await quitarAvisoLogin(id, auth.userId)));
 });

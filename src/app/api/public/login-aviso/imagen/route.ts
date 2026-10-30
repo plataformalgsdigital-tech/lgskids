@@ -1,5 +1,5 @@
 import { avisoLoginImagenHandler } from "@/modules/catalog";
 
-// PÚBLICA a propósito. No recibe id: resuelve sola el aviso vigente y solo
-// responde si está prendido.
+// PÚBLICA a propósito. Recibe el id del AVISO (nunca de archivo) y solo
+// responde si ese aviso está vigente.
 export const GET = avisoLoginImagenHandler;
