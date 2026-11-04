@@ -125,7 +125,12 @@ export {
   excesoAlAgendar,
   type TipoAgenda,
 } from "./domain/agenda";
-export { cambiarFotoGuia, crearGuia, MIMES_FOTO_GUIA } from "./application/alta-guia";
+export {
+  cambiarFotoGuia,
+  quitarFotoGuia,
+  crearGuia,
+  MIMES_FOTO_GUIA,
+} from "./application/alta-guia";
 export type { DatosAltaGuia } from "./application/alta-guia";
 export {
   getRegistroAbierto,

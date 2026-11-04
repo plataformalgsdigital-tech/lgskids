@@ -1585,7 +1585,11 @@ hacen cosas distintas:
   abre los campos y permite cambiar la **foto** (`POST
 /api/scheduling/guias/[guiaUserId]/foto` → `cambiarFotoGuia`: sube la nueva y
   suelta la anterior DESPUÉS). La `<img>` lleva `?v=<fotoFileId>` porque la ruta
-  cachea una hora con la misma URL.
+  cachea una hora con la misma URL. **Descargar / Reemplazar / Borrar foto
+  (2026-11-03)** en el modo edición: descargar baja la vigente con su extensión;
+  reemplazar y borrar se aplican al GUARDAR (`DELETE …/foto` → `quitarFotoGuia`:
+  desliga y suelta el archivo, auditoría `scheduling.foto_guia_quitada`; mismos
+  permisos que cambiarla). Prueba en `alta-guia-integration.test.ts`.
 - Reglas puras en `scheduling/domain/invitacion.ts` (token, hash, estado
   VIGENTE|USADA|REVOCADA|VENCIDA, vencimiento, armado del enlace) con pruebas en
   `tests/invitacion.test.ts`. Aplicación en `application/invitacion-guia.ts`.
@@ -2564,7 +2568,7 @@ la clave inicial en una alerta y deja "el WhatsApp lo maneja KIDS2026").
   agrega, quita (sin tocar los demás), ordena, prende/apaga y programa con fechas
   `desde`/`hasta` opcionales (inclusive, hora Bogotá). Lista en
   `platform_config.login_avisos` (JSON `{id, fileId, nombre, activo, orden, desde,
-  hasta}`), interruptor general en `login_aviso_activo`; cada imagen es un archivo de
+hasta}`), interruptor general en `login_aviso_activo`; cada imagen es un archivo de
   `files` con entidad `login_aviso` y `entidad_id` = id del aviso. La ruta pública de
   la imagen recibe `?id=` del **aviso** (nunca de archivo) y solo responde si ese aviso
   está vigente. Sin `login_avisos` guardado, la imagen única de antes (arte

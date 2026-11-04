@@ -6,7 +6,7 @@ import { env } from "@/platform/config/env";
 import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
-import { cambiarFotoGuia, crearGuia } from "../application/alta-guia";
+import { cambiarFotoGuia, crearGuia, quitarFotoGuia } from "../application/alta-guia";
 import {
   exigirSoloGuia,
   fichasDeGuias,
@@ -165,6 +165,32 @@ describe.runIf(RUN)("alta del guía (integración)", () => {
         foto: { nombreOriginal: "x.pdf", mime: "application/pdf", bytes: PNG },
       }),
     ).rejects.toThrow(ValidationError);
+  });
+
+  it("borrar la foto desde la ficha: queda sin foto y el archivo se suelta", async () => {
+    const actual = fotos[0] as string;
+    expect(await quitarFotoGuia({ actorUserId: ACTOR, guiaUserId: guia.userId })).toEqual({
+      quitada: true,
+    });
+    const ficha = await queryOne<{ foto: string | null }>(
+      `SELECT foto_file_id AS foto FROM scheduling_guia WHERE guia_user_id = $1`,
+      [guia.userId],
+    );
+    expect(ficha?.foto).toBeNull();
+    const archivo = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM files_object WHERE id = $1`,
+      [actual],
+    );
+    expect(archivo?.n).toBe(0);
+    await expect(fotoDeGuia(guia.userId)).rejects.toBeInstanceOf(NotFoundError);
+    // Sin foto, borrar otra vez no hace nada.
+    expect(await quitarFotoGuia({ actorUserId: ACTOR, guiaUserId: guia.userId })).toEqual({
+      quitada: false,
+    });
+    // Las pruebas siguientes cuentan con que tenga foto.
+    fotos[0] = (
+      await cambiarFotoGuia({ actorUserId: ACTOR, guiaUserId: guia.userId, foto: foto() })
+    ).fotoFileId;
   });
 
   it("si la ficha falla (sala de Zoom ajena) no queda cuenta ni foto sueltas", async () => {

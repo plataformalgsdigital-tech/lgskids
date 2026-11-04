@@ -50,6 +50,16 @@ interface Enlace {
 
 const PAISES = ["CL", "CO", "EC", "PE"];
 
+const botonFoto: CSSProperties = {
+  padding: "0.3rem 0.7rem",
+  borderRadius: "0.5rem",
+  border: "1px solid #cfd6e6",
+  background: "white",
+  cursor: "pointer",
+  fontSize: "0.8rem",
+  fontWeight: 600,
+};
+
 const COLOR_ENLACE: Record<Enlace["estado"], { bg: string; c: string; txt: string }> = {
   VIGENTE: { bg: "#e8f5e9", c: "#1b5e20", txt: "Enlace enviado" },
   USADA: { bg: "#e3f2fd", c: "#0d47a1", txt: "Se registró" },
@@ -237,8 +247,12 @@ export default function GuiasPage() {
   const [fotoNueva, setFotoNueva] = useState<File | null>(null);
   const [previoFoto, setPrevioFoto] = useState<string | null>(null);
 
+  /** "Borrar foto" marcado: se quita al GUARDAR, como el reemplazo. */
+  const [borrarFoto, setBorrarFoto] = useState(false);
+
   const elegirFoto = (f: File | null) => {
     setFotoNueva(f);
+    if (f !== null) setBorrarFoto(false);
     setPrevioFoto((anterior) => {
       if (anterior !== null) URL.revokeObjectURL(anterior);
       return f === null ? null : URL.createObjectURL(f);
@@ -252,6 +266,7 @@ export default function GuiasPage() {
     setEditando(false);
     setFotoNueva(null);
     setPrevioFoto(null);
+    setBorrarFoto(false);
     // El enlace se muestra UNA vez, al emitirlo: después solo queda su hash.
     setEnlaceNuevo(null);
     setCopiado(false);
@@ -471,10 +486,23 @@ export default function GuiasPage() {
           await cargar();
           return;
         }
+      } else if (borrarFoto && sel.fotoFileId !== null) {
+        const rf = await apiFetch(`/api/scheduling/guias/${sel.guiaUserId}/foto`, {
+          method: "DELETE",
+        });
+        if (!rf.ok) {
+          const c: { error?: { message?: string } } = await rf.json().catch(() => ({}));
+          setError(
+            `Se guardaron los datos, pero no se borró la foto: ${c.error?.message ?? "error"}.`,
+          );
+          await cargar();
+          return;
+        }
       }
       setAviso(`Ficha de ${nombreDeGuia(sel)} guardada.`);
       setEditando(false);
       elegirFoto(null);
+      setBorrarFoto(false);
       await cargar();
     } finally {
       setOcupado(false);
@@ -484,8 +512,26 @@ export default function GuiasPage() {
   function cancelarEdicion() {
     if (sel !== null) setForm(formDe(sel));
     elegirFoto(null);
+    setBorrarFoto(false);
     setEditando(false);
     setError(null);
+  }
+
+  /** Baja la foto vigente con su extensión (la ruta la sirve en línea). */
+  async function descargarFoto() {
+    if (sel === null || sel.fotoFileId === null) return;
+    const res = await apiFetch(`/api/scheduling/guias/${sel.guiaUserId}/foto?v=${sel.fotoFileId}`);
+    if (!res.ok) {
+      setError("No se pudo descargar la foto.");
+      return;
+    }
+    const blob = await res.blob();
+    const ext = blob.type.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `foto-${sel.username}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   const estadoSel = sel === null ? undefined : enlaces[sel.guiaUserId];
@@ -826,32 +872,69 @@ export default function GuiasPage() {
                         }}
                       />
                     ) : (
-                      <FotoGuia guia={sel} />
+                      // Con "Borrar foto" marcado se ve como quedará: la inicial.
+                      <FotoGuia guia={borrarFoto ? { ...sel, fotoFileId: null } : sel} />
                     )}
-                    <label style={{ flex: 1 }}>
-                      <span style={rotulo}>Foto (JPG, PNG o WebP)</span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={(e) => elegirFoto(e.target.files?.[0] ?? null)}
-                        style={{ fontSize: "0.82rem" }}
-                      />
-                    </label>
-                    {fotoNueva !== null && (
-                      <button
-                        type="button"
-                        onClick={() => elegirFoto(null)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#8a2020",
-                          cursor: "pointer",
-                          fontSize: "0.8rem",
-                        }}
-                      >
-                        Quitar
-                      </button>
-                    )}
+                    <div
+                      style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.35rem" }}
+                    >
+                      <span style={rotulo}>
+                        Foto (JPG, PNG o WebP)
+                        {fotoNueva !== null && (
+                          <span style={{ fontWeight: 600, color: "#1565c0" }}>
+                            {" "}
+                            · nueva: {fotoNueva.name} (se reemplaza al guardar)
+                          </span>
+                        )}
+                        {borrarFoto && (
+                          <span style={{ fontWeight: 600, color: "#8a2020" }}>
+                            {" "}
+                            · se borrará al guardar
+                          </span>
+                        )}
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                        {sel.fotoFileId !== null && (
+                          <button
+                            type="button"
+                            onClick={() => void descargarFoto()}
+                            style={botonFoto}
+                          >
+                            ⬇ Descargar
+                          </button>
+                        )}
+                        <label style={{ ...botonFoto, display: "inline-block" }}>
+                          🔄 {sel.fotoFileId !== null ? "Reemplazar" : "Subir foto"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) => {
+                              elegirFoto(e.target.files?.[0] ?? null);
+                              e.target.value = "";
+                            }}
+                            style={{ display: "none" }}
+                          />
+                        </label>
+                        {fotoNueva !== null && (
+                          <button type="button" onClick={() => elegirFoto(null)} style={botonFoto}>
+                            Deshacer cambio
+                          </button>
+                        )}
+                        {sel.fotoFileId !== null && fotoNueva === null && (
+                          <button
+                            type="button"
+                            onClick={() => setBorrarFoto((b) => !b)}
+                            style={{
+                              ...botonFoto,
+                              color: "#8a2020",
+                              borderColor: borrarFoto ? "#8a2020" : "#e3c4c4",
+                            }}
+                          >
+                            {borrarFoto ? "↩ No borrar" : "🗑 Borrar foto"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 

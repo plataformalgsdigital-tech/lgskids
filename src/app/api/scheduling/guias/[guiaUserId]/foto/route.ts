@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { PERMISOS, getAccessProfile } from "@/modules/access";
 import { bootstrapIdentity } from "@/modules/identity";
-import { cambiarFotoGuia, fotoDeGuia } from "@/modules/scheduling";
+import { cambiarFotoGuia, fotoDeGuia, quitarFotoGuia } from "@/modules/scheduling";
 import { ValidationError } from "@/platform/errors";
 import { handlerWithAuth, json } from "@/platform/http/handler";
 
@@ -61,4 +61,23 @@ export const POST = handlerWithAuth(async (request, auth, context) => {
     ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
   });
   return json(r);
+});
+
+/**
+ * DELETE — quita la foto desde la ficha del guía (queda la inicial). Mismos
+ * permisos que cambiarla: `usuarios.gestionar` + `op.guias.ficha_editar`.
+ */
+export const DELETE = handlerWithAuth(async (request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.USUARIOS_GESTIONAR);
+  profile.requireOpcion("op.guias.ficha_editar");
+  const params = await context.params;
+  const guiaUserId = z.uuid().parse(params["guiaUserId"]);
+  return json(
+    await quitarFotoGuia({
+      actorUserId: auth.userId,
+      guiaUserId,
+      ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    }),
+  );
 });

@@ -72,6 +72,43 @@ export async function cambiarFotoGuia(input: {
   return { fotoFileId };
 }
 
+/**
+ * QUITA la foto del guía desde su ficha: la ficha queda sin foto (se ve la
+ * inicial) y el archivo se suelta DESPUÉS de desligarlo, como al reemplazarla.
+ */
+export async function quitarFotoGuia(input: {
+  actorUserId: string;
+  guiaUserId: string;
+  ip?: string | null;
+}): Promise<{ quitada: boolean }> {
+  const existe = await queryOne<{ anterior: string | null }>(
+    `SELECT foto_file_id AS anterior FROM scheduling_guia WHERE guia_user_id = $1`,
+    [input.guiaUserId],
+  );
+  if (existe === null) throw new NotFoundError("El guía no tiene ficha.");
+  if (existe.anterior === null) return { quitada: false };
+  const anterior = existe.anterior;
+  await execute(
+    `UPDATE scheduling_guia SET foto_file_id = NULL, actualizado_en = now() WHERE guia_user_id = $1`,
+    [input.guiaUserId],
+  );
+  await eliminarArchivo(anterior).catch((e: unknown) => {
+    logger.warn("No se pudo soltar la foto quitada del guía", {
+      fotoFileId: anterior,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "scheduling.foto_guia_quitada",
+    entidad: "identity_user",
+    entidadId: input.guiaUserId,
+    payload: { fotoFileId: anterior },
+    ip: input.ip ?? null,
+  });
+  return { quitada: true };
+}
+
 export interface DatosAltaGuia {
   nombres: string;
   apellidos: string;
