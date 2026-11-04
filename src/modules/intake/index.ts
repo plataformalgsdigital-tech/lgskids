@@ -15,9 +15,11 @@ export type {
   SalonDisponible,
 } from "./application/disponibilidad";
 export type { CampaniaRoster, CursoRoster, SalonRoster } from "./application/roster";
+export type { SesionGuia } from "./application/horas-guias";
 export {
   disponibilidadHandler,
   rosterIntakeHandler,
+  horasGuiasIntakeHandler,
   reservarIntakeHandler,
   aprobarIntakeHandler,
   suspenderIntakeHandler,
