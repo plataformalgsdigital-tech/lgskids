@@ -60,8 +60,10 @@ const fmt = (f: string) => f.split("-").reverse().join("/");
 
 function estadoTexto(a: Aviso, hoy: string): { texto: string; color: string } {
   if (!a.activo) return { texto: "Apagado", color: "var(--texto-suave)" };
-  if (a.desde !== null && hoy < a.desde) return { texto: `Programado desde ${fmt(a.desde)}`, color: "#1565c0" };
-  if (a.hasta !== null && hoy > a.hasta) return { texto: `Venció el ${fmt(a.hasta)}`, color: "#b26a00" };
+  if (a.desde !== null && hoy < a.desde)
+    return { texto: `Programado desde ${fmt(a.desde)}`, color: "#1565c0" };
+  if (a.hasta !== null && hoy > a.hasta)
+    return { texto: `Venció el ${fmt(a.hasta)}`, color: "#b26a00" };
   return { texto: "Visible", color: "#1b5e20" };
 }
 
@@ -136,14 +138,23 @@ export default function AvisoLoginPage() {
     return ejecutar(
       () =>
         patch({
-          avisos: lista.map((a) => ({ id: a.id, nombre: a.nombre, activo: a.activo, desde: a.desde, hasta: a.hasta })),
+          avisos: lista.map((a) => ({
+            id: a.id,
+            nombre: a.nombre,
+            activo: a.activo,
+            desde: a.desde,
+            hasta: a.hasta,
+          })),
         }),
       ok,
     );
   }
 
   function actualizar(id: string, cambios: Partial<Aviso>, ok: string) {
-    return guardarLista(avisos.map((a) => (a.id === id ? { ...a, ...cambios } : a)), ok);
+    return guardarLista(
+      avisos.map((a) => (a.id === id ? { ...a, ...cambios } : a)),
+      ok,
+    );
   }
 
   function mover(i: number, d: -1 | 1) {
@@ -164,7 +175,8 @@ export default function AvisoLoginPage() {
         : `¿Quitar el aviso "${a.nombre}"? Es el único: el login quedará sin avisos.`;
     if (!window.confirm(msg)) return;
     void ejecutar(
-      () => apiFetch(`/api/catalog/aviso-login?id=${encodeURIComponent(a.id)}`, { method: "DELETE" }),
+      () =>
+        apiFetch(`/api/catalog/aviso-login?id=${encodeURIComponent(a.id)}`, { method: "DELETE" }),
       "Aviso quitado.",
     );
   }
@@ -185,9 +197,20 @@ export default function AvisoLoginPage() {
           {error}
         </p>
       )}
-      {aviso !== null && <p style={{ color: "#1b5e20", marginBottom: "1rem", fontWeight: 600 }}>{aviso}</p>}
+      {aviso !== null && (
+        <p style={{ color: "#1b5e20", marginBottom: "1rem", fontWeight: 600 }}>{aviso}</p>
+      )}
 
-      <section style={{ ...caja, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+      <section
+        style={{
+          ...caja,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <p style={{ fontWeight: 700 }}>
             Estado general:{" "}
@@ -210,7 +233,10 @@ export default function AvisoLoginPage() {
             type="button"
             disabled={ocupado || estado === null}
             onClick={() =>
-              void ejecutar(() => patch({ activo: !encendido }), encendido ? "Avisos apagados." : "Avisos prendidos.")
+              void ejecutar(
+                () => patch({ activo: !encendido }),
+                encendido ? "Avisos apagados." : "Avisos prendidos.",
+              )
             }
             style={{
               padding: "0.6rem 1.2rem",
@@ -247,7 +273,9 @@ export default function AvisoLoginPage() {
           onSubir={() => mover(i, -1)}
           onBajar={() => mover(i, 1)}
           onQuitar={() => quitar(a)}
-          onActivo={(v) => void actualizar(a.id, { activo: v }, v ? "Aviso prendido." : "Aviso apagado.")}
+          onActivo={(v) =>
+            void actualizar(a.id, { activo: v }, v ? "Aviso prendido." : "Aviso apagado.")
+          }
           onGuardar={(c) => void actualizar(a.id, c, "Aviso actualizado.")}
         />
       ))}
@@ -262,7 +290,10 @@ export default function AvisoLoginPage() {
             <NuevoAviso
               ocupado={ocupado}
               onAgregar={(form) =>
-                ejecutar(() => apiFetch("/api/catalog/aviso-login", { method: "POST", body: form }), "Aviso agregado.")
+                ejecutar(
+                  () => apiFetch("/api/catalog/aviso-login", { method: "POST", body: form }),
+                  "Aviso agregado.",
+                )
               }
             />
           ))}
@@ -288,35 +319,71 @@ function TarjetaAviso(props: {
   const [nombre, setNombre] = useState(a.nombre);
   const [desde, setDesde] = useState(a.desde ?? "");
   const [hasta, setHasta] = useState(a.hasta ?? "");
-  const cambiado = nombre.trim() !== a.nombre || desde !== (a.desde ?? "") || hasta !== (a.hasta ?? "");
+  const cambiado =
+    nombre.trim() !== a.nombre || desde !== (a.desde ?? "") || hasta !== (a.hasta ?? "");
   const est = estadoTexto(a, props.hoy);
 
   return (
     <section style={{ ...caja, display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-      <a href={a.url} target="_blank" rel="noopener noreferrer" title="Ver en tamaño completo" style={{ flex: "0 0 10rem" }}>
+      <a
+        href={a.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Ver en tamaño completo"
+        style={{ flex: "0 0 10rem" }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={a.url}
           alt={a.nombre}
-          style={{ display: "block", width: "100%", height: "auto", borderRadius: "0.6rem", border: "1px solid #e3e7f0" }}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "auto",
+            borderRadius: "0.6rem",
+            border: "1px solid #e3e7f0",
+          }}
         />
       </a>
 
       <div style={{ flex: "1 1 18rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ fontWeight: 700, color: "var(--texto-suave)" }}>#{String(props.posicion)}</span>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} aria-label="Nombre del aviso" style={input} />
-          <span style={{ fontSize: "0.8rem", fontWeight: 700, color: est.color, whiteSpace: "nowrap" }}>{est.texto}</span>
+          <span style={{ fontWeight: 700, color: "var(--texto-suave)" }}>
+            #{String(props.posicion)}
+          </span>
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            maxLength={80}
+            aria-label="Nombre del aviso"
+            style={input}
+          />
+          <span
+            style={{ fontSize: "0.8rem", fontWeight: 700, color: est.color, whiteSpace: "nowrap" }}
+          >
+            {est.texto}
+          </span>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
           <label style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
             Mostrar desde
-            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={input} />
+            <input
+              type="date"
+              value={desde}
+              onChange={(e) => setDesde(e.target.value)}
+              style={input}
+            />
           </label>
           <label style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
             Mostrar hasta (inclusive)
-            <input type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} style={input} />
+            <input
+              type="date"
+              value={hasta}
+              min={desde || undefined}
+              onChange={(e) => setHasta(e.target.value)}
+              style={input}
+            />
           </label>
         </div>
         <p style={{ fontSize: "0.75rem", color: "var(--texto-suave)", margin: 0 }}>
@@ -329,7 +396,12 @@ function TarjetaAviso(props: {
               type="button"
               disabled={ocupado}
               onClick={() => props.onActivo(!a.activo)}
-              style={{ ...botonChico, marginRight: "auto", fontWeight: 700, color: a.activo ? "#c62828" : "#1b5e20" }}
+              style={{
+                ...botonChico,
+                marginRight: "auto",
+                fontWeight: 700,
+                color: a.activo ? "#c62828" : "#1b5e20",
+              }}
             >
               {a.activo ? "Apagar" : "Prender"}
             </button>
@@ -337,19 +409,50 @@ function TarjetaAviso(props: {
               <button
                 type="button"
                 disabled={ocupado || (desde !== "" && hasta !== "" && desde > hasta)}
-                onClick={() => props.onGuardar({ nombre: nombre.trim() || a.nombre, desde: desde || null, hasta: hasta || null })}
-                style={{ ...botonChico, background: "var(--lgs-azul)", color: "white", border: "none", fontWeight: 700 }}
+                onClick={() =>
+                  props.onGuardar({
+                    nombre: nombre.trim() || a.nombre,
+                    desde: desde || null,
+                    hasta: hasta || null,
+                  })
+                }
+                style={{
+                  ...botonChico,
+                  background: "var(--lgs-azul)",
+                  color: "white",
+                  border: "none",
+                  fontWeight: 700,
+                }}
               >
                 Guardar cambios
               </button>
             )}
-            <button type="button" disabled={ocupado || props.primero} onClick={props.onSubir} aria-label="Subir" title="Mostrar antes" style={botonChico}>
+            <button
+              type="button"
+              disabled={ocupado || props.primero}
+              onClick={props.onSubir}
+              aria-label="Subir"
+              title="Mostrar antes"
+              style={botonChico}
+            >
               ↑
             </button>
-            <button type="button" disabled={ocupado || props.ultimo} onClick={props.onBajar} aria-label="Bajar" title="Mostrar después" style={botonChico}>
+            <button
+              type="button"
+              disabled={ocupado || props.ultimo}
+              onClick={props.onBajar}
+              aria-label="Bajar"
+              title="Mostrar después"
+              style={botonChico}
+            >
               ↓
             </button>
-            <button type="button" disabled={ocupado} onClick={props.onQuitar} style={{ ...botonChico, color: "#c62828", borderColor: "#f1b5b5" }}>
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={props.onQuitar}
+              style={{ ...botonChico, color: "#c62828", borderColor: "#f1b5b5" }}
+            >
               Quitar
             </button>
           </div>
@@ -359,7 +462,13 @@ function TarjetaAviso(props: {
   );
 }
 
-function NuevoAviso({ ocupado, onAgregar }: { ocupado: boolean; onAgregar: (f: FormData) => Promise<boolean> }) {
+function NuevoAviso({
+  ocupado,
+  onAgregar,
+}: {
+  ocupado: boolean;
+  onAgregar: (f: FormData) => Promise<boolean>;
+}) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [nombre, setNombre] = useState("");
@@ -405,7 +514,9 @@ function NuevoAviso({ ocupado, onAgregar }: { ocupado: boolean; onAgregar: (f: F
 
   return (
     <section style={caja}>
-      <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem" }}>➕ Agregar aviso</h2>
+      <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+        ➕ Agregar aviso
+      </h2>
       <p style={{ fontSize: "0.85rem", color: "var(--texto-suave)", marginBottom: "0.9rem" }}>
         JPG, PNG o WebP, hasta 10 MB. Se muestra completa: usa una imagen ya diseñada al tamaño que
         quieras (vertical u horizontal cerrada, no muy alargada).
@@ -424,7 +535,13 @@ function NuevoAviso({ ocupado, onAgregar }: { ocupado: boolean; onAgregar: (f: F
         }}
       >
         {archivo !== null ? "Elegir otra imagen" : "Elegir imagen"}
-        <input type="file" accept="image/jpeg,image/png,image/webp" disabled={ocupado} onChange={elegir} style={{ display: "none" }} />
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={ocupado}
+          onChange={elegir}
+          style={{ display: "none" }}
+        />
       </label>
 
       {archivo !== null && (
@@ -432,7 +549,14 @@ function NuevoAviso({ ocupado, onAgregar }: { ocupado: boolean; onAgregar: (f: F
           type="button"
           disabled={ocupado}
           onClick={descartar}
-          style={{ ...botonChico, color: "#c62828", borderColor: "#f1b5b5", marginLeft: "0.5rem", verticalAlign: "top", marginTop: "0.15rem" }}
+          style={{
+            ...botonChico,
+            color: "#c62828",
+            borderColor: "#f1b5b5",
+            marginLeft: "0.5rem",
+            verticalAlign: "top",
+            marginTop: "0.15rem",
+          }}
         >
           Quitar imagen
         </button>
@@ -443,22 +567,54 @@ function NuevoAviso({ ocupado, onAgregar }: { ocupado: boolean; onAgregar: (f: F
         <img
           src={preview}
           alt="Vista previa"
-          style={{ display: "block", maxWidth: "22rem", width: "100%", height: "auto", borderRadius: "0.7rem", border: "1px solid #e3e7f0", marginBottom: "1rem" }}
+          style={{
+            display: "block",
+            maxWidth: "22rem",
+            width: "100%",
+            height: "auto",
+            borderRadius: "0.7rem",
+            border: "1px solid #e3e7f0",
+            marginBottom: "1rem",
+          }}
         />
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(12rem, 1fr))", gap: "0.6rem", marginBottom: "1rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(12rem, 1fr))",
+          gap: "0.6rem",
+          marginBottom: "1rem",
+        }}
+      >
         <label style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
           Nombre (referencia interna)
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} placeholder="Ej. Feriado 31-oct" style={input} />
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            maxLength={80}
+            placeholder="Ej. Feriado 31-oct"
+            style={input}
+          />
         </label>
         <label style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
           Mostrar desde (opcional)
-          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={input} />
+          <input
+            type="date"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+            style={input}
+          />
         </label>
         <label style={{ fontSize: "0.8rem", color: "var(--texto-suave)" }}>
           Mostrar hasta (opcional)
-          <input type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} style={input} />
+          <input
+            type="date"
+            value={hasta}
+            min={desde || undefined}
+            onChange={(e) => setHasta(e.target.value)}
+            style={input}
+          />
         </label>
       </div>
 

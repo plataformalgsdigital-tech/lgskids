@@ -737,7 +737,11 @@ export const avisoLoginEstadoHandler = handlerWithAuth(async (_request, auth) =>
   return json(estadoAvisoPanel(await getAvisoLogin()));
 });
 
-const fechaAviso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
+const fechaAviso = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullable()
+  .optional();
 const avisoLoginBodySchema = z.object({
   activo: z.boolean().optional(),
   avisos: z

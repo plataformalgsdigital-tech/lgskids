@@ -25,7 +25,13 @@ const PNG = Buffer.from(
 );
 
 const subir = (nombre: string) =>
-  agregarAvisoLogin({ actorUserId: ACTOR, nombreOriginal: `${nombre}.png`, mime: "image/png", bytes: PNG, nombre });
+  agregarAvisoLogin({
+    actorUserId: ACTOR,
+    nombreOriginal: `${nombre}.png`,
+    mime: "image/png",
+    bytes: PNG,
+    nombre,
+  });
 
 describe.runIf(RUN)("avisos del login (integración)", () => {
   let respaldo: { clave: string; valor: string }[] = [];
@@ -102,7 +108,11 @@ describe.runIf(RUN)("avisos del login (integración)", () => {
     ).rejects.toBeInstanceOf(ValidationError);
     await expect(
       editarAvisosLogin(
-        [{ id: c?.id ?? "", desde: "2026-12-10", hasta: "2026-12-01" }, { id: a?.id ?? "" }, { id: b?.id ?? "" }],
+        [
+          { id: c?.id ?? "", desde: "2026-12-10", hasta: "2026-12-01" },
+          { id: a?.id ?? "" },
+          { id: b?.id ?? "" },
+        ],
         ACTOR,
       ),
     ).rejects.toBeInstanceOf(ValidationError);

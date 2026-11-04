@@ -144,10 +144,20 @@ export default function AvisosLogin() {
           ))}
           {total > 1 && (
             <>
-              <button type="button" onClick={() => ir(idx - 1)} aria-label="Aviso anterior" style={{ ...flecha, left: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => ir(idx - 1)}
+                aria-label="Aviso anterior"
+                style={{ ...flecha, left: "0.5rem" }}
+              >
                 ‹
               </button>
-              <button type="button" onClick={() => ir(idx + 1)} aria-label="Aviso siguiente" style={{ ...flecha, right: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => ir(idx + 1)}
+                aria-label="Aviso siguiente"
+                style={{ ...flecha, right: "0.5rem" }}
+              >
                 ›
               </button>
             </>
@@ -158,7 +168,12 @@ export default function AvisosLogin() {
           <div
             role="tablist"
             aria-label="Avisos"
-            style={{ display: "flex", justifyContent: "center", gap: "0.45rem", paddingTop: "0.6rem" }}
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: "0.45rem",
+              paddingTop: "0.6rem",
+            }}
           >
             {avisos.map((a, i) => (
               <button

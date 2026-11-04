@@ -99,10 +99,18 @@ async function leerLista(): Promise<AvisoLoginItem[]> {
     const legado = await arteId("aviso_login");
     return legado === null
       ? []
-      : [{
-          id: "legado", fileId: legado, nombre: "Aviso actual", activo: true, orden: 1,
-          desde: null, hasta: null, subidoEn: new Date(0).toISOString(),
-        }];
+      : [
+          {
+            id: "legado",
+            fileId: legado,
+            nombre: "Aviso actual",
+            activo: true,
+            orden: 1,
+            desde: null,
+            hasta: null,
+            subidoEn: new Date(0).toISOString(),
+          },
+        ];
   }
   try {
     const lista: unknown = JSON.parse(fila.valor);
@@ -132,14 +140,18 @@ export async function avisosLoginVigentes(): Promise<AvisoLoginItem[]> {
 }
 
 /** Prende o apaga TODOS los avisos del login. */
-export async function setAvisoLoginActivo(activo: boolean, actorUserId: string): Promise<AvisoLogin> {
+export async function setAvisoLoginActivo(
+  activo: boolean,
+  actorUserId: string,
+): Promise<AvisoLogin> {
   await escribirConfig(CLAVE_ACTIVO, activo ? "true" : "false", actorUserId);
   return getAvisoLogin();
 }
 
 function validarFecha(v: unknown, campo: string): string | null {
   if (v === null || v === undefined || v === "") return null;
-  if (typeof v !== "string" || !FECHA.test(v)) throw new ValidationError(`${campo}: fecha inválida.`);
+  if (typeof v !== "string" || !FECHA.test(v))
+    throw new ValidationError(`${campo}: fecha inválida.`);
   return v;
 }
 
@@ -179,10 +191,19 @@ export async function agregarAvisoLogin(input: {
   });
   const nombre = (input.nombre ?? "").trim().slice(0, 80) || `Aviso ${String(lista.length + 1)}`;
   await guardarLista(
-    [...lista, {
-      id, fileId, nombre, activo: true, orden: lista.length + 1, desde, hasta,
-      subidoEn: new Date().toISOString(),
-    }],
+    [
+      ...lista,
+      {
+        id,
+        fileId,
+        nombre,
+        activo: true,
+        orden: lista.length + 1,
+        desde,
+        hasta,
+        subidoEn: new Date().toISOString(),
+      },
+    ],
     input.actorUserId,
   );
   return getAvisoLogin();
@@ -212,7 +233,10 @@ export async function editarAvisosLogin(
     const desde = c.desde === undefined ? a.desde : validarFecha(c.desde, "Desde");
     const hasta = c.hasta === undefined ? a.hasta : validarFecha(c.hasta, "Hasta");
     validarRango(desde, hasta);
-    const nombre = typeof c.nombre === "string" && c.nombre.trim() !== "" ? c.nombre.trim().slice(0, 80) : a.nombre;
+    const nombre =
+      typeof c.nombre === "string" && c.nombre.trim() !== ""
+        ? c.nombre.trim().slice(0, 80)
+        : a.nombre;
     return { ...a, nombre, activo: c.activo ?? a.activo, desde, hasta, orden: i + 1 };
   });
   await guardarLista(nuevos, actorUserId);
@@ -224,7 +248,10 @@ export async function quitarAvisoLogin(id: string, actorUserId: string): Promise
   const lista = await leerLista();
   const aviso = lista.find((a) => a.id === id);
   if (aviso === undefined) throw new NotFoundError("Aviso no encontrado.");
-  await guardarLista(lista.filter((a) => a.id !== id), actorUserId);
+  await guardarLista(
+    lista.filter((a) => a.id !== id),
+    actorUserId,
+  );
   try {
     await eliminarArchivo(aviso.fileId);
   } catch (error) {

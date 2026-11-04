@@ -11,7 +11,10 @@ const MAX_DIAS = 62;
  * inclusive) con su guía y los inscritos / presentes por país del contrato del
  * niño. Lo consume la liquidación de horas de guías de LGS. Solo lectura.
  */
-export async function horasGuias(desde: string, hasta: string): Promise<{ sesiones: SesionGuia[] }> {
+export async function horasGuias(
+  desde: string,
+  hasta: string,
+): Promise<{ sesiones: SesionGuia[] }> {
   if (!ISO_DATE.test(desde) || !ISO_DATE.test(hasta) || desde > hasta) {
     throw new ValidationError("Rango inválido: desde y hasta en AAAA-MM-DD, desde ≤ hasta.");
   }
