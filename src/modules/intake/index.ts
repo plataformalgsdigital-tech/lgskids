@@ -16,10 +16,12 @@ export type {
 } from "./application/disponibilidad";
 export type { CampaniaRoster, CursoRoster, SalonRoster } from "./application/roster";
 export type { SesionGuia } from "./application/horas-guias";
+export type { GuiaLgs } from "./application/guias-lgs";
 export {
   disponibilidadHandler,
   rosterIntakeHandler,
   horasGuiasIntakeHandler,
+  guiasIntakeHandler,
   reservarIntakeHandler,
   aprobarIntakeHandler,
   suspenderIntakeHandler,

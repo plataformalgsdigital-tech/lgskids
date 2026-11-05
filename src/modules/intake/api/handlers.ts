@@ -16,6 +16,7 @@ import { handlerWithServiceAuth, json } from "@/platform/http/handler";
 import { disponibilidad } from "../application/disponibilidad";
 import { roster } from "../application/roster";
 import { horasGuias } from "../application/horas-guias";
+import { guiasParaLgs } from "../application/guias-lgs";
 
 /** Usuario de sistema (migración 20260819000003) — actor de auditoría del intake. */
 const SYSTEM_ACTOR = "11111111-1111-4111-8111-111111111111";
@@ -87,6 +88,16 @@ export const rosterIntakeHandler = handlerWithServiceAuth(async () => json(await
 export const horasGuiasIntakeHandler = handlerWithServiceAuth(async (request) => {
   const params = new URL(request.url).searchParams;
   return json(await horasGuias(params.get("desde") ?? "", params.get("hasta") ?? ""));
+});
+
+/**
+ * GET /api/kids-intake/guias[?usuario=username|correo] — guías con su cuenta (usuario,
+ * hash argon2id de la clave, estado) y su ficha. KIDS es la fuente: LGS los refleja
+ * como advisors Kids con el mismo usuario y clave. Solo lectura, clave de servicio.
+ */
+export const guiasIntakeHandler = handlerWithServiceAuth(async (request) => {
+  const params = new URL(request.url).searchParams;
+  return json(await guiasParaLgs(params.get("usuario")));
 });
 
 /** POST /api/kids-intake/reservations — crea la reserva del beneficiario. */
