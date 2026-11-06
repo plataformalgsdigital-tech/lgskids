@@ -6,11 +6,14 @@ import {
   facturasDeGuia,
   facturasEnviando,
   registrarFactura,
+  retirarFactura,
+  vivasDelCorte,
   type FacturaGuiaRow,
 } from "../infrastructure/facturas-guias-repository";
 import {
   avisarFacturaALgs,
   liquidacionGuiaEnLgs,
+  quitarFacturaEnLgs,
   type LiquidacionGuiaLgs,
 } from "../infrastructure/lgs-liquidacion-client";
 
@@ -22,6 +25,9 @@ import {
 
 const PERIODO = /^\d{4}-(0[1-9]|1[0-2])$/;
 const CORTES = new Set(["MES", "Q1", "Q2"]);
+/** Un corte se puede cobrar en varias facturas (p. ej. horas normales + Exam. Intern.); LGS las revisa sumadas. */
+const CONCEPTOS = new Set(["NORMAL", "EXAM_INTERN", "FESTIVO", "OTRO"]);
+const MAX_FACTURAS_CORTE = 3;
 const POLITICA_FACTURA = {
   mimes: new Map([
     ["application/pdf", "pdf"],
@@ -62,9 +68,35 @@ export async function subirFacturaGuia(input: {
   nombre: string;
   mime: string;
   bytes: Buffer;
+  concepto?: string | null | undefined;
+  modo?: string | null | undefined;
+  reemplazaId?: string | null | undefined;
 }): Promise<{ id: string; factura: FacturaGuia | null }> {
   if (!PERIODO.test(input.periodo)) throw new ValidationError("Periodo inválido (AAAA-MM).");
   if (!CORTES.has(input.corte)) throw new ValidationError("Corte inválido.");
+  const concepto = (input.concepto ?? "NORMAL").toUpperCase();
+  if (!CONCEPTOS.has(concepto)) throw new ValidationError("Concepto de factura inválido.");
+  const modo = input.modo === "agregar" ? "agregar" : "reemplazar";
+  const reemplazaId = input.reemplazaId?.trim() || null;
+  if (reemplazaId !== null) {
+    const previa = await facturaPorId(reemplazaId);
+    if (
+      previa === null ||
+      previa.guiaUserId !== input.guiaUserId ||
+      previa.periodo !== input.periodo ||
+      previa.corte !== input.corte ||
+      previa.estado === "REEMPLAZADA"
+    ) {
+      throw new ValidationError("La factura a reemplazar no es de este corte.");
+    }
+  } else if (modo === "agregar") {
+    const vivas = await vivasDelCorte(input.guiaUserId, input.periodo, input.corte);
+    if (vivas >= MAX_FACTURAS_CORTE) {
+      throw new ValidationError(
+        `Un corte admite hasta ${String(MAX_FACTURAS_CORTE)} facturas. Reemplaza o quita una.`,
+      );
+    }
+  }
   // La regla de plazo y de corte cerrado la tiene LGS: se consulta antes de guardar.
   const liq = await liquidacionGuiaEnLgs(input.guiaUserId, input.periodo);
   if (!liq.registrada) {
@@ -99,12 +131,33 @@ export async function subirFacturaGuia(input: {
     fileId: archivo.id,
     nombre: input.nombre.slice(0, 200) || "factura",
     mime: input.mime,
+    concepto,
+    modo,
+    reemplazaId,
   });
   // LGS la toma ya (y nos informa el estado); si no responde, la recoge su cron.
   await avisarFacturaALgs(id);
   const fila = await facturaPorId(id);
   if (fila === null) return { id, factura: null };
   return { id, factura: publica(fila) };
+}
+
+/**
+ * El guía retira una de sus facturas del corte (p. ej. sobró). Si LGS ya la tomó,
+ * primero se retira en LGS; si LGS no la retira, aquí tampoco.
+ */
+export async function quitarFacturaGuia(guiaUserId: string, id: string): Promise<{ ok: true }> {
+  const f = await facturaPorId(id);
+  if (f === null || f.guiaUserId !== guiaUserId) throw new NotFoundError("Factura no encontrada.");
+  if (f.estado !== "ENVIANDO" && f.estado !== "RECIBIDA") {
+    throw new ValidationError(
+      "Solo se puede quitar una factura recibida que aún no se ha verificado.",
+    );
+  }
+  // También si sigue ENVIANDO: LGS pudo tomarla sin alcanzar a avisar. Si no la tiene, responde ok.
+  await quitarFacturaEnLgs(id);
+  await retirarFactura(id);
+  return { ok: true };
 }
 
 /** Archivo de una factura del propio guía. */

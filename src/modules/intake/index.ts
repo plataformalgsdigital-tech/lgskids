@@ -36,5 +36,10 @@ export {
   apoderadoIntakeHandler,
   estadoAcademicoIntakeHandler,
 } from "./api/handlers";
-export { misHorasHandler, subirFacturaHandler, archivoFacturaHandler } from "./api/guia-handlers";
+export {
+  misHorasHandler,
+  subirFacturaHandler,
+  archivoFacturaHandler,
+  quitarFacturaHandler,
+} from "./api/guia-handlers";
 export type { FacturaGuia } from "./application/facturas-guias";

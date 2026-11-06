@@ -6,6 +6,7 @@ import { handlerWithAuth, json } from "@/platform/http/handler";
 import {
   archivoFacturaPropia,
   misHorasGuia,
+  quitarFacturaGuia,
   subirFacturaGuia,
 } from "../application/facturas-guias";
 
@@ -37,8 +38,23 @@ export const subirFacturaHandler = handlerWithAuth(async (request, auth) => {
       nombre: file.name,
       mime: file.type,
       bytes: Buffer.from(await file.arrayBuffer()),
+      concepto: texto(form.get("concepto")),
+      modo: texto(form.get("modo")),
+      reemplazaId: texto(form.get("reemplazaId")),
     }),
   );
+});
+
+function texto(v: FormDataEntryValue | null): string | null {
+  return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+}
+
+/** DELETE /api/guia/mis-horas/factura/[id] — retira una factura propia del corte. */
+export const quitarFacturaHandler = handlerWithAuth(async (_request, auth, context) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.PANEL_GUIA);
+  const params = await context.params;
+  return json(await quitarFacturaGuia(auth.userId, z.uuid().parse(params["id"])));
 });
 
 /** GET /api/guia/mis-horas/factura/[id] — descarga una factura propia. */

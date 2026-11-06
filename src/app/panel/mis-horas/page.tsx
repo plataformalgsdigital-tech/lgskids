@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 
 /**
@@ -28,6 +28,7 @@ interface Factura {
   nombre: string;
   estado: string;
   motivo: string | null;
+  concepto: string | null;
   subidaEn: string;
 }
 interface Datos {
@@ -73,6 +74,29 @@ const ESTADO_FACTURA: Record<string, string> = {
   REEMPLAZADA: "Reemplazada",
 };
 const SUBIBLE = new Set(["ABIERTO", "FACTURA_RECIBIDA", "DEVUELTA"]);
+/** Un corte se puede cobrar en varias facturas; Administración las revisa sumadas. */
+const MAX_FACTURAS = 3;
+const CONCEPTOS: { v: string; t: string }[] = [
+  { v: "NORMAL", t: "Horas normales" },
+  { v: "EXAM_INTERN", t: "Exam. Intern." },
+  { v: "FESTIVO", t: "Festivos" },
+  { v: "OTRO", t: "Otro" },
+];
+const NOMBRE_CONCEPTO: Record<string, string> = Object.fromEntries(
+  CONCEPTOS.map((c) => [c.v, c.t]),
+);
+const VIVAS = new Set(["ENVIANDO", "RECIBIDA"]);
+const botonSec = (ocupado: boolean): CSSProperties => ({
+  cursor: ocupado ? "wait" : "pointer",
+  opacity: ocupado ? 0.6 : 1,
+  background: "white",
+  color: "var(--lgs-azul-oscuro)",
+  border: "1px solid #cbd5e1",
+  fontWeight: 600,
+  fontSize: "0.78rem",
+  padding: "0.25rem 0.6rem",
+  borderRadius: "0.45rem",
+});
 const fmtH = (n: number) => n.toLocaleString("es", { maximumFractionDigits: 2 });
 const fFecha = (s: string) => {
   const [y, m, d] = s.slice(0, 10).split("-");
@@ -87,6 +111,7 @@ export default function MisHorasPage() {
   const [error, setError] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [conceptoSel, setConceptoSel] = useState<Record<string, string>>({});
 
   const [recarga, setRecarga] = useState(0);
   useEffect(() => {
@@ -108,14 +133,21 @@ export default function MisHorasPage() {
     setPeriodo(p > mesActual ? mesActual : p);
   };
 
-  async function subir(corte: Corte, file: File) {
-    setSubiendo(corte.corte);
+  async function subir(
+    corte: Corte,
+    file: File,
+    opciones: { modo: "agregar" | "reemplazar"; concepto: string; reemplazaId?: string },
+  ) {
+    setSubiendo(opciones.reemplazaId ?? corte.corte);
     setAviso(null);
     setError(null);
     const fd = new FormData();
     fd.set("file", file);
     fd.set("periodo", periodo);
     fd.set("corte", corte.corte);
+    fd.set("concepto", opciones.concepto);
+    fd.set("modo", opciones.modo);
+    if (opciones.reemplazaId !== undefined) fd.set("reemplazaId", opciones.reemplazaId);
     const res = await apiFetch("/api/guia/mis-horas/factura", { method: "POST", body: fd });
     const c: { factura?: Factura | null; error?: { message?: string } } = await res
       .json()
@@ -136,11 +168,30 @@ export default function MisHorasPage() {
     setRecarga((n) => n + 1);
   }
 
+  async function quitar(f: Factura) {
+    if (!window.confirm(`¿Quitar la factura "${f.nombre}" de este corte?`)) return;
+    setSubiendo(f.id);
+    setAviso(null);
+    setError(null);
+    const res = await apiFetch(`/api/guia/mis-horas/factura/${f.id}`, { method: "DELETE" });
+    const c: { error?: { message?: string } } = await res.json().catch(() => ({}));
+    setSubiendo(null);
+    if (!res.ok) {
+      setError(c.error?.message ?? "No se pudo quitar la factura.");
+      return;
+    }
+    setAviso("Factura retirada del corte.");
+    setRecarga((n) => n + 1);
+  }
+
   const [anio, mes] = periodo.split("-");
   const anios = [String(hoy.getFullYear() - 1), String(hoy.getFullYear())];
   const cortes = datos?.liquidacion.cortes ?? [];
-  const facturaVigente = (corte: string) =>
-    datos?.facturas.find((f) => f.corte === corte && f.estado !== "REEMPLAZADA") ?? null;
+  /** Facturas actuales del corte (sin las reemplazadas o quitadas), de la más antigua a la más nueva. */
+  const facturasCorte = (corte: string) =>
+    (datos?.facturas ?? [])
+      .filter((f) => f.corte === corte && f.estado !== "REEMPLAZADA")
+      .reverse();
 
   return (
     <main style={{ padding: "2rem", maxWidth: "60rem", margin: "0 auto" }}>
@@ -207,8 +258,12 @@ export default function MisHorasPage() {
             const e = ESTADO_CORTE[c.estado] ?? { t: c.estado, c: "#6b7280" };
             const plazo =
               c.plazoReenvio !== null && c.plazoReenvio > c.plazo ? c.plazoReenvio : c.plazo;
-            const f = facturaVigente(c.corte);
+            const lista = facturasCorte(c.corte);
+            const vivas = lista.filter((x) => VIVAS.has(x.estado)).length;
             const puedeSubir = c.requiereFactura && SUBIBLE.has(c.estado);
+            const puedeAgregar = puedeSubir && vivas < MAX_FACTURAS;
+            const concepto = conceptoSel[c.corte] ?? (vivas === 0 ? "NORMAL" : "EXAM_INTERN");
+            const rechazada = lista.find((x) => x.estado === "RECHAZADA") ?? null;
             return (
               <div
                 key={c.corte}
@@ -249,10 +304,116 @@ export default function MisHorasPage() {
                   >
                     {e.t}
                   </span>
-                  {puedeSubir && (
+                </div>
+                {lista.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: "0.6rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.35rem",
+                    }}
+                  >
+                    {lista.map((f) => (
+                      <div
+                        key={f.id}
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          fontSize: "0.85rem",
+                          background: "#f8fafc",
+                          border: "1px solid #eef0f5",
+                          borderRadius: "0.5rem",
+                          padding: "0.35rem 0.6rem",
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: "var(--lgs-azul-oscuro)" }}>
+                          {NOMBRE_CONCEPTO[f.concepto ?? "NORMAL"] ?? f.concepto}
+                        </span>
+                        <a
+                          href={`/api/guia/mis-horas/factura/${f.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {f.nombre}
+                        </a>
+                        <span style={{ color: "var(--texto-suave)" }}>
+                          · {ESTADO_FACTURA[f.estado] ?? f.estado} · subida el {fFecha(f.subidaEn)}
+                        </span>
+                        {puedeSubir && VIVAS.has(f.estado) && (
+                          <span style={{ marginLeft: "auto", display: "flex", gap: "0.4rem" }}>
+                            <label style={botonSec(subiendo !== null)}>
+                              {subiendo === f.id ? "Procesando…" : "Reemplazar"}
+                              <input
+                                type="file"
+                                accept="application/pdf,image/jpeg,image/png,image/webp"
+                                style={{ display: "none" }}
+                                disabled={subiendo !== null}
+                                onChange={(ev) => {
+                                  const file = ev.target.files?.[0];
+                                  if (file !== undefined) {
+                                    void subir(c, file, {
+                                      modo: "reemplazar",
+                                      concepto: f.concepto ?? "NORMAL",
+                                      reemplazaId: f.id,
+                                    });
+                                  }
+                                  ev.target.value = "";
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={subiendo !== null}
+                              onClick={() => void quitar(f)}
+                              style={{
+                                ...botonSec(subiendo !== null),
+                                color: "#b91c1c",
+                                borderColor: "#fca5a5",
+                              }}
+                            >
+                              Quitar
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {puedeAgregar && (
+                  <div
+                    style={{
+                      marginTop: "0.6rem",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <select
+                      value={concepto}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setConceptoSel((m) => ({ ...m, [c.corte]: v }));
+                      }}
+                      aria-label="Concepto de la factura"
+                      style={{
+                        padding: "0.35rem 0.5rem",
+                        borderRadius: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        fontSize: "0.82rem",
+                      }}
+                    >
+                      {CONCEPTOS.map((k) => (
+                        <option key={k.v} value={k.v}>
+                          {k.t}
+                        </option>
+                      ))}
+                    </select>
                     <label
                       style={{
-                        marginLeft: "auto",
                         cursor: subiendo !== null ? "wait" : "pointer",
                         opacity: subiendo !== null ? 0.6 : 1,
                         background: "var(--lgs-azul)",
@@ -265,9 +426,11 @@ export default function MisHorasPage() {
                     >
                       {subiendo === c.corte
                         ? "Subiendo y revisando…"
-                        : f !== null && f.estado !== "RECHAZADA"
-                          ? "Reemplazar factura"
-                          : "Subir factura"}
+                        : vivas > 0
+                          ? "Agregar otra factura"
+                          : c.estado === "DEVUELTA"
+                            ? "Subir factura corregida"
+                            : "Subir factura"}
                       <input
                         type="file"
                         accept="application/pdf,image/jpeg,image/png,image/webp"
@@ -275,24 +438,20 @@ export default function MisHorasPage() {
                         disabled={subiendo !== null}
                         onChange={(ev) => {
                           const file = ev.target.files?.[0];
-                          if (file !== undefined) void subir(c, file);
+                          if (file !== undefined) {
+                            void subir(c, file, {
+                              modo: vivas > 0 ? "agregar" : "reemplazar",
+                              concepto,
+                            });
+                          }
                           ev.target.value = "";
                         }}
                       />
                     </label>
-                  )}
-                </div>
-                {f !== null && (
-                  <div style={{ marginTop: "0.6rem", fontSize: "0.85rem" }}>
-                    Factura:{" "}
-                    <a
-                      href={`/api/guia/mis-horas/factura/${f.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {f.nombre}
-                    </a>{" "}
-                    · {ESTADO_FACTURA[f.estado] ?? f.estado} · subida el {fFecha(f.subidaEn)}
+                    <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+                      Hasta {MAX_FACTURAS} facturas por corte (p. ej. horas normales y Exam.
+                      Intern.): se revisan sumadas contra tus horas.
+                    </span>
                   </div>
                 )}
                 {c.estado === "DEVUELTA" && c.factura?.comentarioDevolucion != null && (
@@ -311,9 +470,9 @@ export default function MisHorasPage() {
                     corregida antes del {fFecha(plazo)}.
                   </div>
                 )}
-                {f?.estado === "RECHAZADA" && f.motivo !== null && (
+                {rechazada !== null && rechazada.motivo !== null && (
                   <div style={{ marginTop: "0.6rem", fontSize: "0.85rem", color: "#b91c1c" }}>
-                    No fue recibida: {f.motivo}
+                    No fue recibida: {rechazada.motivo}
                   </div>
                 )}
                 {c.estado === "SIN_FACTURA" && (
@@ -359,7 +518,12 @@ export default function MisHorasPage() {
                   {datos.facturas.map((f) => (
                     <tr key={f.id} style={{ borderTop: "1px solid #eef0f5" }}>
                       <td style={{ padding: "0.3rem" }}>{fFecha(f.subidaEn)}</td>
-                      <td style={{ padding: "0.3rem" }}>{NOMBRE_CORTE[f.corte]}</td>
+                      <td style={{ padding: "0.3rem" }}>
+                        {NOMBRE_CORTE[f.corte]}
+                        {f.concepto !== null
+                          ? ` · ${NOMBRE_CONCEPTO[f.concepto] ?? f.concepto}`
+                          : ""}
+                      </td>
                       <td style={{ padding: "0.3rem" }}>
                         <a
                           href={`/api/guia/mis-horas/factura/${f.id}`}

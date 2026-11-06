@@ -18,6 +18,7 @@ export interface CorteGuiaLgs {
   horasOk: boolean;
   pagadoEn: string | null;
   referenciaPago: string | null;
+  maxFacturas?: number;
   factura: {
     nombre: string | null;
     estado: string;
@@ -92,4 +93,29 @@ export async function avisarFacturaALgs(facturaId: string): Promise<void> {
       error: String(error),
     });
   }
+}
+
+/**
+ * Pide a LGS retirar una factura que ya tomó. A diferencia del aviso, esta SÍ debe
+ * confirmarse: si LGS no la retira, KIDS tampoco la quita (seguiría contando en LGS).
+ */
+export async function quitarFacturaEnLgs(facturaId: string): Promise<void> {
+  const { url, clave } = base();
+  let res: Response;
+  try {
+    res = await fetch(`${url}/api/kids-sync/factura-guia`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": clave },
+      body: JSON.stringify({ facturaId, accion: "quitar" }),
+      signal: AbortSignal.timeout(25_000),
+      cache: "no-store",
+    });
+  } catch (error) {
+    logger.error("LGS no respondió (quitar factura)", { facturaId, error: String(error) });
+    throw new ConflictError(
+      "No se pudo quitar la factura en LGS. Intenta de nuevo en unos minutos.",
+    );
+  }
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new ConflictError(`LGS: ${data.error ?? `HTTP ${String(res.status)}`}`);
 }
