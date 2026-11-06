@@ -22,6 +22,9 @@ export {
   rosterIntakeHandler,
   horasGuiasIntakeHandler,
   guiasIntakeHandler,
+  facturasGuiasIntakeHandler,
+  archivoFacturaGuiaIntakeHandler,
+  estadoFacturaGuiaIntakeHandler,
   reservarIntakeHandler,
   aprobarIntakeHandler,
   suspenderIntakeHandler,
@@ -33,3 +36,5 @@ export {
   apoderadoIntakeHandler,
   estadoAcademicoIntakeHandler,
 } from "./api/handlers";
+export { misHorasHandler, subirFacturaHandler, archivoFacturaHandler } from "./api/guia-handlers";
+export type { FacturaGuia } from "./application/facturas-guias";

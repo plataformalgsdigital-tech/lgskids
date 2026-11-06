@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   MOTIVOS_BAJA_LGS,
@@ -17,6 +18,11 @@ import { disponibilidad } from "../application/disponibilidad";
 import { roster } from "../application/roster";
 import { horasGuias } from "../application/horas-guias";
 import { guiasParaLgs } from "../application/guias-lgs";
+import {
+  archivoFacturaLgs,
+  estadoFacturaDesdeLgs,
+  facturasPendientesLgs,
+} from "../application/facturas-guias";
 
 /** Usuario de sistema (migración 20260819000003) — actor de auditoría del intake. */
 const SYSTEM_ACTOR = "11111111-1111-4111-8111-111111111111";
@@ -98,6 +104,36 @@ export const horasGuiasIntakeHandler = handlerWithServiceAuth(async (request) =>
 export const guiasIntakeHandler = handlerWithServiceAuth(async (request) => {
   const params = new URL(request.url).searchParams;
   return json(await guiasParaLgs(params.get("usuario")));
+});
+
+/**
+ * GET /api/kids-intake/facturas-guias?pendientes=1 — facturas que los guías subieron
+ * aquí y LGS aún no tomó (estado ENVIANDO). LGS las pasa a su flujo de Gestión Advisors.
+ */
+export const facturasGuiasIntakeHandler = handlerWithServiceAuth(async () =>
+  json(await facturasPendientesLgs()),
+);
+
+/** GET /api/kids-intake/facturas-guias/[id]/archivo — el archivo de la factura (para LGS). */
+export const archivoFacturaGuiaIntakeHandler = handlerWithServiceAuth(async (_request, context) => {
+  const params = await context.params;
+  const { meta, bytes } = await archivoFacturaLgs(z.uuid().parse(params["id"]));
+  return new NextResponse(new Uint8Array(bytes), {
+    headers: { "Content-Type": meta.mime, "Cache-Control": "no-store" },
+  });
+});
+
+/** POST /api/kids-intake/facturas-guias/[id]/estado — LGS informa el estado de la factura. */
+export const estadoFacturaGuiaIntakeHandler = handlerWithServiceAuth(async (request, context) => {
+  const params = await context.params;
+  const body = z
+    .object({
+      estado: z.string().min(1).max(20),
+      motivo: z.string().max(1000).nullish(),
+      lgsFacturaId: z.string().max(64).nullish(),
+    })
+    .parse(await request.json());
+  return json(await estadoFacturaDesdeLgs(z.uuid().parse(params["id"]), body));
 });
 
 /** POST /api/kids-intake/reservations — crea la reserva del beneficiario. */

@@ -80,6 +80,8 @@ export const PERMISOS = {
   MENU_MIS_CLASES: "menu.mis_clases",
   MENU_MIS_SALONES: "menu.mis_salones",
   MENU_MIS_NINOS: "menu.mis_ninos",
+  /** Guía › Mis horas y facturas (horas del mes y su factura, que LGS liquida). */
+  MENU_MIS_HORAS: "menu.mis_horas",
   /** Servicio › Usuarios sin perfil creado. */
   MENU_SIN_PERFIL: "menu.sin_perfil",
   MENU_SERVICIO_WELCOME: "menu.servicio_welcome",
@@ -241,6 +243,7 @@ export const MATRIZ_ROL_PERMISOS: Record<RoleCode, PermisoCode[]> = {
     PERMISOS.MENU_MIS_CLASES,
     PERMISOS.MENU_MIS_SALONES,
     PERMISOS.MENU_MIS_NINOS,
+    PERMISOS.MENU_MIS_HORAS,
     PERMISOS.CATALOGO_VER,
     PERMISOS.SALONES_VER,
     PERMISOS.MATRICULAS_VER,
@@ -333,6 +336,7 @@ const SECCIONES_BASE: {
       { etiqueta: "Mis clases", permiso: PERMISOS.MENU_MIS_CLASES },
       { etiqueta: "Mis salones", permiso: PERMISOS.MENU_MIS_SALONES },
       { etiqueta: "Mis niños", permiso: PERMISOS.MENU_MIS_NINOS },
+      { etiqueta: "Mis horas y facturas", permiso: PERMISOS.MENU_MIS_HORAS },
     ],
   },
 ];

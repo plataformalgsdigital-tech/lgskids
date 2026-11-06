@@ -258,4 +258,12 @@ export const MENU: {
     href: "/panel/mis-ninos",
     permisoMenu: "menu.mis_ninos",
   },
+  {
+    seccion: "Guía",
+    permiso: "panel.guia",
+    etiqueta: "Mis horas y facturas",
+    color: "var(--lgs-azul)",
+    href: "/panel/mis-horas",
+    permisoMenu: "menu.mis_horas",
+  },
 ];
