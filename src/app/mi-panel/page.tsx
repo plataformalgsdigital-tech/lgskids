@@ -466,7 +466,8 @@ export default function MiPanelPage() {
         body: JSON.stringify({ nivel, datos }),
       });
       if (!res.ok) return null;
-      return ((await res.json()) as { inyectar: Record<string, string> }).inyectar;
+      const r = (await res.json()) as { inyectar: Record<string, string>; pasaporte?: unknown };
+      return { inyectar: r.inyectar, pasaporte: r.pasaporte ?? null };
     };
     setLibroMsg(
       abrirLibroEnPestana({

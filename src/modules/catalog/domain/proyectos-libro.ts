@@ -338,6 +338,56 @@ export function revisionesParaLibro(input: {
   });
 }
 
+/**
+ * CONTEXTO DEL PASAPORTE DE ROOKIE (decisión del negocio, 2026-11-07). El
+ * libro de Rookie solo emite su pasaporte con una confirmación de la plataforma
+ * (`LGSKidsPassport.setPlatformContext`): identidad, `verified`,
+ * `award_id: "rookie_compass"` y las cuatro unidades con puntaje, evaluación,
+ * juego y souvenir. Por las unidades viaja lo que REPORTÓ el libro; lo que la
+ * plataforma pone de su parte es `verified`, que solo es `true` con los cuatro
+ * proyectos APROBADOS por el guía en el servidor, lo único que el navegador no
+ * puede fabricar. Sin eso el libro muestra "pendiente de confirmación".
+ */
+export interface ContextoPasaporteRookie {
+  course: "JUNIOR";
+  level: "Rookie";
+  student: AlumnoLibro;
+  verified: boolean;
+  award_id: "rookie_compass";
+  units: {
+    unit: number;
+    score_percent: number;
+    evaluation_passed: boolean;
+    game_completed: boolean;
+    reward_delivered: boolean;
+  }[];
+}
+
+export function contextoPasaporteRookie(input: {
+  alumno: AlumnoLibro;
+  unidades: readonly UnidadLibro[];
+  /** Unidades con el proyecto aprobado por el guía (registro del servidor). */
+  proyectosAprobados: readonly number[];
+}): ContextoPasaporteRookie {
+  return {
+    course: "JUNIOR",
+    level: "Rookie",
+    student: { id: input.alumno.id, name: input.alumno.name, username: input.alumno.username },
+    verified: UNIDADES_PROYECTO.every((u) => input.proyectosAprobados.includes(u)),
+    award_id: "rookie_compass",
+    units: UNIDADES_PROYECTO.map((u) => {
+      const r = input.unidades.find((x) => x.unidad === u);
+      return {
+        unit: u,
+        score_percent: r?.mejorPuntaje ?? 0,
+        evaluation_passed: r?.evaluacionAprobada ?? false,
+        game_completed: r?.juegoCompletado ?? false,
+        reward_delivered: r?.recompensa ?? false,
+      };
+    }),
+  };
+}
+
 /** Resultado de una unidad en el libro (lo que reportó el navegador). */
 export interface UnidadLibro {
   unidad: number;

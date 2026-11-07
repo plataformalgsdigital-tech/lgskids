@@ -5,6 +5,7 @@ import {
   clavesLibro,
   clavesSoloLectura,
   contextoAlumno,
+  contextoPasaporteRookie,
   leerProyectosLibro,
   nivelDelLibro,
   planificarEntregas,
@@ -146,6 +147,39 @@ describe("qué entregas del libro se registran", () => {
     const r = plan([entrega(1, 1), entrega(1, 2)]);
     expect(r.aRegistrar.map((e) => e.attempt)).toEqual([1]);
     expect(r.rechazadas[0]?.motivo).toMatch(/esperando/);
+  });
+});
+
+describe("pasaporte de Rookie (confirmación de la plataforma)", () => {
+  const alumno = { id: "123", name: "Ana Paz", username: "apaz1" };
+  const unidades = [1, 2, 3, 4].map((unidad) => ({
+    unidad,
+    intentos: 1,
+    mejorPuntaje: 90,
+    evaluacionAprobada: true,
+    juegoCompletado: true,
+    recompensa: true,
+  }));
+
+  it("lleva lo que reportó el libro y solo se VERIFICA con los 4 proyectos aprobados", () => {
+    const sinUno = contextoPasaporteRookie({ alumno, unidades, proyectosAprobados: [1, 2, 3] });
+    expect(sinUno).toMatchObject({ level: "Rookie", award_id: "rookie_compass", verified: false });
+    expect(sinUno.units[0]).toEqual({
+      unit: 1,
+      score_percent: 90,
+      evaluation_passed: true,
+      game_completed: true,
+      reward_delivered: true,
+    });
+    expect(
+      contextoPasaporteRookie({ alumno, unidades, proyectosAprobados: [1, 2, 3, 4] }).verified,
+    ).toBe(true);
+  });
+
+  it("una unidad sin datos va en cero: el libro no la da por cumplida", () => {
+    const c = contextoPasaporteRookie({ alumno, unidades: [], proyectosAprobados: [1, 2, 3, 4] });
+    expect(c.units).toHaveLength(4);
+    expect(c.units[3]).toMatchObject({ score_percent: 0, evaluation_passed: false });
   });
 });
 

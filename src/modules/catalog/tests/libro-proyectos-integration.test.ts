@@ -138,6 +138,20 @@ describe.runIf(RUN)("proyectos del libro (integración)", () => {
     expect(d.soloLectura).toContain(K.revisiones);
   });
 
+  it("Rookie recibe el contexto de su pasaporte, sin verificar hasta los 4 proyectos", async () => {
+    const d = await datosLibroParaAlumno(nino, "JUNIOR", "ROOKIE");
+    expect(d.pasaporte).toMatchObject({
+      level: "Rookie",
+      award_id: "rookie_compass",
+      verified: false,
+      student: { id: doc },
+    });
+    expect(d.pasaporte?.units).toHaveLength(4);
+    // Rookie no usa la clave de pasaporte de los demás niveles.
+    expect(d.inyectar[clavesLibro("ROOKIE").pasaporte]).toBeUndefined();
+    expect((await datosLibroParaAlumno(nino, "JUNIOR", NIVEL)).pasaporte).toBeNull();
+  });
+
   it("entrega → se registra UNA vez; reenviar el historial no duplica", async () => {
     const r1 = await sincronizar({ [K.proyectos]: proyectos([{ id: "a1", unit: 1, attempt: 1 }]) });
     expect(r1.registradas).toBe(1);

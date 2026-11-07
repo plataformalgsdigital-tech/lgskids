@@ -44,6 +44,14 @@ export interface DatosLibro {
   restaurar: Record<string, string>;
   /** Las que el libro no puede escribir. */
   soloLectura: string[];
+  /** Solo Rookie: la confirmación con que el libro emite su pasaporte. */
+  pasaporte?: unknown;
+}
+
+/** Lo que devuelve la sincronización: claves nuevas y el pasaporte (Rookie). */
+export interface RespuestaLibro {
+  inyectar: Record<string, string>;
+  pasaporte?: unknown;
 }
 
 /**
@@ -126,6 +134,7 @@ export function nombreLibro(
     videos: videosBase,
     voces,
     soloLectura: libro?.soloLectura ?? [],
+    pasaporte: libro?.pasaporte ?? null,
   });
   return caja.prefijo + datos.replace(/ /g, "\\u0020");
 }
@@ -138,7 +147,7 @@ interface Abierta {
   datos: Record<string, string>;
   /** Lo último que se le entregó, para no repetírselo. */
   entregado: string;
-  sincronizar: ((datos: Record<string, string>) => Promise<Record<string, string> | null>) | null;
+  sincronizar: ((datos: Record<string, string>) => Promise<RespuestaLibro | null>) | null;
   espera: number | null;
   consulta: number | null;
 }
@@ -154,17 +163,20 @@ async function sincronizarAhora(ventana: Window, a: Abierta): Promise<void> {
     soltar(ventana, a);
     return;
   }
-  let nuevo: Record<string, string> | null;
+  let nuevo: RespuestaLibro | null;
   try {
     nuevo = await a.sincronizar(a.datos);
   } catch {
     return; // sin red: se reintenta con el próximo cambio o la próxima consulta
   }
   if (nuevo === null || a.caja.mensajeActualizar === undefined || ventana.closed) return;
-  const texto = JSON.stringify(nuevo);
+  const texto = JSON.stringify({ inyectar: nuevo.inyectar, pasaporte: nuevo.pasaporte ?? null });
   if (texto === a.entregado) return;
   a.entregado = texto;
-  ventana.postMessage({ tipo: a.caja.mensajeActualizar, datos: nuevo }, "*");
+  ventana.postMessage(
+    { tipo: a.caja.mensajeActualizar, datos: nuevo.inyectar, pasaporte: nuevo.pasaporte ?? null },
+    "*",
+  );
 }
 
 function soltar(ventana: Window, a: Abierta): void {
@@ -226,7 +238,7 @@ export function abrirLibroEnPestana(opciones: {
   /** Identidad, entregas y revisiones (solo el panel del niño). */
   libro?: DatosLibro | null;
   /** Manda al servidor lo que guardó el libro y devuelve lo que debe tener ahora. */
-  sincronizar?: (datos: Record<string, string>) => Promise<Record<string, string> | null>;
+  sincronizar?: (datos: Record<string, string>) => Promise<RespuestaLibro | null>;
 }): boolean {
   const autorizacion = opciones.autorizacion ?? null;
   const libro = opciones.libro ?? null;
@@ -248,7 +260,10 @@ export function abrirLibroEnPestana(opciones: {
     clave: opciones.claveProgreso,
     caja: opciones.caja,
     datos: progresoInicial(opciones.caja, opciones.claveProgreso, autorizacion, libro),
-    entregado: JSON.stringify(libro?.inyectar ?? {}),
+    entregado: JSON.stringify({
+      inyectar: libro?.inyectar ?? {},
+      pasaporte: libro?.pasaporte ?? null,
+    }),
     sincronizar: opciones.sincronizar ?? null,
     espera: null,
     consulta: null,

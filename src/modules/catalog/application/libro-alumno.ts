@@ -10,6 +10,7 @@ import {
   ENTREGAS_TOPE,
   UNIDADES_PROYECTO,
   type AlumnoLibro,
+  type ContextoPasaporteRookie,
   type DecisionProyecto,
   type EntregaLibro,
   type EntregaRegistrada,
@@ -19,6 +20,7 @@ import {
   clavesQueGuarda,
   clavesSoloLectura,
   contextoAlumno,
+  contextoPasaporteRookie,
   leerProyectosLibro,
   planificarEntregas,
   problemaRevision,
@@ -153,6 +155,12 @@ export interface DatosLibroAlumno {
   soloLectura: string[];
   /** Sin identidad válida el libro deja leer pero no entregar. */
   conIdentidad: boolean;
+  /**
+   * Solo Rookie: la confirmación con que el libro emite su pasaporte
+   * (`contextoPasaporteRookie`). El puente la pone en
+   * `window.LGS_KIDS_PASSPORT_CONTEXT` antes de que corra el libro.
+   */
+  pasaporte: ContextoPasaporteRookie | null;
 }
 
 /**
@@ -175,7 +183,9 @@ export async function datosLibroParaAlumno(
     const v = estado.get(clave);
     if (v !== undefined) restaurar[clave] = v.valor;
   }
-  if (alumno === null) return { inyectar: {}, restaurar, soloLectura, conIdentidad: false };
+  if (alumno === null) {
+    return { inyectar: {}, restaurar, soloLectura, conIdentidad: false, pasaporte: null };
+  }
 
   const entregas = await entregasDe(childPersonId, curso, nivel, client);
   const revisiones = await queryRows<{
@@ -253,11 +263,21 @@ export async function datosLibroParaAlumno(
       })),
     }),
   };
-  // Champion, Elite y Legendary siguen leyendo su clave de pasaporte con la
-  // MISMA identidad. Rookie emite su pasaporte con otro mecanismo
-  // (`setPassportContext`, contexto verificado), que no se toca.
-  if (nivel.toUpperCase() !== "ROOKIE") inyectar[k.pasaporte] = contexto;
-  return { inyectar, restaurar, soloLectura, conIdentidad: true };
+  // Champion, Elite y Legendary leen su clave de pasaporte con la MISMA
+  // identidad. Rookie lo emite con un contexto confirmado por la plataforma.
+  let pasaporte: ContextoPasaporteRookie | null = null;
+  if (nivel.toUpperCase() !== "ROOKIE") {
+    inyectar[k.pasaporte] = contexto;
+  } else {
+    pasaporte = contextoPasaporteRookie({
+      alumno,
+      unidades: resumenEvaluacionesLibro(estado.get(k.progreso)?.valor),
+      proyectosAprobados: [
+        ...new Set(entregas.filter((e) => aRegistrada(e).aprobada).map((e) => e.unidad)),
+      ],
+    });
+  }
+  return { inyectar, restaurar, soloLectura, conIdentidad: true, pasaporte };
 }
 
 export interface ResultadoSincronizacion extends DatosLibroAlumno {

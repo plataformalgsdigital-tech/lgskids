@@ -37,5 +37,10 @@ export const POST = handlerWithAuth(async (request, auth) => {
     datos: body.datos,
     ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
   });
-  return json({ inyectar: r.inyectar, registradas: r.registradas, rechazadas: r.rechazadas });
+  return json({
+    inyectar: r.inyectar,
+    pasaporte: r.pasaporte,
+    registradas: r.registradas,
+    rechazadas: r.rechazadas,
+  });
 });

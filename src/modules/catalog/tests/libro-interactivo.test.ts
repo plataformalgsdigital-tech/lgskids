@@ -169,7 +169,13 @@ describe("puente de almacenamiento", () => {
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { k: "v", n: "5" } });
     // La recarga conserva también la base de los videos (y las voces).
     expect(ventana["name"]).toBe(
-      v2({ datos: { k: "v", n: "5" }, videos: base, voces: null, soloLectura: [] }),
+      v2({
+        datos: { k: "v", n: "5" },
+        videos: base,
+        voces: null,
+        soloLectura: [],
+        pasaporte: null,
+      }),
     );
 
     almacen.removeItem("k");
@@ -188,7 +194,7 @@ describe("puente de almacenamiento", () => {
     const { ventana, almacen } = montar(v2({ datos: {}, videos: null }), "solo");
     expect(() => almacen.setItem("k", "v")).not.toThrow();
     expect(ventana["name"]).toBe(
-      v2({ datos: { k: "v" }, videos: null, voces: null, soloLectura: [] }),
+      v2({ datos: { k: "v" }, videos: null, voces: null, soloLectura: [], pasaporte: null }),
     );
   });
 
@@ -239,6 +245,28 @@ describe("puente de almacenamiento", () => {
     // Lo mismo otra vez no vuelve a avisar al libro.
     recibir({ tipo: MENSAJE_ACTUALIZAR_LIBRO, datos: { rev: "nueva" } });
     expect(eventos).toHaveLength(1);
+  });
+
+  it("entrega al libro el contexto del pasaporte de Rookie y lo actualiza en vivo", () => {
+    const pas = { level: "Rookie", verified: false };
+    const { ventana, recibir } = montar(v2({ datos: {}, videos: null, pasaporte: pas }), "opener");
+    // Lo lee el libro al arrancar: tiene que estar ANTES de que corra su script.
+    expect(ventana["LGS_KIDS_PASSPORT_CONTEXT"]).toEqual(pas);
+    const recibidos: unknown[] = [];
+    ventana["LGSKidsPassport"] = { setPlatformContext: (c: unknown) => recibidos.push(c) };
+    recibir({
+      tipo: MENSAJE_ACTUALIZAR_LIBRO,
+      datos: {},
+      pasaporte: { level: "Rookie", verified: true },
+    });
+    expect(recibidos).toEqual([{ level: "Rookie", verified: true }]);
+    // El mismo contexto otra vez no se vuelve a aplicar.
+    recibir({
+      tipo: MENSAJE_ACTUALIZAR_LIBRO,
+      datos: {},
+      pasaporte: { level: "Rookie", verified: true },
+    });
+    expect(recibidos).toHaveLength(1);
   });
 
   it("solo acepta actualizaciones de la ventana que lo abrió", () => {

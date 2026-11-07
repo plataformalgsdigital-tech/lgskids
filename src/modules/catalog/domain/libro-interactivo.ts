@@ -39,8 +39,9 @@ import { PUENTE_VOZ } from "./voz-libro";
  *     cacheado con la versión 2 bloqueaba sus audios (2026-10-28).
  * 4 = claves de SOLO LECTURA (identidad y revisiones del guía) y
  *     actualizaciones del panel sin recargar el libro (2026-11-06).
+ * 5 = contexto del pasaporte de Rookie (`LGS_KIDS_PASSPORT_CONTEXT`) (2026-11-07).
  */
-export const VERSION_PUENTE = "4";
+export const VERSION_PUENTE = "5";
 
 /** La URL del libro con la versión del puente (ver `VERSION_PUENTE`). */
 export function urlLibroConPuente(url: string): string {
@@ -137,6 +138,9 @@ export function cspLibro(baseVideos: string | null): string {
  *   CSP (`base-uri`) lo vuelve a exigir.
  * - `voces` (2026-10-28): qué frases tienen audio y las intervenciones de los
  *   personajes; las usa `PUENTE_VOZ` (ver `voz-libro.ts`), que corre aquí mismo.
+ * - `pasaporte` (2026-11-07, solo Rookie): la confirmación de la plataforma con que el
+ *   libro emite su pasaporte; va a `window.LGS_KIDS_PASSPORT_CONTEXT`, que el libro lee
+ *   al arrancar, y una actualización del panel la pasa por `LGSKidsPassport.setPlatformContext`.
  * - `soloLectura` (2026-11-06): las claves que escribe SOLO la plataforma —la
  *   identidad del niño y las revisiones del guía—. El libro puede leerlas, pero
  *   `setItem`/`removeItem`/`clear` sobre ellas no hacen nada: así el libro (o
@@ -155,18 +159,19 @@ export function cspLibro(baseVideos: string | null): string {
  * try/catch se caería entero.
  */
 export const PUENTE_ALMACEN = `(function(){
-var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},A=${JSON.stringify(MENSAJE_ACTUALIZAR_LIBRO)},EV=${JSON.stringify(EVENTO_REVISIONES_LIBRO)},d={},base=null,voces=null,ro={};
+var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},A=${JSON.stringify(MENSAJE_ACTUALIZAR_LIBRO)},EV=${JSON.stringify(EVENTO_REVISIONES_LIBRO)},d={},base=null,voces=null,ro={},pas=null;
 function propio(o,k){return Object.prototype.hasOwnProperty.call(o,k);}
 function textos(o){var r={};if(o&&typeof o==="object"){for(var k in o){if(propio(o,k)&&typeof o[k]==="string"){r[k]=o[k];}}}return r;}
 try{var n=window.name;if(n&&n.indexOf(P)===0){var o=JSON.parse(n.slice(P.length));
 if(o&&o.v===2){d=textos(o.datos);var b=o.videos;if(typeof b==="string"&&b.charAt(0)==="/"&&b.charAt(1)!=="/"){base=b;}
 if(o.voces&&typeof o.voces==="object"){voces=o.voces;}
+if(o.pasaporte&&typeof o.pasaporte==="object"){pas=o.pasaporte;window.LGS_KIDS_PASSPORT_CONTEXT=pas;}
 if(o.soloLectura&&o.soloLectura.length){for(var i=0;i<o.soloLectura.length;i++){if(typeof o.soloLectura[i]==="string")ro[o.soloLectura[i]]=true;}}}
 else{d=textos(o);}}}catch(e){}
 if(base){try{var e=document.createElement("base");e.href=base;var h=document.head||document.documentElement;h.insertBefore(e,h.firstChild);}catch(x){}}
 function panel(){try{if(window.parent&&window.parent!==window)return window.parent;}catch(e){}
 try{if(window.opener)return window.opener;}catch(e){}return null;}
-function nombre(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base,voces:voces,soloLectura:Object.keys(ro)});}catch(e){}}
+function nombre(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base,voces:voces,soloLectura:Object.keys(ro),pasaporte:pas});}catch(e){}}
 function avisar(){nombre();try{var w=panel();if(w)w.postMessage({tipo:T,datos:d},"*");}catch(e){}}
 function almacen(m,guardar){var s={
 getItem:function(k){k=String(k);return propio(m,k)?m[k]:null;},
@@ -180,6 +185,8 @@ try{Object.defineProperty(window,"sessionStorage",{value:almacen({},false),confi
 try{window.addEventListener("message",function(e){var w=panel();if(!w||e.source!==w)return;var m=e.data;
 if(!m||m.tipo!==A)return;var nuevos=textos(m.datos),cambio=false,k;
 for(k in nuevos){if(propio(nuevos,k)&&d[k]!==nuevos[k]){if(ro[k])cambio=true;d[k]=nuevos[k];}}
+if(m.pasaporte&&typeof m.pasaporte==="object"&&JSON.stringify(m.pasaporte)!==JSON.stringify(pas)){pas=m.pasaporte;window.LGS_KIDS_PASSPORT_CONTEXT=pas;
+try{var lp=window.LGSKidsPassport;if(lp&&lp.setPlatformContext)lp.setPlatformContext(pas);}catch(x){}}
 nombre();if(cambio){try{window.dispatchEvent(new Event(EV));}catch(x){}}});}catch(e){}
 ${PUENTE_VOZ}
 })();`;

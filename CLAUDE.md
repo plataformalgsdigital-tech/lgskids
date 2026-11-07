@@ -1040,9 +1040,19 @@ videos}` (`videos` = base con token de sus videos; el formato viejo, solo `datos
     el libro) y `lgs-<nivel>-project-reviews-v1` (revisiones y autorizaciones, SOLO la
     plataforma). Identidad: `lgs-student-context` = `{v:1,course,level,student:{id,name,
 username}}` con id = DOCUMENTO del niño; Champion/Elite/Legendary reciben la MISMA en
-    `lgs-<nivel>-passport`. Rookie emite su pasaporte con `setPassportContext` (contexto
-    verificado): NO se toca, y hoy la plataforma no lo llama.
-  - **Puente v4** (`VERSION_PUENTE = "4"`): el `window.name` trae `soloLectura` (identidad,
+    `lgs-<nivel>-passport`.
+  - **Pasaporte de Rookie (2026-11-07, decisión del negocio)**: Rookie SOLO lo emite con
+    una confirmación de la plataforma (`setPassportContext`). El servidor la arma
+    (`contextoPasaporteRookie`, `DatosLibroAlumno.pasaporte`): identidad, `award_id:
+"rookie_compass"`, las 4 unidades con lo que REPORTÓ el libro (puntaje, evaluación,
+    juego, souvenir) y `verified: true` SOLO con los 4 proyectos aprobados por el guía en
+    el servidor —lo único que el navegador no puede fabricar—. Viaja en el `window.name`
+    (`pasaporte`) y el puente lo pone en `window.LGS_KIDS_PASSPORT_CONTEXT` ANTES de que
+    corra el libro, que lo lee al arrancar; en una actualización lo pasa por
+    `LGSKidsPassport.setPlatformContext`. Verificado ejecutando el código REAL del libro
+    (`setPassportContext` + `passportStatus`): emite con 4 proyectos, no con 3.
+    **Trampa**: manejar el libro de Rookie (75 MB) con Playwright cuelga la herramienta.
+  - **Puente v4/v5** (`VERSION_PUENTE = "5"`): el `window.name` trae `soloLectura` (identidad,
     revisiones, pasaporte) y el puente IGNORA `setItem/removeItem/clear` sobre ellas. Y
     escucha `MENSAJE_ACTUALIZAR_LIBRO` SOLO de la ventana que lo abrió: aplica las claves
     nuevas sin reenviarlas (si no, panel y libro se reenviarían lo mismo sin fin) y, si
@@ -2723,10 +2733,9 @@ append`), se conecta con el usuario PROPIO de KIDS (`kids2026_app`, nunca el
   volver a cargarlo.
 - **El LIBRO ya se guarda en el servidor (2026-11-06)**, como REGISTRO y no como
   progresión (ver "Proyectos del libro"): la medalla sigue saliendo del cuestionario que
-  registra el guía. **Pendiente**: subir a PRODUCCIÓN los cuatro libros
-  "…_Interactivo_Proyectos.html" por Material del alumno (los anteriores no traen
-  proyectos), y decidir si la plataforma llama al `setPassportContext` de Rookie para
-  emitir su pasaporte con datos del servidor.
+  registra el guía. Los cuatro libros "…_Interactivo_Proyectos.html" ya están cargados en
+  producción (2026-11-07). Las evaluaciones y juegos que se ven en "Mis alumnos" son lo
+  que REPORTÓ el navegador: referencia para el guía, no calificación.
 - **Derechos de las canciones**: los videos de los libros son descargas de YouTube de
   terceros (Planet Pop, LARVA KIDS, ABCmouse, Lingokids, CoComelon, The Singing Walrus…).
   Subirlos a la plataforma es redistribuirlos: confirmar permiso o sustituirlos.
