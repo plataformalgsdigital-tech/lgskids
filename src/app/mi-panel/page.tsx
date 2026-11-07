@@ -5,7 +5,12 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { estadoZoom } from "@/ui/zoom-window";
 import { ZoomAccessButton } from "@/ui/ZoomAccessButton";
 import { Personaje, VacioConPersonaje, poseZoom } from "@/ui/Personaje";
-import { abrirLibroEnPestana, type CajaLibro, type VocesLibro } from "@/ui/libro-pestana";
+import {
+  abrirLibroEnPestana,
+  type CajaLibro,
+  type DatosLibro,
+  type VocesLibro,
+} from "@/ui/libro-pestana";
 import { apiFetch, irACambiarClaveSiCorresponde } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 import { AgendarWelcomeModal } from "../panel/servicio/welcome/AgendarWelcomeModal";
@@ -263,6 +268,8 @@ interface MaterialAlumno {
     misiones: { parada: number; etiqueta: string }[];
     /** Lo mismo, ya armado para que lo lea el libro. */
     autorizacion: string;
+    /** Identidad, entregas registradas y revisiones del guía para el libro. */
+    libroDatos: DatosLibro | null;
     /** Un PDF por unidad; los cerrados vienen sin enlace, con su candado. */
     imprimibles: CasillaDescarga[];
     /** Libro de actividades, también por unidad. */
@@ -447,8 +454,20 @@ export default function MiPanelPage() {
     videosBase: string | null,
     autorizacion: string,
     voces: VocesLibro | null,
+    libro: DatosLibro | null,
   ) {
     if (material === null) return;
+    // Lo que guarda el libro va al servidor (registra los proyectos entregados)
+    // y la respuesta —con las revisiones del guía— vuelve al libro abierto.
+    const sincronizar = async (datos: Record<string, string>) => {
+      const res = await apiFetch("/api/student/libro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nivel, datos }),
+      });
+      if (!res.ok) return null;
+      return ((await res.json()) as { inyectar: Record<string, string> }).inyectar;
+    };
     setLibroMsg(
       abrirLibroEnPestana({
         url,
@@ -457,6 +476,8 @@ export default function MiPanelPage() {
         videosBase,
         autorizacion,
         voces,
+        libro,
+        sincronizar,
       })
         ? null
         : "Tu navegador bloqueó la ventana del libro. Permite las ventanas emergentes de este sitio y vuelve a intentarlo.",
@@ -2763,6 +2784,7 @@ export default function MiPanelPage() {
                               n.videosBase,
                               n.autorizacion,
                               n.voces,
+                              n.libroDatos,
                             )
                           }
                           style={{

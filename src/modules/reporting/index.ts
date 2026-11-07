@@ -25,3 +25,5 @@ export type {
 } from "./application/tablero";
 export { calcularGuiaMes, consolidarGuiaMes, leerGuiaMes } from "./application/guia-mes";
 export type { GuiaMes } from "./application/guia-mes";
+export { misAlumnos, nombreDeGuia, alertasDeAlumno } from "./application/mis-alumnos";
+export type { AlumnoDeSalon, SalonDelGuia } from "./application/mis-alumnos";

@@ -37,8 +37,10 @@ import { PUENTE_VOZ } from "./voz-libro";
  * 2 = voces del libro (2026-10-28).
  * 3 = la CSP nombra el dominio público y no el puerto del contenedor: el libro
  *     cacheado con la versión 2 bloqueaba sus audios (2026-10-28).
+ * 4 = claves de SOLO LECTURA (identidad y revisiones del guía) y
+ *     actualizaciones del panel sin recargar el libro (2026-11-06).
  */
-export const VERSION_PUENTE = "3";
+export const VERSION_PUENTE = "4";
 
 /** La URL del libro con la versión del puente (ver `VERSION_PUENTE`). */
 export function urlLibroConPuente(url: string): string {
@@ -50,6 +52,15 @@ export const PREFIJO_NOMBRE_LIBRO = "lgs-material:";
 
 /** `tipo` del mensaje con el que el libro avisa al panel de un cambio. */
 export const MENSAJE_ALMACEN_LIBRO = "lgs-material-almacen";
+
+/**
+ * `tipo` del mensaje con el que el PANEL le entrega al libro claves nuevas
+ * (una revisión del guía, una entrega ya registrada) sin recargarlo.
+ */
+export const MENSAJE_ACTUALIZAR_LIBRO = "lgs-material-actualizar";
+
+/** Evento que el libro escucha para volver a leer sus revisiones (contrato). */
+export const EVENTO_REVISIONES_LIBRO = "lgs:project-review-updated";
 
 /**
  * CONTRATO CON DISEÑO (2026-09-23) — qué unidades abrió el guía.
@@ -126,34 +137,50 @@ export function cspLibro(baseVideos: string | null): string {
  *   CSP (`base-uri`) lo vuelve a exigir.
  * - `voces` (2026-10-28): qué frases tienen audio y las intervenciones de los
  *   personajes; las usa `PUENTE_VOZ` (ver `voz-libro.ts`), que corre aquí mismo.
+ * - `soloLectura` (2026-11-06): las claves que escribe SOLO la plataforma —la
+ *   identidad del niño y las revisiones del guía—. El libro puede leerlas, pero
+ *   `setItem`/`removeItem`/`clear` sobre ellas no hacen nada: así el libro (o
+ *   quien lo manipule desde dentro) no se autoaprueba un proyecto. El servidor,
+ *   igual, nunca las acepta de vuelta.
  * Un `window.name` antiguo (solo el progreso, sin `v`) se sigue entendiendo.
+ *
+ * El panel también le ESCRIBE (2026-11-06): un mensaje `MENSAJE_ACTUALIZAR_LIBRO`
+ * de la ventana que lo abrió trae claves nuevas (una revisión del guía, las
+ * entregas registradas). Se aplican sin avisar de vuelta —si no, panel y libro
+ * se reenviarían lo mismo sin fin— y, si cambió alguna de solo lectura, se
+ * dispara `EVENTO_REVISIONES_LIBRO` para que el libro vuelva a leerlas.
  *
  * `sessionStorage` también se sustituye (en memoria, sin guardar): en un origen
  * opaco lanza igual que `localStorage`, y un libro futuro que lo use sin
  * try/catch se caería entero.
  */
 export const PUENTE_ALMACEN = `(function(){
-var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},d={},base=null,voces=null;
+var P=${JSON.stringify(PREFIJO_NOMBRE_LIBRO)},T=${JSON.stringify(MENSAJE_ALMACEN_LIBRO)},A=${JSON.stringify(MENSAJE_ACTUALIZAR_LIBRO)},EV=${JSON.stringify(EVENTO_REVISIONES_LIBRO)},d={},base=null,voces=null,ro={};
 function propio(o,k){return Object.prototype.hasOwnProperty.call(o,k);}
 function textos(o){var r={};if(o&&typeof o==="object"){for(var k in o){if(propio(o,k)&&typeof o[k]==="string"){r[k]=o[k];}}}return r;}
 try{var n=window.name;if(n&&n.indexOf(P)===0){var o=JSON.parse(n.slice(P.length));
 if(o&&o.v===2){d=textos(o.datos);var b=o.videos;if(typeof b==="string"&&b.charAt(0)==="/"&&b.charAt(1)!=="/"){base=b;}
-if(o.voces&&typeof o.voces==="object"){voces=o.voces;}}
+if(o.voces&&typeof o.voces==="object"){voces=o.voces;}
+if(o.soloLectura&&o.soloLectura.length){for(var i=0;i<o.soloLectura.length;i++){if(typeof o.soloLectura[i]==="string")ro[o.soloLectura[i]]=true;}}}
 else{d=textos(o);}}}catch(e){}
 if(base){try{var e=document.createElement("base");e.href=base;var h=document.head||document.documentElement;h.insertBefore(e,h.firstChild);}catch(x){}}
 function panel(){try{if(window.parent&&window.parent!==window)return window.parent;}catch(e){}
 try{if(window.opener)return window.opener;}catch(e){}return null;}
-function avisar(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base,voces:voces});}catch(e){}
-try{var w=panel();if(w)w.postMessage({tipo:T,datos:d},"*");}catch(e){}}
+function nombre(){try{window.name=P+JSON.stringify({v:2,datos:d,videos:base,voces:voces,soloLectura:Object.keys(ro)});}catch(e){}}
+function avisar(){nombre();try{var w=panel();if(w)w.postMessage({tipo:T,datos:d},"*");}catch(e){}}
 function almacen(m,guardar){var s={
 getItem:function(k){k=String(k);return propio(m,k)?m[k]:null;},
-setItem:function(k,v){m[String(k)]=String(v);if(guardar)avisar();},
-removeItem:function(k){delete m[String(k)];if(guardar)avisar();},
-clear:function(){for(var k in m){if(propio(m,k))delete m[k];}if(guardar)avisar();},
+setItem:function(k,v){k=String(k);if(guardar&&ro[k])return;m[k]=String(v);if(guardar)avisar();},
+removeItem:function(k){k=String(k);if(guardar&&ro[k])return;delete m[k];if(guardar)avisar();},
+clear:function(){for(var k in m){if(propio(m,k)&&!(guardar&&ro[k]))delete m[k];}if(guardar)avisar();},
 key:function(i){var ks=Object.keys(m);return i>=0&&i<ks.length?ks[i]:null;}};
 Object.defineProperty(s,"length",{get:function(){return Object.keys(m).length;}});return s;}
 try{Object.defineProperty(window,"localStorage",{value:almacen(d,true),configurable:true});}catch(e){}
 try{Object.defineProperty(window,"sessionStorage",{value:almacen({},false),configurable:true});}catch(e){}
+try{window.addEventListener("message",function(e){var w=panel();if(!w||e.source!==w)return;var m=e.data;
+if(!m||m.tipo!==A)return;var nuevos=textos(m.datos),cambio=false,k;
+for(k in nuevos){if(propio(nuevos,k)&&d[k]!==nuevos[k]){if(ro[k])cambio=true;d[k]=nuevos[k];}}
+nombre();if(cambio){try{window.dispatchEvent(new Event(EV));}catch(x){}}});}catch(e){}
 ${PUENTE_VOZ}
 })();`;
 

@@ -253,7 +253,7 @@ export const MENU: {
   {
     seccion: "Guía",
     permiso: "panel.guia",
-    etiqueta: "Mis niños",
+    etiqueta: "Mis alumnos",
     color: "var(--lgs-magenta)",
     href: "/panel/mis-ninos",
     permisoMenu: "menu.mis_ninos",

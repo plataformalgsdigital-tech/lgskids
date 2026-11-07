@@ -182,6 +182,11 @@ export const MAPA_TABLAS: Record<string, EntradaMapa> = {
     para: "Ficha del guía: nombre, documento, contacto, país, sala de Zoom y foto.",
     pantalla: "Académica › Guías",
   },
+  liquidacion_factura_guia: {
+    tema: "Guías",
+    para: "Facturas que sube el guía por corte; LGS las toma, verifica y paga, y devuelve el estado.",
+    pantalla: "Guía › Mis horas y facturas",
+  },
   scheduling_guia_invitacion: {
     tema: "Guías",
     para: "Enlaces para que el guía complete su ficha (vigente, usado, vencido).",
@@ -260,6 +265,26 @@ export const MAPA_TABLAS: Record<string, EntradaMapa> = {
     tema: "Contenido académico",
     para: "Unidades del libro que el guía abrió a cada niño en clase.",
     pantalla: "Modal de la sesión › Misiones",
+  },
+  catalog_libro_estado: {
+    tema: "Asistencia y avance",
+    para: "Lo último que guardó el libro interactivo de cada niño (evaluaciones, práctica, borradores). Registro, no progresión.",
+    pantalla: "Guía › Mis alumnos › Libro",
+  },
+  catalog_proyecto_entrega: {
+    tema: "Asistencia y avance",
+    para: "Proyectos escritos que el niño entregó desde el libro, una fila por versión.",
+    pantalla: "Guía › Mis alumnos › Libro",
+  },
+  catalog_proyecto_revision: {
+    tema: "Asistencia y avance",
+    para: "Revisión del guía de cada proyecto: decisión, rúbrica de 4 criterios y observaciones.",
+    pantalla: "Guía › Mis alumnos › Libro",
+  },
+  catalog_proyecto_autorizacion: {
+    tema: "Asistencia y avance",
+    para: "Oportunidades de entrega extra que autorizó el guía (total permitido por unidad).",
+    pantalla: "Guía › Mis alumnos › Libro",
   },
   catalog_material_video: {
     tema: "Contenido académico",

@@ -324,7 +324,10 @@ export const SQL_MOTIVOS_NO_BORRAR = (u: string) => `
            OR EXISTS (SELECT 1 FROM scheduling_repeticion sr
                        WHERE sr.solicitado_por = ${u}.id OR sr.resuelto_por = ${u}.id)
            OR EXISTS (SELECT 1 FROM scheduling_guia_invitacion gi WHERE gi.creado_por = ${u}.id)
-         THEN 'creó o gestionó eventos, refuerzos o enlaces' END
+         THEN 'creó o gestionó eventos, refuerzos o enlaces' END,
+    CASE WHEN EXISTS (SELECT 1 FROM catalog_proyecto_revision pr WHERE pr.revisado_por = ${u}.id)
+           OR EXISTS (SELECT 1 FROM catalog_proyecto_autorizacion pa WHERE pa.autorizado_por = ${u}.id)
+         THEN 'revisó proyectos del libro' END
   ], NULL)`;
 
 /** Borra una cuenta SIN historia (ver `SQL_MOTIVOS_NO_BORRAR`). */

@@ -59,6 +59,7 @@ export {
   SANDBOX_LIBRO,
   PREFIJO_NOMBRE_LIBRO,
   MENSAJE_ALMACEN_LIBRO,
+  MENSAJE_ACTUALIZAR_LIBRO,
   CLAVE_AUTORIZACIONES_LIBRO,
   valorAutorizacionesLibro,
   urlLibroConPuente,
@@ -82,6 +83,30 @@ export {
   revocarMision,
 } from "./application/misiones";
 export type { MisionAutorizada, NivelDeNino, ResultadoAutorizacion } from "./application/misiones";
+export {
+  autorizarEntregaExtra,
+  datosLibroParaAlumno,
+  duenoDeEntrega,
+  exigirNinoDelGuia,
+  libroDeNino,
+  nivelesConLibro,
+  revisarProyecto,
+  sincronizarLibroAlumno,
+} from "./application/libro-alumno";
+export type {
+  DatosLibroAlumno,
+  EstadoProyecto,
+  LibroDeNino,
+  ProyectoUnidad,
+} from "./application/libro-alumno";
+export {
+  CRITERIOS_PROYECTO,
+  ENTREGAS_BASE,
+  ENTREGAS_TOPE,
+  EVENTO_REVISION_LIBRO,
+  PUNTOS_MINIMOS,
+  resumenEvaluacionesLibro,
+} from "./domain/proyectos-libro";
 export {
   videosLibroListarHandler,
   videosLibroSubirHandler,

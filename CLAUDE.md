@@ -1028,6 +1028,63 @@ videos}` (`videos` = base con token de sus videos; el formato viejo, solo `datos
     (preparar, generar con la voz de cada uno, no repagar, cortar sin créditos).
     Verificado con el libro REAL de Junior en Chrome: voz reconocida, burbuja de Rooky
     en la página 1, MP3 del lead al pulsar "Escuchar", sin errores.
+- **Proyectos del libro con revisión del guía + el libro en el SERVIDOR (2026-11-06)**:
+  contrato con diseño `Integracion_Proyectos_LGS.md` (libros JUNIOR Rookie/Champion/
+  Elite/Legendary "…_Interactivo_Proyectos.html", en `Libros/Junior/<Nivel>/Interactivo/`).
+  Cada unidad 1–4 tiene un proyecto escrito que el niño ENTREGA y el guía REVISA (rúbrica
+  de 4 criterios 0–2; aprueba con ≥6/8 y sin ceros; 3 entregas salvo autorización).
+  Migración `20261106100000_libro_proyectos`; reglas puras en
+  `catalog/domain/proyectos-libro.ts`, servidor en `catalog/application/libro-alumno.ts`.
+  - **Claves del libro** (`clavesLibro`): `lgs-<nivel>-assessments-v2` y `lgs-<nivel>-v1`
+    (avance, sin cambios), `lgs-<nivel>-projects-v1` (entregas y borradores, las escribe
+    el libro) y `lgs-<nivel>-project-reviews-v1` (revisiones y autorizaciones, SOLO la
+    plataforma). Identidad: `lgs-student-context` = `{v:1,course,level,student:{id,name,
+username}}` con id = DOCUMENTO del niño; Champion/Elite/Legendary reciben la MISMA en
+    `lgs-<nivel>-passport`. Rookie emite su pasaporte con `setPassportContext` (contexto
+    verificado): NO se toca, y hoy la plataforma no lo llama.
+  - **Puente v4** (`VERSION_PUENTE = "4"`): el `window.name` trae `soloLectura` (identidad,
+    revisiones, pasaporte) y el puente IGNORA `setItem/removeItem/clear` sobre ellas. Y
+    escucha `MENSAJE_ACTUALIZAR_LIBRO` SOLO de la ventana que lo abrió: aplica las claves
+    nuevas sin reenviarlas (si no, panel y libro se reenviarían lo mismo sin fin) y, si
+    cambió una de solo lectura, dispara `lgs:project-review-updated` (el libro vuelve a
+    "Mis proyectos").
+  - **Panel del niño** (`src/ui/libro-pestana.ts`): al abrir, `restaurar` (avance del
+    servidor si el dispositivo no lo tiene: cambio de tableta) e `inyectar` (identidad,
+    entregas REGISTRADAS y revisiones; pisan lo local). Cada cambio del libro va, con 2 s
+    de espera, a `POST /api/student/libro` (`sincronizarLibroAlumno`; el niño sale de la
+    sesión y el nivel tiene que ser alcanzado), y además se consulta cada 90 s mientras el
+    libro está abierto: la revisión del guía le llega al libro SIN recargarlo.
+  - **El servidor no confía en el navegador**: `catalog_libro_estado` guarda solo las
+    claves que el libro puede escribir (registro, no progresión — regla 4); cada entrega
+    se registra una vez por `submission_id` y solo si cumple `planificarEntregas` (unidad
+    abierta por el guía, texto 1–8000, intento siguiente, dentro del límite, sin otra
+    esperando revisión, unidad sin aprobar), con candado por niño y nivel y la hora del
+    servidor (`recibido_en`). Una entrega rechazada desaparece del libro al sincronizar.
+    La revisión va SOLO sobre la última entrega de la unidad, y `approved` sin el puntaje
+    se rechaza (`problemaRevision`). Auditoría `catalog.proyecto_entregado|rechazado|
+revisado|entrega_autorizada`.
+  - **Guía › Mis alumnos** (`/panel/mis-ninos`, antes "Mis niños"; como el "Mis alumnos"
+    de MOSAICO): pestañas por salón, cifras (alumnos, con alertas, asistencia media, avance
+    del curso, proyectos por revisar, casos) y por niño asistencia, faltas recientes (de las
+    últimas 4 marcadas), casos abiertos, libro y alertas (`alertasDeAlumno`: proyecto por
+    revisar, caso abierto, ≥2 faltas recientes, asistencia <80 % con ≥3 marcas), con CSV.
+    `GET /api/guia/alumnos` (`misAlumnos`, en `reporting`); coordinación
+    (`salones.gestionar`) elige guía con `?guia=`. "📘 Libro" abre `LibroAlumnoModal`:
+    evaluaciones/juegos/souvenirs que REPORTÓ el libro (`resumenEvaluacionesLibro`, entiende
+    las dos formas: Rookie marca con `completed_at`/`delivered_at`, los demás con bandera)
+    y los proyectos con la rúbrica (cada criterio arranca SIN valor: el guía elige) y
+    "Autorizar una entrega más". `GET|POST /api/guia/alumnos/[id]/libro`,
+    `POST /api/guia/proyectos/[entregaId]/revision`; alcance = niño con matrícula ACTIVA
+    en un salón del guía (`exigirNinoDelGuia`), revisar/autorizar exige
+    `evaluaciones.gestionar`. Quien revisó o autorizó ya no se puede eliminar
+    (`SQL_MOTIVOS_NO_BORRAR`).
+  - **Verificado en Chrome con el libro REAL de Champion** (2026-11-06): identidad recibida,
+    unidades según la autorización, entrega registrada, el guía pide cambios y el libro los
+    muestra con puntajes, reentrega, aprobación y el libro ABIERTO pasa a "Aprobado por el
+    guía" en ~70 s. Pruebas: `proyectos-libro.test.ts`, `libro-interactivo.test.ts`
+    (puente) y `libro-proyectos-integration.test.ts`. **Trampa al probarlo**: un
+    `page.evaluate` de Playwright dentro de la pestaña del libro (origen opaco) se queda
+    colgado; manejarlo con clics.
 - **Comentarios del guía (2026-08-28)**: bajo "Mis próximas clases", del más
   reciente al más antiguo (`comentariosDeGuia`). Devuelve SOLO `comentario_usuario`:
   la `nota_privada` de la misma fila es del equipo y NUNCA viaja al panel del niño.
@@ -2664,20 +2721,15 @@ append`), se conecta con el usuario PROPIO de KIDS (`kids2026_app`, nunca el
   comprimidos quedan sin usar. Hay que pedirle a diseño que exporte con
   `videos/<página>-<n>.mp4` (guía en `docs/operacion/libro-interactivo-videos.md`) y
   volver a cargarlo.
-- **Lo que el niño logra en el LIBRO no se guarda en el servidor**: el puente ya trae
-  su progreso al panel (intentos, juegos, souvenirs), pero hoy solo queda en el
-  `localStorage` del dispositivo. Falta el endpoint que lo reciba y lo guarde por niño
-  como REGISTRO —no como progresión, decisión del negocio (2026-09-23): la medalla del
-  nivel sigue saliendo del cuestionario que registra el guía—. Sin eso, un cambio de
-  tableta se lleva el souvenir y la plataforma no sabe quién lo consiguió.
+- **El LIBRO ya se guarda en el servidor (2026-11-06)**, como REGISTRO y no como
+  progresión (ver "Proyectos del libro"): la medalla sigue saliendo del cuestionario que
+  registra el guía. **Pendiente**: subir a PRODUCCIÓN los cuatro libros
+  "…_Interactivo_Proyectos.html" por Material del alumno (los anteriores no traen
+  proyectos), y decidir si la plataforma llama al `setPassportContext` de Rookie para
+  emitir su pasaporte con datos del servidor.
 - **Derechos de las canciones**: los videos de los libros son descargas de YouTube de
   terceros (Planet Pop, LARVA KIDS, ABCmouse, Lingokids, CoComelon, The Singing Walrus…).
   Subirlos a la plataforma es redistribuirlos: confirmar permiso o sustituirlos.
-- **Progreso del libro interactivo solo en el dispositivo**: el puente lo guarda en el
-  `localStorage` del panel, igual que el HTML original. Si el niño cambia de tableta a
-  computador, empieza de cero. Llevarlo al servidor es decisión del negocio. Si se
-  hace, es portafolio, NO progresión: las respuestas del libro no pasan por
-  `registrarIntento` y no deben mover medallas (regla 4).
 - **El libro de Rookie muestra las respuestas al niño**: trae un desplegable
   "Respuestas y pistas para el docente" dentro del mismo HTML. Es contenido de diseño,
   no de la plataforma, que sirve el archivo tal cual.

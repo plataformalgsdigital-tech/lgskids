@@ -7,6 +7,8 @@ import {
   PREFIJO_NOMBRE_LIBRO,
   autorizacionParaLibro,
   baseVideosLibro,
+  datosLibroParaAlumno,
+  MENSAJE_ACTUALIZAR_LIBRO,
   etiquetaParada,
   materialVigente,
   misionesAutorizadas,
@@ -91,6 +93,10 @@ export const GET = handlerWithAuth(async (_request, auth) => {
         // regla; `autorizacion` es lo mismo, armado para el LIBRO.
         misiones: abiertas.map((parada) => ({ parada, etiqueta: etiquetaParada(parada) })),
         autorizacion: await autorizacionParaLibro(personaId, curso, nivel),
+        // Lo que la plataforma le da al libro (identidad, entregas registradas,
+        // revisiones del guía) y su avance guardado en el servidor.
+        libroDatos:
+          interactivo !== null ? await datosLibroParaAlumno(personaId, curso, nivel) : null,
         // La base de SUS videos, con un token recién firmado: el libro la usa
         // para pedir `videos/7-1.mp4` sin cookie. Se emite aquí porque aquí ya
         // se comprobó que el niño alcanzó este nivel.
@@ -115,6 +121,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
     libro: {
       prefijo: PREFIJO_NOMBRE_LIBRO,
       mensaje: MENSAJE_ALMACEN_LIBRO,
+      mensajeActualizar: MENSAJE_ACTUALIZAR_LIBRO,
       claveAutorizaciones: CLAVE_AUTORIZACIONES_LIBRO,
     },
   });

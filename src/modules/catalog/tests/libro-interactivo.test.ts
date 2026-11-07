@@ -2,6 +2,8 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import {
   cspLibro,
+  EVENTO_REVISIONES_LIBRO,
+  MENSAJE_ACTUALIZAR_LIBRO,
   MENSAJE_ALMACEN_LIBRO,
   PREFIJO_NOMBRE_LIBRO,
   PUENTE_ALMACEN,
@@ -108,6 +110,12 @@ describe("puente de almacenamiento", () => {
     const bases: string[] = [];
     const panel = { postMessage: (m: unknown) => enviados.push(JSON.parse(JSON.stringify(m))) };
     const ventana: Record<string, unknown> = { name: nombre };
+    // Lo justo de eventos: el panel le escribe por "message" y el libro escucha
+    // el evento de revisiones.
+    const oyentes: Record<string, (e: unknown) => void> = {};
+    const eventos: string[] = [];
+    ventana["addEventListener"] = (tipo: string, f: (e: unknown) => void) => (oyentes[tipo] = f);
+    ventana["dispatchEvent"] = (e: { type: string }) => eventos.push(e.type);
     ventana["parent"] = donde === "parent" ? panel : ventana;
     if (donde === "opener") ventana["opener"] = panel;
     // Lo justo de `document` para ver la <base> que pone el puente.
@@ -118,9 +126,15 @@ describe("puente de almacenamiento", () => {
       },
       createElement: (tag: string) => ({ tag, href: "" }),
     };
-    runInNewContext(PUENTE_ALMACEN, { window: ventana, document: documento });
+    class Event {
+      constructor(public type: string) {}
+    }
+    runInNewContext(PUENTE_ALMACEN, { window: ventana, document: documento, Event });
     const almacen = ventana["localStorage"] as Storage;
-    return { ventana, almacen, enviados, bases };
+    /** Un mensaje que llega a la pestaña del libro (del panel o de otro lado). */
+    const recibir = (data: unknown, source: unknown = panel) =>
+      oyentes["message"]?.({ data, source });
+    return { ventana, almacen, enviados, bases, recibir, eventos };
   }
   const v2 = (o: object) => `${PREFIJO_NOMBRE_LIBRO}${JSON.stringify({ v: 2, ...o })}`;
 
@@ -154,7 +168,9 @@ describe("puente de almacenamiento", () => {
     almacen.setItem("n", 5 as unknown as string); // localStorage guarda texto
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { k: "v", n: "5" } });
     // La recarga conserva también la base de los videos (y las voces).
-    expect(ventana["name"]).toBe(v2({ datos: { k: "v", n: "5" }, videos: base, voces: null }));
+    expect(ventana["name"]).toBe(
+      v2({ datos: { k: "v", n: "5" }, videos: base, voces: null, soloLectura: [] }),
+    );
 
     almacen.removeItem("k");
     expect(enviados.at(-1)).toEqual({ tipo: MENSAJE_ALMACEN_LIBRO, datos: { n: "5" } });
@@ -171,7 +187,9 @@ describe("puente de almacenamiento", () => {
   it("si ya no hay panel, el libro sigue: el progreso queda en su window.name", () => {
     const { ventana, almacen } = montar(v2({ datos: {}, videos: null }), "solo");
     expect(() => almacen.setItem("k", "v")).not.toThrow();
-    expect(ventana["name"]).toBe(v2({ datos: { k: "v" }, videos: null, voces: null }));
+    expect(ventana["name"]).toBe(
+      v2({ datos: { k: "v" }, videos: null, voces: null, soloLectura: [] }),
+    );
   });
 
   it("descarta lo que no sea texto y sobrevive a un window.name ajeno o roto", () => {
@@ -187,5 +205,49 @@ describe("puente de almacenamiento", () => {
     (ventana["sessionStorage"] as Storage).setItem("s", "1");
     expect((ventana["sessionStorage"] as Storage).getItem("s")).toBe("1");
     expect(enviados).toHaveLength(0);
+  });
+
+  it("las claves de SOLO LECTURA (identidad, revisiones) no las escribe el libro", () => {
+    const { almacen, enviados } = montar(
+      v2({ datos: { rev: "del-guia" }, videos: null, soloLectura: ["rev"] }),
+    );
+    almacen.setItem("rev", "aprobado-por-mi");
+    almacen.removeItem("rev");
+    almacen.clear();
+    expect(almacen.getItem("rev")).toBe("del-guia");
+    // Lo que sí puede escribir sigue viajando al panel.
+    almacen.setItem("mio", "1");
+    expect(enviados.at(-1)).toEqual({
+      tipo: MENSAJE_ALMACEN_LIBRO,
+      datos: { rev: "del-guia", mio: "1" },
+    });
+  });
+
+  it("el PANEL le entrega una revisión nueva sin recargar y el libro se entera", () => {
+    const { almacen, enviados, recibir, eventos, ventana } = montar(
+      v2({ datos: { rev: "vieja" }, videos: null, soloLectura: ["rev"] }),
+      "opener",
+    );
+    recibir({ tipo: MENSAJE_ACTUALIZAR_LIBRO, datos: { rev: "nueva", proyectos: "p" } });
+    expect(almacen.getItem("rev")).toBe("nueva");
+    expect(almacen.getItem("proyectos")).toBe("p");
+    expect(eventos).toEqual([EVENTO_REVISIONES_LIBRO]);
+    // No se lo devuelve al panel (se reenviarían lo mismo sin fin), pero sí
+    // queda en window.name para una recarga.
+    expect(enviados).toHaveLength(0);
+    expect(String(ventana["name"])).toContain("nueva");
+    // Lo mismo otra vez no vuelve a avisar al libro.
+    recibir({ tipo: MENSAJE_ACTUALIZAR_LIBRO, datos: { rev: "nueva" } });
+    expect(eventos).toHaveLength(1);
+  });
+
+  it("solo acepta actualizaciones de la ventana que lo abrió", () => {
+    const { almacen, recibir, eventos } = montar(
+      v2({ datos: { rev: "vieja" }, videos: null, soloLectura: ["rev"] }),
+      "opener",
+    );
+    recibir({ tipo: MENSAJE_ACTUALIZAR_LIBRO, datos: { rev: "falsa" } }, { otra: true });
+    expect(almacen.getItem("rev")).toBe("vieja");
+    expect(eventos).toHaveLength(0);
   });
 });
