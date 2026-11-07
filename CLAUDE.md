@@ -1657,6 +1657,14 @@ hacen cosas distintas:
   reemplazar y borrar se aplican al GUARDAR (`DELETE …/foto` → `quitarFotoGuia`:
   desliga y suelta el archivo, auditoría `scheduling.foto_guia_quitada`; mismos
   permisos que cambiarla). Prueba en `alta-guia-integration.test.ts`.
+  **Pestañas Ficha · Asistencia (2026-11-07)**: "Asistencia" (`AsistenciaGuia.tsx`)
+  lista las sesiones que DICTA el guía —`GET /api/scheduling/guias/[guiaUserId]/sesiones?from=&to=`,
+  la MISMA `agenda` del calendario filtrada por el guía EFECTIVO, rango máx. 93 días,
+  `usuarios.gestionar` + `salones.ver`— con estado derivado (Por registrar = empezó y
+  no está cerrada, Registrada, Programada, Suspendida) y filtro por estado. El clic
+  abre el MISMO `SesionModal` del calendario: pasar lista y registrar van por sus
+  rutas de siempre (regla 4), que vuelven a exigir sus permisos. Con "Editar ficha"
+  abierto, la pestaña queda en Ficha.
 - Reglas puras en `scheduling/domain/invitacion.ts` (token, hash, estado
   VIGENTE|USADA|REVOCADA|VENCIDA, vencimiento, armado del enlace) con pruebas en
   `tests/invitacion.test.ts`. Aplicación en `application/invitacion-guia.ts`.

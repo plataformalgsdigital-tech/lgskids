@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { apiFetch } from "@/ui/api-fetch";
 import { descargarCsv } from "@/ui/csv";
 import { SoloSi } from "@/ui/SoloSi";
+import { AsistenciaGuia } from "./AsistenciaGuia";
 
 /**
  * Fichas de los guías: datos de contacto y su sala de Zoom.
@@ -244,6 +245,8 @@ export default function GuiasPage() {
 
   /** La ficha se ve en solo lectura; "Editar ficha" (con su permiso) la abre. */
   const [editando, setEditando] = useState(false);
+  /** Pestaña de la ficha: los datos del guía o sus sesiones para pasar lista. */
+  const [pestana, setPestana] = useState<"ficha" | "asistencia">("ficha");
   const [fotoNueva, setFotoNueva] = useState<File | null>(null);
   const [previoFoto, setPrevioFoto] = useState<string | null>(null);
 
@@ -264,6 +267,7 @@ export default function GuiasPage() {
     setAviso(null);
     setError(null);
     setEditando(false);
+    setPestana("ficha");
     setFotoNueva(null);
     setPrevioFoto(null);
     setBorrarFoto(false);
@@ -831,403 +835,457 @@ export default function GuiasPage() {
                 </p>
               )}
 
-              {/* Solo lectura hasta "Editar ficha": un fieldset deshabilitado
-                  apaga todos sus campos de una vez. */}
-              <fieldset
-                className="ficha-guia"
-                disabled={!editando || ocupado}
-                style={{
-                  border: "none",
-                  padding: 0,
-                  margin: 0,
-                  minWidth: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.7rem",
-                }}
+              <div
+                role="tablist"
+                style={{ display: "flex", gap: "0.3rem", borderBottom: "1px solid #e3e7f0" }}
               >
-                {editando && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.8rem",
-                      padding: "0.6rem 0.8rem",
-                      border: "1px dashed #cfd6e6",
-                      borderRadius: "0.7rem",
-                      background: "#fbfcff",
-                    }}
-                  >
-                    {previoFoto !== null ? (
-                      // Vista previa local de la foto elegida (aún no subida).
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={previoFoto}
-                        alt=""
-                        style={{
-                          width: "3.2rem",
-                          height: "3.2rem",
-                          borderRadius: "50%",
-                          objectFit: "cover",
-                        }}
-                      />
-                    ) : (
-                      // Con "Borrar foto" marcado se ve como quedará: la inicial.
-                      <FotoGuia guia={borrarFoto ? { ...sel, fotoFileId: null } : sel} />
-                    )}
-                    <div
-                      style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.35rem" }}
-                    >
-                      <span style={rotulo}>
-                        Foto (JPG, PNG o WebP)
-                        {fotoNueva !== null && (
-                          <span style={{ fontWeight: 600, color: "#1565c0" }}>
-                            {" "}
-                            · nueva: {fotoNueva.name} (se reemplaza al guardar)
-                          </span>
-                        )}
-                        {borrarFoto && (
-                          <span style={{ fontWeight: 600, color: "#8a2020" }}>
-                            {" "}
-                            · se borrará al guardar
-                          </span>
-                        )}
-                      </span>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                        {sel.fotoFileId !== null && (
-                          <button
-                            type="button"
-                            onClick={() => void descargarFoto()}
-                            style={botonFoto}
-                          >
-                            ⬇ Descargar
-                          </button>
-                        )}
-                        <label style={{ ...botonFoto, display: "inline-block" }}>
-                          🔄 {sel.fotoFileId !== null ? "Reemplazar" : "Subir foto"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={(e) => {
-                              elegirFoto(e.target.files?.[0] ?? null);
-                              e.target.value = "";
-                            }}
-                            style={{ display: "none" }}
-                          />
-                        </label>
-                        {fotoNueva !== null && (
-                          <button type="button" onClick={() => elegirFoto(null)} style={botonFoto}>
-                            Deshacer cambio
-                          </button>
-                        )}
-                        {sel.fotoFileId !== null && fotoNueva === null && (
-                          <button
-                            type="button"
-                            onClick={() => setBorrarFoto((b) => !b)}
-                            style={{
-                              ...botonFoto,
-                              color: "#8a2020",
-                              borderColor: borrarFoto ? "#8a2020" : "#e3c4c4",
-                            }}
-                          >
-                            {borrarFoto ? "↩ No borrar" : "🗑 Borrar foto"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div
-                  style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
-                  className="guias-dos"
-                >
-                  <div>
-                    <label style={rotulo} htmlFor="g-nom">
-                      Nombres
-                    </label>
-                    <input
-                      id="g-nom"
-                      value={form.nombres}
-                      onChange={(e) => setForm({ ...form, nombres: e.target.value })}
-                      style={campo}
-                    />
-                  </div>
-                  <div>
-                    <label style={rotulo} htmlFor="g-ape">
-                      Apellidos
-                    </label>
-                    <input
-                      id="g-ape"
-                      value={form.apellidos}
-                      onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
-                      style={campo}
-                    />
-                  </div>
-                  <div>
-                    <label style={rotulo} htmlFor="g-doc">
-                      Documento
-                    </label>
-                    <input
-                      id="g-doc"
-                      value={form.docNumero}
-                      onChange={(e) => setForm({ ...form, docNumero: e.target.value })}
-                      style={campo}
-                    />
-                  </div>
-                  <div>
-                    <label style={rotulo} htmlFor="g-nac">
-                      Fecha de nacimiento
-                    </label>
-                    <input
-                      id="g-nac"
-                      type="date"
-                      value={form.fechaNacimiento}
-                      onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
-                      style={campo}
-                    />
-                  </div>
-                  <div>
-                    <label style={rotulo} htmlFor="g-mail">
-                      Correo
-                    </label>
-                    <input
-                      id="g-mail"
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      style={campo}
-                    />
-                  </div>
-                  <div>
-                    <label style={rotulo} htmlFor="g-tel">
-                      Teléfono
-                    </label>
-                    <input
-                      id="g-tel"
-                      value={form.telefono}
-                      onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                      style={campo}
-                    />
-                  </div>
-                  <div>
-                    <label style={rotulo} htmlFor="g-pais">
-                      País
-                    </label>
-                    <select
-                      id="g-pais"
-                      value={form.pais}
-                      onChange={(e) => setForm({ ...form, pais: e.target.value })}
-                      style={campo}
-                    >
-                      <option value="">Sin país</option>
-                      {PAISES.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={rotulo} htmlFor="g-dom">
-                      Domicilio
-                    </label>
-                    <input
-                      id="g-dom"
-                      value={form.domicilio}
-                      onChange={(e) => setForm({ ...form, domicilio: e.target.value })}
-                      style={campo}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={rotulo} htmlFor="g-zoom">
-                    Sala de Zoom
-                  </label>
-                  <input
-                    id="g-zoom"
-                    value={form.zoomUrl}
-                    onChange={(e) => setForm({ ...form, zoomUrl: e.target.value })}
-                    placeholder="https://zoom.us/j/NÚMERO"
-                    style={campo}
-                  />
-                  <p
-                    style={{
-                      fontSize: "0.75rem",
-                      color: "var(--texto-suave)",
-                      marginTop: "0.2rem",
-                    }}
-                  >
-                    Debe ser el enlace de la <strong>sala</strong>, no el de chat o contacto: ese
-                    último le abre al alumno “Enviar solicitud de contacto” en vez de la clase. El
-                    enlace de anfitrión (<code>/s/</code>) se convierte solo. Dos guías no pueden
-                    compartir sala.
-                  </p>
-                </div>
-              </fieldset>
-
-              {editando && (
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => void guardar()}
-                    disabled={ocupado}
-                    style={{
-                      padding: "0.6rem 1.2rem",
-                      borderRadius: "0.6rem",
-                      border: "none",
-                      background: "var(--lgs-azul)",
-                      color: "white",
-                      fontWeight: 700,
-                      cursor: ocupado ? "wait" : "pointer",
-                    }}
-                  >
-                    {ocupado ? "Guardando…" : "💾 Guardar cambios"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelarEdicion}
-                    disabled={ocupado}
-                    style={{
-                      padding: "0.6rem 1.2rem",
-                      borderRadius: "0.6rem",
-                      border: "1.5px solid #d8dce6",
-                      background: "white",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              )}
-
-              <section
-                style={{
-                  border: "1px dashed #cfd6e6",
-                  borderRadius: "0.7rem",
-                  padding: "0.8rem 0.9rem",
-                  background: "#fbfcff",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: "0.9rem" }}>🔗 Enlace de registro</strong>
-                  <p
-                    style={{
-                      fontSize: "0.76rem",
-                      color: "var(--texto-suave)",
-                      marginTop: "0.15rem",
-                    }}
-                  >
-                    En vez de llenarle la ficha, envíale este enlace y él mismo carga sus datos, su
-                    sala de Zoom y su foto. Sirve <strong>una sola vez</strong> y vence a los{" "}
-                    {diasVigencia} días.
-                  </p>
-                </div>
-
-                {estadoSel !== undefined && (
-                  <p style={{ fontSize: "0.78rem" }}>
-                    Último enlace:{" "}
-                    <strong style={{ color: COLOR_ENLACE[estadoSel.estado].c }}>
-                      {COLOR_ENLACE[estadoSel.estado].txt}
-                    </strong>
-                    {estadoSel.estado === "USADA" && estadoSel.usadoEn !== null
-                      ? ` el ${new Date(estadoSel.usadoEn).toLocaleDateString("es-CL")}`
-                      : estadoSel.estado === "VIGENTE"
-                        ? ` · vence el ${new Date(estadoSel.expiraEn).toLocaleDateString("es-CL")}`
-                        : ""}
-                  </p>
-                )}
-
-                {enlaceNuevo !== null && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "0.4rem",
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <input
-                      readOnly
-                      value={enlaceNuevo}
-                      onFocus={(e) => e.currentTarget.select()}
-                      style={{
-                        ...campo,
-                        flex: 1,
-                        minWidth: "14rem",
-                        fontSize: "0.78rem",
-                        background: "white",
-                      }}
-                    />
+                {(
+                  [
+                    ["ficha", "Ficha"],
+                    ["asistencia", "Asistencia"],
+                  ] as const
+                ).map(([valor, texto]) => {
+                  const activa = (editando ? "ficha" : pestana) === valor;
+                  return (
                     <button
+                      key={valor}
                       type="button"
-                      onClick={() => void copiar()}
-                      style={{
-                        padding: "0.5rem 0.9rem",
-                        borderRadius: "0.5rem",
-                        border: "none",
-                        background: copiado ? "var(--lgs-verde)" : "var(--lgs-azul)",
-                        color: "white",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        fontSize: "0.82rem",
-                      }}
-                    >
-                      {copiado ? "✓ Copiado" : "Copiar"}
-                    </button>
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <SoloSi op="op.guias.enlace">
-                    <button
-                      type="button"
-                      onClick={() => void emitirEnlace()}
-                      disabled={ocupado}
+                      role="tab"
+                      aria-selected={activa}
+                      disabled={editando && valor !== "ficha"}
+                      onClick={() => setPestana(valor)}
                       style={{
                         padding: "0.5rem 1rem",
-                        borderRadius: "0.5rem",
-                        border: "1.5px solid var(--lgs-azul)",
-                        background: "white",
-                        color: "var(--lgs-azul-oscuro)",
+                        border: "none",
+                        borderBottom: activa
+                          ? "3px solid var(--lgs-azul)"
+                          : "3px solid transparent",
+                        background: "none",
                         fontWeight: 700,
-                        cursor: ocupado ? "wait" : "pointer",
-                        fontSize: "0.82rem",
+                        color: activa ? "var(--lgs-azul)" : "var(--texto-suave)",
+                        cursor: "pointer",
                       }}
                     >
-                      {estadoSel?.estado === "VIGENTE"
-                        ? "↻ Generar uno nuevo"
-                        : "🔗 Generar enlace"}
+                      {texto}
                     </button>
-                  </SoloSi>
-                  {estadoSel?.estado === "VIGENTE" && (
-                    <SoloSi op="op.guias.enlace">
-                      <button
-                        type="button"
-                        onClick={() => void revocarEnlace()}
-                        disabled={ocupado}
+                  );
+                })}
+              </div>
+
+              {pestana === "asistencia" && !editando && (
+                <AsistenciaGuia guiaUserId={sel.guiaUserId} />
+              )}
+
+              {(pestana === "ficha" || editando) && (
+                <>
+                  {/* Solo lectura hasta "Editar ficha": un fieldset deshabilitado
+                  apaga todos sus campos de una vez. */}
+                  <fieldset
+                    className="ficha-guia"
+                    disabled={!editando || ocupado}
+                    style={{
+                      border: "none",
+                      padding: 0,
+                      margin: 0,
+                      minWidth: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.7rem",
+                    }}
+                  >
+                    {editando && (
+                      <div
                         style={{
-                          padding: "0.5rem 1rem",
-                          borderRadius: "0.5rem",
-                          border: "1.5px solid #e0e4ee",
-                          background: "white",
-                          color: "#8a2020",
-                          fontWeight: 700,
-                          cursor: ocupado ? "wait" : "pointer",
-                          fontSize: "0.82rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.8rem",
+                          padding: "0.6rem 0.8rem",
+                          border: "1px dashed #cfd6e6",
+                          borderRadius: "0.7rem",
+                          background: "#fbfcff",
                         }}
                       >
-                        Revocar
+                        {previoFoto !== null ? (
+                          // Vista previa local de la foto elegida (aún no subida).
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={previoFoto}
+                            alt=""
+                            style={{
+                              width: "3.2rem",
+                              height: "3.2rem",
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          // Con "Borrar foto" marcado se ve como quedará: la inicial.
+                          <FotoGuia guia={borrarFoto ? { ...sel, fotoFileId: null } : sel} />
+                        )}
+                        <div
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.35rem",
+                          }}
+                        >
+                          <span style={rotulo}>
+                            Foto (JPG, PNG o WebP)
+                            {fotoNueva !== null && (
+                              <span style={{ fontWeight: 600, color: "#1565c0" }}>
+                                {" "}
+                                · nueva: {fotoNueva.name} (se reemplaza al guardar)
+                              </span>
+                            )}
+                            {borrarFoto && (
+                              <span style={{ fontWeight: 600, color: "#8a2020" }}>
+                                {" "}
+                                · se borrará al guardar
+                              </span>
+                            )}
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                            {sel.fotoFileId !== null && (
+                              <button
+                                type="button"
+                                onClick={() => void descargarFoto()}
+                                style={botonFoto}
+                              >
+                                ⬇ Descargar
+                              </button>
+                            )}
+                            <label style={{ ...botonFoto, display: "inline-block" }}>
+                              🔄 {sel.fotoFileId !== null ? "Reemplazar" : "Subir foto"}
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                onChange={(e) => {
+                                  elegirFoto(e.target.files?.[0] ?? null);
+                                  e.target.value = "";
+                                }}
+                                style={{ display: "none" }}
+                              />
+                            </label>
+                            {fotoNueva !== null && (
+                              <button
+                                type="button"
+                                onClick={() => elegirFoto(null)}
+                                style={botonFoto}
+                              >
+                                Deshacer cambio
+                              </button>
+                            )}
+                            {sel.fotoFileId !== null && fotoNueva === null && (
+                              <button
+                                type="button"
+                                onClick={() => setBorrarFoto((b) => !b)}
+                                style={{
+                                  ...botonFoto,
+                                  color: "#8a2020",
+                                  borderColor: borrarFoto ? "#8a2020" : "#e3c4c4",
+                                }}
+                              >
+                                {borrarFoto ? "↩ No borrar" : "🗑 Borrar foto"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}
+                      className="guias-dos"
+                    >
+                      <div>
+                        <label style={rotulo} htmlFor="g-nom">
+                          Nombres
+                        </label>
+                        <input
+                          id="g-nom"
+                          value={form.nombres}
+                          onChange={(e) => setForm({ ...form, nombres: e.target.value })}
+                          style={campo}
+                        />
+                      </div>
+                      <div>
+                        <label style={rotulo} htmlFor="g-ape">
+                          Apellidos
+                        </label>
+                        <input
+                          id="g-ape"
+                          value={form.apellidos}
+                          onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
+                          style={campo}
+                        />
+                      </div>
+                      <div>
+                        <label style={rotulo} htmlFor="g-doc">
+                          Documento
+                        </label>
+                        <input
+                          id="g-doc"
+                          value={form.docNumero}
+                          onChange={(e) => setForm({ ...form, docNumero: e.target.value })}
+                          style={campo}
+                        />
+                      </div>
+                      <div>
+                        <label style={rotulo} htmlFor="g-nac">
+                          Fecha de nacimiento
+                        </label>
+                        <input
+                          id="g-nac"
+                          type="date"
+                          value={form.fechaNacimiento}
+                          onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
+                          style={campo}
+                        />
+                      </div>
+                      <div>
+                        <label style={rotulo} htmlFor="g-mail">
+                          Correo
+                        </label>
+                        <input
+                          id="g-mail"
+                          type="email"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                          style={campo}
+                        />
+                      </div>
+                      <div>
+                        <label style={rotulo} htmlFor="g-tel">
+                          Teléfono
+                        </label>
+                        <input
+                          id="g-tel"
+                          value={form.telefono}
+                          onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                          style={campo}
+                        />
+                      </div>
+                      <div>
+                        <label style={rotulo} htmlFor="g-pais">
+                          País
+                        </label>
+                        <select
+                          id="g-pais"
+                          value={form.pais}
+                          onChange={(e) => setForm({ ...form, pais: e.target.value })}
+                          style={campo}
+                        >
+                          <option value="">Sin país</option>
+                          {PAISES.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={rotulo} htmlFor="g-dom">
+                          Domicilio
+                        </label>
+                        <input
+                          id="g-dom"
+                          value={form.domicilio}
+                          onChange={(e) => setForm({ ...form, domicilio: e.target.value })}
+                          style={campo}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={rotulo} htmlFor="g-zoom">
+                        Sala de Zoom
+                      </label>
+                      <input
+                        id="g-zoom"
+                        value={form.zoomUrl}
+                        onChange={(e) => setForm({ ...form, zoomUrl: e.target.value })}
+                        placeholder="https://zoom.us/j/NÚMERO"
+                        style={campo}
+                      />
+                      <p
+                        style={{
+                          fontSize: "0.75rem",
+                          color: "var(--texto-suave)",
+                          marginTop: "0.2rem",
+                        }}
+                      >
+                        Debe ser el enlace de la <strong>sala</strong>, no el de chat o contacto:
+                        ese último le abre al alumno “Enviar solicitud de contacto” en vez de la
+                        clase. El enlace de anfitrión (<code>/s/</code>) se convierte solo. Dos
+                        guías no pueden compartir sala.
+                      </p>
+                    </div>
+                  </fieldset>
+
+                  {editando && (
+                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => void guardar()}
+                        disabled={ocupado}
+                        style={{
+                          padding: "0.6rem 1.2rem",
+                          borderRadius: "0.6rem",
+                          border: "none",
+                          background: "var(--lgs-azul)",
+                          color: "white",
+                          fontWeight: 700,
+                          cursor: ocupado ? "wait" : "pointer",
+                        }}
+                      >
+                        {ocupado ? "Guardando…" : "💾 Guardar cambios"}
                       </button>
-                    </SoloSi>
+                      <button
+                        type="button"
+                        onClick={cancelarEdicion}
+                        disabled={ocupado}
+                        style={{
+                          padding: "0.6rem 1.2rem",
+                          borderRadius: "0.6rem",
+                          border: "1.5px solid #d8dce6",
+                          background: "white",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                   )}
-                </div>
-              </section>
+
+                  <section
+                    style={{
+                      border: "1px dashed #cfd6e6",
+                      borderRadius: "0.7rem",
+                      padding: "0.8rem 0.9rem",
+                      background: "#fbfcff",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: "0.9rem" }}>🔗 Enlace de registro</strong>
+                      <p
+                        style={{
+                          fontSize: "0.76rem",
+                          color: "var(--texto-suave)",
+                          marginTop: "0.15rem",
+                        }}
+                      >
+                        En vez de llenarle la ficha, envíale este enlace y él mismo carga sus datos,
+                        su sala de Zoom y su foto. Sirve <strong>una sola vez</strong> y vence a los{" "}
+                        {diasVigencia} días.
+                      </p>
+                    </div>
+
+                    {estadoSel !== undefined && (
+                      <p style={{ fontSize: "0.78rem" }}>
+                        Último enlace:{" "}
+                        <strong style={{ color: COLOR_ENLACE[estadoSel.estado].c }}>
+                          {COLOR_ENLACE[estadoSel.estado].txt}
+                        </strong>
+                        {estadoSel.estado === "USADA" && estadoSel.usadoEn !== null
+                          ? ` el ${new Date(estadoSel.usadoEn).toLocaleDateString("es-CL")}`
+                          : estadoSel.estado === "VIGENTE"
+                            ? ` · vence el ${new Date(estadoSel.expiraEn).toLocaleDateString("es-CL")}`
+                            : ""}
+                      </p>
+                    )}
+
+                    {enlaceNuevo !== null && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.4rem",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <input
+                          readOnly
+                          value={enlaceNuevo}
+                          onFocus={(e) => e.currentTarget.select()}
+                          style={{
+                            ...campo,
+                            flex: 1,
+                            minWidth: "14rem",
+                            fontSize: "0.78rem",
+                            background: "white",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void copiar()}
+                          style={{
+                            padding: "0.5rem 0.9rem",
+                            borderRadius: "0.5rem",
+                            border: "none",
+                            background: copiado ? "var(--lgs-verde)" : "var(--lgs-azul)",
+                            color: "white",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontSize: "0.82rem",
+                          }}
+                        >
+                          {copiado ? "✓ Copiado" : "Copiar"}
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <SoloSi op="op.guias.enlace">
+                        <button
+                          type="button"
+                          onClick={() => void emitirEnlace()}
+                          disabled={ocupado}
+                          style={{
+                            padding: "0.5rem 1rem",
+                            borderRadius: "0.5rem",
+                            border: "1.5px solid var(--lgs-azul)",
+                            background: "white",
+                            color: "var(--lgs-azul-oscuro)",
+                            fontWeight: 700,
+                            cursor: ocupado ? "wait" : "pointer",
+                            fontSize: "0.82rem",
+                          }}
+                        >
+                          {estadoSel?.estado === "VIGENTE"
+                            ? "↻ Generar uno nuevo"
+                            : "🔗 Generar enlace"}
+                        </button>
+                      </SoloSi>
+                      {estadoSel?.estado === "VIGENTE" && (
+                        <SoloSi op="op.guias.enlace">
+                          <button
+                            type="button"
+                            onClick={() => void revocarEnlace()}
+                            disabled={ocupado}
+                            style={{
+                              padding: "0.5rem 1rem",
+                              borderRadius: "0.5rem",
+                              border: "1.5px solid #e0e4ee",
+                              background: "white",
+                              color: "#8a2020",
+                              fontWeight: 700,
+                              cursor: ocupado ? "wait" : "pointer",
+                              fontSize: "0.82rem",
+                            }}
+                          >
+                            Revocar
+                          </button>
+                        </SoloSi>
+                      )}
+                    </div>
+                  </section>
+                </>
+              )}
             </div>
           </section>
         </>
