@@ -400,8 +400,9 @@ function CargaCatalogoCursoPageContenido() {
             LEGENDARY o ULTIMATE (también “ULTIMATE STAGE”).
           </li>
           <li>
-            <code>unidad</code>: “Unidad 0” (Welcome) a “Unidad 4” son las paradas del mapa; “Repaso
-            N” y “Evaluacion N” también se aceptan, pero sus juegos no se abren desde la isla.
+            <code>unidad</code>: “Unidad 0” (Welcome) a “Unidad 4” (“Unidad 5” en YOUNGSTER·ELITE)
+            son las paradas del mapa; “Repaso N” y “Evaluacion N” también se aceptan, pero sus
+            juegos no se abren desde la isla.
           </li>
           <li>
             Listas: ítems <code>Nombre|enlace</code> separados por <code>;</code> y entre comillas

@@ -2,7 +2,6 @@ import { PERMISOS, getAccessProfile } from "@/modules/access";
 import {
   CLAVE_AUTORIZACIONES_LIBRO,
   MENSAJE_ALMACEN_LIBRO,
-  PARADAS,
   PARADA_WELCOME,
   PREFIJO_NOMBRE_LIBRO,
   autorizacionParaLibro,
@@ -12,6 +11,7 @@ import {
   etiquetaParada,
   materialVigente,
   misionesAutorizadas,
+  paradasDelNivel,
   todasLasUnidades,
   urlLibroConPuente,
   vocesParaLibro,
@@ -41,34 +41,36 @@ export const GET = handlerWithAuth(async (_request, auth) => {
   const niveles = await Promise.all(
     alcanzados.map(async (nivel) => {
       const abiertas = await misionesAutorizadas(personaId, curso, nivel);
+      // Las paradas del NIVEL: Youngster·Elite tiene Welcome + 5 unidades.
+      const paradas = paradasDelNivel(curso, nivel);
       const [interactivo, imprimibleCompleto, actividadesCompleto, ...pdfs] = await Promise.all([
         materialVigente("interactivo", curso, nivel),
         materialVigente("imprimible", curso, nivel),
         materialVigente("actividades", curso, nivel),
-        ...PARADAS.map((parada) => materialVigente("imprimible", curso, nivel, parada)),
-        ...PARADAS.map((parada) => materialVigente("actividades", curso, nivel, parada)),
+        ...paradas.map((parada) => materialVigente("imprimible", curso, nivel, parada)),
+        ...paradas.map((parada) => materialVigente("actividades", curso, nivel, parada)),
       ]);
       const url = (id: string) => `/api/student/material/${id}`;
 
       /**
        * El PDF del NIVEL ENTERO (los dos libros lo admiten): se habilita con
-       * las cuatro unidades abiertas — el nivel entero se gana al terminarlo.
+       * todas las unidades del nivel abiertas — el nivel entero se gana al terminarlo.
        */
       const completo = (m: { id: string } | null) =>
         m === null
           ? null
           : {
-              abierta: todasLasUnidades(abiertas),
-              url: todasLasUnidades(abiertas) ? `${url(m.id)}?descargar=1` : null,
+              abierta: todasLasUnidades(abiertas, curso, nivel),
+              url: todasLasUnidades(abiertas, curso, nivel) ? `${url(m.id)}?descargar=1` : null,
             };
 
       /**
-       * Las CINCO unidades, siempre a la vista: el niño ve el camino completo
+       * TODAS las paradas del nivel, siempre a la vista: el niño ve el camino completo
        * y se le van habilitando de a una. Cerrada = sin enlace (la ruta que
        * las sirve lo vuelve a comprobar); sin archivo = todavía sin cargar.
        */
       const casillas = (desde: number) =>
-        PARADAS.map((parada, i) => {
+        paradas.map((parada, i) => {
           const pdf = pdfs[desde + i] ?? null;
           const abierta = parada === PARADA_WELCOME || abiertas.includes(parada);
           return {
@@ -103,7 +105,7 @@ export const GET = handlerWithAuth(async (_request, auth) => {
         videosBase: interactivo !== null ? baseVideosLibro(interactivo.id) : null,
         // Libro para descargar y libro de actividades, los dos por unidad…
         imprimibles: casillas(0),
-        actividades: casillas(PARADAS.length),
+        actividades: casillas(paradas.length),
         // …y los dos con su nivel entero (decisión del negocio, 2026-09-23/24).
         imprimibleCompleto: completo(imprimibleCompleto),
         actividadesCompleto: completo(actividadesCompleto),

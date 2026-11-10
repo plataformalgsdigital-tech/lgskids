@@ -5,6 +5,7 @@ import {
   NIVELES,
   PARADAS,
   autorizarMisiones,
+  paradasDelNivel,
   etiquetaParada,
   misionesDeNinos,
   nivelDeNino,
@@ -57,8 +58,9 @@ async function exigirAcceso(sessionId: string, userId: string, escribe = false) 
 export const GET = handlerWithAuth(async (request, auth, context) => {
   const sessionId = await sesionDe(context as Contexto);
   await exigirAcceso(sessionId, auth.userId);
-  const { lista } = await listaDeSesion(sessionId);
+  const { sesion, lista } = await listaDeSesion(sessionId);
   const misiones = await misionesDeNinos(lista.map((f) => f.childPersonId));
+  const curso = sesion.cursoTipo;
   const conNiveles = request.nextUrl.searchParams.get("conNiveles") === "1";
 
   return json({
@@ -66,7 +68,16 @@ export const GET = handlerWithAuth(async (request, auth, context) => {
     // regla de "la 0 se llama Welcome".
     misiones: misiones.map((m) => ({ ...m, etiqueta: etiquetaParada(m.parada) })),
     paradas: PARADAS.map((parada) => ({ parada, etiqueta: etiquetaParada(parada) })),
-    niveles: NIVELES.map((n) => ({ codigo: n.codigo, nombre: n.nombre })),
+    // Cada nivel con SUS paradas: Youngster·Elite tiene Welcome + 5 unidades, el
+    // resto 4. Sin curso en la sesión, las de un nivel corriente.
+    niveles: NIVELES.map((n) => ({
+      codigo: n.codigo,
+      nombre: n.nombre,
+      paradas: (curso !== null ? paradasDelNivel(curso, n.codigo) : PARADAS).map((parada) => ({
+        parada,
+        etiqueta: etiquetaParada(parada),
+      })),
+    })),
     ...(conNiveles && {
       ninos: await Promise.all(
         lista.map(async (f) => ({

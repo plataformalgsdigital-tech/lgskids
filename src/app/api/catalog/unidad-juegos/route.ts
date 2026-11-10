@@ -6,6 +6,7 @@ import {
   guardarPosicionesUnidad,
   juegosDeUnidad,
   leccionesSinCasilla,
+  paradasDelNivel,
 } from "@/modules/catalog";
 import { bootstrapIdentity } from "@/modules/identity";
 import { ValidationError } from "@/platform/errors";
@@ -46,14 +47,18 @@ export const GET = handlerWithAuth(async (request, auth) => {
   if (curso === null || nivel === null || !Number.isInteger(unidad)) {
     throw new ValidationError("Indica curso, nivel y unidad.");
   }
+  // Las paradas del NIVEL viajan con la respuesta (Youngster·Elite tiene una
+  // Unidad 5): el editor no copia cuántas hay. Una parada que el nivel no tiene
+  // —el editor venía de Elite en la 5— responde vacía en vez de fallar.
+  const paradas = paradasDelNivel(curso, nivel);
   // `sinCasilla` acompaña siempre: sin él, una unidad vacía no distingue "aún
   // no hay actividades" de "las hay, pero en una lección que el mapa no abre".
   const [juegos, sinCasilla] = await Promise.all([
-    juegosDeUnidad(curso, nivel, unidad),
+    paradas.includes(unidad) ? juegosDeUnidad(curso, nivel, unidad) : Promise.resolve([]),
     leccionesSinCasilla(curso, nivel),
   ]);
   // El tamaño por defecto viaja resuelto para que el editor no lo copie.
-  return json({ juegos, sinCasilla, zona: { ancho: ANCHO_ZONA, alto: ALTO_ZONA } });
+  return json({ juegos, sinCasilla, paradas, zona: { ancho: ANCHO_ZONA, alto: ALTO_ZONA } });
 });
 
 export const PUT = handlerWithAuth(async (request, auth) => {

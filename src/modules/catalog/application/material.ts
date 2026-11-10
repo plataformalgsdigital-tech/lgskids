@@ -10,7 +10,7 @@ import {
 import { ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
 import { esHtml, esPdf } from "../domain/libro-interactivo";
-import { PARADAS, etiquetaParada, paradaValida } from "../domain/unidad-mapa";
+import { etiquetaParada, paradaValida, paradasDelNivel } from "../domain/unidad-mapa";
 
 /**
  * Material del alumno: lo que abre el botón "Material" del panel del niño.
@@ -91,7 +91,9 @@ export function claveMaterial(curso: string, nivel: string, parada?: number | nu
   if (!CURSOS.includes(curso)) throw new ValidationError(`Curso inválido: ${curso}.`);
   if (!CODIGOS_NIVEL.includes(nivel)) throw new ValidationError(`Nivel inválido: ${nivel}.`);
   if (parada == null) return `${curso}:${nivel}`;
-  if (!paradaValida(parada)) throw new ValidationError(`Unidad inválida: ${String(parada)}.`);
+  if (!paradaValida(parada, curso, nivel)) {
+    throw new ValidationError(`Unidad inválida en ${curso} ${nivel}: ${String(parada)}.`);
+  }
   return `${curso}:${nivel}:${String(parada)}`;
 }
 
@@ -100,7 +102,7 @@ export function claveMaterial(curso: string, nivel: string, parada?: number | nu
  *  - interactivo: NUNCA (es uno por nivel; con unidad aparecería cinco veces);
  *  - los dos PDF: las DOS cosas — uno por unidad, que se abre al llegar a ella,
  *    y uno del NIVEL COMPLETO (sin unidad), que se habilita cuando el niño ya
- *    tiene abiertas las cuatro. Al de descargar se le sumó el completo el
+ *    tiene abiertas todas las del nivel. Al de descargar se le sumó el completo el
  *    2026-09-24, para que quien termina el nivel pueda bajarlo de una vez.
  */
 function exigirParada(tipo: MaterialTipo, parada?: number | null): number | null {
@@ -201,7 +203,7 @@ export interface MaterialNivel {
   interactivo: MaterialResumen | null;
   /** Un PDF por unidad: el niño ve los de las unidades que le abrieron. */
   imprimibles: CasillaUnidad[];
-  /** Y el del nivel entero: se habilita con las cuatro unidades abiertas. */
+  /** Y el del nivel entero: se habilita con todas las unidades del nivel abiertas. */
   imprimibleCompleto: MaterialResumen | null;
   /** Libro de ACTIVIDADES, por unidad. */
   actividades: CasillaUnidad[];
@@ -228,12 +230,15 @@ export async function estadoMaterial(): Promise<Record<string, MaterialNivel[]>>
     Map<string, MaterialResumen>,
     Map<string, MaterialResumen>,
   ];
-  const casillas = (mapa: Map<string, MaterialResumen>, clave: string): CasillaUnidad[] =>
-    PARADAS.map((parada) => ({
+  // Las casillas son las del NIVEL: Youngster·Elite tiene Welcome + 5 unidades.
+  const casillas = (mapa: Map<string, MaterialResumen>, clave: string): CasillaUnidad[] => {
+    const [curso = "", nivel = ""] = clave.split(":");
+    return paradasDelNivel(curso, nivel).map((parada) => ({
       parada,
       etiqueta: etiquetaParada(parada),
       archivo: mapa.get(`${clave}:${String(parada)}`) ?? null,
     }));
+  };
 
   return Object.fromEntries(
     CURSOS.map((curso) => [
@@ -304,7 +309,7 @@ export async function archivoDeMaterial(id: string): Promise<ArchivoMaterial | n
     tipo,
     curso,
     nivel,
-    parada: n !== null && paradaValida(n) ? n : null,
+    parada: n !== null && paradaValida(n, curso, nivel) ? n : null,
     nombreOriginal: meta.nombreOriginal,
   };
 }

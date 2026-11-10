@@ -724,6 +724,20 @@ comercial (vende LGS y llega por Reservas); lo decidió el negocio.
     desde el mapa. Constantes: `PARADA_WELCOME = 0`, `UNIDADES_MAPA = 4` (la unidad
     NUMERADA más alta), `PARADAS_MAPA = 5` y `PARADAS = [0..4]`; `paradaValida` y
     `etiquetaParada` (la 0 se muestra "Welcome", nunca "Unidad 0").
+    **La cantidad es del NIVEL (2026-11-10)**: YOUNGSTER·ELITE trae Welcome + **CINCO**
+    unidades (así lo entregó diseño: libro, cuaderno y PDF de la Unidad 0 a la 5). El
+    4 de `UNIDADES_MAPA` es el valor por defecto; las excepciones van en
+    `UNIDADES_ESPECIALES` (`unidad-mapa.ts`) y se leen con `unidadesDelNivel` /
+    `paradasDelNivel`. `paradaValida`, `unidadMapa` y `caminoAbierto` aceptan curso y
+    nivel (sin ellos, hasta `UNIDADES_MAXIMAS`); `todasLasUnidades` los EXIGE (el nivel
+    completo de Elite pide la 5). Lo usan arte (lámina e insignia), juegos, material
+    (casillas y PDF completo), misiones (el GET de la sesión manda las paradas de cada
+    nivel; una parada que el niño no tiene vuelve `noAplica`) y el editor del mapa
+    (`nUnidades` en el GET de hotspots). Las pantallas NO copian la lista: la reciben
+    del servidor (`paradas`). Sumar un nivel con otra cantidad es una línea en
+    `UNIDADES_ESPECIALES`. La progresión sigue contando 4 prácticas por nivel (regla 4):
+    en la isla de Elite las VoBo de unidad van por prácticas y el nivel completo las
+    marca todas.
   - **Libro interactivo: RETIRADO (2026-09-17)**. El visor del cuadernillo salió
     del panel del niño por decisión del negocio —el resultado no convenció— y el
     material se rehará DESDE CERO. Se fue el CÓDIGO: `application/libro.ts` y
@@ -2744,6 +2758,11 @@ append`), se conecta con el usuario PROPIO de KIDS (`kids2026_app`, nunca el
   registra el guía. Los cuatro libros "…_Interactivo_Proyectos.html" ya están cargados en
   producción (2026-11-07). Las evaluaciones y juegos que se ven en "Mis alumnos" son lo
   que REPORTÓ el navegador: referencia para el guía, no calificación.
+- **Proyectos del libro de YOUNGSTER sin integrar** (2026-11-10): la revisión del guía
+  (`proyectos-libro.ts`) está hecha para los libros de JUNIOR: claves `lgs-<nivel>-*` y
+  `UNIDADES_PROYECTO = [1..4]`. El de YOUNGSTER·Elite usa `lgs-youngster-elite-*` y
+  tiene CINCO proyectos (su guía, `Libros/Youngster/Elite/Elite_Guia_de_Uso_y_Verificacion.md`),
+  así que sus entregas no llegan al guía hasta adaptar claves y unidades por curso·nivel.
 - **Derechos de las canciones**: los videos de los libros son descargas de YouTube de
   terceros (Planet Pop, LARVA KIDS, ABCmouse, Lingokids, CoComelon, The Singing Walrus…).
   Subirlos a la plataforma es redistribuirlos: confirmar permiso o sustituirlos.

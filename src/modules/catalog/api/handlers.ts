@@ -33,7 +33,12 @@ import {
 } from "../domain/libro-interactivo";
 import { baseVideosLibro } from "../application/video-libro";
 import { vocesParaLibro } from "../application/voz-libro";
-import { PARADAS, paradaValida } from "../domain/unidad-mapa";
+import {
+  UNIDADES_MAXIMAS,
+  paradaValida,
+  paradasDelNivel,
+  unidadesDelNivel,
+} from "../domain/unidad-mapa";
 import {
   MAX_AVISOS_LOGIN,
   agregarAvisoLogin,
@@ -410,18 +415,23 @@ export const imagenCursoSubirHandler = handlerWithAuth(async (request, auth) => 
   return json(r, { status: 201 });
 });
 
-/** GET /api/catalog/imagen-curso?tipo=&curso=&nivel= — id del arte vigente (o null). */
+/**
+ * GET /api/catalog/imagen-curso?tipo=&curso=&nivel= — id del arte vigente (o null)
+ * y las PARADAS de ese nivel, para que la pantalla no copie cuántas unidades tiene
+ * (Youngster·Elite tiene cinco; los demás, cuatro).
+ */
 export const imagenCursoInfoHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
   const q = request.nextUrl.searchParams;
-  const id = await arteId(
-    tipoArte(q.get("tipo")),
-    q.get("curso") ?? undefined,
-    q.get("nivel") ?? undefined,
-    unidadParam(q.get("unidad")),
-  );
-  return json({ id, url: id !== null ? `/api/catalog/imagen-curso/${id}` : null });
+  const curso = q.get("curso") ?? undefined;
+  const nivel = q.get("nivel") ?? undefined;
+  const id = await arteId(tipoArte(q.get("tipo")), curso, nivel, unidadParam(q.get("unidad")));
+  return json({
+    id,
+    url: id !== null ? `/api/catalog/imagen-curso/${id}` : null,
+    paradas: curso !== undefined && nivel !== undefined ? paradasDelNivel(curso, nivel) : null,
+  });
 });
 
 /**
@@ -515,8 +525,12 @@ export const materialEstadoHandler = handlerWithAuth(async (_request, auth) => {
       claveAutorizaciones: CLAVE_AUTORIZACIONES_LIBRO,
     },
     // En la vista previa del EQUIPO se abren todas las unidades: se revisa el
-    // libro entero. Al niño solo le llegan las que su guía le abrió.
-    autorizacionPrevia: valorAutorizacionesLibro(PARADAS),
+    // libro entero. Al niño solo le llegan las que su guía le abrió. Hasta la
+    // más alta de CUALQUIER nivel (Youngster·Elite llega a la 5): a un libro de
+    // cuatro unidades la 5 no le abre nada.
+    autorizacionPrevia: valorAutorizacionesLibro(
+      Array.from({ length: UNIDADES_MAXIMAS + 1 }, (_, i) => i),
+    ),
   });
 });
 
@@ -635,12 +649,11 @@ export const hotspotsInfoHandler = handlerWithAuth(async (request, auth) => {
   const profile = await getAccessProfile(auth.userId);
   profile.requirePermission(PERMISOS.CATALOGO_VER);
   const q = request.nextUrl.searchParams;
-  const data = await getHotspots(
-    q.get("scope") ?? "ISLA",
-    q.get("curso") ?? "",
-    q.get("nivel") ?? "",
-  );
-  return json(data);
+  const curso = q.get("curso") ?? "";
+  const nivel = q.get("nivel") ?? "";
+  const data = await getHotspots(q.get("scope") ?? "ISLA", curso, nivel);
+  // Cuántas unidades marca el editor en ESE nivel (Youngster·Elite: cinco).
+  return json({ ...data, nUnidades: unidadesDelNivel(curso, nivel) });
 });
 
 const hotspotsBodySchema = z.object({

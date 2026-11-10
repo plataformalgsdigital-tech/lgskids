@@ -278,13 +278,18 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
   // del libro). El NIVEL se elige —el libro es uno por nivel— y se sugiere el
   // que trabaja la mayoría del grupo.
   const [misiones, setMisiones] = useState<Mision[]>([]);
-  const [paradas, setParadas] = useState<Parada[]>([]);
-  const [niveles, setNiveles] = useState<{ codigo: string; nombre: string }[]>([]);
+  const [paradasBase, setParadas] = useState<Parada[]>([]);
+  /** Cada nivel trae SUS paradas: Youngster·Elite tiene Welcome + 5 unidades. */
+  const [niveles, setNiveles] = useState<{ codigo: string; nombre: string; paradas?: Parada[] }[]>(
+    [],
+  );
   /** El nivel que trabaja cada niño: para sugerir el de la clase y avisar. */
   const [nivelesNinos, setNivelesNinos] = useState<Record<string, string | null>>({});
   const [nivelElegido, setNivelElegido] = useState("");
   const [abriendoMision, setAbriendoMision] = useState(false);
   const [paradaElegida, setParadaElegida] = useState(1);
+  /** Las paradas del nivel elegido (las del servidor; no se copia cuántas tiene). */
+  const paradas = niveles.find((n) => n.codigo === nivelElegido)?.paradas ?? paradasBase;
   /** Por defecto se abre a TODA la lista; aquí van los que el guía desmarca. */
   const [excluidos, setExcluidos] = useState<Set<string>>(new Set());
 
@@ -327,7 +332,7 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
         const d = (await rm.json()) as {
           misiones: Mision[];
           paradas: Parada[];
-          niveles: { codigo: string; nombre: string }[];
+          niveles: { codigo: string; nombre: string; paradas?: Parada[] }[];
         };
         setMisiones(d.misiones);
         setParadas(d.paradas);
@@ -474,9 +479,17 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
         return;
       }
       const { resultados } = (await res.json()) as {
-        resultados: { childPersonId: string; nivel: string | null; yaEstaba: boolean }[];
+        resultados: {
+          childPersonId: string;
+          nivel: string | null;
+          yaEstaba: boolean;
+          noAplica?: boolean;
+        }[];
       };
-      const abiertas = resultados.filter((r) => r.nivel !== null && !r.yaEstaba).length;
+      const noAplica = resultados.filter((r) => r.noAplica === true).length;
+      const abiertas = resultados.filter(
+        (r) => r.nivel !== null && !r.yaEstaba && r.noAplica !== true,
+      ).length;
       const yaTenian = resultados.filter((r) => r.yaEstaba).length;
       const sinMatricula = resultados.filter((r) => r.nivel === null).length;
       const etiqueta = paradas.find((p) => p.parada === paradaElegida)?.etiqueta ?? "La unidad";
@@ -484,6 +497,7 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
         `${etiqueta}: abierta a ${String(abiertas)} niño(s)` +
           (yaTenian > 0 ? `, ${String(yaTenian)} ya la tenía(n)` : "") +
           (sinMatricula > 0 ? `. ${String(sinMatricula)} sin matrícula activa` : "") +
+          (noAplica > 0 ? `. ${String(noAplica)} no la tiene(n) en su curso` : "") +
           ".",
       );
       setAbriendoMision(false);

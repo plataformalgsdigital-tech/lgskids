@@ -12,7 +12,8 @@ type Punto = { x: number; y: number };
 
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"] as const;
-const N_UNIDADES = 4;
+/** Unidades mientras no responde el servidor; el nivel trae las suyas (Youngster·Elite: 5). */
+const N_UNIDADES_INICIAL = 4;
 
 const input: CSSProperties = {
   padding: "0.5rem 0.65rem",
@@ -30,7 +31,8 @@ function EditorMapaPageContenido() {
   const [scope, setScope] = useState<Scope>("ISLA");
   const [nivel, setNivel] = useState<string>("ROOKIE");
   const [imgUrl, setImgUrl] = useState<string | null>(null);
-  const [unidades, setUnidades] = useState<(Punto | null)[]>(Array(N_UNIDADES).fill(null));
+  const [nUnidades, setNUnidades] = useState(N_UNIDADES_INICIAL);
+  const [unidades, setUnidades] = useState<(Punto | null)[]>(Array(N_UNIDADES_INICIAL).fill(null));
   // Parada 0 de la isla. Va aparte de `unidades[]`, que es posicional.
   const [welcome, setWelcome] = useState<Punto | null>(null);
   const [especial, setEspecial] = useState<Punto | null>(null); // premio (ISLA) o centro (MAPA)
@@ -51,7 +53,8 @@ function EditorMapaPageContenido() {
     ]);
     let url: string | null = null;
     if (imgRes.ok) url = ((await imgRes.json()) as { url: string | null }).url;
-    const us: (Punto | null)[] = Array(N_UNIDADES).fill(null);
+    let n = N_UNIDADES_INICIAL;
+    let us: (Punto | null)[] = Array(n).fill(null);
     let esp: Punto | null = null;
     let wel: Punto | null = null;
     if (hsRes.ok) {
@@ -60,12 +63,16 @@ function EditorMapaPageContenido() {
         unidades?: Punto[];
         premio?: Punto | null;
         centro?: Punto | null;
+        nUnidades?: number;
       };
-      (d.unidades ?? []).slice(0, N_UNIDADES).forEach((p, i) => (us[i] = p));
+      n = d.nUnidades ?? N_UNIDADES_INICIAL;
+      us = Array(n).fill(null);
+      (d.unidades ?? []).slice(0, n).forEach((p, i) => (us[i] = p));
       esp = scope === "MAPA" ? (d.centro ?? null) : (d.premio ?? null);
       wel = d.welcome ?? null;
     }
     setImgUrl(url);
+    setNUnidades(n);
     setUnidades(us);
     setWelcome(wel);
     setEspecial(esp);
@@ -94,12 +101,12 @@ function EditorMapaPageContenido() {
       const i = Number(tool.slice(1));
       setUnidades((prev) => prev.map((v, k) => (k === i ? p : v)));
     }
-    // Avanza al siguiente punto para marcar rápido: Welcome → 1..4 → especial.
+    // Avanza al siguiente punto para marcar rápido: Welcome → 1..N → especial.
     setTool((t) => {
       if (t === "esp") return "esp";
       if (t === "wel") return "u0";
       const i = Number(t.slice(1));
-      return i < N_UNIDADES - 1 ? `u${i + 1}` : "esp";
+      return i < nUnidades - 1 ? `u${i + 1}` : "esp";
     });
   }
 
@@ -132,7 +139,7 @@ function EditorMapaPageContenido() {
   }
 
   function limpiar() {
-    setUnidades(Array(N_UNIDADES).fill(null));
+    setUnidades(Array(nUnidades).fill(null));
     setWelcome(null);
     setEspecial(null);
     setTool(scope === "MAPA" ? "u0" : "wel");
@@ -170,8 +177,8 @@ function EditorMapaPageContenido() {
         Marca dónde va cada parada —{scope === "MAPA" ? "" : "el "}
         {scope === "MAPA" ? "" : <strong>Welcome (W)</strong>}
         {scope === "MAPA" ? "" : " y "}
-        <strong>unidades 1–4</strong>— y el <strong>{etiquetaEsp.toLowerCase()}</strong> sobre la
-        imagen. Elige un punto y haz <strong>clic sobre la imagen</strong>; se guarda como
+        <strong>unidades 1–{nUnidades}</strong>— y el <strong>{etiquetaEsp.toLowerCase()}</strong>{" "}
+        sobre la imagen. Elige un punto y haz <strong>clic sobre la imagen</strong>; se guarda como
         coordenada %. Lo usa la pantalla <strong>Avance</strong> del alumno.
       </p>
 

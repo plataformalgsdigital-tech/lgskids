@@ -151,7 +151,10 @@ export function planificarFila(fila: FilaCsvCurso, actual: LeccionGuardada | nul
     clubes: fila.clubes ?? base.clubes,
   };
 
-  if (unidadMapa(fila.unidad) === null && resultado.actividades.length > 0) {
+  if (
+    unidadMapa(fila.unidad, fila.curso, fila.nivel) === null &&
+    resultado.actividades.length > 0
+  ) {
     avisos.push(
       `"${fila.unidad ?? ""}" no es una parada del mapa: sus juegos no se abren desde la isla.`,
     );

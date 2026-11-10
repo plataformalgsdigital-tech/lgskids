@@ -24,7 +24,7 @@ bootstrapIdentity();
  * 2. que sea de SU curso y de un nivel que ya alcanzó;
  * 3. si es un PDF, que su guía haya abierto esa unidad —o una posterior, ver
  *    `caminoAbierto`—. El Welcome va siempre, como en el libro, y los dos PDF
- *    del NIVEL ENTERO piden las CUATRO unidades.
+ *    del NIVEL ENTERO piden TODAS las unidades del nivel (cinco en Youngster·Elite).
  * Cualquiera que falle responde 404, no 403: no se confirma que el id exista.
  */
 export const GET = handlerWithAuth(async (request, auth, context) => {
@@ -48,8 +48,8 @@ export const GET = handlerWithAuth(async (request, auth, context) => {
     const abierta =
       material.parada === null
         ? // Sin unidad: el del NIVEL ENTERO (cualquiera de los dos PDF), que
-          // pide las cuatro unidades abiertas.
-          todasLasUnidades(abiertas)
+          // pide todas las unidades del nivel abiertas.
+          todasLasUnidades(abiertas, material.curso, material.nivel)
         : material.parada === PARADA_WELCOME || abiertas.includes(material.parada);
     if (!abierta) throw new NotFoundError("Tu guía todavía no abrió eso.");
   }

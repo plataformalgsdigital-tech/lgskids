@@ -143,10 +143,13 @@ export {
   PARADAS_MAPA,
   PARADA_WELCOME,
   UNIDADES_MAPA,
+  UNIDADES_MAXIMAS,
   etiquetaParada,
   paradaValida,
+  paradasDelNivel,
   todasLasUnidades,
   unidadMapa,
+  unidadesDelNivel,
 } from "./domain/unidad-mapa";
 export {
   obtenerReferenciaNivel,

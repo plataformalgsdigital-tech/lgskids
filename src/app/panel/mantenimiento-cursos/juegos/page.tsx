@@ -53,8 +53,11 @@ interface Arrastre {
 
 const CURSOS = ["JUNIOR", "YOUNGSTER"];
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"];
-/** Paradas de la isla: el Welcome (0) y las cuatro unidades. */
-const UNIDADES = [0, 1, 2, 3, 4];
+/**
+ * Paradas mientras no responde el servidor: el Welcome (0) y cuatro unidades.
+ * Las de verdad llegan con los juegos (Youngster·Elite tiene una Unidad 5).
+ */
+const PARADAS_INICIALES = [0, 1, 2, 3, 4];
 const etiquetaParada = (p: number) => (p === 0 ? "Welcome" : `Unidad ${String(p)}`);
 /** Bajo esto el gesto fue un clic, no un arrastre: se usa el tamaño estándar. */
 const MINIMO_ARRASTRE = 1.5;
@@ -73,6 +76,7 @@ function JuegosUnidadPageContenido() {
   const [curso, setCurso] = useState("JUNIOR");
   const [nivel, setNivel] = useState("ROOKIE");
   const [unidad, setUnidad] = useState(1);
+  const [paradas, setParadas] = useState<number[]>(PARADAS_INICIALES);
 
   const [juegos, setJuegos] = useState<Juego[]>([]);
   const [sinCasilla, setSinCasilla] = useState<SinCasilla[]>([]);
@@ -98,7 +102,19 @@ function JuegosUnidadPageContenido() {
     }
     setError(null);
     setAviso(null);
-    const c = (await res.json()) as { juegos: Juego[]; sinCasilla: SinCasilla[]; zona: Zona };
+    const c = (await res.json()) as {
+      juegos: Juego[];
+      sinCasilla: SinCasilla[];
+      zona: Zona;
+      paradas?: number[];
+    };
+    const delNivel = c.paradas ?? PARADAS_INICIALES;
+    setParadas(delNivel);
+    // Venía de un nivel con más unidades (Elite·Unidad 5): se queda en la última.
+    if (!delNivel.includes(unidad)) {
+      setUnidad(delNivel[delNivel.length - 1] ?? 0);
+      return;
+    }
     setJuegos(c.juegos);
     setSinCasilla(c.sinCasilla);
     setZona(c.zona);
@@ -272,7 +288,7 @@ function JuegosUnidadPageContenido() {
         <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
           <span style={rotulo}>Parada</span>
           <select value={unidad} onChange={(e) => setUnidad(Number(e.target.value))} style={input}>
-            {UNIDADES.map((u) => (
+            {paradas.map((u) => (
               <option key={u} value={u}>
                 {etiquetaParada(u)}
               </option>

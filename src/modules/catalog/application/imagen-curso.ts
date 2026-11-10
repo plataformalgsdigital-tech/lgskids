@@ -1,7 +1,13 @@
 import { descargarArchivo, listarArchivos, metaArchivo, subirArchivo } from "@/modules/files";
 import { NotFoundError, ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
-import { PARADAS, PARADA_WELCOME, UNIDADES_MAPA, paradaValida } from "../domain/unidad-mapa";
+import {
+  PARADA_WELCOME,
+  UNIDADES_MAPA,
+  paradaValida,
+  paradasDelNivel,
+  unidadesDelNivel,
+} from "../domain/unidad-mapa";
 
 /**
  * Arte curricular (no dato de menores). Reutiliza el módulo `files` (storage +
@@ -10,7 +16,7 @@ import { PARADAS, PARADA_WELCOME, UNIDADES_MAPA, paradaValida } from "../domain/
  *  - banner: imagen de portada por (curso, nivel) — banner del panel/mapa de isla.
  *  - premio: imagen del premio por (curso, nivel) — brújula/llave/corona/…
  *  - mapa:   mapa del curso completo (todas las islas) por curso.
- *  - unidad: lámina de la UNIDAD por (curso, nivel, unidad 1..4). Es la que
+ *  - unidad: lámina de la PARADA por (curso, nivel, parada 0..N del nivel). Es la que
  *    se abre al tocar "Unidad N" en el mapa de la isla.
  *  - vobo:   sello "VoBo" global (marca de unidad vista).
  *  - aviso_login: imagen del aviso de la pantalla de login (global). No es
@@ -21,7 +27,7 @@ import { PARADAS, PARADA_WELCOME, UNIDADES_MAPA, paradaValida } from "../domain/
 export type ArteTipo =
   "banner" | "premio" | "unidad" | "insignia" | "vobo" | "mapa" | "aviso_login";
 
-/** Unidades NUMERADAS que marca el mapa. El Welcome (parada 0) va aparte. */
+/** Unidades NUMERADAS de un nivel corriente. El Welcome (parada 0) va aparte; ver `unidadesDelNivel`. */
 export const UNIDADES_POR_NIVEL = UNIDADES_MAPA;
 
 const ENTIDAD_POR_TIPO: Record<ArteTipo, string> = {
@@ -56,14 +62,15 @@ function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: 
   if (!CURSOS.includes(curso ?? "")) throw new ValidationError(`Curso inválido: ${curso}.`);
   if (tipo === "mapa") return curso as string;
   if (!nivelValido(nivel ?? "")) throw new ValidationError(`Nivel inválido: ${nivel}.`);
-  // La lámina de unidad va por NÚMERO (1..4), el mismo que marca el mapa: en
+  // La lámina de unidad va por NÚMERO (0..N del nivel), el mismo que marca el mapa: en
   // `catalog_curso` la unidad es texto libre y colgar de ahí la clave la haría
   // frágil ("Unidad 0", "Repaso 3", erratas incluidas).
   if (tipo === "unidad" || tipo === "insignia") {
-    if (!unidadValida(unidad)) {
+    if (!unidadValida(unidad, curso, nivel)) {
       throw new ValidationError(
         `Parada inválida: ${String(unidad)} (${String(PARADA_WELCOME)} a ` +
-          `${String(UNIDADES_MAPA)}; la ${String(PARADA_WELCOME)} es el Welcome).`,
+          `${String(unidadesDelNivel(curso ?? "", nivel ?? ""))} en ${String(curso)} ${String(nivel)}; ` +
+          `la ${String(PARADA_WELCOME)} es el Welcome).`,
       );
     }
     return `${curso}:${nivel}:${String(unidad)}`;
@@ -72,8 +79,11 @@ function entidadIdArte(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: 
   return `${curso}:${nivel}`;
 }
 
-function unidadValida(unidad?: number): boolean {
-  return paradaValida(unidad);
+/** La parada existe en ESE nivel (Youngster·Elite llega a la 5; los demás, a la 4). */
+function unidadValida(unidad: number | undefined, curso?: string, nivel?: string): boolean {
+  return curso !== undefined && nivel !== undefined && nivel !== NIVEL_TODOS
+    ? paradaValida(unidad, curso, nivel)
+    : false;
 }
 
 /** ¿los parámetros forman una clave válida para el tipo? (sin lanzar). */
@@ -82,7 +92,7 @@ function claveValida(tipo: ArteTipo, curso?: string, nivel?: string, unidad?: nu
   if (!CURSOS.includes(curso ?? "")) return false;
   if (tipo === "mapa") return true;
   if (!nivelValido(nivel ?? "")) return false;
-  return tipo === "unidad" || tipo === "insignia" ? unidadValida(unidad) : true;
+  return tipo === "unidad" || tipo === "insignia" ? unidadValida(unidad, curso, nivel) : true;
 }
 
 /**
@@ -97,7 +107,7 @@ export async function subirArte(input: {
   tipo: ArteTipo;
   curso?: string;
   nivel?: string;
-  /** Solo para el tipo `unidad`: 1..4, el número que marca el mapa. */
+  /** Solo para `unidad` e `insignia`: la parada 0..N del nivel, la que marca el mapa. */
   unidad?: number;
   nombreOriginal: string;
   mime: string;
@@ -201,7 +211,7 @@ export async function arteAsignado(): Promise<ArteAsignado[]> {
       claves.push({ tipo: "banner", curso, nivel, parada: null });
       if (nivel === NIVEL_TODOS) continue;
       claves.push({ tipo: "premio", curso, nivel, parada: null });
-      for (const parada of PARADAS) {
+      for (const parada of paradasDelNivel(curso, nivel)) {
         claves.push({ tipo: "unidad", curso, nivel, parada });
         claves.push({ tipo: "insignia", curso, nivel, parada });
       }
@@ -247,7 +257,7 @@ export async function descargarImagenCurso(id: string): Promise<{
 }
 
 /**
- * Láminas de las paradas de un nivel: `{ 0: url|null, ... 4: url|null }`.
+ * Láminas de las paradas de un nivel: `{ 0: url|null, ... N: url|null }`.
  *
  * Incluye la parada 0 (Welcome): el mapa nuevo le da cartel propio, así que
  * también puede tener su lámina.
@@ -256,20 +266,22 @@ export async function imagenesUnidadNivel(
   curso: string,
   nivel: string,
 ): Promise<Record<number, string | null>> {
-  const ids = await Promise.all(PARADAS.map((p) => arteId("unidad", curso, nivel, p)));
-  return Object.fromEntries(PARADAS.map((p, i) => [p, ids[i] ?? null])) as Record<
+  const paradas = paradasDelNivel(curso, nivel);
+  const ids = await Promise.all(paradas.map((p) => arteId("unidad", curso, nivel, p)));
+  return Object.fromEntries(paradas.map((p, i) => [p, ids[i] ?? null])) as Record<
     number,
     string | null
   >;
 }
 
-/** Insignias de las paradas de un nivel: `{ 0: url|null, ... 4: url|null }`. */
+/** Insignias de las paradas de un nivel: `{ 0: url|null, ... N: url|null }`. */
 export async function insigniasDeNivel(
   curso: string,
   nivel: string,
 ): Promise<Record<number, string | null>> {
-  const ids = await Promise.all(PARADAS.map((p) => arteId("insignia", curso, nivel, p)));
-  return Object.fromEntries(PARADAS.map((p, i) => [p, ids[i] ?? null])) as Record<
+  const paradas = paradasDelNivel(curso, nivel);
+  const ids = await Promise.all(paradas.map((p) => arteId("insignia", curso, nivel, p)));
+  return Object.fromEntries(paradas.map((p, i) => [p, ids[i] ?? null])) as Record<
     number,
     string | null
   >;

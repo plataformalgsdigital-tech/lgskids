@@ -11,12 +11,14 @@ type Curso = "JUNIOR" | "YOUNGSTER";
 type Tipo = "banner" | "premio" | "unidad" | "insignia" | "mapa" | "vobo";
 
 /**
- * Paradas de la isla: el Welcome (0) y las cuatro unidades.
+ * Paradas de la isla mientras no responde el servidor: el Welcome (0) y cuatro
+ * unidades. Las del nivel llegan con la imagen actual: Youngster·Elite tiene
+ * una Unidad 5.
  *
  * La 0 NO se llama "Unidad 0": en el mapa su cartel dice "Welcome" y el
  * cuadernillo le entrega su propia insignia.
  */
-const PARADAS = [0, 1, 2, 3, 4];
+const PARADAS_INICIALES = [0, 1, 2, 3, 4];
 const etiquetaParada = (p: number) => (p === 0 ? "Welcome" : `Unidad ${String(p)}`);
 
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
@@ -88,6 +90,7 @@ function ImagenesCursoPageContenido() {
   const [curso, setCurso] = useState<Curso>("JUNIOR");
   const [nivel, setNivel] = useState<string>("ROOKIE");
   const [unidad, setUnidad] = useState(1);
+  const [paradas, setParadas] = useState<number[]>(PARADAS_INICIALES);
   const [actualUrl, setActualUrl] = useState<string | null>(null);
   const [previo, setPrevio] = useState<string | null>(null); // data URL del archivo elegido
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -115,10 +118,15 @@ function ImagenesCursoPageContenido() {
   const cargarActual = useCallback(async () => {
     const res = await apiFetch(`/api/catalog/imagen-curso?${query()}`);
     if (res.ok) {
-      const data: { url: string | null } = await res.json();
+      const data: { url: string | null; paradas?: number[] | null } = await res.json();
       setActualUrl(data.url !== null ? `${data.url}?t=${Date.now()}` : null);
+      if (usaUnidad && data.paradas != null) {
+        setParadas(data.paradas);
+        // Venía de un nivel con más unidades (Elite·Unidad 5): a la última de este.
+        if (!data.paradas.includes(unidad)) setUnidad(data.paradas[data.paradas.length - 1] ?? 0);
+      }
     }
-  }, [query]);
+  }, [query, usaUnidad, unidad]);
 
   // Cambiar de tipo: corrige el nivel si dejó de ser válido (premio no admite TODOS).
   function cambiarTipo(t: Tipo) {
@@ -374,7 +382,7 @@ function ImagenesCursoPageContenido() {
               onChange={(e) => setUnidad(Number(e.target.value))}
               style={{ ...input, width: "16rem" }}
             >
-              {PARADAS.map((p) => (
+              {paradas.map((p) => (
                 <option key={p} value={p}>
                   {etiquetaParada(p)}
                 </option>

@@ -171,13 +171,17 @@ describe.runIf(RUN)("material del alumno (integración)", () => {
     expect(await archivoDeMaterial(id)).toMatchObject({ tipo: "imprimible", parada: 2 });
 
     const nivel = (await estadoMaterial())["YOUNGSTER"]?.find((n) => n.nivel === "ELITE");
+    // Youngster·Elite trae Welcome + CINCO unidades (los demás niveles, cuatro).
     expect(nivel?.imprimibles.map((p) => p.etiqueta)).toEqual([
       "Welcome",
       "Unidad 1",
       "Unidad 2",
       "Unidad 3",
       "Unidad 4",
+      "Unidad 5",
     ]);
+    const champion = (await estadoMaterial())["YOUNGSTER"]?.find((n) => n.nivel === "CHAMPION");
+    expect(champion?.imprimibles.map((p) => p.parada)).toEqual([0, 1, 2, 3, 4]);
     expect(nivel?.imprimibles.find((p) => p.parada === 2)?.archivo?.id).toBe(id);
     expect(nivel?.imprimibleCompleto).toBeNull();
 

@@ -93,7 +93,7 @@ export async function misionesAutorizadas(
   curso: string,
   nivel: string,
 ): Promise<number[]> {
-  return caminoAbierto(await paradasAutorizadas(childPersonId, curso, nivel));
+  return caminoAbierto(await paradasAutorizadas(childPersonId, curso, nivel), curso, nivel);
 }
 
 /** Lo abierto a varios niños (la lista de una sesión), para pintarlo de una vez. */
@@ -116,6 +116,11 @@ export interface ResultadoAutorizacion {
   nivel: string | null;
   /** Ya la tenía abierta: autorizar de nuevo no duplica ni cambia quién la abrió. */
   yaEstaba: boolean;
+  /**
+   * Esa parada no existe en SU curso y nivel (la Unidad 5 solo la tiene
+   * Youngster·Elite): no se le abrió nada.
+   */
+  noAplica?: boolean;
 }
 
 /**
@@ -154,6 +159,10 @@ export async function autorizarMisiones(input: {
         continue;
       }
       const elNivel = input.nivel ?? nivel.actual;
+      if (!paradaValida(input.parada, nivel.curso, elNivel)) {
+        salida.push({ childPersonId: id, nivel: elNivel, yaEstaba: false, noAplica: true });
+        continue;
+      }
       const insertadas = await execute(
         `INSERT INTO catalog_mision_autorizada
            (id, child_person_id, curso, nivel, parada, session_id, autorizado_por)
@@ -184,7 +193,8 @@ export async function autorizarMisiones(input: {
       parada: input.parada,
       etiqueta: etiquetaParada(input.parada),
       nivel: input.nivel ?? "(el de cada niño)",
-      abiertas: resultados.filter((r) => r.nivel !== null && !r.yaEstaba).length,
+      abiertas: resultados.filter((r) => r.nivel !== null && !r.yaEstaba && r.noAplica !== true)
+        .length,
       ninos: resultados.map((r) => r.childPersonId),
     },
     ip: input.ip ?? null,

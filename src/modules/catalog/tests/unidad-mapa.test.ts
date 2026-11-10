@@ -4,11 +4,14 @@ import {
   PARADAS_MAPA,
   PARADA_WELCOME,
   UNIDADES_MAPA,
+  UNIDADES_MAXIMAS,
   caminoAbierto,
   etiquetaParada,
   paradaValida,
+  paradasDelNivel,
   todasLasUnidades,
   unidadMapa,
+  unidadesDelNivel,
 } from "../domain/unidad-mapa";
 
 /**
@@ -49,8 +52,9 @@ describe("unidad del catálogo → parada del mapa", () => {
     expect(unidadMapa("UNIDAD  0")).toBe(PARADA_WELCOME);
   });
 
-  it("una unidad más allá del mapa no inventa parada", () => {
-    expect(unidadMapa("Unidad 5")).toBeNull();
+  it("una unidad más allá del mapa del NIVEL no inventa parada", () => {
+    expect(unidadMapa("Unidad 5", "JUNIOR", "ELITE")).toBeNull();
+    expect(unidadMapa("Unidad 5", "YOUNGSTER", "CHAMPION")).toBeNull();
     expect(unidadMapa("Unidad 12")).toBeNull();
   });
 
@@ -61,10 +65,11 @@ describe("unidad del catálogo → parada del mapa", () => {
     expect(unidadMapa("Unidad")).toBeNull();
   });
 
-  it("paradaValida acepta 0..4 y rechaza lo demás", () => {
-    for (const n of PARADAS) expect(paradaValida(n)).toBe(true);
+  it("paradaValida acepta 0..4 en un nivel corriente y rechaza lo demás", () => {
+    for (const n of PARADAS) expect(paradaValida(n, "JUNIOR", "ROOKIE")).toBe(true);
     expect(paradaValida(-1)).toBe(false);
-    expect(paradaValida(5)).toBe(false);
+    expect(paradaValida(5, "JUNIOR", "ROOKIE")).toBe(false);
+    expect(paradaValida(UNIDADES_MAXIMAS + 1)).toBe(false);
     expect(paradaValida(1.5)).toBe(false);
     expect(paradaValida("2")).toBe(false);
     expect(paradaValida(undefined)).toBe(false);
@@ -102,7 +107,42 @@ describe("camino abierto", () => {
   });
 
   it("el nivel completo se abre solo al llegar a la última unidad", () => {
-    expect(todasLasUnidades(caminoAbierto([3]))).toBe(false);
-    expect(todasLasUnidades(caminoAbierto([UNIDADES_MAPA]))).toBe(true);
+    expect(todasLasUnidades(caminoAbierto([3]), "JUNIOR", "ROOKIE")).toBe(false);
+    expect(todasLasUnidades(caminoAbierto([UNIDADES_MAPA]), "JUNIOR", "ROOKIE")).toBe(true);
+  });
+});
+
+/**
+ * YOUNGSTER·ELITE trae Welcome + CINCO unidades (libro, cuaderno y PDF de la
+ * Unidad 0 a la 5). Con el 4 fijo, la Unidad 5 no se podía asignar en ningún
+ * lado y el nivel completo se abría una unidad antes.
+ */
+describe("niveles con otra cantidad de unidades", () => {
+  it("Youngster·Elite tiene cinco; los demás, cuatro", () => {
+    expect(unidadesDelNivel("YOUNGSTER", "ELITE")).toBe(5);
+    expect(paradasDelNivel("YOUNGSTER", "ELITE")).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(unidadesDelNivel("JUNIOR", "ELITE")).toBe(4);
+    expect(unidadesDelNivel("YOUNGSTER", "CHAMPION")).toBe(4);
+    expect(paradasDelNivel("JUNIOR", "ROOKIE")).toEqual(PARADAS);
+    // Tolera cómo llega el texto.
+    expect(unidadesDelNivel(" youngster ", "elite")).toBe(5);
+  });
+
+  it("la Unidad 5 es parada en Youngster·Elite y en ningún otro", () => {
+    expect(unidadMapa("Unidad 5", "YOUNGSTER", "ELITE")).toBe(5);
+    expect(paradaValida(5, "YOUNGSTER", "ELITE")).toBe(true);
+    expect(paradaValida(6, "YOUNGSTER", "ELITE")).toBe(false);
+    // Sin nivel se acepta lo que exista en ALGÚN nivel.
+    expect(paradaValida(5)).toBe(true);
+  });
+
+  it("el nivel completo de Elite pide la quinta", () => {
+    expect(todasLasUnidades(caminoAbierto([4]), "YOUNGSTER", "ELITE")).toBe(false);
+    expect(todasLasUnidades(caminoAbierto([5]), "YOUNGSTER", "ELITE")).toBe(true);
+  });
+
+  it("el camino de un nivel de cuatro no se estira con una 5", () => {
+    expect(caminoAbierto([5], "JUNIOR", "ROOKIE")).toEqual([0]);
+    expect(caminoAbierto([5], "YOUNGSTER", "ELITE")).toEqual([0, 1, 2, 3, 4, 5]);
   });
 });

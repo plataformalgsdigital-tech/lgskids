@@ -246,7 +246,7 @@ interface CasillaDescarga {
   url: string | null;
 }
 
-/** El PDF del NIVEL ENTERO: se abre con las cuatro unidades. */
+/** El PDF del NIVEL ENTERO: se abre con todas las unidades del nivel. */
 interface CasillaCompleta {
   abierta: boolean;
   url: string | null;
@@ -274,7 +274,7 @@ interface MaterialAlumno {
     imprimibles: CasillaDescarga[];
     /** Libro de actividades, también por unidad. */
     actividades: CasillaDescarga[];
-    /** Los dos del nivel entero: se abren con las cuatro unidades. */
+    /** Los dos del nivel entero: se abren con todas las unidades del nivel. */
     imprimibleCompleto: CasillaCompleta | null;
     actividadesCompleto: CasillaCompleta | null;
   }[];
@@ -334,7 +334,7 @@ export default function MiPanelPage() {
   // Sella el ofrecimiento inicial de foto para no insistir en cada visita.
   const [fotoOfrecida, setFotoOfrecida] = useState(false);
   const [avanceNivel, setAvanceNivel] = useState<string | null>(null);
-  /** Unidad abierta desde el mapa de la isla: { nivel, unidad 1..4 }. */
+  /** Unidad abierta desde el mapa de la isla: { nivel, unidad 1..N del nivel }. */
   const [unidadAbierta, setUnidadAbierta] = useState<{ nivel: string; unidad: number } | null>(
     null,
   ); // isla abierta (código de nivel) o null = mapa
@@ -2881,7 +2881,7 @@ export default function MiPanelPage() {
                           </a>
                         ) : (
                           <span
-                            title="Se abre cuando tu guía te abra las cuatro unidades"
+                            title="Se abre cuando tu guía te abra todas las unidades"
                             style={{
                               ...chip,
                               border: "1.5px dashed #d8dce6",
@@ -3175,7 +3175,14 @@ export default function MiPanelPage() {
                                   marca(
                                     `u${i}`,
                                     p,
-                                    botonUnidad(n.codigo, i, n.leccionesCompletadas, "2.8rem"),
+                                    // Completo = todas vistas: un nivel de 5 unidades
+                                    // (Youngster·Elite) cuenta 4 prácticas.
+                                    botonUnidad(
+                                      n.codigo,
+                                      i,
+                                      completo ? hs.unidades.length : n.leccionesCompletadas,
+                                      "2.8rem",
+                                    ),
                                   ),
                                 )}
                                 {/* Unidad actual: aro que late */}

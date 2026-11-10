@@ -4,11 +4,11 @@ import { withTransaction } from "@/platform/db/transaction";
 import { ValidationError } from "@/platform/errors";
 import { NIVELES, TIPOS_CURSO } from "../domain/curriculo";
 import {
-  PARADAS,
   PARADA_WELCOME,
-  UNIDADES_MAPA,
   paradaValida,
+  paradasDelNivel,
   unidadMapa,
+  unidadesDelNivel,
 } from "../domain/unidad-mapa";
 
 /**
@@ -23,7 +23,7 @@ import {
  * guardada dentro de la propia actividad. Nombre y enlace se siguen editando
  * donde siempre.
  *
- * Qué lección cae en qué parada lo decide `unidadMapa`: "Unidad 0".."Unidad 4",
+ * Qué lección cae en qué parada lo decide `unidadMapa`: "Unidad 0".."Unidad N" del nivel,
  * donde la 0 es el **Welcome** (parada de pleno derecho desde 2026-09-11, con su
  * propia insignia). Los repasos y las evaluaciones no tienen parada, así que sus
  * actividades existen pero no se abren desde el mapa.
@@ -128,14 +128,14 @@ export async function juegosDeUnidad(
   unidad: number,
 ): Promise<Juego[]> {
   exigirCursoNivel(curso, nivel);
-  if (!paradaValida(unidad)) {
+  if (!paradaValida(unidad, curso, nivel)) {
     throw new ValidationError(
       `Parada inválida: ${String(unidad)} (${String(PARADA_WELCOME)} a ` +
-        `${String(UNIDADES_MAPA)}; la ${String(PARADA_WELCOME)} es el Welcome).`,
+        `${String(unidadesDelNivel(curso, nivel))}; la ${String(PARADA_WELCOME)} es el Welcome).`,
     );
   }
   const filas = await actividadesDelNivel(curso, nivel);
-  return filas.filter((f) => unidadMapa(f.unidad) === unidad).flatMap(juegosDeFila);
+  return filas.filter((f) => unidadMapa(f.unidad, curso, nivel) === unidad).flatMap(juegosDeFila);
 }
 
 export interface LeccionSinCasilla {
@@ -161,7 +161,7 @@ export async function leccionesSinCasilla(
   const filas = await actividadesDelNivel(curso, nivel);
   const sueltas: LeccionSinCasilla[] = [];
   for (const f of filas) {
-    if (unidadMapa(f.unidad) !== null) continue;
+    if (unidadMapa(f.unidad, curso, nivel) !== null) continue;
     const cuantas = juegosDeFila(f).length;
     if (cuantas === 0) continue;
     sueltas.push({ leccion: f.leccion, unidad: f.unidad ?? "(sin unidad)", actividades: cuantas });
@@ -177,9 +177,9 @@ export async function juegosDeNivel(
   if (!CURSOS.includes(curso) || !NIVELES_CODIGO.includes(nivel)) return {};
   const filas = await actividadesDelNivel(curso, nivel);
   const mapa: Record<number, Juego[]> = {};
-  for (const p of PARADAS) mapa[p] = [];
+  for (const p of paradasDelNivel(curso, nivel)) mapa[p] = [];
   for (const f of filas) {
-    const u = unidadMapa(f.unidad);
+    const u = unidadMapa(f.unidad, curso, nivel);
     if (u === null) continue;
     mapa[u] = [...(mapa[u] ?? []), ...juegosDeFila(f)];
   }
