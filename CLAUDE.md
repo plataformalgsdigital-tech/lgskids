@@ -197,6 +197,20 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   `usuarios.ver_clave` (la respuesta trae
   `puedeVerClaves` y `userId`; la ruta de la bóveda lo vuelve a exigir). El guía
   sale por su NOMBRE (`scheduling_guia`), no por el usuario generado.
+  **"✏️ Editar datos" (2026-11-11)**, junto a "Enviar acceso por WhatsApp"
+  (`EditarDatosModal.tsx`, `GET|PUT /api/contracts/ninos/[id]/datos` →
+  `datosNinoEditables`/`editarDatosNino` en `contracts/application/datos-nino.ts`;
+  `personas.gestionar` + opción `op.kids.editar_datos`, migración
+  `20261111000000`, con alcance por país). Edita del niño fecha de nacimiento,
+  correo y teléfono, y de su apoderado nombre, correo, teléfono y parentesco, en UNA
+  transacción con auditoría del antes y el después (`contracts.datos_nino_editados`).
+  **NO se editan** (decisión del negocio; el esquema ni los recibe): nombre,
+  documento, usuario y país del niño, nada académico ni del contrato, el documento
+  del apoderado y el NOMBRE del apoderado que es TITULAR (es dato del contrato). Si el
+  niño compartía correo/teléfono con el apoderado y solo se cambia el del apoderado,
+  el niño lo sigue; uno propio no se pisa. La cuenta del niño toma el correo nuevo
+  si lleva correo familiar o sintético (`actualizarCorreoFamiliarTx`). Prueba:
+  `contracts/tests/datos-nino-integration.test.ts`.
   **El encabezado dice dónde va (2026-10-15)**: una línea "Curso · Nivel · Lección"
   bajo la de ID/Contrato/Programa, leída del MISMO avance que Academic Info
   (`personas/[id]/ubicacion.ts`, `ubicacionActual`: primer nivel sin completar y la

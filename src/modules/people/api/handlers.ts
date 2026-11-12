@@ -132,5 +132,7 @@ export const detalleNinoHandler = handlerWithAuth(async (_request, auth, context
     // Las opciones de la ficha (Roles › Operación › Kids).
     puedeEnviarMensajes: profile.hasPermission("op.kids.whatsapp_acceso"),
     puedeEnviarEnlace: profile.hasPermission("op.kids.enlace_perfil"),
+    // "✏️ Editar datos" (la ruta lo vuelve a exigir).
+    puedeEditarDatos: profile.hasPermission("op.kids.editar_datos"),
   });
 });

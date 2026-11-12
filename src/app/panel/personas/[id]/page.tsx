@@ -8,6 +8,7 @@ import { usePermisos } from "@/ui/permisos";
 import { numeroContrato } from "@/ui/numero-contrato";
 import { ClaveConsultada, type ConsultaClave } from "../../usuarios/comunes";
 import { AcademicInfo } from "./AcademicInfo";
+import { EditarDatosModal } from "./EditarDatosModal";
 import { EnviarCredencialesModal } from "./EnviarCredencialesModal";
 import { CasosNino } from "./CasosNino";
 import { PerfilWelcome } from "./PerfilWelcome";
@@ -123,6 +124,8 @@ export default function DetalleNinoPage() {
   const [puedeVerClaves, setPuedeVerClaves] = useState(false);
   const [puedeEnviarMensajes, setPuedeEnviarMensajes] = useState(false);
   const [puedeEnviarEnlace, setPuedeEnviarEnlace] = useState(false);
+  const [puedeEditarDatos, setPuedeEditarDatos] = useState(false);
+  const [editandoDatos, setEditandoDatos] = useState(false);
   const { puede } = usePermisos();
   const [enviandoCredenciales, setEnviandoCredenciales] = useState(false);
   const [pestana, setPestana] = useState<"general" | "academic">("general");
@@ -157,6 +160,7 @@ export default function DetalleNinoPage() {
         puedeVerClaves?: boolean;
         puedeEnviarMensajes?: boolean;
         puedeEnviarEnlace?: boolean;
+        puedeEditarDatos?: boolean;
         error?: { message: string };
       } = await res.json();
       if (!res.ok) {
@@ -167,6 +171,7 @@ export default function DetalleNinoPage() {
       setPuedeVerClaves(data.puedeVerClaves === true);
       setPuedeEnviarMensajes(data.puedeEnviarMensajes === true);
       setPuedeEnviarEnlace(data.puedeEnviarEnlace === true);
+      setPuedeEditarDatos(data.puedeEditarDatos === true);
       // Dónde va (curso, nivel, lección): el MISMO avance que lee Academic Info.
       // Sin `progresion.ver` la línea simplemente no se muestra.
       const rp = await apiFetch(`/api/progression/children/${params.id}`);
@@ -322,6 +327,16 @@ export default function DetalleNinoPage() {
         />
       )}
 
+      {editandoDatos && (
+        <EditarDatosModal
+          childPersonId={nino.id}
+          onCerrar={(guardado) => {
+            setEditandoDatos(false);
+            if (guardado) setRecarga((n) => n + 1);
+          }}
+        />
+      )}
+
       {pestana === "academic" && puede("op.kids.academic_info") && (
         <AcademicInfo
           childPersonId={nino.id}
@@ -346,25 +361,46 @@ export default function DetalleNinoPage() {
               }}
             >
               <h2 style={{ fontSize: "1.1rem", margin: 0 }}>Datos personales</h2>
-              {puedeEnviarMensajes && nino.userId !== null && (
-                <button
-                  type="button"
-                  onClick={() => setEnviandoCredenciales(true)}
-                  title="Envía usuario y clave al WhatsApp del apoderado"
-                  style={{
-                    padding: "0.4rem 0.9rem",
-                    borderRadius: "0.6rem",
-                    border: "none",
-                    background: "#25d366",
-                    color: "white",
-                    fontWeight: 700,
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  📲 Enviar acceso por WhatsApp
-                </button>
-              )}
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                {puedeEditarDatos && (
+                  <button
+                    type="button"
+                    onClick={() => setEditandoDatos(true)}
+                    title="Datos personales del niño y de su apoderado (no nombre, documento ni usuario)"
+                    style={{
+                      padding: "0.4rem 0.9rem",
+                      borderRadius: "0.6rem",
+                      border: "1.5px solid var(--lgs-azul)",
+                      background: "white",
+                      color: "var(--lgs-azul)",
+                      fontWeight: 700,
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✏️ Editar datos
+                  </button>
+                )}
+                {puedeEnviarMensajes && nino.userId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setEnviandoCredenciales(true)}
+                    title="Envía usuario y clave al WhatsApp del apoderado"
+                    style={{
+                      padding: "0.4rem 0.9rem",
+                      borderRadius: "0.6rem",
+                      border: "none",
+                      background: "#25d366",
+                      color: "white",
+                      fontWeight: 700,
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    📲 Enviar acceso por WhatsApp
+                  </button>
+                )}
+              </div>
             </div>
             {/* Tres líneas fijas: identidad · contacto (el correo ocupa dos columnas,
             porque el sintético es largo) · acceso. */}

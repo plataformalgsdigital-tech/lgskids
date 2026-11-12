@@ -206,6 +206,9 @@ export const OPCIONES_MENU = [
   // ── Operación › Kids ──────────────────────────────────────────────────
   op("menu.kids", "op.kids.csv", "Descargar CSV", ["personas.ver"]),
   op("menu.kids", "op.kids.academic_info", "Pestaña Academic Info", ["personas.ver"]),
+  op("menu.kids", "op.kids.editar_datos", "Editar datos del niño y del apoderado", [
+    "personas.gestionar",
+  ]),
   op("menu.kids", "op.kids.whatsapp_acceso", "Enviar acceso por WhatsApp", ["mensajes.enviar"]),
   op("menu.kids", "op.kids.enlace_perfil", "Enviar enlace de perfil (con o sin Welcome)", [
     "mensajes.enviar",

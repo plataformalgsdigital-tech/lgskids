@@ -91,3 +91,5 @@ export {
   reactivarHandler,
   inactivarHandler,
 } from "./api/handlers";
+export { datosNinoEditables, editarDatosNino } from "./application/datos-nino";
+export type { DatosNinoEditables, EdicionDatosNino } from "./application/datos-nino";
