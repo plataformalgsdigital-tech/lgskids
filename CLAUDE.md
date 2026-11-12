@@ -456,6 +456,22 @@ Migración `20260921100000_cuentas_usuario`.
     que se les restablezca la clave o la cambien.
     **Rotar la llave** deja ilegibles las copias existentes (`ILEGIBLE`); todavía no
     hay script de recifrado.
+    **Recuperar la copia desde LGS SIN cambiar la clave (2026-11-12)**: LGS guarda la
+    clave INICIAL de cada niño que matriculó (`KIDS_INSCRIPCIONES.kidsPassword`) y la
+    entrega a KIDS por `POST {LGS_API_URL}/api/kids-sync/claves-iniciales` (con la
+    clave de servicio; `clavesInicialesDeLgs`). `recuperarClavesDesdeLgs`
+    (`contracts/application/recuperar-claves.ts`) toma los niños con cuenta SIN copia
+    y contrato de LGS, y `guardarCopiaSiCoincide` (identity) la verifica contra el
+    hash: SOLO si abre la cuenta guarda la copia cifrada (el hash va en el `WHERE`,
+    por si cambió entretanto); si el niño ya la cambió → `NO_COINCIDE` y no se toca.
+    No cambia hash, marca ni sesiones. Dos puertas, ambas para quien puede ver claves
+    (`puedeVerClaves`): el botón **"↻ Recuperar copia desde LGS"** junto al aviso "Sin
+    copia" de la ficha del niño (`POST /api/contracts/ninos/[id]/recuperar-clave`) y la
+    tarjeta **"🔑 Claves Sin copia de niños de LGS"** en Usuarios y roles › Consultar
+    (`POST /api/contracts/recuperar-claves-lgs` con `aplicar: false` = revisar, sin
+    guardar; `true` = recuperar). Ninguna devuelve claves; auditoría
+    `identity.copia_clave_recuperada_lgs` con QUIÉNES, nunca cuáles. Prueba:
+    `contracts/tests/recuperar-claves-integration.test.ts` (LGS simulado).
 - **"Cambiar clave al entrar" se hace cumplir en el SERVIDOR**: con la marca
   encendida, el autenticador responde **403 `DEBE_CAMBIAR_PASSWORD`**
   (`DebeCambiarPasswordError`) a toda ruta salvo `/api/auth/me` y

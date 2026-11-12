@@ -99,6 +99,61 @@ export async function avisarDatosNinoALgs(cuerpo: DatosNinoLgs): Promise<Respues
   return llamarLgs("datos-nino", cuerpo);
 }
 
+/** Clave inicial que LGS guardó de un niño al matricularlo en KIDS. */
+export interface ClaveInicialLgs {
+  externalRef: string;
+  username: string | null;
+  clave: string;
+}
+
+/**
+ * Las claves INICIALES que LGS guardó de estos niños (`/api/kids-sync/claves-iniciales`),
+ * para recuperar la copia de la bóveda de cuentas que no la tienen. Solo devuelve las
+ * que LGS tiene; sin la integración configurada, lanza (no hay de dónde sacarlas).
+ * Lo que vuelve NO se registra en ningún log.
+ */
+export async function clavesInicialesDeLgs(externalRefs: string[]): Promise<ClaveInicialLgs[]> {
+  const e = env();
+  if (!e.LGS_API_URL || !e.LGS_INTAKE_API_KEY) {
+    throw new ConflictError("La integración con LGS no está configurada (LGS_API_URL).");
+  }
+  const url = `${e.LGS_API_URL.replace(/\/+$/, "")}/api/kids-sync/claves-iniciales`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": e.LGS_INTAKE_API_KEY },
+      body: JSON.stringify({ externalRefs }),
+      signal: AbortSignal.timeout(20_000),
+      cache: "no-store",
+    });
+  } catch (error) {
+    logger.error("LGS no respondió al pedir claves iniciales", { error: String(error) });
+    throw new ConflictError("LGS no respondió. Intenta de nuevo en unos minutos.");
+  }
+  const data = (await res.json().catch(() => ({}))) as {
+    success?: boolean;
+    error?: string;
+    claves?: { externalRef?: unknown; username?: unknown; clave?: unknown }[];
+  };
+  if (!res.ok || data.success === false) {
+    throw new ConflictError(
+      `LGS rechazó la consulta: ${data.error ?? `HTTP ${String(res.status)}`}`,
+    );
+  }
+  return (data.claves ?? []).flatMap((c) =>
+    typeof c.externalRef === "string" && typeof c.clave === "string" && c.clave !== ""
+      ? [
+          {
+            externalRef: c.externalRef,
+            username: typeof c.username === "string" ? c.username : null,
+            clave: c.clave,
+          },
+        ]
+      : [],
+  );
+}
+
 async function llamarLgs(
   ruta: "onhold" | "extension" | "matricula" | "datos-nino",
   cuerpo: object,

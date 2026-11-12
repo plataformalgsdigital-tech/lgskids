@@ -23,6 +23,8 @@ export {
   CLAVE_NINO_MIN,
 } from "./domain/password-policy";
 export { fijarClaveNinoTx } from "./application/clave-nino";
+export { bovedaEncendida, guardarCopiaSiCoincide } from "./application/recuperar-copia";
+export type { ResultadoCopia } from "./application/recuperar-copia";
 export {
   provisionarUsuarioAlumno,
   actualizarCorreoFamiliarTx,

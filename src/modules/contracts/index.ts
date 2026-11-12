@@ -93,3 +93,9 @@ export {
 } from "./api/handlers";
 export { datosNinoEditables, editarDatosNino } from "./application/datos-nino";
 export type { DatosNinoEditables, EdicionDatosNino } from "./application/datos-nino";
+export { recuperarClavesDesdeLgs } from "./application/recuperar-claves";
+export type {
+  FilaRecuperacion,
+  Recuperacion,
+  ResultadoRecuperacion,
+} from "./application/recuperar-claves";

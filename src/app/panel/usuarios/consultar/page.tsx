@@ -18,6 +18,7 @@ import {
   type ConsultaClave,
 } from "../comunes";
 import { ConOpcion } from "@/ui/ConOpcion";
+import { RecuperarCopiasLgs } from "./RecuperarCopiasLgs";
 import { SoloSi } from "@/ui/SoloSi";
 
 type Tipo = "estudiante" | "guia" | "administrativo" | "otro";
@@ -270,6 +271,9 @@ function ConsultarUsuariosPageContenido() {
       <p style={{ margin: 0, color: "var(--texto-suave)", fontSize: "0.9rem" }}>
         Consulta, edita, inactiva o exporta las cuentas. Cada tipo se edita donde vive su ficha.
       </p>
+
+      {/* Solo quien puede ver claves: es justo lo que habilita. */}
+      {puedeVerClaves && <RecuperarCopiasLgs />}
 
       <div style={{ ...tarjeta, marginTop: "1rem", padding: "1rem" }}>
         <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>

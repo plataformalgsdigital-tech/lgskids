@@ -134,6 +134,48 @@ export default function DetalleNinoPage() {
   const [clave, setClave] = useState<ConsultaClave | null>(null);
   const [errorClave, setErrorClave] = useState<string | null>(null);
 
+  const [recuperando, setRecuperando] = useState(false);
+  const [avisoCopia, setAvisoCopia] = useState<string | null>(null);
+
+  /**
+   * "↻ Recuperar copia desde LGS": toma la clave INICIAL que LGS guardó y, si
+   * sigue siendo la del niño, la deja en la bóveda. No cambia la clave.
+   */
+  async function recuperarCopia(userId: string) {
+    setRecuperando(true);
+    setAvisoCopia(null);
+    try {
+      const res = await apiFetch(`/api/contracts/ninos/${params.id}/recuperar-clave`, {
+        method: "POST",
+      });
+      const d = (await res.json().catch(() => ({}))) as {
+        resultado?: string | null;
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        setAvisoCopia(d.error?.message ?? "No se pudo recuperar la copia.");
+        return;
+      }
+      const textos: Record<string, string> = {
+        NO_COINCIDE:
+          "La clave inicial de LGS ya no es la del niño (la cambió). Restablécela o envía el enlace de perfil.",
+        SIN_CLAVE_EN_LGS: "LGS no tiene guardada la clave inicial de este niño.",
+        OTRO_USUARIO: "LGS tiene la clave de otro usuario para este contrato: no se usó.",
+        YA_TENIA: "La cuenta ya tenía copia.",
+      };
+      if (d.resultado === "RECUPERADA") {
+        setClave(null);
+        const r = await apiFetch(`/api/identity/users/${userId}/clave`);
+        if (r.ok) setClave((await r.json()) as ConsultaClave);
+        setAvisoCopia("✔ Copia recuperada desde LGS (la clave no cambió).");
+        return;
+      }
+      setAvisoCopia(textos[d.resultado ?? ""] ?? "No se pudo recuperar la copia.");
+    } finally {
+      setRecuperando(false);
+    }
+  }
+
   async function verClave(userId: string) {
     if (clave !== null) {
       setClave(null);
@@ -461,6 +503,36 @@ export default function DetalleNinoPage() {
                       >
                         {clave === null ? "👁 Ver clave" : "🙈 Ocultar"}
                       </button>
+                      {clave !== null && clave.clave === null && clave.motivo === "SIN_COPIA" && (
+                        <button
+                          type="button"
+                          disabled={recuperando}
+                          onClick={() => nino.userId !== null && void recuperarCopia(nino.userId)}
+                          title="Toma la clave inicial que guardó LGS y, si sigue siendo la del niño, la deja en la bóveda. No cambia la clave."
+                          style={{
+                            padding: "0.2rem 0.6rem",
+                            borderRadius: "0.5rem",
+                            border: "1px solid var(--lgs-azul)",
+                            background: "white",
+                            color: "var(--lgs-azul)",
+                            cursor: recuperando ? "wait" : "pointer",
+                            fontSize: "0.8rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {recuperando ? "Recuperando…" : "↻ Recuperar copia desde LGS"}
+                        </button>
+                      )}
+                      {avisoCopia !== null && (
+                        <span
+                          style={{
+                            fontSize: "0.8rem",
+                            color: avisoCopia.startsWith("✔") ? "#1b5e20" : "#8a4b00",
+                          }}
+                        >
+                          {avisoCopia}
+                        </span>
+                      )}
                       {errorClave !== null && (
                         <span style={{ color: "#c62828", fontSize: "0.8rem" }}>{errorClave}</span>
                       )}
