@@ -209,7 +209,14 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   del apoderado y el NOMBRE del apoderado que es TITULAR (es dato del contrato). Si el
   niño compartía correo/teléfono con el apoderado y solo se cambia el del apoderado,
   el niño lo sigue; uno propio no se pisa. La cuenta del niño toma el correo nuevo
-  si lleva correo familiar o sintético (`actualizarCorreoFamiliarTx`). Prueba:
+  si lleva correo familiar o sintético (`actualizarCorreoFamiliarTx`). **LGS
+  PRIMERO**, como el OnHold y la extensión: si el contrato viene de LGS, antes de
+  guardar se llama `POST {LGS_API_URL}/api/kids-sync/datos-nino`
+  (`avisarDatosNinoALgs` en `infrastructure/lgs-sync.ts`); si LGS rechaza o no
+  responde, no se guarda en ningún lado. Va UNA llamada por cada niño de LGS con ese
+  apoderado (allá cada hermano guarda su copia del apoderado). LGS actualiza el
+  beneficiario en `PEOPLE`/`ACADEMICA` y el apoderado en `KIDS_INSCRIPCIONES` (o solo
+  el contacto del titular, si es el apoderado). Prueba (con LGS simulado):
   `contracts/tests/datos-nino-integration.test.ts`.
   **El encabezado dice dónde va (2026-10-15)**: una línea "Curso · Nivel · Lección"
   bajo la de ID/Contrato/Programa, leída del MISMO avance que Academic Info

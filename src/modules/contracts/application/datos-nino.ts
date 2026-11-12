@@ -1,8 +1,9 @@
 import { registrarAuditoria } from "@/modules/audit";
 import { actualizarCorreoFamiliarTx } from "@/modules/identity";
-import { execute, queryOne } from "@/platform/db/query";
+import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { withTransaction } from "@/platform/db/transaction";
 import { NotFoundError, ValidationError } from "@/platform/errors";
+import { avisarDatosNinoALgs, lgsSyncConfigurado } from "../infrastructure/lgs-sync";
 
 /**
  * EDITAR DATOS DEL NIÑO Y DE SU APODERADO desde la ficha (2026-11-11).
@@ -163,6 +164,46 @@ export async function editarDatosNino(input: {
     ap0?.telefono,
     ap1?.telefono,
   );
+
+  // LGS PRIMERO (como el OnHold y la extensión): si rechaza o no responde, no se
+  // guarda en ningún lado. Va por cada niño que viene de LGS con ESTE apoderado —
+  // allá cada hermano guarda su propia copia del apoderado—; los hermanos llevan
+  // sus datos de siempre (aquí solo cambia el apoderado).
+  if (lgsSyncConfigurado()) {
+    const ninos = await queryRows<{
+      id: string;
+      ref: string;
+      fechaNacimiento: string | null;
+      email: string | null;
+      telefono: string | null;
+    }>(
+      `SELECT p.id, c.external_ref AS ref, p.fecha_nacimiento::text AS "fechaNacimiento",
+              p.email, p.telefono
+         FROM people_person p
+         JOIN LATERAL (SELECT cc.external_ref FROM contracts_contract cc
+                        WHERE cc.beneficiario_id = p.id ORDER BY cc.created_at DESC LIMIT 1) c ON true
+        WHERE c.external_ref IS NOT NULL
+          AND (p.id = $1 OR ($2::uuid IS NOT NULL AND p.id IN
+                 (SELECT g.nino_id FROM people_guardianship g WHERE g.apoderado_id = $2::uuid)))`,
+      [input.childPersonId, ap1 !== null ? (ap0?.id ?? null) : null],
+    );
+    for (const n of ninos) {
+      const propio = n.id === input.childPersonId;
+      // Un niño siempre trae fecha de nacimiento (la exige la reserva).
+      if (!propio && n.fechaNacimiento === null) continue;
+      await avisarDatosNinoALgs({
+        externalRef: n.ref,
+        nino: propio
+          ? { fechaNacimiento: d.nino.fechaNacimiento, email: ninoEmail, telefono: ninoTelefono }
+          : {
+              fechaNacimiento: n.fechaNacimiento as string,
+              email: n.email,
+              telefono: n.telefono,
+            },
+        apoderado: ap1,
+      });
+    }
+  }
 
   await withTransaction(async (tx) => {
     if (ap0 !== null && ap1 !== null) {

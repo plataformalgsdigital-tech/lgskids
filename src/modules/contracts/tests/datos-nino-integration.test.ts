@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { crearCampania } from "@/modules/catalog";
 import { crearSalon } from "@/modules/scheduling";
 import { env } from "@/platform/config/env";
@@ -7,6 +7,22 @@ import { closePool } from "@/platform/db/pool";
 import { execute, queryOne } from "@/platform/db/query";
 import { datosNinoEditables, editarDatosNino } from "../application/datos-nino";
 import { crearReservaBeneficiario } from "../application/gestion-contratos";
+import type { DatosNinoLgs } from "../infrastructure/lgs-sync";
+
+// LGS se simula: la prueba mira QUÉ se le manda y que un rechazo frena todo.
+const lgs = vi.hoisted(() => ({
+  configurado: false,
+  llamadas: [] as DatosNinoLgs[],
+  rechazar: false,
+}));
+vi.mock("../infrastructure/lgs-sync", () => ({
+  lgsSyncConfigurado: () => lgs.configurado,
+  avisarDatosNinoALgs: (c: DatosNinoLgs) => {
+    lgs.llamadas.push(c);
+    if (lgs.rechazar) return Promise.reject(new Error("LGS rechazó el cambio: prueba"));
+    return Promise.resolve({ configurado: true, aplicado: true });
+  },
+}));
 
 /**
  * "✏️ Editar datos" de la ficha del niño (2026-11-11): se editan sus datos
@@ -264,5 +280,62 @@ describe.runIf(RUN)("editar datos del niño y del apoderado (integración)", () 
         },
       }),
     ).rejects.toThrow(/futura/);
+  });
+
+  it("avisa a LGS ANTES de guardar, con el N° de LGS y lo editado", async () => {
+    lgs.configurado = true;
+    lgs.llamadas.length = 0;
+    const fecha = `${String(new Date().getUTCFullYear() - 7)}-06-01`;
+    await editarDatosNino({
+      actorUserId: actor,
+      childPersonId: ninoConApoderado,
+      countryScope: null,
+      datos: {
+        nino: {
+          fechaNacimiento: fecha,
+          email: `propio-${marca}@ejemplo.cl`,
+          telefono: "56955555555",
+        },
+        apoderado: {
+          nombres: "Abuelita",
+          apellidos: APELLIDO,
+          email: `otra-${marca}@ejemplo.cl`,
+          telefono: "56933333333",
+          parentesco: "ABUELA MATERNA",
+        },
+      },
+    });
+    expect(lgs.llamadas).toHaveLength(1);
+    expect(lgs.llamadas[0]).toMatchObject({
+      externalRef: `${base}#EA-${marca}`,
+      nino: { fechaNacimiento: fecha, telefono: "56955555555" },
+      apoderado: { nombres: "Abuelita", parentesco: "ABUELA MATERNA" },
+    });
+  });
+
+  it("si LGS rechaza, KIDS no guarda nada", async () => {
+    lgs.configurado = true;
+    lgs.rechazar = true;
+    try {
+      await expect(
+        editarDatosNino({
+          actorUserId: actor,
+          childPersonId: ninoConApoderado,
+          countryScope: null,
+          datos: {
+            nino: {
+              fechaNacimiento: `${String(new Date().getUTCFullYear() - 7)}-06-01`,
+              email: `nunca-${marca}@ejemplo.cl`,
+              telefono: "56955555555",
+            },
+            apoderado: null,
+          },
+        }),
+      ).rejects.toThrow(/LGS/);
+      expect((await nino(ninoConApoderado))?.email).toBe(`propio-${marca}@ejemplo.cl`);
+    } finally {
+      lgs.rechazar = false;
+      lgs.configurado = false;
+    }
   });
 });

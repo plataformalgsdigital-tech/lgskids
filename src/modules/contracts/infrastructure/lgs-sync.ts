@@ -45,6 +45,24 @@ export interface MatriculaLgs {
   motivo: string;
 }
 
+/**
+ * Datos del niño y de su apoderado editados en su ficha de KIDS → LGS
+ * (`/api/kids-sync/datos-nino`). Solo contacto y fecha de nacimiento del niño y
+ * los datos del apoderado: nombre, documento, usuario, lo académico y el
+ * contrato no viajan.
+ */
+export interface DatosNinoLgs {
+  externalRef: string;
+  nino: { fechaNacimiento: string; email: string | null; telefono: string | null };
+  apoderado: {
+    nombres: string;
+    apellidos: string;
+    email: string | null;
+    telefono: string | null;
+    parentesco: string | null;
+  } | null;
+}
+
 export interface RespuestaLgs {
   configurado: boolean;
   /** false = LGS no tenía nada que hacer (ya estaba así o no existe allá). */
@@ -76,8 +94,13 @@ export async function avisarMatriculaALgs(cuerpo: MatriculaLgs): Promise<Respues
   return llamarLgs("matricula", cuerpo);
 }
 
+/** Datos del niño y del apoderado editados en KIDS → LGS (mismas reglas de error). */
+export async function avisarDatosNinoALgs(cuerpo: DatosNinoLgs): Promise<RespuestaLgs> {
+  return llamarLgs("datos-nino", cuerpo);
+}
+
 async function llamarLgs(
-  ruta: "onhold" | "extension" | "matricula",
+  ruta: "onhold" | "extension" | "matricula" | "datos-nino",
   cuerpo: object,
 ): Promise<RespuestaLgs> {
   const e = env();
