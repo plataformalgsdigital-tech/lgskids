@@ -215,8 +215,13 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   (`avisarDatosNinoALgs` en `infrastructure/lgs-sync.ts`); si LGS rechaza o no
   responde, no se guarda en ningún lado. Va UNA llamada por cada niño de LGS con ese
   apoderado (allá cada hermano guarda su copia del apoderado). LGS actualiza el
-  beneficiario en `PEOPLE`/`ACADEMICA` y el apoderado en `KIDS_INSCRIPCIONES` (o solo
-  el contacto del titular, si es el apoderado). Prueba (con LGS simulado):
+  beneficiario en `PEOPLE`/`ACADEMICA` y SIEMPRE la copia del apoderado en
+  `KIDS_INSCRIPCIONES` —también si es el titular: ahí solo teléfono, correo y
+  parentesco, sin tocar el `PEOPLE` ni el login del titular (corregido 2026-11-12: la
+  ficha de LGS seguía mostrando el teléfono viejo)—. Al revés, "Modificar apoderado"
+  de LGS deja editar el teléfono y el correo del apoderado-titular y los manda a KIDS
+  por `…/reservations/[ref]/apoderado` con el titular como persona (se conserva su
+  nombre). Prueba (con LGS simulado):
   `contracts/tests/datos-nino-integration.test.ts`.
   **El encabezado dice dónde va (2026-10-15)**: una línea "Curso · Nivel · Lección"
   bajo la de ID/Contrato/Programa, leída del MISMO avance que Academic Info
