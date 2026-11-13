@@ -15,6 +15,7 @@ import { apiFetch, irACambiarClaveSiCorresponde } from "@/ui/api-fetch";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 import { AgendarWelcomeModal } from "../panel/servicio/welcome/AgendarWelcomeModal";
 import { InscripcionClubesModal } from "./InscripcionClubes";
+import { NivelBloqueado } from "./NivelBloqueado";
 
 /** Marca que ya se ofreció subir la foto: no se insiste en cada visita. */
 const FOTO_OFRECIDA = "lgs-kids:foto-ofrecida";
@@ -334,6 +335,8 @@ export default function MiPanelPage() {
   // Sella el ofrecimiento inicial de foto para no insistir en cada visita.
   const [fotoOfrecida, setFotoOfrecida] = useState(false);
   const [avanceNivel, setAvanceNivel] = useState<string | null>(null);
+  /** Nivel superior al del niño que tocó en el mapa: no se abre, habla un personaje. */
+  const [nivelBloqueado, setNivelBloqueado] = useState<string | null>(null);
   /** Unidad abierta desde el mapa de la isla: { nivel, unidad 1..N del nivel }. */
   const [unidadAbierta, setUnidadAbierta] = useState<{ nivel: string; unidad: number } | null>(
     null,
@@ -361,6 +364,10 @@ export default function MiPanelPage() {
     if (!verImagen && !verComoVoy && !verHistorial && !verAvance && !verMaterial) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        if (nivelBloqueado !== null) {
+          setNivelBloqueado(null);
+          return;
+        }
         setVerImagen(false);
         setVerComoVoy(false);
         setVerHistorial(false);
@@ -371,7 +378,16 @@ export default function MiPanelPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [verImagen, verComoVoy, verHistorial, verAvance, verPerfil, avanceNivel, verMaterial]);
+  }, [
+    verImagen,
+    verComoVoy,
+    verHistorial,
+    verAvance,
+    verPerfil,
+    avanceNivel,
+    verMaterial,
+    nivelBloqueado,
+  ]);
 
   useEffect(() => {
     let cancelado = false;
@@ -3109,7 +3125,11 @@ export default function MiPanelPage() {
                             <button
                               key={n.codigo}
                               type="button"
-                              onClick={() => setAvanceNivel(n.codigo)}
+                              onClick={() =>
+                                n.estado === "PENDIENTE"
+                                  ? setNivelBloqueado(n.nombre)
+                                  : setAvanceNivel(n.codigo)
+                              }
                               style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -3247,6 +3267,14 @@ export default function MiPanelPage() {
             </div>
           );
         })()}
+
+      {nivelBloqueado !== null && (
+        <NivelBloqueado
+          nivel={nivelBloqueado}
+          esJunior={esJunior}
+          onCerrar={() => setNivelBloqueado(null)}
+        />
+      )}
 
       {/*
         Lámina de la UNIDAD: se abre al tocar "Unidad N" sobre la isla. Va

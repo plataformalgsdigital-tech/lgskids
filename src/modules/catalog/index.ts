@@ -74,6 +74,8 @@ export {
   intervencionEliminarHandler,
 } from "./api/voz-handlers";
 export { vocesParaLibro } from "./application/voz-libro";
+export { audioNivelBloqueado, TEXTO_NIVEL_BLOQUEADO } from "./application/aviso-voz";
+export type { QuienAviso } from "./application/aviso-voz";
 export {
   autorizarMisiones,
   autorizacionParaLibro,
