@@ -28,6 +28,7 @@ export interface OpcionesAcademicas {
     nombre: string;
     tipo: string;
     courseId: string;
+    campaignId: string;
     campania: string;
     cupo: number;
     ocupados: number;
@@ -74,6 +75,7 @@ export async function opcionesAcademicas(contractId: string): Promise<OpcionesAc
         nombre: s.nombre,
         tipo: s.tipo,
         courseId: s.courseId,
+        campaignId: s.campaignId,
         campania: s.campania,
         cupo: s.cupo,
         ocupados: s.ocupados,

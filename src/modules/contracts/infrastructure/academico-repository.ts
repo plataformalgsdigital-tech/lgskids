@@ -16,6 +16,7 @@ export interface PosicionActual {
   classroomId: string | null;
   salon: string | null;
   courseId: string | null;
+  campaignId: string | null;
   campania: string | null;
 }
 
@@ -24,7 +25,7 @@ export async function getPosicionActual(contractId: string): Promise<PosicionAct
     `SELECT c.id AS "contractId", c.beneficiario_id AS "childPersonId",
             c.tipo_curso::text AS "tipoCurso", c.estado::text AS "contratoEstado",
             e.id AS "enrollmentId", cl.id AS "classroomId", cl.nombre AS salon,
-            cl.course_id AS "courseId", ca.nombre AS campania
+            cl.course_id AS "courseId", ca.id AS "campaignId", ca.nombre AS campania
        FROM contracts_contract c
        LEFT JOIN enrollment_enrollment e ON e.contract_id = c.id AND e.estado = 'ACTIVA'
        LEFT JOIN scheduling_classroom cl ON cl.id = e.classroom_id
@@ -40,6 +41,7 @@ export interface SalonCandidato {
   nombre: string;
   tipo: string;
   courseId: string;
+  campaignId: string;
   campania: string;
   cupo: number;
   ocupados: number;
@@ -63,7 +65,7 @@ export async function listSalonesCandidatos(): Promise<SalonCandidato[]> {
   return queryRows<SalonCandidato>(
     `WITH ord AS ${SQL_ORDINAL_CLASE}, sec AS ${SQL_SECUENCIA_LECCIONES}
      SELECT cl.id, cl.nombre, co.tipo::text AS tipo, co.id AS "courseId",
-            ca.nombre AS campania, cl.cupo,
+            ca.id AS "campaignId", ca.nombre AS campania, cl.cupo,
             (SELECT count(*)::int FROM enrollment_enrollment e
               WHERE e.classroom_id = cl.id AND e.estado IN ('ACTIVA', 'RESERVADA')) AS ocupados,
             COALESCE(NULLIF(TRIM(CONCAT_WS(' ', gg.nombres, gg.apellidos)), ''), g.username) AS guia,

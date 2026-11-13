@@ -27,6 +27,7 @@ interface Salon {
   nombre: string;
   tipo: string;
   courseId: string;
+  campaignId: string;
   campania: string;
   cupo: number;
   ocupados: number;
@@ -45,6 +46,7 @@ interface Opciones {
     classroomId: string | null;
     salon: string | null;
     courseId: string | null;
+    campaignId: string | null;
     campania: string | null;
   };
   salones: Salon[];
@@ -128,6 +130,8 @@ export function AcademicChangeModal(props: {
   const { puede } = usePermisos();
   const [mov, setMov] = useState<Movimiento>("SALON");
   const [salonId, setSalonId] = useState("");
+  // Campaña del salón destino ("" = la que el niño ya tiene).
+  const [campaniaElegida, setCampaniaElegida] = useState("");
   const [levelId, setLevelId] = useState("");
   const [lecciones, setLecciones] = useState(0);
   const [motivo, setMotivo] = useState("");
@@ -154,16 +158,39 @@ export function AcademicChangeModal(props: {
   const tipoDestino =
     mov === "PROMOVER" ? "YOUNGSTER" : mov === "DEGRADAR" ? "JUNIOR" : (actual?.tipoCurso ?? "");
 
-  // Salones elegibles según el movimiento: del MISMO curso (cambio de salón)
-  // o del otro tipo (promover/degradar). Con cupo libre, o el actual.
+  // Campañas con salones del tipo de curso destino: la actual del niño, las
+  // anteriores que siguen en marcha y las que vienen. Más recientes primero
+  // (el servidor ya entrega los salones ordenados por inicio de campaña).
+  const campanias = useMemo(() => {
+    if (op === null) return [];
+    const vistas = new Map<string, string>();
+    for (const s of op.salones) {
+      if (s.tipo === tipoDestino && !vistas.has(s.campaignId)) vistas.set(s.campaignId, s.campania);
+    }
+    return [...vistas].map(([id, nombre]) => ({ id, nombre }));
+  }, [op, tipoDestino]);
+  const campaniaActualId = actual?.campaignId ?? null;
+  // Por defecto la del niño; si esa no tiene salones del curso destino (o no
+  // tiene matrícula), la primera que sí.
+  const campaniaId =
+    campaniaElegida !== ""
+      ? campaniaElegida
+      : campanias.some((c) => c.id === campaniaActualId)
+        ? (campaniaActualId ?? "")
+        : (campanias[0]?.id ?? "");
+  // Mismo tipo de curso pero en OTRA campaña: es otro curso del catálogo, con su
+  // propio avance, así que se ubica al niño igual que al promover o degradar.
+  const otraCampania =
+    mov === "SALON" && campaniaActualId !== null && campaniaId !== campaniaActualId;
+
+  // Salones elegibles de la campaña elegida, del tipo de curso que corresponde
+  // al movimiento (el mismo para cambiar de salón; el otro al promover/degradar).
   const salonesElegibles = useMemo(() => {
     if (op === null || actual === null) return [];
-    return op.salones.filter((s) =>
-      mov === "SALON"
-        ? s.courseId === actual.courseId && s.id !== actual.classroomId
-        : s.tipo === tipoDestino,
+    return op.salones.filter(
+      (s) => s.tipo === tipoDestino && s.campaignId === campaniaId && s.id !== actual.classroomId,
     );
-  }, [op, actual, mov, tipoDestino]);
+  }, [op, actual, tipoDestino, campaniaId]);
 
   const salon = op?.salones.find((s) => s.id === salonId) ?? null;
   const salonActual = op?.salones.find((s) => s.id === actual?.classroomId) ?? null;
@@ -173,7 +200,8 @@ export function AcademicChangeModal(props: {
     opcion === "AJUSTE" ? (actual?.courseId ?? null) : (salon?.courseId ?? null);
   const niveles = courseIdNiveles !== null ? (op?.niveles[courseIdNiveles] ?? []) : [];
   const nivel = niveles.find((n) => n.id === levelId) ?? null;
-  const conUbicacion = opcion === "AJUSTE" || (opcion === "CURSO" && mov !== "SALON");
+  const conUbicacion =
+    opcion === "AJUSTE" || (opcion === "CURSO" && (mov !== "SALON" || otraCampania));
 
   function aplicarSugerencia(s: Salon | null) {
     if (s?.sugerencia == null) return;
@@ -185,11 +213,20 @@ export function AcademicChangeModal(props: {
     setSalonId(id);
     // En promover/degradar, se propone el punto en que va el salón destino:
     // el niño queda alineado con su grupo nuevo.
-    if (mov !== "SALON") aplicarSugerencia(op?.salones.find((s) => s.id === id) ?? null);
+    if (conUbicacion) aplicarSugerencia(op?.salones.find((s) => s.id === id) ?? null);
+  }
+
+  function elegirCampania(id: string) {
+    setCampaniaElegida(id);
+    setSalonId("");
+    setLevelId("");
+    setLecciones(0);
+    setResumen(false);
   }
 
   function cambiarMov(m: Movimiento) {
     setMov(m);
+    setCampaniaElegida("");
     setSalonId("");
     setLevelId("");
     setLecciones(0);
@@ -200,6 +237,7 @@ export function AcademicChangeModal(props: {
     setOpcion(o);
     setResumen(false);
     setError(null);
+    setCampaniaElegida("");
     setSalonId("");
     setLevelId("");
     setLecciones(0);
@@ -227,7 +265,7 @@ export function AcademicChangeModal(props: {
           body: JSON.stringify({ levelId, lecciones, motivo: motivo.trim() }),
         });
         hecho = `Ajuste aplicado: ${nivel?.nombre ?? ""}, ${String(lecciones)} lección(es) cursadas.`;
-      } else if (mov === "SALON") {
+      } else if (mov === "SALON" && !otraCampania) {
         if (actual.enrollmentId === null) {
           setError("El niño no tiene matrícula activa.");
           return;
@@ -249,7 +287,10 @@ export function AcademicChangeModal(props: {
             motivo: motivo.trim(),
           }),
         });
-        hecho = `${mov === "PROMOVER" ? "Promovido" : "Degradado"} a ${CURSO_UI[tipoDestino] ?? tipoDestino}, ${salon?.nombre ?? ""}.`;
+        hecho =
+          mov === "SALON"
+            ? `Pasado a la campaña ${salon?.campania ?? ""}, ${salon?.nombre ?? ""}.`
+            : `${mov === "PROMOVER" ? "Promovido" : "Degradado"} a ${CURSO_UI[tipoDestino] ?? tipoDestino}, ${salon?.nombre ?? ""}.`;
       }
       if (!res.ok) {
         setError(await mensajeDeError(res, "No se pudo aplicar el cambio."));
@@ -426,6 +467,20 @@ export function AcademicChangeModal(props: {
                     </label>
                   ))}
                 </div>
+                <Campo etiqueta="Campaña destino">
+                  <select
+                    value={campaniaId}
+                    onChange={(e) => elegirCampania(e.target.value)}
+                    style={campo}
+                  >
+                    {campanias.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                        {c.id === campaniaActualId ? " (actual)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Campo>
                 <Campo etiqueta="Salón destino">
                   <select
                     value={salonId}
@@ -435,8 +490,7 @@ export function AcademicChangeModal(props: {
                     <option value="">— Elige el salón —</option>
                     {salonesElegibles.map((s) => (
                       <option key={s.id} value={s.id} disabled={s.ocupados >= s.cupo}>
-                        {s.campania} · {s.nombre} · {horarioDe(s)} · {String(s.ocupados)}/
-                        {String(s.cupo)}
+                        {s.nombre} · {horarioDe(s)} · {String(s.ocupados)}/{String(s.cupo)}
                         {s.ocupados >= s.cupo ? " (sin cupo)" : ""}
                         {s.sugerencia !== null &&
                           ` · va en ${s.sugerencia.nivel}${s.sugerencia.lecciones > 0 ? ` (${String(s.sugerencia.lecciones)} lecc.)` : ""}`}
@@ -449,9 +503,15 @@ export function AcademicChangeModal(props: {
                     No hay salones disponibles para este movimiento.
                   </p>
                 )}
-                {mov === "SALON" && (
+                {mov === "SALON" && !otraCampania && (
                   <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--texto-suave)" }}>
-                    Mismo curso: su avance no cambia, solo pasa a la lista del otro salón.
+                    Misma campaña: su avance no cambia, solo pasa a la lista del otro salón.
+                  </p>
+                )}
+                {otraCampania && (
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#8a5a00" }}>
+                    Otra campaña es otro curso del catálogo, con su propio avance: abajo elige en
+                    qué nivel y lección queda.
                   </p>
                 )}
               </div>
@@ -567,6 +627,9 @@ export function AcademicChangeModal(props: {
                     CURSO_UI[actual.tipoCurso] ?? actual.tipoCurso,
                     CURSO_UI[tipoDestino] ?? tipoDestino,
                   ],
+                  ...(otraCampania
+                    ? [["Campaña", actual.campania ?? "—", salon?.campania ?? "—"]]
+                    : []),
                   [
                     "Salón",
                     actual.salon ?? "—",
@@ -605,6 +668,12 @@ export function AcademicChangeModal(props: {
               </tbody>
             </table>
             <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.82rem", color: "#5a6172" }}>
+              {opcion === "CURSO" && conUbicacion && mov === "SALON" && (
+                <li>
+                  Cambia de campaña: en el curso de esa campaña, los niveles anteriores al elegido
+                  quedan <strong>convalidados</strong> (sin medalla).
+                </li>
+              )}
               {opcion === "CURSO" && mov !== "SALON" && (
                 <li>
                   Cada curso tiene su propio avance: en el curso nuevo, los niveles anteriores al

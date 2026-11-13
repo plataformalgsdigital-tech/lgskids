@@ -249,15 +249,19 @@ function CuestionarioEditor(props: {
   );
 }
 
-/** Tarjeta editable de una lección (contenido + WordWall + evaluación). */
-function LeccionCard(props: { row: Fila; onSaved: () => void }) {
-  const { row, onSaved } = props;
+/**
+ * Tarjeta editable de una lección, en UNA de sus dos partes: el contenido del curso
+ * (temario y video) o su evaluación (cuestionarios). Las actividades WordWall son
+ * por UNIDAD y se editan aparte. Cada parte solo manda lo suyo: lo que no viaja se
+ * conserva (regla de `planificarFila`).
+ */
+function LeccionCard(props: { row: Fila; parte: "contenido" | "evaluacion"; onSaved: () => void }) {
+  const { row, parte, onSaved } = props;
   const [leccion, setLeccion] = useState(row.leccion);
   const [unidad, setUnidad] = useState(row.unidad ?? "");
   const [orden, setOrden] = useState(String(row.orden));
   const [contenido, setContenido] = useState(row.contenido ?? "");
   const [video, setVideo] = useState(row.video ?? "");
-  const [actividades, setActividades] = useState<LinkItem[]>(row.actividades ?? []);
   const [cuestionarios, setCuestionarios] = useState<Cuestionario[]>(() =>
     normalizarQuiz(row.quiz),
   );
@@ -275,13 +279,12 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
         body: JSON.stringify({
           curso: row.curso,
           nivel: row.nivel,
-          unidad: unidad || null,
-          leccion,
-          orden: Number(orden) || 0,
-          contenido: contenido || null,
-          video: video || null,
-          actividades,
-          quiz: cuestionarios.length > 0 ? { cuestionarios } : null,
+          unidad: (parte === "contenido" ? unidad : (row.unidad ?? "")) || null,
+          leccion: parte === "contenido" ? leccion : row.leccion,
+          orden: parte === "contenido" ? Number(orden) || 0 : row.orden,
+          ...(parte === "contenido"
+            ? { contenido: contenido || null, video: video || null }
+            : { quiz: cuestionarios.length > 0 ? { cuestionarios } : null }),
         }),
       });
       const data: { error?: { message: string } } = await res.json();
@@ -309,178 +312,155 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
         gap: "0.6rem",
       }}
     >
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-        <label
-          style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "2 1 12rem" }}
-        >
-          <span style={label}>Lección (título)</span>
-          <input value={leccion} onChange={(e) => setLeccion(e.target.value)} style={input} />
-        </label>
-        <label
-          style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 8rem" }}
-        >
-          <span style={label}>Unidad</span>
-          <input
-            value={unidad}
-            onChange={(e) => setUnidad(e.target.value)}
-            placeholder="Unidad 1"
-            style={input}
-          />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem", width: "5rem" }}>
-          <span style={label}>Orden</span>
-          <input
-            type="number"
-            min={0}
-            value={orden}
-            onChange={(e) => setOrden(e.target.value)}
-            style={input}
-          />
-        </label>
-      </div>
-
-      <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-        <span style={{ ...label, display: "flex", justifyContent: "space-between" }}>
-          Contenido / temario
-          <button
-            type="button"
-            onClick={() => setVerPreview((v) => !v)}
-            style={{ ...btn, padding: "0.15rem 0.5rem" }}
+      {parte === "evaluacion" && (
+        <strong>
+          {row.unidad ?? "Sin unidad"} · {row.leccion}
+        </strong>
+      )}
+      {parte === "contenido" && (
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "2 1 12rem" }}
           >
-            {verPreview ? "Editar" : "Vista previa"}
-          </button>
-        </span>
-        {verPreview ? (
-          <div
-            style={{ ...input, minHeight: "5rem", whiteSpace: "pre-wrap", background: "#f9fafc" }}
+            <span style={label}>Lección (título)</span>
+            <input value={leccion} onChange={(e) => setLeccion(e.target.value)} style={input} />
+          </label>
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.15rem", flex: "1 1 8rem" }}
           >
-            {contenido || "—"}
-          </div>
-        ) : (
-          <textarea
-            value={contenido}
-            onChange={(e) => setContenido(e.target.value)}
-            rows={4}
-            style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
-          />
-        )}
-      </label>
-
-      <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-        <span style={label}>Video (URL o key)</span>
-        <input
-          value={video}
-          onChange={(e) => setVideo(e.target.value)}
-          placeholder="videos/…mp4"
-          style={input}
-        />
-      </label>
-
-      {/* Actividades WordWall de la lección */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-        <span style={label}>Actividades WordWall (de la lección)</span>
-        {actividades.map((a, i) => (
-          <div key={i} style={{ display: "flex", gap: "0.35rem" }}>
+            <span style={label}>Unidad</span>
             <input
-              placeholder="Nombre visible"
-              value={a.nombre}
-              onChange={(e) =>
-                setActividades(
-                  actividades.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)),
-                )
-              }
-              style={{ ...input, flex: "1 1 8rem" }}
+              value={unidad}
+              onChange={(e) => setUnidad(e.target.value)}
+              placeholder="Unidad 1"
+              style={input}
             />
+          </label>
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.15rem", width: "5rem" }}
+          >
+            <span style={label}>Orden</span>
             <input
-              placeholder="https://wordwall.net/…"
-              value={a.link}
-              onChange={(e) =>
-                setActividades(
-                  actividades.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)),
-                )
-              }
-              style={{ ...input, flex: "2 1 12rem" }}
+              type="number"
+              min={0}
+              value={orden}
+              onChange={(e) => setOrden(e.target.value)}
+              style={input}
             />
-            <button
-              type="button"
-              onClick={() => setActividades(actividades.filter((_, j) => j !== i))}
-              style={{ ...btn, color: "#c62828" }}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={() => setActividades([...actividades, { nombre: "", link: "" }])}
-          style={{ ...btn, alignSelf: "flex-start" }}
-        >
-          + agregar actividad
-        </button>
-      </div>
+          </label>
+        </div>
+      )}
+
+      {parte === "contenido" && (
+        <>
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+            <span style={{ ...label, display: "flex", justifyContent: "space-between" }}>
+              Contenido / temario
+              <button
+                type="button"
+                onClick={() => setVerPreview((v) => !v)}
+                style={{ ...btn, padding: "0.15rem 0.5rem" }}
+              >
+                {verPreview ? "Editar" : "Vista previa"}
+              </button>
+            </span>
+            {verPreview ? (
+              <div
+                style={{
+                  ...input,
+                  minHeight: "5rem",
+                  whiteSpace: "pre-wrap",
+                  background: "#f9fafc",
+                }}
+              >
+                {contenido || "—"}
+              </div>
+            ) : (
+              <textarea
+                value={contenido}
+                onChange={(e) => setContenido(e.target.value)}
+                rows={4}
+                style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
+              />
+            )}
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+            <span style={label}>Video (URL o key)</span>
+            <input
+              value={video}
+              onChange={(e) => setVideo(e.target.value)}
+              placeholder="videos/…mp4"
+              style={input}
+            />
+          </label>
+        </>
+      )}
 
       {/* Evaluación (varios cuestionarios) */}
-      <div
-        style={{
-          border: "1px dashed #d8cef0",
-          borderRadius: "0.7rem",
-          padding: "0.7rem",
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.5rem",
-        }}
-      >
+      {parte === "evaluacion" && (
         <div
           style={{
+            border: "1px dashed #d8cef0",
+            borderRadius: "0.7rem",
+            padding: "0.7rem",
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            flexDirection: "column",
             gap: "0.5rem",
           }}
         >
-          <strong>Evaluación</strong>
-          <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
-            varios cuestionarios · se presentan en orden · se autocalifican
-          </span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.5rem",
+            }}
+          >
+            <strong>Evaluación</strong>
+            <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+              varios cuestionarios · se presentan en orden · se autocalifican
+            </span>
+          </div>
+          {cuestionarios.map((c, i) => (
+            <CuestionarioEditor
+              key={i}
+              c={c}
+              idx={i}
+              onChange={(nc) => setCuestionarios(cuestionarios.map((x, j) => (j === i ? nc : x)))}
+              onRemove={() => setCuestionarios(cuestionarios.filter((_, j) => j !== i))}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setCuestionarios([
+                ...cuestionarios,
+                {
+                  titulo: `Cuestionario ${cuestionarios.length + 1}`,
+                  minutos: 15,
+                  preguntas: [nuevaPregunta()],
+                },
+              ])
+            }
+            style={{
+              ...btn,
+              alignSelf: "flex-start",
+              borderColor: "var(--lgs-purpura)",
+              color: "var(--lgs-purpura)",
+            }}
+          >
+            + cuestionario
+          </button>
         </div>
-        {cuestionarios.map((c, i) => (
-          <CuestionarioEditor
-            key={i}
-            c={c}
-            idx={i}
-            onChange={(nc) => setCuestionarios(cuestionarios.map((x, j) => (j === i ? nc : x)))}
-            onRemove={() => setCuestionarios(cuestionarios.filter((_, j) => j !== i))}
-          />
-        ))}
-        <button
-          type="button"
-          onClick={() =>
-            setCuestionarios([
-              ...cuestionarios,
-              {
-                titulo: `Cuestionario ${cuestionarios.length + 1}`,
-                minutos: 15,
-                preguntas: [nuevaPregunta()],
-              },
-            ])
-          }
-          style={{
-            ...btn,
-            alignSelf: "flex-start",
-            borderColor: "var(--lgs-purpura)",
-            color: "var(--lgs-purpura)",
-          }}
-        >
-          + cuestionario
-        </button>
-      </div>
+      )}
 
       <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
         <SoloSi op="op.mant.lecciones_editar">
           <button
             type="button"
             onClick={() => void guardar()}
-            disabled={ocupado || leccion.trim() === ""}
+            disabled={ocupado || (parte === "contenido" && leccion.trim() === "")}
             style={{
               ...btn,
               background: "var(--lgs-verde)",
@@ -490,7 +470,11 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
               fontSize: "0.88rem",
             }}
           >
-            {ocupado ? "Guardando…" : "Guardar lección"}
+            {ocupado
+              ? "Guardando…"
+              : parte === "contenido"
+                ? "Guardar lección"
+                : "Guardar evaluación"}
           </button>
         </SoloSi>
         {msg !== null && (
@@ -503,7 +487,202 @@ function LeccionCard(props: { row: Fila; onSaved: () => void }) {
   );
 }
 
+type Seccion = "contenido" | "evaluacion" | "actividades";
+const SECCIONES: { id: Seccion; icono: string; titulo: string; texto: string }[] = [
+  {
+    id: "contenido",
+    icono: "📖",
+    titulo: "Contenido del curso",
+    texto: "Lecciones: título, unidad, orden, temario y video.",
+  },
+  {
+    id: "evaluacion",
+    icono: "📝",
+    titulo: "Evaluaciones",
+    texto: "Cuestionarios de cada lección. Se autocalifican.",
+  },
+  {
+    id: "actividades",
+    icono: "🎮",
+    titulo: "Actividades WordWall",
+    texto: "Juegos de cada unidad (los ve el niño en la lámina de la unidad).",
+  },
+];
+
+interface ItemUnidad extends LinkItem {
+  /** Lección en la que está guardada: no cambia al editar, para no perder su zona. */
+  origen: string;
+}
+
+/** Agrupa las lecciones por unidad, en el orden en que aparecen. */
+function unidades(filas: Fila[]): { unidad: string | null; lecciones: Fila[] }[] {
+  const mapa = new Map<string, { unidad: string | null; lecciones: Fila[] }>();
+  for (const f of [...filas].sort((a, b) => a.orden - b.orden)) {
+    const k = f.unidad ?? "";
+    const g = mapa.get(k) ?? { unidad: f.unidad, lecciones: [] };
+    g.lecciones.push(f);
+    mapa.set(k, g);
+  }
+  return [...mapa.values()];
+}
+
+/**
+ * Actividades WordWall de UNA unidad. En la base cada actividad cuelga de una
+ * lección (así la lee el panel del niño y la carga el CSV); aquí se editan por
+ * unidad, juntas. Cada una se guarda en la lección donde ya estaba —así conserva su
+ * zona sobre la lámina— y las nuevas van a la primera lección de la unidad.
+ */
+function ActividadesUnidad(props: {
+  unidad: string | null;
+  lecciones: Fila[];
+  onSaved: () => void;
+}) {
+  const { unidad, lecciones, onSaved } = props;
+  const [items, setItems] = useState<ItemUnidad[]>(() =>
+    lecciones.flatMap((l) =>
+      (l.actividades ?? []).map((a) => ({ nombre: a.nombre, link: a.link, origen: l.id })),
+    ),
+  );
+  const [msg, setMsg] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const primera = lecciones[0];
+
+  async function guardar() {
+    setOcupado(true);
+    setMsg(null);
+    try {
+      for (const l of lecciones) {
+        const nuevas = items
+          .filter((i) => i.origen === l.id)
+          .map((i) => ({ nombre: i.nombre, link: i.link }));
+        const antes = (l.actividades ?? []).map((a) => ({ nombre: a.nombre, link: a.link }));
+        if (JSON.stringify(nuevas) === JSON.stringify(antes)) continue;
+        const res = await apiFetch(`/api/catalog/curso/${l.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            curso: l.curso,
+            nivel: l.nivel,
+            unidad: l.unidad,
+            leccion: l.leccion,
+            orden: l.orden,
+            actividades: nuevas,
+          }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+          setMsg(data.error?.message ?? "No se pudo guardar.");
+          return;
+        }
+      }
+      setMsg("✔ Guardadas.");
+      onSaved();
+    } catch {
+      setMsg("Error de conexión.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  const nombreLeccion = (id: string) => lecciones.find((l) => l.id === id)?.leccion ?? "";
+
+  return (
+    <div
+      style={{
+        border: "1px solid #e3e7f0",
+        borderRadius: "0.9rem",
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.5rem",
+      }}
+    >
+      <strong>{unidad ?? "Sin unidad"}</strong>
+      <span style={{ fontSize: "0.76rem", color: "var(--texto-suave)" }}>
+        Lecciones de la unidad: {lecciones.map((l) => l.leccion).join(" · ")}
+      </span>
+      {items.length === 0 && (
+        <span style={{ fontSize: "0.85rem", color: "var(--texto-suave)" }}>
+          Esta unidad aún no tiene actividades.
+        </span>
+      )}
+      {items.map((a, i) => (
+        <div key={i} style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+          <input
+            placeholder="Nombre visible"
+            value={a.nombre}
+            onChange={(e) =>
+              setItems(items.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)))
+            }
+            style={{ ...input, flex: "1 1 8rem" }}
+          />
+          <input
+            placeholder="https://wordwall.net/…"
+            value={a.link}
+            onChange={(e) =>
+              setItems(items.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)))
+            }
+            style={{ ...input, flex: "2 1 12rem" }}
+          />
+          {lecciones.length > 1 && (
+            <span
+              title="Lección donde se guarda"
+              style={{ fontSize: "0.72rem", color: "var(--texto-suave)", whiteSpace: "nowrap" }}
+            >
+              {nombreLeccion(a.origen)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setItems(items.filter((_, j) => j !== i))}
+            style={{ ...btn, color: "#c62828" }}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <SoloSi op="op.mant.lecciones_editar">
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() =>
+              primera !== undefined &&
+              setItems([...items, { nombre: "", link: "", origen: primera.id }])
+            }
+            style={btn}
+          >
+            + agregar actividad
+          </button>
+          <button
+            type="button"
+            onClick={() => void guardar()}
+            disabled={ocupado}
+            style={{
+              ...btn,
+              background: "var(--lgs-verde)",
+              borderColor: "var(--lgs-verde)",
+              color: "#1b2a10",
+              padding: "0.5rem 1.3rem",
+              fontSize: "0.88rem",
+            }}
+          >
+            {ocupado ? "Guardando…" : "Guardar actividades"}
+          </button>
+          {msg !== null && (
+            <span
+              style={{ fontSize: "0.85rem", color: msg.startsWith("✔") ? "#1b5e20" : "#c62828" }}
+            >
+              {msg}
+            </span>
+          )}
+        </div>
+      </SoloSi>
+    </div>
+  );
+}
+
 function GestionContenidoPageContenido() {
+  const [seccion, setSeccion] = useState<Seccion>("contenido");
   const [fCurso, setFCurso] = useState<Curso>("JUNIOR");
   const [fNivel, setFNivel] = useState<string>("ROOKIE");
   const [filas, setFilas] = useState<Fila[] | null>(null);
@@ -565,8 +744,8 @@ function GestionContenidoPageContenido() {
       </Link>
       <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>Gestión de Contenido</h1>
       <p style={{ color: "var(--texto-suave)", fontSize: "0.9rem" }}>
-        Edita el temario de cada lección y su evaluación (varios cuestionarios). Elige curso y
-        nivel.
+        Elige curso y nivel, y luego qué parte editar: el contenido de cada lección, sus
+        evaluaciones o las actividades WordWall de cada unidad.
       </p>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
@@ -600,55 +779,96 @@ function GestionContenidoPageContenido() {
         </label>
       </div>
 
-      {/* Agregar lección */}
       <div
+        role="tablist"
         style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(14rem, 1fr))",
+          gap: "0.75rem",
           marginTop: "1rem",
-          display: "flex",
-          gap: "0.5rem",
-          flexWrap: "wrap",
-          alignItems: "flex-end",
         }}
       >
-        <label
-          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "2 1 12rem" }}
-        >
-          <span style={label}>Nueva lección</span>
-          <input
-            value={nuevaLeccion}
-            onChange={(e) => setNuevaLeccion(e.target.value)}
-            placeholder="Lección 1"
-            style={input}
-          />
-        </label>
-        <label
-          style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 8rem" }}
-        >
-          <span style={label}>Unidad</span>
-          <input
-            value={nuevaUnidad}
-            onChange={(e) => setNuevaUnidad(e.target.value)}
-            placeholder="Unidad 1"
-            style={input}
-          />
-        </label>
-        <SoloSi op="op.mant.lecciones_editar">
-          <button
-            type="button"
-            onClick={() => void agregar()}
-            disabled={creando || nuevaLeccion.trim() === ""}
-            style={{
-              ...btn,
-              background: "var(--lgs-azul)",
-              borderColor: "var(--lgs-azul)",
-              color: "white",
-              padding: "0.5rem 1.2rem",
-            }}
-          >
-            {creando ? "Agregando…" : "+ Agregar lección"}
-          </button>
-        </SoloSi>
+        {SECCIONES.map((c) => {
+          const activa = seccion === c.id;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={activa}
+              onClick={() => setSeccion(c.id)}
+              style={{
+                textAlign: "left",
+                padding: "0.8rem 1rem",
+                borderRadius: "0.9rem",
+                border: activa ? "2px solid var(--lgs-azul)" : "1.5px solid #e3e7f0",
+                background: activa ? "#eef5ff" : "white",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.2rem",
+              }}
+            >
+              <span style={{ fontWeight: 800, fontSize: "0.95rem" }}>
+                {c.icono} {c.titulo}
+              </span>
+              <span style={{ fontSize: "0.78rem", color: "var(--texto-suave)" }}>{c.texto}</span>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Agregar lección */}
+      {seccion === "contenido" && (
+        <div
+          style={{
+            marginTop: "1rem",
+            display: "flex",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            alignItems: "flex-end",
+          }}
+        >
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "2 1 12rem" }}
+          >
+            <span style={label}>Nueva lección</span>
+            <input
+              value={nuevaLeccion}
+              onChange={(e) => setNuevaLeccion(e.target.value)}
+              placeholder="Lección 1"
+              style={input}
+            />
+          </label>
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: "1 1 8rem" }}
+          >
+            <span style={label}>Unidad</span>
+            <input
+              value={nuevaUnidad}
+              onChange={(e) => setNuevaUnidad(e.target.value)}
+              placeholder="Unidad 1"
+              style={input}
+            />
+          </label>
+          <SoloSi op="op.mant.lecciones_editar">
+            <button
+              type="button"
+              onClick={() => void agregar()}
+              disabled={creando || nuevaLeccion.trim() === ""}
+              style={{
+                ...btn,
+                background: "var(--lgs-azul)",
+                borderColor: "var(--lgs-azul)",
+                color: "white",
+                padding: "0.5rem 1.2rem",
+              }}
+            >
+              {creando ? "Agregando…" : "+ Agregar lección"}
+            </button>
+          </SoloSi>
+        </div>
+      )}
       {error !== null && (
         <p role="alert" style={{ color: "#c62828" }}>
           {error}
@@ -662,8 +882,24 @@ function GestionContenidoPageContenido() {
           <p style={{ color: "var(--texto-suave)" }}>
             {fCurso} · {fNivel}: sin lecciones. Agrega la primera arriba.
           </p>
+        ) : seccion === "actividades" ? (
+          unidades(filas).map((u) => (
+            <ActividadesUnidad
+              key={`${fCurso}-${fNivel}-${u.unidad ?? ""}-${u.lecciones.map((l) => l.id).join()}`}
+              unidad={u.unidad}
+              lecciones={u.lecciones}
+              onSaved={() => void cargar()}
+            />
+          ))
         ) : (
-          filas.map((f) => <LeccionCard key={f.id} row={f} onSaved={() => void cargar()} />)
+          filas.map((f) => (
+            <LeccionCard
+              key={`${seccion}-${f.id}`}
+              row={f}
+              parte={seccion}
+              onSaved={() => void cargar()}
+            />
+          ))
         )}
       </div>
     </main>

@@ -34,6 +34,9 @@ describe.runIf(RUN)("cambio de curso (integración)", () => {
   let campaniaId: string;
   let salonJunior: string;
   let salonYoungster: string;
+  let campania2Id: string;
+  let salonOtraCampania: string;
+  let nivelOtraCampania: string;
   let ninoId: string;
   let apoderadoId: string;
   let contractId: string;
@@ -91,6 +94,22 @@ describe.runIf(RUN)("cambio de curso (integración)", () => {
       },
       parentesco: "MADRE",
     });
+    // Segunda campaña: el niño puede pasar a ella (anterior o posterior).
+    const campania2 = await crearCampania({
+      actorUserId: ACTOR,
+      nombre: `IT Curso2 ${marca}`,
+      inicio: hoy,
+      cursoInicio: hoy,
+    });
+    campania2Id = campania2.id;
+    const yg2 = await queryOne<{ course: string; nivel: string }>(
+      `SELECT co.id::text AS course,
+              (SELECT n.id::text FROM catalog_level n WHERE n.course_id = co.id ORDER BY n.orden LIMIT 1) AS nivel
+         FROM catalog_course co WHERE co.campaign_id = $1 AND co.tipo = 'YOUNGSTER'`,
+      [campania2Id],
+    );
+    nivelOtraCampania = yg2?.nivel ?? "";
+    salonOtraCampania = await salon(yg2?.course ?? "", `IT Yg2 ${marca}`);
     ninoId = personas.ninoId;
     apoderadoId = personas.apoderadoId;
 
@@ -117,12 +136,13 @@ describe.runIf(RUN)("cambio de curso (integración)", () => {
       await execute(`DELETE FROM identity_user WHERE username = $1`, [username]);
     }
     await execute(`DELETE FROM people_person WHERE id = ANY($1)`, [[ninoId, apoderadoId]]);
-    for (const id of [salonJunior, salonYoungster]) {
+    for (const id of [salonJunior, salonYoungster, salonOtraCampania]) {
       await execute(`DELETE FROM scheduling_session WHERE classroom_id = $1`, [id]);
       await execute(`DELETE FROM scheduling_slot WHERE classroom_id = $1`, [id]);
       await execute(`DELETE FROM scheduling_classroom WHERE id = $1`, [id]);
     }
-    await execute(`DELETE FROM catalog_campaign WHERE id = $1`, [campaniaId]);
+    await execute(`DELETE FROM progression_ubicacion WHERE child_person_id = $1`, [ninoId]);
+    await execute(`DELETE FROM catalog_campaign WHERE id = ANY($1)`, [[campaniaId, campania2Id]]);
     await closePool();
   });
 
@@ -184,15 +204,34 @@ describe.runIf(RUN)("cambio de curso (integración)", () => {
     expect(vivas?.n).toBe(1);
   });
 
-  it("no se cambia al curso que ya tiene", async () => {
+  it("no se cambia al curso que ya tiene (sin salón de otra campaña)", async () => {
     await expect(
       cambiarCursoContrato({
         actorUserId: ACTOR,
         contractId,
         tipoCurso: "YOUNGSTER",
-        classroomId: salonYoungster,
         motivo: "otra vez lo mismo",
       }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("pasa al MISMO curso de OTRA campaña con su ubicación, y el salón la trae identificada", async () => {
+    const antes = await opcionesAcademicas(contractId);
+    const destino = antes.salones.find((s) => s.id === salonOtraCampania);
+    expect(destino?.campaignId).toBe(campania2Id);
+    expect(antes.actual.campaignId).toBe(campaniaId);
+
+    await cambiarCursoContrato({
+      actorUserId: ACTOR,
+      contractId,
+      tipoCurso: "YOUNGSTER",
+      classroomId: salonOtraCampania,
+      ubicacion: { levelId: nivelOtraCampania, lecciones: 0 },
+      motivo: "pasa a la campaña siguiente",
+    });
+    const ficha = await fichaContrato(contractId, null);
+    expect(ficha.contrato.salon).toBe(`IT Yg2 ${marca}`);
+    const despues = await opcionesAcademicas(contractId);
+    expect(despues.actual.campaignId).toBe(campania2Id);
   });
 });

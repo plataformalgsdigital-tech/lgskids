@@ -101,7 +101,7 @@ del salón, nunca de una acción del estudiante.
   La plantilla que descarga la pantalla va con `;` y BOM: el BOM se arma con
   `String.fromCharCode(0xfeff)` porque las herramientas de edición convierten el
   escape `\uFEFF` en el carácter invisible.
-  **Gestión de Contenido** (`/panel/mantenimiento-cursos/gestion-contenido`, estilo
+  **Gestión de Contenido en TRES cajas (2026-11-12)**: tras elegir curso y nivel, la pantalla separa **Contenido del curso** (título, unidad, orden, temario, video), **Evaluaciones** (cuestionarios, POR LECCIÓN) y **Actividades WordWall** (POR UNIDAD: se agrupan las lecciones de la unidad y cada actividad se guarda en la lección donde ya estaba —conserva su zona en la lámina—; las nuevas van a la primera de la unidad). Cada caja manda solo sus campos al PUT (lo ausente se conserva). **Gestión de Contenido** (`/panel/mantenimiento-cursos/gestion-contenido`, estilo
   MOSAICO): editor guiado por Curso→Nivel que edita el temario y la **evaluación de
   cada lección con VARIOS cuestionarios** (`quiz = { cuestionarios: [{titulo, minutos,
 preguntas: [{tipo: opcion_multiple|verdadero_falso|respuesta_escrita, enunciado,
@@ -253,7 +253,14 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   Cada salón destino se ofrece con su **horario y su país** ("MAR-JUE 17:00-18:00
   (Chile)", hora de PARED del salón) y el resumen compara el horario de antes y el
   de después (2026-10-15); el formato vive en `src/ui/horario.ts` (`resumenHorario`),
-  el mismo de la columna Horario de la ficha de campaña. No hay restricción por
+  el mismo de la columna Horario de la ficha de campaña. **Campaña destino (2026-11-12)**: "Cambiar de salón" trae un selector de CAMPAÑA
+  (por defecto la del niño; también las anteriores aún en marcha y las siguientes) y
+  el salón se lista SOLO por nombre, horario y cupo. En la misma campaña va por
+  `/api/enrollment/[id]/move` (el avance no cambia); en OTRA es otro curso del
+  catálogo con su propio avance, así que usa `cambiarCursoContrato` con el MISMO tipo
+  de curso + salón + `ubicacion` (solo rechaza "ya está en ese curso" si no viene
+  salón). `OpcionesAcademicas` ganó `campaignId` (en `actual` y en cada salón).
+  Prueba: `cambio-curso-integration.test.ts`. No hay restricción por
   país: un niño de Chile puede ir a un salón de Colombia (horario y feriados del salón).
   El modal NO escribe por su cuenta: cada opción usa el camino que ya cuida sus
   invariantes (reglas 4 y 5). Permiso `matriculas.gestionar` (cambiar de curso,

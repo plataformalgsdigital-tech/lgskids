@@ -1470,7 +1470,10 @@ export async function cambiarCursoContrato(input: {
   }
   const contrato = await findContractById(input.contractId);
   if (contrato === null) throw new NotFoundError("El contrato no existe.");
-  if (contrato.tipoCurso === input.tipoCurso) {
+  // Mismo tipo de curso solo con salón: es el paso a OTRA CAMPAÑA (otro curso
+  // del catálogo, con su propio avance), que pide ubicación igual que promover
+  // o degradar.
+  if (contrato.tipoCurso === input.tipoCurso && (input.classroomId ?? "") === "") {
     throw new ValidationError("El contrato ya está en ese curso.");
   }
   if (contrato.estado === "INACTIVO") {
