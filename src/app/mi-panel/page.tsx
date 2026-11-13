@@ -569,6 +569,11 @@ export default function MiPanelPage() {
   const nivelActual =
     niveles.find((n) => n.estado === "EN_CURSO") ?? niveles.find((n) => n.estado !== "COMPLETADO");
   const ordenActual = nivelActual?.orden;
+  // El estado EN_CURSO se guarda para TODO nivel sin completar, no solo el actual:
+  // "bloqueado" es lo que viene DESPUÉS del nivel actual (el mismo corte posicional
+  // del servidor, `alcanceDelAlumno`), además de lo marcado PENDIENTE.
+  const nivelBloqueadoParaMi = (n: { orden: number; estado: string }): boolean =>
+    n.estado === "PENDIENTE" || (ordenActual !== undefined && n.orden > ordenActual);
   const nivelAnterior =
     ordenActual !== undefined ? niveles.find((n) => n.orden === ordenActual - 1) : undefined;
   const nivelProximo =
@@ -675,7 +680,7 @@ export default function MiPanelPage() {
               borderLeft: `5px solid ${colorN}`,
               borderRadius: "0.7rem",
               overflow: "hidden",
-              opacity: nivel.estado === "PENDIENTE" ? 0.7 : 1,
+              opacity: nivelBloqueadoParaMi(nivel) ? 0.7 : 1,
             }}
           >
             {/* Header clicable: despliega/colapsa las Stages */}
@@ -3118,7 +3123,7 @@ export default function MiPanelPage() {
                           const icon =
                             n.estado === "COMPLETADO"
                               ? "🏅"
-                              : n.estado === "EN_CURSO"
+                              : !nivelBloqueadoParaMi(n)
                                 ? "▶️"
                                 : "🔒";
                           return (
@@ -3126,7 +3131,7 @@ export default function MiPanelPage() {
                               key={n.codigo}
                               type="button"
                               onClick={() =>
-                                n.estado === "PENDIENTE"
+                                nivelBloqueadoParaMi(n)
                                   ? setNivelBloqueado(n.nombre)
                                   : setAvanceNivel(n.codigo)
                               }
@@ -3142,7 +3147,7 @@ export default function MiPanelPage() {
                                 cursor: "pointer",
                                 fontWeight: 700,
                                 fontSize: "0.85rem",
-                                opacity: n.estado === "PENDIENTE" ? 0.7 : 1,
+                                opacity: nivelBloqueadoParaMi(n) ? 0.7 : 1,
                               }}
                             >
                               {icon} {n.nombre}{" "}
@@ -3159,7 +3164,7 @@ export default function MiPanelPage() {
                     (() => {
                       const n = nivelIsla;
                       const banner = data.bannersNivel?.[n.codigo] ?? data.imagenCursoUrl ?? null;
-                      const bloqueado = n.estado === "PENDIENTE";
+                      const bloqueado = nivelBloqueadoParaMi(n);
                       const completo = n.estado === "COMPLETADO";
                       const hs = hsIsla[n.codigo];
                       const c = COLOR_NIVEL[n.codigo] ?? "var(--lgs-azul)";
