@@ -7,6 +7,7 @@ import { usePermisos } from "@/ui/permisos";
 import { ReportarCasoModal } from "../servicio/casos-atencion/ReportarCasoModal";
 import { CancelacionSesion } from "./CancelacionSesion";
 import { LibrosDelCurso } from "./LibrosDelCurso";
+import { MaterialGuiaSesion } from "./MaterialGuiaSesion";
 import { APERTURA_CERRADA, type AperturaEvento, type EventoEditable } from "./NuevoEventoModal";
 import { SoloSi } from "@/ui/SoloSi";
 
@@ -87,6 +88,8 @@ interface Sesion {
   /** Lección DERIVADA del catálogo Curso (la sesión N es la N-ésima lección). */
   leccion: string | null;
   leccionNivel: string | null;
+  /** Fila del catálogo de esa lección: de ahí cuelga el Material Guía. */
+  leccionRefId: string | null;
   /** Puesto entre las clases regulares del salón (sin clubes ni extras). */
   claseNumero: number | null;
   /** Creado a mano en el calendario (sin slot): se puede editar. */
@@ -1277,7 +1280,7 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
                 {pestana === "material_usuario"
                   ? "📚 Libros del estudiante"
                   : pestana === "material_guia"
-                    ? "📖 Material del guía"
+                    ? "📖 Material"
                     : "🔗 Recursos"}
               </h3>
               {pestana === "material_usuario" ? (
@@ -1285,56 +1288,19 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
                   curso={sesion?.cursoTipo ?? null}
                   nivelDeLaClase={sesion?.nivel ?? null}
                 />
-              ) : contenido === null ? (
-                <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando…</p>
-              ) : contenido.length === 0 ? (
-                <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>
-                  Todavía no hay contenido cargado para {sesion?.cursoTipo ?? "este curso"}. Se sube
-                  en Mantenimiento Académico › Gestión de Contenido.
-                </p>
               ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.3rem",
-                    maxHeight: "16rem",
-                    overflowY: "auto",
-                  }}
-                >
-                  {contenido.map((c) => {
-                    const items = c[pestana] ?? [];
-                    if (items.length === 0) return null;
-                    return (
-                      <div
-                        key={c.id}
-                        style={{
-                          padding: "0.4rem 0.6rem",
-                          background: "#fafbfe",
-                          borderRadius: "0.5rem",
-                          fontSize: "0.84rem",
-                        }}
-                      >
-                        <b>
-                          {c.nivel} · Unidad {c.unidad} · Lección {c.leccion}
-                        </b>
-                        <ul style={{ margin: "0.25rem 0 0 1rem" }}>
-                          {items.map((it, i) => (
-                            <li key={i}>
-                              {typeof it.enlace === "string" || typeof it.url === "string" ? (
-                                <a href={it.enlace ?? it.url} target="_blank" rel="noreferrer">
-                                  {it.nombre ?? it.enlace ?? it.url}
-                                </a>
-                              ) : (
-                                (it.nombre ?? "—")
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
+                <MaterialGuiaSesion
+                  tab={pestana === "material_guia" ? "MATERIAL" : "RECURSO"}
+                  leccionRefId={sesion?.leccionRefId ?? null}
+                  etiquetaLeccion={[
+                    sesion?.leccionNivel != null
+                      ? (NIVEL_UI[sesion.leccionNivel] ?? sesion.leccionNivel)
+                      : null,
+                    sesion?.leccion ?? null,
+                  ]
+                    .filter((x) => x !== null)
+                    .join(" · ")}
+                />
               )}
             </section>
           )}

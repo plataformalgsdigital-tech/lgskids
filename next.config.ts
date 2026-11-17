@@ -48,6 +48,11 @@ const nextConfig: NextConfig = {
         source: "/api/:area(catalog|student)/material/:id",
         headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
       },
+      // El Material Guía (PDF, imagen y video) se ve en un visor DENTRO del panel de la sesión.
+      {
+        source: "/api/catalog/material-guia/:id/archivo",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
 };

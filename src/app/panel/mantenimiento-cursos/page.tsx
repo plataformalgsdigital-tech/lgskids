@@ -72,6 +72,14 @@ const TARJETAS: Tarjeta[] = [
     op: "op.mant.material",
   },
   {
+    titulo: "Material Guía",
+    desc: "Presentaciones y PDF (Material) e imágenes, videos y enlaces (Recursos) por lección. El guía los abre desde la sesión.",
+    emoji: "🧑‍🏫",
+    color: "var(--lgs-verde)",
+    href: "/panel/mantenimiento-cursos/material-guia",
+    op: "op.mant.material_guia",
+  },
+  {
     titulo: "Videos del libro",
     desc: "Los videos del libro interactivo, por página. Se comprimen al subirlos; revisa el previo y confirma para publicarlos.",
     emoji: "🎬",

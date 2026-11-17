@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { archivosDeMaterialDeLeccion, soltarArchivos } from "./material-guia";
 import { registrarAuditoria } from "@/modules/audit";
 import { withTransaction } from "@/platform/db/transaction";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
@@ -379,7 +380,10 @@ export async function eliminarCursoReferencia(input: {
 }): Promise<void> {
   const actual = await getCursoReferencia(input.id);
   if (actual === null) throw new NotFoundError("La referencia de curso no existe.");
+  // El Material Guía cuelga de la lección (CASCADE): sus archivos se sueltan aparte.
+  const archivosGuia = await archivosDeMaterialDeLeccion(input.id);
   await deleteCursoReferencia(input.id);
+  await soltarArchivos(archivosGuia);
   await registrarAuditoria({
     actorUserId: input.actorUserId,
     accion: "catalog.curso_referencia_eliminada",

@@ -14,12 +14,12 @@
  *   LEFT JOIN ${SQL_SECUENCIA_LECCIONES} sec
  *     ON sec.curso = <tipo del curso> AND sec.n = s.numero AND s.numero > 0
  *
- * Columnas: `curso` (enum), `nivel` (código), `leccion` (texto del catálogo),
+ * Columnas: `id` (la fila del catálogo), `curso` (enum), `nivel` (código), `leccion` (texto del catálogo),
  * `n` (posición global en el curso), `pos` (posición dentro del nivel) y
  * `total` (lecciones del nivel).
  */
 export const SQL_SECUENCIA_LECCIONES = `(
-  SELECT cc.curso, cc.nivel, cc.leccion,
+  SELECT cc.id, cc.curso, cc.nivel, cc.leccion,
          ROW_NUMBER() OVER (
            PARTITION BY cc.curso
            ORDER BY array_position(ARRAY['ROOKIE','CHAMPION','ELITE','LEGENDARY','ULTIMATE']::text[], cc.nivel),

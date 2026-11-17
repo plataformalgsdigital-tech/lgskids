@@ -1935,7 +1935,7 @@ solo servía para completar la ficha.
   está cargado. El nivel de la clase sale resaltado. Lee `GET /api/catalog/material` y sirve cada archivo
   por `/api/catalog/material/[id]`, las dos con `catalogo.ver` (el guía lo tiene), así que no hay ruta ni
   permiso nuevos; antes listaba solo los enlaces sueltos de `catalog_curso.material_usuario`. Las
-  pestañas "Material" (del guía) y "Recursos" siguen leyendo la referencia curricular.
+  pestañas "Material" y "Recursos" leen el **Material Guía** (ver su sección).
   **Editar / cancelar / suspender viven en la tarjeta de la AGENDA (2026-10-29, como
   LGS)**, no en el modal: ✏️ edita un evento creado a mano (`cargarEventoEditable` →
   el formulario de siempre) y ✕ abre `QuitarEventoModal`: un evento suelto se
@@ -2652,6 +2652,58 @@ dictan clase, los cursos que toca y los niños de OTRO país** que se quedan sin
   ("no se le cambia") —quien no se resuelve sigue pendiente hasta que pase la fecha— ni mirar
   el caso contrario (el niño de un país con feriado en un salón de otro calendario, que ese día
   SÍ tiene clase y puede faltar justificado).
+
+## Material Guía (2026-11-17)
+
+Mantenimiento Académico › **Material Guía** (`/panel/mantenimiento-cursos/material-guia`,
+opciones `op.mant.material_guia` —ver, base `catalogo.ver`— y `op.mant.material_guia_subir`
+—subir/quitar, base `catalogo.gestionar`—, migración `20261117000000_material_guia`): lo que
+el GUÍA abre desde los botones **Material** y **Recursos** del panel de la sesión, por LECCIÓN
+del catálogo Curso. Decisiones del negocio (grill-me, 2026-11-17): los PPTX se ven con sus
+**animaciones y sonido** (convertirlos a PDF las perdería); el video se SUBE (mp4 hasta 80 MB) o
+se enlaza; el botón muestra SOLO la lección de esa sesión; lo viejo de `material_guia`/`recursos`
+del catálogo dejó de leerse (el material se carga de cero); la carga es una lección a la vez, con
+varios archivos. Guía para quien carga: `docs/operacion/material-guia.md`.
+
+- **Tabla `catalog_material_guia`**: UN ítem por fila, colgada de `catalog_curso` (la lección,
+  CASCADE): `tab` MATERIAL|RECURSO, `tipo` PPT|PDF|IMAGEN|VIDEO|ENLACE, `titulo`, `orden` y
+  `file_id` (archivo de `files`) O `enlace` —nunca los dos—; los CHECK de la base fijan qué
+  tipo va en qué pestaña. **Material** admite PPT/PPTX/PPS/PPSX y PDF; **Recursos**, JPG/PNG/WebP,
+  mp4 y enlaces http(s). Tope 80 MB por archivo (`TAMANO_MAXIMO_MATERIAL_GUIA`), con política
+  PROPIA de `files` (`MIMES_MATERIAL_GUIA`) para no ampliar la lista global.
+- **El tipo lo decide el CONTENIDO** (`detectarArchivoGuia`, `domain/material-guia.ts`, con
+  pruebas): extensión Y firma de los primeros bytes (PDF `%PDF`, PPTX = ZIP, PPT = OLE2, mp4 =
+  `ftyp`…): un .pdf renombrado o un .pptx sin firma no entra, y una imagen no entra en Material.
+  Las imágenes pasan por `sharp` como en todo `files` (a WebP, 1600 px). Quitar un ítem suelta su
+  archivo DESPUÉS de borrar la fila; borrar una LECCIÓN suelta los de todo su material
+  (`eliminarCursoReferencia` → `archivosDeMaterialDeLeccion`/`soltarArchivos`).
+- **De la sesión a su lección**: `SQL_SECUENCIA_LECCIONES` ganó la columna `id` y `getSessionInfo`
+  devuelve `leccionRefId` (la fila del catálogo de la lección derivada). Una sesión sin lección
+  (refuerzo, evento, Welcome) dice que no hay material.
+- **Pantalla de carga**: Curso → Nivel → Lección → pestañas Material | Recursos; lista con Ver,
+  ▲▼ (renumera 1..N), ✏️ título y Quitar; "Agregar" con varios archivos o un enlace y título.
+  Si un archivo falla, los demás se guardan y se informa (`errores`).
+- **Visor** (`src/ui/VisorMaterialGuia.tsx`, lo usan Mantenimiento y la sesión): PDF en el visor
+  del navegador; imagen ampliada; video con barra (rangos, `respuestaConRango`); enlace en una
+  ventana nueva; con "Pantalla completa". **PPT/PPTX = Office para la web**
+  (`view.officeapps.live.com/op/embed.aspx?src=…`), que respeta animaciones y sonido. Microsoft baja el
+  archivo desde una URL PÚBLICA, así que se le da un **enlace temporal firmado**
+  (`GET /api/material-guia/t/<token>/<id>/presentacion.pptx`, SIN sesión; token = HMAC con
+  `AUTH_JWT_SECRET` de ítem + vencimiento, **60 min**, solo sirve presentaciones y todo fallo es
+  404). La URL pública sale de `origenPublico` (no de `nextUrl.origin`) y la extensión va en la
+  ruta porque Office decide el tipo por ella. Respaldo: "ábrela en PowerPoint" (descarga). Es
+  material curricular, no datos de menores (regla 9). **Pendiente de medir**: el tope de tamaño del
+  visor de Microsoft para PPTX (se creía cerca de 10 MB; los PPT típicos del negocio pesan menos):
+  si uno no abre, el aviso y la descarga son el camino.
+- **Rutas**: `GET|POST /api/catalog/material-guia` (listar por `cursoId`+`tab`; subir multipart),
+  `PATCH|DELETE …/[id]`, `GET …/[id]/archivo[?descargar=1]` (con sesión; en línea salvo la
+  presentación; `next.config.ts` abre SAMEORIGIN solo para esta ruta) y `GET …/[id]/office`. Ver =
+  `catalogo.ver` + (`op.mant.material_guia` o `op.calendario.contenido`, que es la del botón de la
+  sesión: el guía las tiene); subir/quitar = `catalogo.gestionar` + `op.mant.material_guia_subir`.
+  Auditoría `catalog.material_guia_subido|editado|eliminado`.
+- Pruebas: `catalog/tests/material-guia.test.ts` (tipos, enlaces, token) y
+  `material-guia-integration.test.ts` (pestañas, doble ítem, orden, soltar archivos, borrar la
+  lección).
 
 ## Colisiones de guías (2026-10-13)
 

@@ -182,3 +182,24 @@ export { NIVELES, LECCIONES_POR_NIVEL, TIPOS_CURSO } from "./domain/curriculo";
 export type { NivelCodigo, CursoTipo } from "./domain/curriculo";
 export type { CampaignListItem, CampaignDetail } from "./application/ports";
 export { cuestionariosDeCurso, listarCampanias, detalleCampania } from "./application/consultas";
+export {
+  materialGuiaArchivoHandler,
+  materialGuiaEditarHandler,
+  materialGuiaEliminarHandler,
+  materialGuiaListarHandler,
+  materialGuiaOfficeHandler,
+  materialGuiaPublicoHandler,
+  materialGuiaSubirHandler,
+} from "./api/material-guia-handlers";
+export {
+  AYUDA_POR_TAB,
+  TAMANO_MAXIMO_MATERIAL_GUIA,
+  type TabMaterialGuia,
+  type TipoMaterialGuia,
+} from "./domain/material-guia";
+export type { ItemMaterialGuia } from "./application/material-guia";
+export {
+  eliminarMaterialGuia,
+  listarMaterialGuia,
+  subirMaterialGuia,
+} from "./application/material-guia";

@@ -179,6 +179,10 @@ export const OPCIONES_MENU = [
     "catalogo.gestionar",
   ]),
   op("menu.mantenimiento", "op.mant.material", "Material del alumno (consulta)", ["catalogo.ver"]),
+  op("menu.mantenimiento", "op.mant.material_guia", "Material Guía (consulta)", ["catalogo.ver"]),
+  op("menu.mantenimiento", "op.mant.material_guia_subir", "Subir y quitar Material Guía", [
+    "catalogo.gestionar",
+  ]),
   op("menu.mantenimiento", "op.mant.material_subir", "Subir y quitar material del alumno", [
     "catalogo.gestionar",
   ]),

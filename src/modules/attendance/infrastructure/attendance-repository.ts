@@ -43,6 +43,8 @@ export interface SessionInfo {
    */
   leccion: string | null;
   leccionNivel: string | null;
+  /** La fila del catálogo Curso de esa lección (de ahí cuelga el Material Guía). */
+  leccionRefId: string | null;
   /**
    * Puesto de la sesión entre las CLASES regulares del salón (sin clubes,
    * eventos ni refuerzos). Es el "Sesión N" que se muestra y el que elige la
@@ -117,7 +119,8 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
                    COALESCE(acl.nombre, 'Todos los salones')) END AS "alcanceEtiqueta",
             s.cerrada_por AS "cerradaPor", s.cerrada_en::text AS "cerradaEn",
             ca.nombre AS campania, co.tipo::text AS "cursoTipo",
-            sec.leccion, sec.nivel AS "leccionNivel", ord.n::int AS "claseNumero",
+            sec.leccion, sec.nivel AS "leccionNivel", sec.id AS "leccionRefId",
+            ord.n::int AS "claseNumero",
             (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
             s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,
             s.grupo_id AS "grupoId", ${SQL_SESION_CANCELADA("s")} AS cancelada,

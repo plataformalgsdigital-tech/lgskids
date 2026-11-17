@@ -286,6 +286,11 @@ export const MAPA_TABLAS: Record<string, EntradaMapa> = {
     para: "Oportunidades de entrega extra que autorizó el guía (total permitido por unidad).",
     pantalla: "Guía › Mis alumnos › Libro",
   },
+  catalog_material_guia: {
+    tema: "Contenido académico",
+    para: "Material y recursos del GUÍA por lección: presentaciones, PDF, imágenes, videos y enlaces.",
+    pantalla: "Mantenimiento Académico › Material Guía",
+  },
   catalog_material_video: {
     tema: "Contenido académico",
     para: "Videos del libro interactivo (por curso, nivel y página) y su estado.",
