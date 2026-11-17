@@ -64,6 +64,14 @@ const TARJETAS: Tarjeta[] = [
     op: "op.sesiones.suspensiones",
   },
   {
+    titulo: "Gestión Festivos",
+    desc: "Los feriados que vienen y los niños de otro país que se quedan sin clase: pasarlos, solo ese día, a otro salón.",
+    emoji: "🎉",
+    color: "#e65100",
+    href: "/panel/sesiones/gestion-festivos",
+    op: "op.sesiones.festivos",
+  },
+  {
     titulo: "Feriados",
     desc: "Calendario de feriados por país y los extra curados que solo suman.",
     emoji: "📅",

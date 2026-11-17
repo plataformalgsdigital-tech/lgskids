@@ -673,9 +673,16 @@ export async function opcionesAgendaNino(input: {
   countryScope: string[] | null;
   tipo: TipoAgenda;
   fecha: string;
+  /** Solo Gestión Festivos: clases regulares de cualquier campaña y curso. */
+  amplio?: boolean;
 }): Promise<OpcionAgenda[]> {
   const nino = await contextoAgenda(input.childPersonId, input.countryScope);
-  return opcionesAgenda({ nino, tipo: input.tipo, fecha: input.fecha });
+  return opcionesAgenda({
+    nino,
+    tipo: input.tipo,
+    fecha: input.fecha,
+    ...(input.amplio === true && { amplio: true }),
+  });
 }
 
 /** Agenda al niño (la regla, el cupo y el choque los vuelve a mirar `agendarNino`). */
@@ -687,6 +694,9 @@ export async function agendarParaNino(input: {
   id: string;
   autorizarSobrecupo: boolean;
   puedeSobrecupo: boolean;
+  /** Solo Gestión Festivos. */
+  amplio?: boolean;
+  motivo?: string | null;
   ip?: string | null;
 }): Promise<{ startsAt: string; sobrecupo: boolean }> {
   const nino = await contextoAgenda(input.childPersonId, input.countryScope);
@@ -697,6 +707,8 @@ export async function agendarParaNino(input: {
     id: input.id,
     autorizarSobrecupo: input.autorizarSobrecupo,
     puedeSobrecupo: input.puedeSobrecupo,
+    ...(input.amplio === true && { amplio: true }),
+    ...(input.motivo != null && { motivo: input.motivo }),
     ip: input.ip ?? null,
   });
 }

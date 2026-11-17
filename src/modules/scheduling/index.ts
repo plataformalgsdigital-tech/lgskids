@@ -256,3 +256,13 @@ export type { NivelWelcome } from "./domain/welcome";
 export { DIAS_VIGENCIA_INVITACION } from "./domain/invitacion";
 export { SQL_ORDINAL_CLASE } from "./domain/ordinal-sesion";
 export type { EstadoInvitacion } from "./domain/invitacion";
+export {
+  DIAS_FESTIVOS_DEFECTO,
+  DIAS_FESTIVOS_MAXIMO,
+  festivoDe,
+  festivosProximos,
+  ninoAfectadoPorFestivo,
+  type AlumnoAfectado,
+  type FestivoImpacto,
+  type SalonAfectado,
+} from "./application/festivos";

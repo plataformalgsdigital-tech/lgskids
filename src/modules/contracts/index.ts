@@ -99,3 +99,9 @@ export type {
   Recuperacion,
   ResultadoRecuperacion,
 } from "./application/recuperar-claves";
+export {
+  aprobarCambioFestivo,
+  sugerenciasFestivo,
+  type SugerenciaFestivo,
+  type SugerenciasFestivo,
+} from "./application/gestion-festivos";

@@ -2601,6 +2601,49 @@ guía**, un cambio TEMPORAL que no afecta las sesiones futuras, solo esa.
   del curso regenerando el salón.
 - Prueba: `scheduling/tests/cancelacion-integration.test.ts`.
 
+## Gestión Festivos (2026-11-16)
+
+Académica › Sesiones › **Gestión Festivos** (`/panel/sesiones/gestion-festivos`, opciones
+`op.sesiones.festivos` —base `salones.gestionar`— y `op.sesiones.festivos_aprobar` —base
+`salones.gestionar` + `matriculas.gestionar`—, migración `20261116000000_gestion_festivos`).
+Muestra los feriados de los próximos 30/60/90/180 días y, de cada uno, **los salones que no
+dictan clase, los cursos que toca y los niños de OTRO país** que se quedan sin ella.
+
+- **Por qué hay niños afectados**: el calendario de feriados es del SALÓN (política de
+  feriados). Si el día es feriado en el país del salón, esa clase no se dicta y se corre al
+  final del curso (nadie pierde clases); pero un niño colombiano en un salón con calendario
+  de Chile no está de feriado y se queda sin clase ese día. Los niños DEL país del festivo
+  se cuentan aparte (`propios`): están de feriado y no necesitan nada.
+- **Todo se DERIVA** (`scheduling/application/festivos.ts`, `festivosProximos`): feriados
+  de `scheduling_holiday`; salón afectado = activo, con ese país en su calendario, con un slot
+  SESION en ese día de la semana, el curso ya empezado y con clases por delante, y SIN
+  sesión ese día (la generación ya la corrió); niño afectado = matrícula ACTIVA en él, país
+  distinto Y sin feriado propio ese día (si su país TAMBIÉN lo tiene, está de feriado y no se
+  toca; cuenta con los "propios"); resuelto = ya tiene un `scheduling_agendado` REGULAR ese día. Respeta el alcance
+  por país del rol.
+- **Aprobar el cambio temporal ES AGENDAR** (regla de cohortes): `aprobarCambioFestivo`
+  (`contracts/application/gestion-festivos.ts`) vuelve a comprobar que el feriado existe y que el
+  niño es de los afectados (`ninoAfectadoPorFestivo`) y llama a `agendarParaNino`, así que el
+  cupo con bloqueo, el choque de horario, el sobrecupo (`op.kids.agendar_sobrecupo`) y la
+  auditoría (`scheduling.nino_agendado`, con el motivo) son los de siempre. Solo ese día: el
+  salón del niño no cambia y retoma esa clase al final. La reserva guarda el porqué en
+  `scheduling_agendado.motivo` ("Festivo CL 2026-12-08: Inmaculada…").
+- **Sugerencias** (`sugerenciasFestivo`): las clases regulares de ESE día de su campaña y curso
+  (`opcionesAgenda`), ordenadas libres primero, misma lección y hora más cercana; la mejor sale
+  "★ Recomendada". Cada una dice su lección (derivada como en el calendario:
+  `leccionesDeSesiones`) frente a la que el niño habría tenido (`leccionQueSeSalta`). **"Elegir
+  otra campaña, curso o salón"** (`amplio`, exige `op.sesiones.festivos_aprobar`) abre las
+  clases de CUALQUIER campaña y curso de ese día —filtros Campaña → Curso → Salón—; solo existe en
+  esta pantalla (`sesionesElegibles` ganó `amplio`; el Agendar de la ficha sigue acotado a su
+  campaña y curso) y el resumen avisa si el curso no es el del niño o la lección es distinta.
+- **Vale para CL, CO, EC y PE** (el código no nombra ningún país: compara el del festivo, el del calendario del salón y el del niño). Guía para coordinación: `docs/operacion/gestion-festivos.md`.
+- Rutas: `GET /api/scheduling/festivos?dias=`, `GET …/festivos/sugerencias` y
+  `POST …/festivos/aprobar`. Prueba: `contracts/tests/gestion-festivos-integration.test.ts`.
+- **No hace** (decisiones abiertas): avisar a la familia por WhatsApp, descartar a un niño
+  ("no se le cambia") —quien no se resuelve sigue pendiente hasta que pase la fecha— ni mirar
+  el caso contrario (el niño de un país con feriado en un salón de otro calendario, que ese día
+  SÍ tiene clase y puede faltar justificado).
+
 ## Colisiones de guías (2026-10-13)
 
 Pestaña **Colisiones** en la ficha de campaña (`ColisionesCampania.tsx`,

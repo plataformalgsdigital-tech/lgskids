@@ -81,6 +81,9 @@ export interface OpcionAgenda {
   /** Nivel del evento (null = todos) y su descripción. */
   nivel: string | null;
   observaciones: string | null;
+  /** Curso y campaña del salón donde se dicta (null en el Welcome). */
+  curso: string | null;
+  campaignId: string | null;
 }
 
 async function salonDelNino(classroomId: string, q?: Queryable): Promise<SalonNino> {
@@ -114,6 +117,8 @@ interface FilaSesion {
   nivel: string | null;
   observaciones: string | null;
   tandaId: string | null;
+  curso: string;
+  campaignId: string;
 }
 
 /**
@@ -133,6 +138,11 @@ async function sesionesElegibles(
     /** La SEMANA en curso (lunes a domingo en el reloj de su salón). */
     semana?: boolean;
     sessionId?: string;
+    /**
+     * SOLO "Gestión Festivos": una clase regular de CUALQUIER campaña y curso (la
+     * elige coordinación). El Agendar de la ficha sigue acotado a su campaña y curso.
+     */
+    amplio?: boolean;
   },
 ): Promise<FilaSesion[]> {
   const v: unknown[] = [
@@ -147,7 +157,7 @@ async function sesionesElegibles(
   if (input.tipo === "REGULAR") {
     // Clase del horario de cualquier salón de SU campaña y SU curso.
     conds.push(`s.slot_id IS NOT NULL`, `s.tipo = 'SESION'`);
-    conds.push(`cu.campaign_id = $2`, `cu.tipo::text = $3`);
+    if (input.amplio !== true) conds.push(`cu.campaign_id = $2`, `cu.tipo::text = $3`);
   } else {
     v.push(input.tipo);
     conds.push(`s.slot_id IS NULL`, `s.tipo::text = $${String(v.length)}`);
@@ -190,7 +200,8 @@ async function sesionesElegibles(
             (SELECT a.id FROM scheduling_agendado a
               WHERE a.classroom_id = s.classroom_id AND a.starts_at = s.starts_at
                 AND a.child_person_id = $4 AND a.estado = 'ACTIVA' LIMIT 1) AS "agendadoId",
-            $5::text AS "_pais", $6::text AS "_nivel"
+            cu.tipo::text AS curso, cu.campaign_id AS "campaignId",
+            $2::uuid AS "_camp", $3::text AS "_curso", $5::text AS "_pais", $6::text AS "_nivel"
        FROM scheduling_session s
        JOIN scheduling_classroom cl ON cl.id = s.classroom_id
        JOIN catalog_course cu ON cu.id = cl.course_id
@@ -259,6 +270,8 @@ function agrupar(
       timezone: rep.timezone,
       nivel: rep.nivel,
       observaciones: rep.observaciones,
+      curso: rep.curso,
+      campaignId: rep.campaignId,
       tramo: tramo(rep.startsAt, rep.duracionMin),
     };
   });
@@ -330,6 +343,8 @@ export async function opcionesAgenda(input: {
   nino: ContextoNino;
   tipo: TipoAgenda;
   fecha: string;
+  /** Solo Gestión Festivos: clases regulares de cualquier campaña y curso. */
+  amplio?: boolean;
 }): Promise<OpcionAgenda[]> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) {
     throw new ValidationError("La fecha debe ser YYYY-MM-DD.");
@@ -365,6 +380,8 @@ export async function opcionesAgenda(input: {
         timezone: null,
         nivel: w.nivel,
         observaciones: w.observaciones,
+        curso: null,
+        campaignId: null,
         tramo: tramo(w.startsAt, w.duracionMin),
       }));
   } else {
@@ -374,6 +391,7 @@ export async function opcionesAgenda(input: {
       nivel: input.nino.nivel,
       tipo: input.tipo,
       fecha: input.fecha,
+      amplio: input.amplio === true,
     });
     opciones = agrupar(filas, input.tipo, salon.classroomId);
   }
@@ -491,6 +509,10 @@ export async function agendarNino(input: {
   id: string;
   autorizarSobrecupo: boolean;
   puedeSobrecupo: boolean;
+  /** Solo Gestión Festivos: clase regular de cualquier campaña y curso. */
+  amplio?: boolean;
+  /** Por qué se agenda (queda en la reserva y en la auditoría). */
+  motivo?: string | null;
   ip?: string | null;
 }): Promise<{ startsAt: string; sobrecupo: boolean }> {
   if (input.autorizarSobrecupo && !input.puedeSobrecupo) {
@@ -563,6 +585,7 @@ export async function agendarNino(input: {
             nivel: input.nino.nivel,
             tipo: input.tipo,
             sessionId: input.id,
+            amplio: input.amplio === true,
           })
         : (
             await Promise.all(
@@ -579,6 +602,7 @@ export async function agendarNino(input: {
                   nivel: input.nino.nivel,
                   tipo: input.tipo as Exclude<TipoAgenda, "WELCOME">,
                   sessionId: h.id,
+                  amplio: input.amplio === true,
                 }),
               ),
             )
@@ -624,8 +648,8 @@ export async function agendarNino(input: {
     const rep = filas.find((f) => f.id === opcion.id)!;
     await execute(
       `INSERT INTO scheduling_agendado
-         (id, classroom_id, starts_at, child_person_id, tipo, agendado_por, sobrecupo_autorizado_por)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         (id, classroom_id, starts_at, child_person_id, tipo, agendado_por, sobrecupo_autorizado_por, motivo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         newId(),
         rep.classroomId,
@@ -634,6 +658,7 @@ export async function agendarNino(input: {
         input.tipo,
         input.actorUserId,
         opcion.lleno ? sobrecupoPor : null,
+        input.motivo ?? null,
       ],
       tx,
     );
@@ -650,6 +675,7 @@ export async function agendarNino(input: {
       id: input.id,
       startsAt: resultado.startsAt,
       sobrecupo: resultado.sobrecupo,
+      ...(input.motivo != null && { motivo: input.motivo }),
     },
     ip: input.ip ?? null,
   });
