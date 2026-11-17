@@ -6,6 +6,7 @@ import { ZONA_CHILE, referenciaHoraria } from "@/ui/hora-paises";
 import { usePermisos } from "@/ui/permisos";
 import { ReportarCasoModal } from "../servicio/casos-atencion/ReportarCasoModal";
 import { CancelacionSesion } from "./CancelacionSesion";
+import { LibrosDelCurso } from "./LibrosDelCurso";
 import { APERTURA_CERRADA, type AperturaEvento, type EventoEditable } from "./NuevoEventoModal";
 import { SoloSi } from "@/ui/SoloSi";
 
@@ -1279,7 +1280,12 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
                     ? "📖 Material del guía"
                     : "🔗 Recursos"}
               </h3>
-              {contenido === null ? (
+              {pestana === "material_usuario" ? (
+                <LibrosDelCurso
+                  curso={sesion?.cursoTipo ?? null}
+                  nivelDeLaClase={sesion?.nivel ?? null}
+                />
+              ) : contenido === null ? (
                 <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>Cargando…</p>
               ) : contenido.length === 0 ? (
                 <p style={{ color: "var(--texto-suave)", fontSize: "0.85rem" }}>

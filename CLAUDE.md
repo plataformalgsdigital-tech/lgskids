@@ -1927,6 +1927,15 @@ solo servía para completar la ficha.
   leía "15:00" desde Colombia sin decir de qué país era. El Welcome también la muestra.
 - Un evento abre **MODAL** (`calendario/SesionModal.tsx`), no una página. El nombre
   del guía SIEMPRE se ve; "Cambiar guía" solo con `salones.gestionar`.
+  **"📚 Libros" del modal (2026-11-17, `calendario/LibrosDelCurso.tsx`)**: muestra el MATERIAL DEL
+  ALUMNO del curso de la sesión —Junior en una sesión Junior, Youngster en una Youngster—, de TODOS
+  los niveles: el libro interactivo (se abre como la vista previa del equipo: su pestaña, su caja, sus
+  videos y todas las unidades habilitadas), el libro completo para descargar (PDF) y el libro de
+  actividades completo (PDF), más un desplegable "PDF por unidad" por si el del nivel completo aún no
+  está cargado. El nivel de la clase sale resaltado. Lee `GET /api/catalog/material` y sirve cada archivo
+  por `/api/catalog/material/[id]`, las dos con `catalogo.ver` (el guía lo tiene), así que no hay ruta ni
+  permiso nuevos; antes listaba solo los enlaces sueltos de `catalog_curso.material_usuario`. Las
+  pestañas "Material" (del guía) y "Recursos" siguen leyendo la referencia curricular.
   **Editar / cancelar / suspender viven en la tarjeta de la AGENDA (2026-10-29, como
   LGS)**, no en el modal: ✏️ edita un evento creado a mano (`cargarEventoEditable` →
   el formulario de siempre) y ✕ abre `QuitarEventoModal`: un evento suelto se
