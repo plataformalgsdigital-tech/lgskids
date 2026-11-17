@@ -7,6 +7,10 @@ import { feriadosDelPais } from "../domain/feriados";
 import { generarFechasSlot } from "../domain/generacion";
 import {
   agendaSesiones,
+  borrarSesionesPorId,
+  finActualDeSesiones,
+  renumerarSesiones,
+  sesionesFuturasGeneradas,
   campaniaTieneMatriculas,
   classroomExisteNombre,
   classroomTieneMatriculas,
@@ -121,6 +125,99 @@ async function salonDormido(tx: Queryable, classroom: ClassroomRecord): Promise<
   return !classroom.activo && (await matriculasVivasDeSalon(classroom.id, tx)) === 0;
 }
 
+/** Lo que un ajuste de calendario haría con las sesiones FUTURAS de un salón. */
+export interface PlanFuturas {
+  /** Sesiones que existen y ya no tocan (el feriado nuevo): se borrarían. */
+  aBorrar: { id: string; startsAt: Date; tipo: string; conHistoria: boolean }[];
+  /** Sesiones que tocan y no existen (la que se agrega al final, o la que vuelve). */
+  aInsertar: SessionRow[];
+  /** Las que siguen pero cambian de número (todas las posteriores al cambio). */
+  aRenumerar: { id: string; numero: number }[];
+  /** Fecha local de la última clase (tipo SESION) con el calendario deseado. */
+  finDeseado: string | null;
+  /** Ídem, con lo que existe hoy. */
+  finActual: string | null;
+}
+
+/**
+ * Compara el calendario que le TOCA al salón (con feriados reales o hipotéticos)
+ * con las sesiones futuras que TIENE, sin escribir nada.
+ *
+ * Solo mira hacia ADELANTE: regenerar el salón entero borra y recrea también lo ya
+ * dictado, y la asistencia cuelga de la sesión con ON DELETE CASCADE. Un feriado
+ * nuevo siempre cae por delante, así que lo pasado no necesita tocarse.
+ */
+export async function planDeFuturas(
+  tx: Queryable | undefined,
+  classroom: ClassroomRecord,
+  slots: SlotRecord[],
+  ajuste?: AjusteFeriados,
+): Promise<PlanFuturas> {
+  const ahora = Date.now();
+  let deseadas = await filasDeSesiones(tx, classroom, slots, ajuste);
+  if (await salonDormidoTx(tx, classroom)) {
+    deseadas = deseadas.filter((r) => r.startsAt.getTime() <= ahora);
+  }
+  const existentes = await sesionesFuturasGeneradas(classroom.id, tx);
+  const porInstante = new Map(existentes.map((e) => [e.startsAt.getTime(), e]));
+  const futurasDeseadas = deseadas.filter((r) => r.startsAt.getTime() > ahora);
+  const claves = new Set(futurasDeseadas.map((r) => r.startsAt.getTime()));
+
+  const aRenumerar: PlanFuturas["aRenumerar"] = [];
+  for (const r of futurasDeseadas) {
+    const e = porInstante.get(r.startsAt.getTime());
+    if (e !== undefined && e.numero !== r.numero) aRenumerar.push({ id: e.id, numero: r.numero });
+  }
+  const sesiones = deseadas.filter((r) => r.tipo === "SESION");
+  const ultimaDeseada = sesiones.reduce<SessionRow | null>(
+    (m, r) => (m === null || r.startsAt > m.startsAt ? r : m),
+    null,
+  );
+  const ultimaActual = await finActualDeSesiones(classroom.id, tx);
+  return {
+    aBorrar: existentes.filter((e) => !claves.has(e.startsAt.getTime())),
+    aInsertar: futurasDeseadas.filter((r) => !porInstante.has(r.startsAt.getTime())),
+    aRenumerar,
+    finDeseado: ultimaDeseada?.fecha ?? null,
+    finActual: ultimaActual,
+  };
+}
+
+async function salonDormidoTx(
+  tx: Queryable | undefined,
+  classroom: ClassroomRecord,
+): Promise<boolean> {
+  return !classroom.activo && (await matriculasVivasDeSalon(classroom.id, tx)) === 0;
+}
+
+/** ¿El plan toca algo? */
+export function planCambia(plan: PlanFuturas): boolean {
+  return plan.aBorrar.length > 0 || plan.aInsertar.length > 0 || plan.aRenumerar.length > 0;
+}
+
+/**
+ * Aplica el plan DENTRO de la transacción. Si borrar tocaría una sesión con
+ * asistencia o ya cerrada, no hace nada y lo dice (lo ya dictado no se toca).
+ */
+export async function aplicarPlanFuturasTx(
+  tx: Queryable,
+  classroom: ClassroomRecord,
+  plan: PlanFuturas,
+): Promise<void> {
+  const conHistoria = plan.aBorrar.filter((s) => s.conHistoria);
+  if (conHistoria.length > 0) {
+    throw new ConflictError(
+      `El salón ${classroom.nombre} ya tiene asistencia o cierre en ${String(conHistoria.length)} sesión(es) que el cambio quitaría.`,
+    );
+  }
+  await borrarSesionesPorId(
+    tx,
+    plan.aBorrar.map((s) => s.id),
+  );
+  await renumerarSesiones(tx, plan.aRenumerar);
+  await insertSessionsBatch(tx, classroom.id, plan.aInsertar);
+}
+
 /**
  * Al REACTIVAR un salón: crea las sesiones futuras de su horario que le faltan,
  * con la MISMA generación (y numeración) de siempre, sin borrar nada — lo ya
@@ -140,11 +237,21 @@ async function rellenarSesionesFuturasTx(
   return faltan.length;
 }
 
+/**
+ * Feriados HIPOTÉTICOS para simular: fechas que se sumarían o se quitarían del
+ * calendario del salón, sin escribir nada (el previo de Feriados propios).
+ */
+export interface AjusteFeriados {
+  agregar?: string[];
+  quitar?: string[];
+}
+
 /** Las sesiones que le tocan al salón por su horario, numeradas, SIN escribir nada. */
-async function filasDeSesiones(
-  tx: Queryable,
+export async function filasDeSesiones(
+  tx: Queryable | undefined,
   classroom: ClassroomRecord,
   slots: SlotRecord[],
+  ajuste?: AjusteFeriados,
 ): Promise<SessionRow[]> {
   const ventana = await getCourseWindow(classroom.courseId, tx);
   if (ventana === null) {
@@ -158,7 +265,12 @@ async function filasDeSesiones(
     tx,
   );
   const suspensiones = await getSuspensionDates(classroom.id, tx);
-  const noDictables = new Set([...feriados, ...suspensiones]);
+  const quitar = new Set(ajuste?.quitar ?? []);
+  const noDictables = new Set([
+    ...feriados.filter((f) => !quitar.has(f)),
+    ...(ajuste?.agregar ?? []),
+    ...suspensiones,
+  ]);
 
   const rows: SessionRow[] = [];
   for (const slot of slots) {

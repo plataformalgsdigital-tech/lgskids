@@ -2662,6 +2662,52 @@ dictan clase, los cursos que toca y los niños de OTRO país** que se quedan sin
   el caso contrario (el niño de un país con feriado en un salón de otro calendario, que ese día
   SÍ tiene clase y puede faltar justificado).
 
+## Feriados propios (2026-11-18)
+
+Académica › Sesiones › **Feriados** (`/panel/sesiones/feriados`, antes "En construcción"; guía:
+`docs/operacion/feriados-propios.md`). Opciones `op.sesiones.feriados` (ver) y
+`op.sesiones.feriados_crear` (crear/quitar/regenerar, base `salones.gestionar`, migración
+`20261118000000_feriados_propios`). Muestra los feriados del **mes** (abre en el corriente, con
+flechas) con la **bandera** de cada país, y deja agregar feriados PROPIOS: una fecha futura, **nombre
+obligatorio** y uno o varios países (CL, CO, EC, PE). Vale solo para esa fecha y ese año.
+
+- **Una fila más de `scheduling_holiday`** con fuente `MANUAL` (sin tabla nueva): la generación, el
+  calendario y **Gestión Festivos** lo leen igual que a los de código. `upsertHolidays` ya NO pisa una
+  fila `MANUAL` (antes un feriado de código en la misma fecha le cambiaba nombre y fuente). Crear un
+  feriado donde el país ya tiene uno no lo pisa: ese país se omite.
+- **Regla de las sesiones** (la de siempre): los salones con ese país en su calendario no dictan ese día
+  y la sesión se AGREGA AL FINAL (total conservado, `final_curso` intacto); la lección sale del puesto
+  entre las clases dictadas, así que la que tocaba ese día la dicta la siguiente para TODOS los niños
+  del salón (los de Colombia y los de Ecuador). Los niños de un país NO cubierto en un salón cubierto
+  quedan en Gestión Festivos; los del país del feriado, o de un país que también lo tiene, no.
+- **Solo se ajusta lo FUTURO** (`planDeFuturas` / `aplicarPlanFuturasTx` en `gestion-salones.ts`): compara
+  el calendario que le toca al salón (`filasDeSesiones`, que ahora acepta un `AjusteFeriados` hipotético
+  para el previo) con sus sesiones futuras generadas, borra las que sobran, renumera y agrega las que
+  faltan. **NO usa `generarSesionesTx`**: ese borra y recrea TODO el salón, y con el curso en marcha se
+  llevaría las sesiones pasadas y su asistencia (ON DELETE CASCADE). Una sesión futura con asistencia o
+  cierre que el cambio quitaría BLOQUEA ese salón. Trampa: `UNIQUE (slot_id, numero)` se comprueba fila
+  por fila, así que `renumerarSesiones` aparta primero los números a un rango libre (+1.000.000).
+- **El final del curso no puede pasar del contrato** (decisión del negocio): el previo compara la nueva
+  última sesión de cada salón con el `final_contrato` de sus niños con matrícula ACTIVA. Si pasara, el
+  feriado se GUARDA y rige para los demás salones, pero ese salón NO se toca: queda **PENDIENTE** con los
+  niños y sus fechas a la vista. Coordinación decide (p. ej. ampliar esos contratos) y pulsa
+  **Regenerar** (`regenerarSalonPendiente`, que vuelve a comprobar). **Lo pendiente se DERIVA**
+  (`salonesPendientesDeFeriados`: calendario que le toca contra el que tiene): no hay tabla.
+- **Quitar** solo los propios (`MANUAL`) y de fecha futura, por el mismo previo y la misma regeneración
+  (la sesión agregada al final desaparece); editar = quitar y crear. La fecha de hoy no vale (`> hoy`,
+  reloj de Bogotá). Alcance por país del rol: solo gestiona feriados de sus países.
+- **Banderas** (`src/ui/Bandera.tsx`, SVG en línea para CL/CO/EC/PE): los emojis 🇨🇱 no se dibujan en
+  Windows (salen las letras). Sirve para reutilizarlas en otras pantallas.
+- Rutas: `GET|POST|DELETE /api/scheduling/feriados`, `POST …/feriados/previo` y
+  `POST …/feriados/salon/[id]`. Auditoría `scheduling.feriado_propio_creado|quitado` y
+  `scheduling.salon_calendario_ajustado`. Núcleo: `scheduling/application/feriados-propios.ts`.
+- Prueba: `contracts/tests/feriados-propios-integration.test.ts` (usa un DOMINGO, que ningún salón real
+  dicta, para no mover datos de otros): previo, conflicto de contrato, lo pasado conserva sus ids,
+  total conservado, numeración 1..N, pendiente derivado, regenerar tras ampliar el contrato y quitar.
+- **Riesgo ya existente, sin tocar**: `regenerarSesiones` y `suspenderDia` SÍ borran y recrean todo el
+  salón (también lo pasado) y no se bloquean con asistencia, a diferencia de "Fin del Programa". Con un
+  curso en marcha conviene revisarlos.
+
 ## Material Guía (2026-11-17)
 
 Mantenimiento Académico › **Material Guía** (`/panel/mantenimiento-cursos/material-guia`,

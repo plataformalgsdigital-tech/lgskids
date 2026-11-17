@@ -257,6 +257,21 @@ export { DIAS_VIGENCIA_INVITACION } from "./domain/invitacion";
 export { SQL_ORDINAL_CLASE } from "./domain/ordinal-sesion";
 export type { EstadoInvitacion } from "./domain/invitacion";
 export {
+  PAISES_FERIADO,
+  NOMBRE_MIN as NOMBRE_FERIADO_MIN,
+  NOMBRE_MAX as NOMBRE_FERIADO_MAX,
+  feriadosDelMes,
+  previoFeriadoPropio,
+  crearFeriadoPropio,
+  quitarFeriadoPropio,
+  salonesPendientesDeFeriados,
+  regenerarSalonPendiente,
+  type FeriadoDelMes,
+  type PrevioFeriado,
+  type ResultadoFeriado,
+  type SalonPendiente,
+} from "./application/feriados-propios";
+export {
   DIAS_FESTIVOS_DEFECTO,
   DIAS_FESTIVOS_MAXIMO,
   festivoDe,

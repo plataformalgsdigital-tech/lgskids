@@ -73,7 +73,7 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     titulo: "Feriados",
-    desc: "Calendario de feriados por país y los extra curados que solo suman.",
+    desc: "Los feriados del mes con la bandera de cada país, y feriados propios para una fecha y los países que elijas.",
     emoji: "📅",
     color: "var(--lgs-amarillo)",
     href: "/panel/sesiones/feriados",

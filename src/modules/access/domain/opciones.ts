@@ -124,6 +124,9 @@ export const OPCIONES_MENU = [
   ]),
   op("menu.sesiones", "op.sesiones.suspensiones", "Suspensiones", ["salones.gestionar"]),
   op("menu.sesiones", "op.sesiones.feriados", "Feriados", ["salones.gestionar"]),
+  op("menu.sesiones", "op.sesiones.feriados_crear", "Feriados: crear y quitar feriados propios", [
+    "salones.gestionar",
+  ]),
   op("menu.sesiones", "op.sesiones.festivos", "Gestión Festivos: ver niños afectados", [
     "salones.gestionar",
   ]),

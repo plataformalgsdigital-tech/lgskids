@@ -431,11 +431,95 @@ export async function upsertHolidays(
     await execute(
       `INSERT INTO scheduling_holiday (country_code, fecha, nombre, fuente)
        VALUES ($1, $2::date, $3, $4)
-       ON CONFLICT (country_code, fecha) DO UPDATE SET nombre = $3, fuente = $4`,
+       ON CONFLICT (country_code, fecha) DO UPDATE SET nombre = $3, fuente = $4
+        -- Un feriado PROPIO (fuente MANUAL) no lo pisa el que calcula el código.
+        WHERE scheduling_holiday.fuente <> 'MANUAL'`,
       [countryCode, feriado.fecha, feriado.nombre, feriado.fuente],
       client,
     );
   }
+}
+
+export interface SesionFutura {
+  id: string;
+  startsAt: Date;
+  numero: number;
+  tipo: string;
+  /** Tiene marcas de asistencia o ya está cerrada: borrarla perdería historia. */
+  conHistoria: boolean;
+}
+
+/** Las sesiones GENERADAS del salón que todavía no empiezan (las únicas que un ajuste toca). */
+export async function sesionesFuturasGeneradas(
+  classroomId: string,
+  client?: Queryable,
+): Promise<SesionFutura[]> {
+  return queryRows<SesionFutura>(
+    `SELECT s.id, s.starts_at AS "startsAt", s.numero, s.tipo::text AS tipo,
+            (s.cerrada_en IS NOT NULL OR EXISTS (
+               SELECT 1 FROM attendance_attendance a WHERE a.session_id = s.id)) AS "conHistoria"
+       FROM scheduling_session s
+      WHERE s.classroom_id = $1 AND s.slot_id IS NOT NULL AND s.starts_at > now()`,
+    [classroomId],
+    client,
+  );
+}
+
+/** Fecha local de la última clase (tipo SESION) que tiene hoy el salón. */
+export async function finActualDeSesiones(
+  classroomId: string,
+  client?: Queryable,
+): Promise<string | null> {
+  const row = await queryOne<{ fin: string | null }>(
+    `SELECT max(fecha)::text AS fin FROM scheduling_session
+      WHERE classroom_id = $1 AND slot_id IS NOT NULL AND tipo = 'SESION'`,
+    [classroomId],
+    client,
+  );
+  return row?.fin ?? null;
+}
+
+export async function borrarSesionesPorId(tx: Queryable, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await execute(`DELETE FROM scheduling_session WHERE id = ANY($1::uuid[])`, [ids], tx);
+}
+
+export async function renumerarSesiones(
+  tx: Queryable,
+  cambios: { id: string; numero: number }[],
+): Promise<void> {
+  if (cambios.length === 0) return;
+  // UNIQUE (slot_id, numero) se comprueba fila por fila: correr todos los números un
+  // puesto chocaría a mitad de la sentencia. Primero se apartan a un rango libre.
+  await execute(
+    `UPDATE scheduling_session SET numero = numero + 1000000 WHERE id = ANY($1::uuid[])`,
+    [cambios.map((c) => c.id)],
+    tx,
+  );
+  await execute(
+    `UPDATE scheduling_session s SET numero = v.numero
+       FROM (SELECT unnest($1::uuid[]) AS id, unnest($2::int[]) AS numero) v
+      WHERE s.id = v.id`,
+    [cambios.map((c) => c.id), cambios.map((c) => c.numero)],
+    tx,
+  );
+}
+
+/** Fuente de los feriados que escribe una persona desde el panel. */
+export const FUENTE_FERIADO_PROPIO = "MANUAL";
+
+/** Los feriados de TODOS los países entre dos fechas (inclusive), con su fuente. */
+export async function feriadosEntre(
+  desde: string,
+  hasta: string,
+): Promise<{ pais: string; fecha: string; nombre: string; fuente: string }[]> {
+  return queryRows(
+    `SELECT country_code::text AS pais, fecha::text AS fecha, nombre, fuente
+       FROM scheduling_holiday
+      WHERE fecha BETWEEN $1::date AND $2::date
+      ORDER BY fecha, country_code`,
+    [desde, hasta],
+  );
 }
 
 export async function getSuspensionDates(
