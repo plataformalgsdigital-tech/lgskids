@@ -2645,6 +2645,15 @@ dictan clase, los cursos que toca y los niños de OTRO país** que se quedan sin
   clases de CUALQUIER campaña y curso de ese día —filtros Campaña → Curso → Salón—; solo existe en
   esta pantalla (`sesionesElegibles` ganó `amplio`; el Agendar de la ficha sigue acotado a su
   campaña y curso) y el resumen avisa si el curso no es el del niño o la lección es distinta.
+- **"No hay clases" se EXPLICA (2026-11-17)**: el 8-dic es feriado en Chile Y en Colombia, que son
+  los dos calendarios de TODOS los salones activos, así que no existe ninguna clase a la que pasar
+  al niño y la lista salía vacía —con los filtros Campaña/Curso/Salón sin opciones— sin decir por
+  qué. `sugerenciasFestivo` devuelve un `diagnostico` (`fechaPasada`, `calendariosActivos`,
+  `calendariosConFeriado`) y la pantalla dice el motivo ("ningún salón activo dicta clase: es
+  feriado en Chile y Colombia…"); los filtros solo aparecen si hay clases que filtrar. Y
+  `festivosProximos` ya no cuenta como afectado al niño cuya clase del día YA empezó (el feriado de
+  hoy a las 17:00 deja de listarse a las 17:01). Cubrir un día así exigiría una sesión extra en un
+  calendario sin feriado (EC/PE no tienen salones hoy).
 - **Vale para CL, CO, EC y PE** (el código no nombra ningún país: compara el del festivo, el del calendario del salón y el del niño). Guía para coordinación: `docs/operacion/gestion-festivos.md`.
 - Rutas: `GET /api/scheduling/festivos?dias=`, `GET …/festivos/sugerencias` y
   `POST …/festivos/aprobar`. Prueba: `contracts/tests/gestion-festivos-integration.test.ts`.

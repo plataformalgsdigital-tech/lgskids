@@ -31,10 +31,25 @@ export interface SugerenciaFestivo extends OpcionAgenda {
   recomendada: boolean;
 }
 
+/**
+ * Por qué puede no haber a dónde pasar al niño ese día. El caso real: el feriado cae en
+ * TODOS los calendarios que usan los salones activos (p. ej. el 8-dic, feriado en Chile y
+ * en Colombia), así que ningún salón dicta clase y no hay opción que ofrecer.
+ */
+export interface DiagnosticoFestivo {
+  /** La clase que se pierde ya empezó: no hay a dónde pasarlo. */
+  fechaPasada: boolean;
+  /** Países de los calendarios de los salones ACTIVOS (CL, CO…). */
+  calendariosActivos: string[];
+  /** De esos, los que tienen feriado ese día. */
+  calendariosConFeriado: string[];
+}
+
 export interface SugerenciasFestivo {
   /** La lección que el niño habría tenido en su salón ese día. */
   leccionPerdida: LeccionDeSesion | null;
   opciones: SugerenciaFestivo[];
+  diagnostico: DiagnosticoFestivo;
 }
 
 export interface LeccionDeSesion {
@@ -150,7 +165,26 @@ export async function sugerenciasFestivo(input: {
   );
   const mejor = opciones.find((o) => libre(o) === 0 && !o.enSuLista);
   if (mejor !== undefined) mejor.recomendada = true;
-  return { leccionPerdida, opciones };
+  const [activos, feriados] = await Promise.all([
+    queryRows<{ pais: string }>(
+      `SELECT DISTINCT holiday_country::text AS pais FROM scheduling_classroom WHERE activo`,
+    ),
+    queryRows<{ pais: string }>(
+      `SELECT DISTINCT country_code::text AS pais FROM scheduling_holiday WHERE fecha = $1::date`,
+      [input.fecha],
+    ),
+  ]);
+  const calendariosActivos = activos.map((a) => a.pais).sort();
+  const conFeriado = new Set(feriados.map((f) => f.pais));
+  return {
+    leccionPerdida,
+    opciones,
+    diagnostico: {
+      fechaPasada: perdida.getTime() < Date.now(),
+      calendariosActivos,
+      calendariosConFeriado: calendariosActivos.filter((c) => conFeriado.has(c)),
+    },
+  };
 }
 
 /**

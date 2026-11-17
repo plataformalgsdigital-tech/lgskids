@@ -81,6 +81,11 @@ interface Opcion {
 interface Sugerencias {
   leccionPerdida: Leccion | null;
   opciones: Opcion[];
+  diagnostico: {
+    fechaPasada: boolean;
+    calendariosActivos: string[];
+    calendariosConFeriado: string[];
+  };
 }
 
 const PAIS: Record<string, string> = { CL: "Chile", CO: "Colombia", EC: "Ecuador", PE: "Perú" };
@@ -142,6 +147,28 @@ async function mensaje(res: Response, porDefecto: string): Promise<string> {
   } catch {
     return porDefecto;
   }
+}
+
+/** Por qué no hay a dónde pasar al niño (y qué hacer), en vez de una lista vacía sin explicación. */
+function SinClases(props: { datos: Sugerencias; amplio: boolean; hayFiltros: boolean }) {
+  const { diagnostico: d } = props.datos;
+  const nombres = (l: string[]) => l.map((p) => PAIS[p] ?? p).join(" y ");
+  let texto: string;
+  if (props.hayFiltros && props.datos.opciones.length > 0) {
+    texto = "Ninguna clase de ese día coincide con esos filtros: quita alguno para ver las demás.";
+  } else if (d.fechaPasada) {
+    texto = "La clase que se pierde ya empezó: no hay a dónde pasarlo.";
+  } else if (
+    d.calendariosActivos.length > 0 &&
+    d.calendariosConFeriado.length === d.calendariosActivos.length
+  ) {
+    texto = `Ese día ningún salón activo dicta clase: es feriado en ${nombres(d.calendariosConFeriado)}, que son los calendarios de todos los salones. No hay una clase a la que pasarlo; solo se podría con una sesión extra en otro calendario.`;
+  } else {
+    texto = props.amplio
+      ? "Ese día no hay clases con cupo en ninguna campaña, curso o salón."
+      : "No hay clases ese día en su campaña y curso. Marca “Elegir otra campaña, curso o salón” para ver las demás.";
+  }
+  return <p style={{ margin: "0.6rem 0 0", color: "#8a5a00", fontWeight: 600 }}>{texto}</p>;
 }
 
 /** Las opciones para UN niño en UN feriado, con el cambio de campaña/curso/salón. */
@@ -286,7 +313,7 @@ function PanelAlumno(props: {
         </label>
       </SoloSi>
 
-      {amplio && datos !== null && (
+      {amplio && datos !== null && datos.opciones.length > 0 && (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", margin: "0.6rem 0" }}>
           <select
             value={fCampania}
@@ -346,10 +373,11 @@ function PanelAlumno(props: {
         </p>
       )}
       {datos !== null && visibles.length === 0 && (
-        <p style={{ margin: "0.6rem 0 0", color: "#8a5a00" }}>
-          No hay clases ese día {amplio ? "con esos filtros" : "en su campaña y curso"}.
-          {!amplio && " Marca “Elegir otra campaña, curso o salón” para ver las demás."}
-        </p>
+        <SinClases
+          datos={datos}
+          amplio={amplio}
+          hayFiltros={fCampania !== "" || fCurso !== "" || fSalon !== ""}
+        />
       )}
 
       {visibles.length > 0 && (

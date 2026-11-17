@@ -159,6 +159,8 @@ export async function festivosProximos(input: {
           WHERE cl.activo AND cl.holiday_country = h.country_code
             -- El curso ya empezó y todavía tiene clases por delante.
             AND h.fecha >= cu.inicio
+            -- Y la clase que se pierde todavía no empezó (hoy, la de más tarde sí; la que ya pasó no).
+            AND ((h.fecha::timestamp + sl.hora_local::time) AT TIME ZONE cl.timezone) > now()
             AND h.fecha <= (
               SELECT max((s.starts_at AT TIME ZONE cl.timezone)::date)
                 FROM scheduling_session s

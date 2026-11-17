@@ -217,6 +217,11 @@ describe.runIf(RUN)("gestión de festivos (integración)", () => {
     });
     expect(normal.opciones.map((o) => o.id)).toContain(sesionCol);
     expect(normal.opciones.map((o) => o.id)).not.toContain(sesionOtra);
+    // El diagnóstico dice qué calendarios de salones activos tienen feriado ese día.
+    expect(normal.diagnostico.fechaPasada).toBe(false);
+    expect(normal.diagnostico.calendariosActivos).toEqual(expect.arrayContaining(["CL", "CO"]));
+    expect(normal.diagnostico.calendariosConFeriado).toContain("CL");
+    expect(normal.diagnostico.calendariosConFeriado).not.toContain("CO");
     const mejor = normal.opciones.find((o) => o.id === sesionCol);
     expect(mejor?.recomendada).toBe(true);
     expect(mejor?.choque).toBeNull();
