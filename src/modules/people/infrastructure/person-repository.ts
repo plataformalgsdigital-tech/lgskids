@@ -300,6 +300,8 @@ export interface NinoDetalle {
   finalContrato: string | null;
   contratoEstado: string | null;
   firmado: boolean | null;
+  /** Día (hora de Bogotá) en que se registró la reserva/contrato en KIDS. */
+  fechaReserva: string | null;
   /** Día (hora de Bogotá) de la última aprobación; null si aún no se aprobó. */
   fechaAprobacion: string | null;
   matriculaEstado: string | null;
@@ -346,6 +348,7 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
             c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
             c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
             c.firmado,
+            (c.created_at AT TIME ZONE 'America/Bogota')::date::text AS "fechaReserva",
             -- La aprobación no tiene columna: queda en la auditoría (contracts.aprobado).
             (SELECT (a.created_at AT TIME ZONE 'America/Bogota')::date::text
                FROM audit_log a
