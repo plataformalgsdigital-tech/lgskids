@@ -190,6 +190,13 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   mismo, y el N° de LGS sin sufijo trae a TODOS los hermanos. Despliega una lista
   para elegir y abrir la ficha, con los hermanos agrupados bajo su contrato. El
   buscador global usa la misma consulta.
+  **Caja "Contrato" de la ficha (2026-11-18)**: las etiquetas son **Fecha contrato (Reserva)**
+  (`inicio`), **Fecha final contrato** (`finalContrato`) y **Fecha de aprobación**
+  (`detalleNino.fechaAprobacion`: la última `contracts.aprobado` de la auditoría, hora de Bogotá, SIN
+  columna nueva; "—" si no se aprobó o si se aprobó antes de que la auditoría la registrara). Ojo: la
+  "Fecha contrato" es el `inicio` que se escribe en el wizard o manda LGS (`inicioContrato`), de la que
+  salen los 12 meses y la edad; NO es el instante en que KIDS registró la reserva (`created_at`), que
+  puede ser posterior (en datos locales, inicio 2026-08-03 con registro 2026-11-06).
   **Ficha del niño** (`/panel/personas/[id]`, 2026-10-02): "Datos personales" va en
   tres líneas fijas —identidad · correo (dos columnas, porque el sintético es largo
   y se montaba sobre el teléfono), teléfono y plataforma · usuario y clave—. La

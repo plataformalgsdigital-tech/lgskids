@@ -37,6 +37,7 @@ interface Nino {
   finalContrato: string | null;
   contratoEstado: string | null;
   firmado: boolean | null;
+  fechaAprobacion: string | null;
   matriculaEstado: string | null;
   salon: string | null;
   meetingUrl: string | null;
@@ -606,8 +607,9 @@ export default function DetalleNinoPage() {
                 <Dato etiqueta="N° de contrato">{nc.numero}</Dato>
               )}
               <Dato etiqueta="Curso">{cursoLabel(nino.tipoCurso)}</Dato>
-              <Dato etiqueta="Inicio">{nino.inicio ?? "—"}</Dato>
-              <Dato etiqueta="Final">{nino.finalContrato ?? "—"}</Dato>
+              <Dato etiqueta="Fecha contrato (Reserva)">{nino.inicio ?? "—"}</Dato>
+              <Dato etiqueta="Fecha final contrato">{nino.finalContrato ?? "—"}</Dato>
+              <Dato etiqueta="Fecha de aprobación">{nino.fechaAprobacion ?? "—"}</Dato>
               <Dato etiqueta="Estado">{nino.contratoEstado ?? "—"}</Dato>
               <Dato etiqueta="Firmado">{nino.firmado === true ? "Sí" : "No"}</Dato>
             </Grid>

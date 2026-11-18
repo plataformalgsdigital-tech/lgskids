@@ -37,7 +37,8 @@ const SISTEMA = "00000000-0000-0000-0000-000000000000";
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const sumar = (d: Date, dias: number) => new Date(d.getTime() + dias * 86_400_000);
 
-describe.runIf(RUN)("feriados propios (integración)", () => {
+// Recorre los salones del país en una base compartida y con otros archivos en paralelo.
+describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () => {
   let campania = "";
   let salonConNino = "";
   let salonVacio = "";

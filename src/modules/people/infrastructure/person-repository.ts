@@ -300,6 +300,8 @@ export interface NinoDetalle {
   finalContrato: string | null;
   contratoEstado: string | null;
   firmado: boolean | null;
+  /** Día (hora de Bogotá) de la última aprobación; null si aún no se aprobó. */
+  fechaAprobacion: string | null;
   matriculaEstado: string | null;
   salon: string | null;
   meetingUrl: string | null;
@@ -344,6 +346,12 @@ export async function detalleNino(id: string): Promise<NinoDetalle | null> {
             c.tipo_curso::text AS "tipoCurso", c.inicio::text AS inicio,
             c.final_contrato::text AS "finalContrato", c.estado::text AS "contratoEstado",
             c.firmado,
+            -- La aprobación no tiene columna: queda en la auditoría (contracts.aprobado).
+            (SELECT (a.created_at AT TIME ZONE 'America/Bogota')::date::text
+               FROM audit_log a
+              WHERE a.accion = 'contracts.aprobado' AND a.entidad = 'contracts_contract'
+                AND a.entidad_id = c.id::text
+              ORDER BY a.created_at DESC LIMIT 1) AS "fechaAprobacion",
             e.estado::text AS "matriculaEstado", cl.nombre AS salon,
             -- La sala es la del GUÍA; la del salón solo si el guía no tiene.
             COALESCE(NULLIF(TRIM(gg.zoom_url), ''), cl.meeting_url) AS "meetingUrl",

@@ -148,7 +148,15 @@ interface SalonCandidato {
 }
 
 /** Salones con ese país en su calendario y sesiones por delante: los únicos a los que un feriado nuevo llega. */
-async function salonesCandidatos(paises: string[]): Promise<SalonCandidato[]> {
+async function salonesCandidatos(paises: string[], fecha?: string): Promise<SalonCandidato[]> {
+  // Un feriado solo mueve las sesiones de SU fecha: con ella, basta mirar los salones que
+  // tienen un bloque de horario ese día de la semana (evita simular todos los demás).
+  const conBloqueEseDia =
+    fecha === undefined
+      ? ""
+      : `AND EXISTS (SELECT 1 FROM scheduling_slot sl
+                      WHERE sl.classroom_id = cl.id
+                        AND sl.dia_semana = EXTRACT(DOW FROM $2::date)::int)`;
   return queryRows<SalonCandidato>(
     `SELECT cl.id, cl.nombre, cl.holiday_country::text AS pais, cu.tipo::text AS curso,
             ca.nombre AS campania
@@ -159,8 +167,9 @@ async function salonesCandidatos(paises: string[]): Promise<SalonCandidato[]> {
         AND EXISTS (SELECT 1 FROM scheduling_session s
                      WHERE s.classroom_id = cl.id AND s.slot_id IS NOT NULL
                        AND s.starts_at > now())
+        ${conBloqueEseDia}
       ORDER BY ca.inicio DESC, cu.tipo, cl.nombre`,
-    [paises],
+    fecha === undefined ? [paises] : [paises, fecha],
   );
 }
 
@@ -283,7 +292,7 @@ export async function previoFeriadoPropio(input: {
   if (efectivos.length > 0) {
     const ajuste: AjusteFeriados =
       input.accion === "AGREGAR" ? { agregar: [input.fecha] } : { quitar: [input.fecha] };
-    for (const c of await salonesCandidatos(efectivos)) {
+    for (const c of await salonesCandidatos(efectivos, input.fecha)) {
       const r = await impactoDeSalon(c, ajuste);
       if (r !== null) salones.push(r.impacto);
     }
@@ -373,7 +382,7 @@ export async function crearFeriadoPropio(input: {
         tx,
       );
     }
-    return ajustarSalonesTx(tx, await salonesCandidatos(nuevos));
+    return ajustarSalonesTx(tx, await salonesCandidatos(nuevos, input.fecha));
   });
 
   await registrarAuditoria({
@@ -418,7 +427,7 @@ export async function quitarFeriadoPropio(input: {
       [input.fecha, FUENTE_FERIADO_PROPIO, paises],
       tx,
     );
-    return ajustarSalonesTx(tx, await salonesCandidatos(paises));
+    return ajustarSalonesTx(tx, await salonesCandidatos(paises, input.fecha));
   });
 
   await registrarAuditoria({
