@@ -965,7 +965,7 @@ videos}` (`videos` = base con token de sus videos; el formato viejo, solo `datos
     debe aceptar esa cantidad en su validación. El libro de YOUNGSTER Rookie que diseño entregó NO trae la
     clave `lgs-autorizaciones` (su regla fija era `u<=1||complete(u-1)`, así que quedaba bloqueado desde la
     Unidad 2 en la vista previa y no obedecía al guía). Se generó `Libros/Youngster/Rockie/Interactivo/
-    LGS_YOUNGSTER_Rookie_Interactivo_Autorizacion.html` (2026-11-23): MISMO código que los otros libros (`auth()`
+LGS_YOUNGSTER_Rookie_Interactivo_Autorizacion.html` (2026-11-23): MISMO código que los otros libros (`auth()`
     con tope 0..4 + `allowed()` + aviso al cambiar la clave); hay que SUBIRLO en Material del alumno (Reemplazar).
     Verificado: sintaxis del script y `allowed()` con y sin clave, lista inválida y lista vacía.
   - **Quién ve qué**: el niño por `/api/student/material` (lista) y
