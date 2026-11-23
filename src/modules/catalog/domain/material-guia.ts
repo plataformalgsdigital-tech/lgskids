@@ -58,11 +58,15 @@ export function detectarArchivoGuia(nombre: string, bytes: Buffer): ArchivoDetec
     return { tipo: "PDF", mime: "application/pdf", extension: "pdf" };
   }
   // PPTX/PPSX son ZIP (PK\x03\x04); PPT/PPS son OLE2 (D0 CF 11 E0).
-  if ((ext === "pptx" || ext === "ppsx") && empieza(bytes, 0x50, 0x4b, 0x03, 0x04)) {
-    return { tipo: "PPT", mime: MIME_PPTX, extension: ext };
-  }
-  if ((ext === "ppt" || ext === "pps") && empieza(bytes, 0xd0, 0xcf, 0x11, 0xe0)) {
-    return { tipo: "PPT", mime: MIME_PPT, extension: ext };
+  // Lo decide la FIRMA, no la extensión: PowerPoint guarda a veces un .ppsx/.pps con el
+  // formato del otro tipo (ZIP u OLE2) y rechazarlo por eso era un falso error.
+  if (["ppt", "pps", "pptx", "ppsx", "pptm", "ppsm"].includes(ext)) {
+    if (empieza(bytes, 0x50, 0x4b, 0x03, 0x04)) {
+      return { tipo: "PPT", mime: MIME_PPTX, extension: ext };
+    }
+    if (empieza(bytes, 0xd0, 0xcf, 0x11, 0xe0)) {
+      return { tipo: "PPT", mime: MIME_PPT, extension: ext };
+    }
   }
   if (["jpg", "jpeg"].includes(ext) && empieza(bytes, 0xff, 0xd8, 0xff)) {
     return { tipo: "IMAGEN", mime: "image/jpeg", extension: "jpg" };
@@ -97,7 +101,7 @@ export const MIMES_MATERIAL_GUIA: ReadonlyMap<string, string> = new Map([
 
 /** Texto de ayuda con lo que admite cada pestaña. */
 export const AYUDA_POR_TAB: Record<TabMaterialGuia, string> = {
-  MATERIAL: "PPT, PPTX o PDF",
+  MATERIAL: "PPT, PPTX, PPS, PPSX o PDF",
   RECURSO: "JPG, PNG, WebP, MP4 o un enlace",
 };
 

@@ -38,7 +38,7 @@ interface Limites {
 }
 
 const ACCEPT: Record<Tab, string> = {
-  MATERIAL: ".pdf,.ppt,.pptx,.pps,.ppsx",
+  MATERIAL: ".pdf,.ppt,.pptx,.pps,.ppsx,.pptm,.ppsm",
   RECURSO: ".jpg,.jpeg,.png,.webp,.mp4,.m4v",
 };
 const TITULO_TAB: Record<Tab, string> = { MATERIAL: "📖 Material", RECURSO: "🔗 Recursos" };

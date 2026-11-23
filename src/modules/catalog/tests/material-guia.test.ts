@@ -34,9 +34,13 @@ describe("material guía: qué es cada archivo (lo decide el contenido)", () => 
   it("un archivo renombrado o de otro tipo no pasa", () => {
     // Un ejecutable con extensión .pdf.
     expect(detectarArchivoGuia("x.pdf", bytes(0x4d, 0x5a))).toBeNull();
-    // Un ZIP cualquiera NO es un .ppt viejo, ni un .pptx sin firma ZIP.
-    expect(detectarArchivoGuia("x.ppt", bytes(0x50, 0x4b, 0x03, 0x04))).toBeNull();
+    // Una presentación se reconoce por su firma (ZIP u OLE2), sea cual sea su extensión
+    // de PowerPoint: un .ppsx con formato viejo no es un error.
+    expect(detectarArchivoGuia("x.ppsx", bytes(0xd0, 0xcf, 0x11, 0xe0))?.tipo).toBe("PPT");
+    expect(detectarArchivoGuia("x.ppt", bytes(0x50, 0x4b, 0x03, 0x04))?.tipo).toBe("PPT");
+    // Pero sin firma de presentación, no pasa.
     expect(detectarArchivoGuia("x.pptx", bytes(0x25, 0x50, 0x44, 0x46))).toBeNull();
+    expect(detectarArchivoGuia("x.ppsx", bytes(0x4d, 0x5a))).toBeNull();
     // Extensiones que el módulo no admite.
     expect(detectarArchivoGuia("x.docx", bytes(0x50, 0x4b, 0x03, 0x04))).toBeNull();
     expect(detectarArchivoGuia("x.html", Buffer.from("<html>"))).toBeNull();
