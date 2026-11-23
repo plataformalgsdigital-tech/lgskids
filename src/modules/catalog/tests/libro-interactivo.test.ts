@@ -8,10 +8,13 @@ import {
   PREFIJO_NOMBRE_LIBRO,
   PUENTE_ALMACEN,
   SANDBOX_LIBRO,
+  autorizacionPreviaDelLibro,
   esHtml,
   esPdf,
   inyectarPuente,
 } from "../domain/libro-interactivo";
+import { NIVELES } from "../domain/curriculo";
+import { unidadesDelNivel } from "../domain/unidad-mapa";
 
 const SCRIPT = `<script>${PUENTE_ALMACEN}</script>`;
 const html = (s: string) => Buffer.from(s, "utf8");
@@ -277,5 +280,29 @@ describe("puente de almacenamiento", () => {
     recibir({ tipo: MENSAJE_ACTUALIZAR_LIBRO, datos: { rev: "falsa" } }, { otra: true });
     expect(almacen.getItem("rev")).toBe("vieja");
     expect(eventos).toHaveLength(0);
+  });
+});
+
+describe("autorizacionPreviaDelLibro (vista previa del equipo y del advisor)", () => {
+  const lista = (curso: string, nivel: string) =>
+    (JSON.parse(autorizacionPreviaDelLibro(curso, nivel)) as { v: number; unidades: number[] })
+      .unidades;
+
+  it("abre TODAS las unidades del libro, del Welcome a la última", () => {
+    for (const curso of ["JUNIOR", "YOUNGSTER"]) {
+      for (const { codigo } of NIVELES) {
+        const n = unidadesDelNivel(curso, codigo);
+        expect(lista(curso, codigo)).toEqual(Array.from({ length: n + 1 }, (_, i) => i));
+      }
+    }
+  });
+
+  it("NUNCA manda una unidad que el libro no tiene: el libro descarta la lista entera", () => {
+    // Los libros de cuatro unidades validan `<= 4` (Rookie, `< D.units.length`) y
+    // rechazan la lista completa si trae la 5, que solo existe en Youngster·Elite.
+    expect(Math.max(...lista("JUNIOR", "ROOKIE"))).toBe(4);
+    expect(Math.max(...lista("JUNIOR", "CHAMPION"))).toBe(4);
+    expect(Math.max(...lista("YOUNGSTER", "LEGENDARY"))).toBe(4);
+    expect(Math.max(...lista("YOUNGSTER", "ELITE"))).toBe(5);
   });
 });

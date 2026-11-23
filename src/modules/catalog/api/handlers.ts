@@ -29,16 +29,11 @@ import {
   cspLibro,
   inyectarPuente,
   urlLibroConPuente,
-  valorAutorizacionesLibro,
+  autorizacionPreviaDelLibro,
 } from "../domain/libro-interactivo";
 import { baseVideosLibro } from "../application/video-libro";
 import { vocesParaLibro } from "../application/voz-libro";
-import {
-  UNIDADES_MAXIMAS,
-  paradaValida,
-  paradasDelNivel,
-  unidadesDelNivel,
-} from "../domain/unidad-mapa";
+import { paradaValida, paradasDelNivel, unidadesDelNivel } from "../domain/unidad-mapa";
 import {
   MAX_AVISOS_LOGIN,
   agregarAvisoLogin,
@@ -513,6 +508,9 @@ export const materialEstadoHandler = handlerWithAuth(async (_request, auth) => {
                       url: urlLibroConPuente(`/api/catalog/material/${f.interactivo.id}`),
                       videosBase: baseVideosLibro(f.interactivo.id),
                       voces: await vocesParaLibro(curso, f.nivel),
+                      // Vista previa del equipo y del advisor: TODAS las unidades de ESTE
+                      // libro, ni una más (si sobra una, el libro descarta la lista).
+                      autorizacion: autorizacionPreviaDelLibro(curso, f.nivel),
                     },
             })),
           ),
@@ -524,13 +522,10 @@ export const materialEstadoHandler = handlerWithAuth(async (_request, auth) => {
       mensaje: MENSAJE_ALMACEN_LIBRO,
       claveAutorizaciones: CLAVE_AUTORIZACIONES_LIBRO,
     },
-    // En la vista previa del EQUIPO se abren todas las unidades: se revisa el
-    // libro entero. Al niño solo le llegan las que su guía le abrió. Hasta la
-    // más alta de CUALQUIER nivel (Youngster·Elite llega a la 5): a un libro de
-    // cuatro unidades la 5 no le abre nada.
-    autorizacionPrevia: valorAutorizacionesLibro(
-      Array.from({ length: UNIDADES_MAXIMAS + 1 }, (_, i) => i),
-    ),
+    // La vista previa del EQUIPO abre todas las unidades (se revisa el libro entero);
+    // al niño solo le llegan las que su guía le abrió. La lista va en CADA libro
+    // (`interactivo.autorizacion`), no aquí: una lista única con la unidad 5 de
+    // Youngster·Elite hacía que los libros de cuatro unidades la descartaran entera.
   });
 });
 

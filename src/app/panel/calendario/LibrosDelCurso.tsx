@@ -24,6 +24,8 @@ interface Resumen {
   videosBase?: string | null;
   url?: string;
   voces?: VocesLibro | null;
+  /** Vista previa: TODAS las unidades de ESTE libro (la arma el servidor por nivel). */
+  autorizacion?: string;
 }
 interface Casilla {
   parada: number;
@@ -42,7 +44,6 @@ interface FilaNivel {
 interface Estado {
   cursos: Record<string, FilaNivel[]>;
   libro: CajaLibro;
-  autorizacionPrevia: string;
 }
 
 const NOMBRE_CURSO: Record<string, string> = { JUNIOR: "Junior", YOUNGSTER: "Youngster" };
@@ -96,7 +97,7 @@ export function LibrosDelCurso(props: {
       caja: estado.libro,
       claveProgreso: `lgs-material:equipo:${libro.id}`,
       videosBase: libro.videosBase ?? null,
-      autorizacion: estado.autorizacionPrevia,
+      autorizacion: libro.autorizacion ?? null,
       voces: libro.voces ?? null,
     });
     if (!abierto) {

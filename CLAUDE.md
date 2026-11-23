@@ -937,6 +937,21 @@ videos}` (`videos` = base con token de sus videos; el formato viejo, solo `datos
     `self.origin`; y con el visor en iframe, Chrome lo corría en OTRO proceso, fuera de
     `Page.getFrameTree` (hacía falta `Target.setAutoAttach`), mientras que la pestaña sí
     aparece como un target normal.
+  - **VISTA PREVIA del equipo y del advisor (2026-11-24)**: el "Ver" del libro interactivo
+    (Material del alumno) y el botón "📚 Libros" del panel de la sesión abren el libro con TODAS
+    las unidades abiertas, sin las reglas del alumno, y se puede rendir la evaluación y el juego
+    (todo LOCAL: el progreso va a `lgs-material:equipo:<id>` y NO se sincroniza al servidor).
+    La lista de unidades la arma el servidor POR LIBRO (`autorizacionPreviaDelLibro(curso, nivel)`
+    → `interactivo.autorizacion` en `GET /api/catalog/material`): **cada libro descarta la lista
+    ENTERA si trae una unidad que no tiene** (los de cuatro unidades validan `<= 4`; Rookie,
+    `< D.units.length`; Youngster·Elite, `<= 5`) y entonces vuelve a su regla secuencial de
+    alumno ("Completa el cierre anterior"). Desde 2026-11-10 se mandaba una lista única 0..5
+    (por la Unidad 5 de Elite): todos los libros menos Youngster·Elite quedaban bloqueados
+    desde la Unidad 2 para el equipo y para el advisor (el PDF no tiene ese candado). La
+    prueba `libro-interactivo.test.ts` exige que ninguna lista pase de las unidades del nivel.
+    **Sumar un nivel con más unidades = una línea en `UNIDADES_ESPECIALES`**, y el libro nuevo
+    debe aceptar esa cantidad en su validación. El libro de YOUNGSTER Rookie no trae la clave
+    `lgs-autorizaciones` (no está integrado): abre por su cuenta.
   - **Quién ve qué**: el niño por `/api/student/material` (lista) y
     `/api/student/material/[id]` (sirve), que exigen que el archivo SEA material
     (`archivoDeMaterial`) y que sea de SU curso y de un nivel ALCANZADO (`alcance.ts`, la

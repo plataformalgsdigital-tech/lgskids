@@ -21,6 +21,8 @@ interface Resumen {
   url?: string;
   /** Solo el interactivo: audios de ElevenLabs e intervenciones. */
   voces?: VocesLibro | null;
+  /** Vista previa: TODAS las unidades de ESTE libro (la arma el servidor por nivel). */
+  autorizacion?: string;
 }
 interface Casilla {
   parada: number;
@@ -45,8 +47,6 @@ interface Estado {
   cursos: Record<string, FilaNivel[]>;
   /** La caja del libro: permisos de su pestaña y cómo habla el puente. */
   libro: CajaLibro;
-  /** Vista previa del equipo: con todas las unidades abiertas. */
-  autorizacionPrevia: string;
 }
 
 const CURSOS: Curso[] = ["JUNIOR", "YOUNGSTER"];
@@ -127,7 +127,7 @@ function MaterialAlumnoPageContenido() {
       caja: estado.libro,
       claveProgreso: `lgs-material:equipo:${libro.id}`,
       videosBase: libro.videosBase ?? null,
-      autorizacion: estado.autorizacionPrevia,
+      autorizacion: libro.autorizacion ?? null,
       voces: libro.voces ?? null,
     });
     if (!abierto) {

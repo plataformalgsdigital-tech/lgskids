@@ -62,6 +62,7 @@ export {
   MENSAJE_ACTUALIZAR_LIBRO,
   CLAVE_AUTORIZACIONES_LIBRO,
   valorAutorizacionesLibro,
+  autorizacionPreviaDelLibro,
   urlLibroConPuente,
 } from "./domain/libro-interactivo";
 export {

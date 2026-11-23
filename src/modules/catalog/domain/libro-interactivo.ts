@@ -27,6 +27,7 @@
  * (la voz de Emma) sigue disponible.
  */
 
+import { paradasDelNivel } from "./unidad-mapa";
 import { PUENTE_VOZ } from "./voz-libro";
 
 /**
@@ -82,6 +83,20 @@ export const CLAVE_AUTORIZACIONES_LIBRO = "lgs-autorizaciones";
 /** Valor de esa clave, armado en UN solo lugar. */
 export function valorAutorizacionesLibro(paradas: readonly number[]): string {
   return JSON.stringify({ v: 1, unidades: [...paradas].sort((a, b) => a - b) });
+}
+
+/**
+ * La autorización de la VISTA PREVIA del equipo y del advisor: todas las unidades
+ * de ESE libro, ni una más.
+ *
+ * Cada libro valida la lista que recibe y la DESCARTA ENTERA si trae una unidad que
+ * no tiene (los de cuatro unidades exigen `<= 4`; Youngster·Elite, `<= 5`). Con una
+ * lista única 0..5 —la que se mandó desde que existe la Unidad 5 de Elite— todos los
+ * demás libros la rechazaban y volvían a su regla de alumno ("Completa el cierre
+ * anterior"): la revisión veía bloqueado de la Unidad 2 en adelante.
+ */
+export function autorizacionPreviaDelLibro(curso: string, nivel: string): string {
+  return valorAutorizacionesLibro(paradasDelNivel(curso, nivel));
 }
 
 /**
