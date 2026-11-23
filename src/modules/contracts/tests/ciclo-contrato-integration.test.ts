@@ -8,7 +8,9 @@ import {
   aprobarContrato,
   crearContrato,
   inactivarContrato,
+  inactivarContratoDePanel,
   ponerEnPausa,
+  reactivarContratoInactivo,
   reactivar,
 } from "../application/gestion-contratos";
 import { findContractById, findContratosVencidos } from "../infrastructure/contract-repository";
@@ -192,6 +194,34 @@ describe.runIf(RUN)("ciclo de vida del contrato (integración)", () => {
     await expect(
       inactivarContrato({ actorUserId: ACTOR, contractId, motivo: "repetido a propósito" }),
     ).resolves.toBeUndefined();
+  });
+
+  it("ACTIVAR un contrato inactivo vuelve a encender contrato, persona y cuenta (y se puede inactivar otra vez)", async () => {
+    // Sin N° de LGS no hay a quién avisar: NO_APLICA. Con LGS encendido se avisa PRIMERO.
+    const r = await reactivarContratoInactivo({
+      actorUserId: ACTOR,
+      contractId,
+      motivo: "se equivocaron al inactivar",
+    });
+    expect(r.lgs).toBe("NO_APLICA");
+    expect((await findContractById(contractId))?.estado).toBe("APROBADO");
+    const persona = await queryOne<{ estado: string; user_id: string }>(
+      `SELECT estado, user_id FROM people_person WHERE id = $1`,
+      [ninoId],
+    );
+    expect(persona?.estado).toBe("ACTIVA");
+    const usuario = await queryOne<{ estado: string }>(
+      `SELECT estado FROM identity_user WHERE id = $1`,
+      [persona?.user_id],
+    );
+    expect(usuario?.estado).toBe("ACTIVO");
+    // Solo se activa lo inactivo.
+    await expect(
+      reactivarContratoInactivo({ actorUserId: ACTOR, contractId, motivo: "ya está activo" }),
+    ).rejects.toBeInstanceOf(ConflictError);
+    // Vuelve a inactivarse por el camino del panel.
+    await inactivarContratoDePanel({ actorUserId: ACTOR, contractId, motivo: "retiro voluntario" });
+    expect((await findContractById(contractId))?.estado).toBe("INACTIVO");
   });
 
   it("RENOVACIÓN: el niño que vuelve recibe contrato nuevo y, al aprobarlo, recupera su MISMA cuenta", async () => {

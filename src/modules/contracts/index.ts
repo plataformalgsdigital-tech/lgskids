@@ -25,6 +25,8 @@ export {
   cambiarApoderadoPorExternalRef,
   reactivar,
   inactivarContrato,
+  inactivarContratoDePanel,
+  reactivarContratoInactivo,
   procesarVencimientos,
   listarContratos,
   buscarContratos,
@@ -90,6 +92,7 @@ export {
   extenderHandler,
   reactivarHandler,
   inactivarHandler,
+  activarHandler,
 } from "./api/handlers";
 export { datosNinoEditables, editarDatosNino } from "./application/datos-nino";
 export type { DatosNinoEditables, EdicionDatosNino } from "./application/datos-nino";

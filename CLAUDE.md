@@ -159,6 +159,18 @@ opciones[], correcta}] }] }`). El campo `quiz` de la API es JSON libre: cada edi
   distinguen por el sufijo `#documento`—, y cada tarjeta actúa sobre SU contrato
   (aprobar, matricular, cambiar salón, cambiar curso, pausar/reactivar,
   inactivar).
+  **INACTIVAR y ACTIVAR desde KIDS avisan a LGS (2026-11-23)**: el botón Inactivar de la ficha
+  (`inactivarContratoDePanel`) y el nuevo **✔ Activar** de un contrato INACTIVO
+  (`reactivarContratoInactivo`, `POST /api/contracts/[id]/activate`, misma opción
+  `op.contratos.inactivar`, motivo obligatorio) llaman PRIMERO a `POST {LGS_API_URL}/api/kids-sync/estado`
+  (`avisarEstadoALgs`, `{externalRef, accion: inactivar|reactivar, motivo, ejecutadoPor}`): LGS lo deja como
+  con su botón Inactivar (estadoInactivo, clases futuras, login) SIN avisar de vuelta (`desdeKids`, sin eco) y
+  es idempotente (`aplicado: false` si ya estaba así). Si LGS rechaza o no responde, no se cambia en ningún
+  lado; un contrato sin N° de LGS no avisa. Antes inactivar en KIDS NO llegaba a LGS. Activar deja contrato
+  APROBADO, persona ACTIVA y cuenta encendida, NO mueve la vigencia: si el contrato ya venció dice "usa Extender
+  vigencia" (que también reactiva), porque el barrido de vencidos lo volvería a inactivar; la matrícula se
+  canceló al inactivar, así que puede quedar `requiereMatricula`. El vencimiento automático y la baja desde LGS
+  NO avisan (LGS ya lo sabe o lo hizo). Prueba: `ciclo-contrato-integration.test.ts`.
   **Buscar (2026-10-15)**: la lista tiene un campo "Buscar" (`GET /api/contracts?buscar=`)
   que busca POR PALABRAS en el nombre y el documento del niño Y del titular, el
   usuario, el N° de LGS (sin sufijo trae a los hermanos) y el N° interno exacto. La

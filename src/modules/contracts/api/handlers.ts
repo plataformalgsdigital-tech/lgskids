@@ -11,7 +11,8 @@ import {
   crearReservaBeneficiario,
   extenderContrato,
   fichaContrato,
-  inactivarContrato,
+  inactivarContratoDePanel,
+  reactivarContratoInactivo,
   listarContratos,
   ponerEnPausa,
   reactivar,
@@ -309,11 +310,27 @@ export const inactivarHandler = handlerWithAuth(async (request, auth, context) =
   profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
   profile.requireOpcion("op.contratos.inactivar");
   const body = motivoSchema.parse(await request.json());
-  await inactivarContrato({
+  const r = await inactivarContratoDePanel({
     actorUserId: auth.userId,
     contractId,
     motivo: body.motivo,
     ip: ip(request),
   });
-  return json({ ok: true });
+  return json({ ok: true, ...r });
+});
+
+/** POST /api/contracts/[id]/activate — vuelve a activar un contrato INACTIVO (y a LGS). */
+export const activarHandler = handlerWithAuth(async (request, auth, context) => {
+  const contractId = await contractIdFromContext(context);
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.CONTRATOS_GESTIONAR);
+  profile.requireOpcion("op.contratos.inactivar");
+  const body = motivoSchema.parse(await request.json());
+  const r = await reactivarContratoInactivo({
+    actorUserId: auth.userId,
+    contractId,
+    motivo: body.motivo,
+    ip: ip(request),
+  });
+  return json({ ok: true, ...r });
 });

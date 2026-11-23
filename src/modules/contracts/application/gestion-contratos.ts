@@ -44,6 +44,7 @@ import {
   sumarDias,
 } from "../domain/vigencia";
 import {
+  avisarEstadoALgs,
   avisarExtensionALgs,
   avisarMatriculaALgs,
   avisarOnholdALgs,
@@ -1286,6 +1287,98 @@ export async function inactivarContrato(input: {
     payload: { motivo: input.motivo.trim() },
     ip: input.ip ?? null,
   });
+}
+
+type EstadoLgsAviso = "SINCRONIZADO" | "NO_APLICA" | "SIN_CONFIGURAR";
+
+/** Avisa a LGS (si el contrato viene de allá y la integración está encendida). Lanza si LGS rechaza. */
+async function sincronizarEstadoConLgs(
+  contractId: string,
+  accion: "inactivar" | "reactivar",
+  motivo: string,
+  actorUserId: string,
+): Promise<EstadoLgsAviso> {
+  const externalRef = await externalRefDe(contractId);
+  if (externalRef === null) return "NO_APLICA";
+  if (!lgsSyncConfigurado()) return "SIN_CONFIGURAR";
+  const r = await avisarEstadoALgs({
+    externalRef,
+    accion,
+    motivo,
+    ejecutadoPor: await usernameDe(actorUserId),
+  });
+  return r.aplicado === false ? "NO_APLICA" : "SINCRONIZADO";
+}
+
+/**
+ * INACTIVAR desde el panel de KIDS. Si el contrato viene de LGS, LGS se inactiva
+ * PRIMERO (mismas reglas que el OnHold: si LGS no responde o rechaza, no se inactiva
+ * en ningún lado) y después corre la cascada de siempre.
+ */
+export async function inactivarContratoDePanel(input: {
+  actorUserId: string;
+  contractId: string;
+  motivo: string;
+  ip?: string | null;
+}): Promise<{ lgs: EstadoLgsAviso }> {
+  const motivo = input.motivo.trim();
+  if (motivo.length < 5) {
+    throw new ValidationError("El motivo es obligatorio (mínimo 5 caracteres).");
+  }
+  const contrato = await findContractById(input.contractId);
+  if (contrato === null) throw new NotFoundError("El contrato no existe.");
+  if (contrato.estado === "INACTIVO") return { lgs: "NO_APLICA" };
+  const lgs = await sincronizarEstadoConLgs(contrato.id, "inactivar", motivo, input.actorUserId);
+  await inactivarContrato({ ...input, motivo });
+  return { lgs };
+}
+
+/**
+ * REACTIVAR un contrato INACTIVO desde el panel (el botón "Activar"): contrato
+ * APROBADO, persona ACTIVA y la cuenta del niño encendida —lo mismo que hace
+ * extender la vigencia de un inactivo—, y LGS se reactiva PRIMERO. NO devuelve días
+ * ni mueve la vigencia: si el contrato ya venció, hay que extenderla (el barrido de
+ * vencidos lo volvería a inactivar). La matrícula se canceló al inactivar, así que
+ * puede quedar pendiente de salón (`requiereMatricula`).
+ */
+export async function reactivarContratoInactivo(input: {
+  actorUserId: string;
+  contractId: string;
+  motivo: string;
+  ip?: string | null;
+}): Promise<{ lgs: EstadoLgsAviso; requiereMatricula: boolean }> {
+  const motivo = input.motivo.trim();
+  if (motivo.length < 5) {
+    throw new ValidationError("El motivo es obligatorio (mínimo 5 caracteres).");
+  }
+  const contrato = await findContractById(input.contractId);
+  if (contrato === null) throw new NotFoundError("El contrato no existe.");
+  if (contrato.estado !== "INACTIVO") {
+    throw new ConflictError(`Solo se activa un contrato INACTIVO (está ${contrato.estado}).`);
+  }
+  if (contratoVencido(contrato.finalContrato)) {
+    throw new ConflictError(
+      `El contrato venció el ${contrato.finalContrato}: usa "Extender vigencia", que también lo reactiva.`,
+    );
+  }
+  const beneficiario = await findPersonById(contrato.beneficiarioId);
+  const lgs = await sincronizarEstadoConLgs(contrato.id, "reactivar", motivo, input.actorUserId);
+  await withTransaction(async (tx) => {
+    await setContractEstado(contrato.id, "APROBADO", tx);
+    if (beneficiario !== null && beneficiario.estado !== "ACTIVA") {
+      await setPersonEstado(beneficiario.id, "ACTIVA", tx);
+    }
+    if (beneficiario?.userId) await reactivarUsuarioTx(tx, beneficiario.userId);
+  });
+  await registrarAuditoria({
+    actorUserId: input.actorUserId,
+    accion: "contracts.reactivado_inactivo",
+    entidad: "contracts_contract",
+    entidadId: contrato.id,
+    payload: { motivo, lgs },
+    ip: input.ip ?? null,
+  });
+  return { lgs, requiereMatricula: (await findMatriculaVivaByContract(contrato.id)) === null };
 }
 
 /**

@@ -275,6 +275,14 @@ export default function FichaContratoPage() {
         setAviso(
           `Reactivado: el contrato se extendió ${String(data.diasExtendidos)} días.${enLgs}`,
         );
+      } else if (ruta === "deactivate") {
+        setAviso(`Contrato inactivado.${enLgs}`);
+      } else if (ruta === "activate") {
+        setAviso(
+          `Contrato activado: el niño puede entrar.` +
+            (data.requiereMatricula === true ? " ⚠ No tiene salón: matricúlalo." : "") +
+            enLgs,
+        );
       } else if (ruta === "onhold") {
         setAviso(`OnHold activado.${enLgs}`);
       } else if (ruta === "extend") {
@@ -725,6 +733,22 @@ export default function FichaContratoPage() {
                       }}
                     >
                       ▶ Reactivar
+                    </button>
+                  )}
+                  {puede.inactivar && c.estado === "INACTIVO" && (
+                    <button
+                      style={{ ...boton, color: "#2e7d32" }}
+                      disabled={ocupado}
+                      onClick={() => {
+                        const m = pedirMotivo(
+                          "Motivo de la reactivación (obligatorio). El niño vuelve a entrar" +
+                            (c.externalRef !== null ? " y LGS se activa igual" : "") +
+                            "; si el contrato ya venció, usa Extender vigencia:",
+                        );
+                        if (m !== null) void accion(c.id, "activate", { motivo: m });
+                      }}
+                    >
+                      ✔ Activar
                     </button>
                   )}
                   {puede.inactivar && c.estado !== "INACTIVO" && (

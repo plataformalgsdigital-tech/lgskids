@@ -63,6 +63,17 @@ export interface DatosNinoLgs {
   } | null;
 }
 
+/**
+ * Inactivar / reactivar un beneficiario hecho en KIDS → LGS (`/api/kids-sync/estado`):
+ * LGS lo marca igual (estadoInactivo, clases futuras, login) SIN avisar de vuelta.
+ */
+export interface EstadoLgs {
+  externalRef: string;
+  accion: "inactivar" | "reactivar";
+  motivo: string;
+  ejecutadoPor: string | null;
+}
+
 export interface RespuestaLgs {
   configurado: boolean;
   /** false = LGS no tenía nada que hacer (ya estaba así o no existe allá). */
@@ -97,6 +108,11 @@ export async function avisarMatriculaALgs(cuerpo: MatriculaLgs): Promise<Respues
 /** Datos del niño y del apoderado editados en KIDS → LGS (mismas reglas de error). */
 export async function avisarDatosNinoALgs(cuerpo: DatosNinoLgs): Promise<RespuestaLgs> {
   return llamarLgs("datos-nino", cuerpo);
+}
+
+/** Inactivar o reactivar hecho en KIDS → LGS (mismas reglas de error). */
+export async function avisarEstadoALgs(cuerpo: EstadoLgs): Promise<RespuestaLgs> {
+  return llamarLgs("estado", cuerpo);
 }
 
 /** Clave inicial que LGS guardó de un niño al matricularlo en KIDS. */
@@ -155,7 +171,7 @@ export async function clavesInicialesDeLgs(externalRefs: string[]): Promise<Clav
 }
 
 async function llamarLgs(
-  ruta: "onhold" | "extension" | "matricula" | "datos-nino",
+  ruta: "onhold" | "extension" | "matricula" | "datos-nino" | "estado",
   cuerpo: object,
 ): Promise<RespuestaLgs> {
   const e = env();
