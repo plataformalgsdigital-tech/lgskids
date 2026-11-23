@@ -201,6 +201,12 @@ describe.runIf(RUN)("creación de perfil del niño (integración)", () => {
     expect(yo?.enlace?.estado).toBe("VIGENTE");
     expect(yo?.salon).toBe(`Perfil Jr ${marca}`);
     expect(yo?.apoderado).toBe(`Mamá Perfil${marca}`);
+    // Cada envío del enlace queda en la lista del niño: el de la aprobación y el reenvío.
+    expect(yo?.envios).toHaveLength(2);
+    expect(yo?.envios.every((e) => e.ok && !e.sinWelcome && e.error === null)).toBe(true);
+    expect(new Date(yo?.envios[0]?.en ?? 0).getTime()).toBeGreaterThanOrEqual(
+      new Date(yo?.envios[1]?.en ?? 0).getTime(),
+    );
     // Fuera de su país no se ve.
     const ajeno = await ninosSinPerfil({ countryScope: ["CL"], buscar: `NP-${marca}` });
     expect(ajeno).toHaveLength(0);

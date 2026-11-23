@@ -22,6 +22,7 @@ import {
   MARCADORES,
   SLUG_CREDENCIALES,
 } from "../domain/plantilla";
+import { estadoLinea } from "../infrastructure/linea-whatsapp";
 import { proveedorActivo } from "../infrastructure/senders";
 
 function ip(request: Request): string | null {
@@ -211,4 +212,15 @@ export const credencialesEnviarHandler = handlerWithAuth(async (request, auth, c
     ip: ip(request),
   });
   return json(r, { status: r.ok ? 200 : 502 });
+});
+
+/**
+ * GET /api/notifications/linea — ¿está viva la línea de WhatsApp? La luz del Tablero.
+ * Solo INDICA (activa / caída y por qué): el número lo cambia Servicio LGS en
+ * Contingencia, no se toca desde aquí.
+ */
+export const lineaEstadoHandler = handlerWithAuth(async (_request, auth) => {
+  const profile = await getAccessProfile(auth.userId);
+  profile.requirePermission(PERMISOS.PANEL_TABLERO);
+  return json(await estadoLinea(), { headers: { "Cache-Control": "no-store" } });
 });

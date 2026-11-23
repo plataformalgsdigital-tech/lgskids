@@ -5,6 +5,7 @@ import { env } from "../config/env";
 import { isAppError, UnauthorizedError } from "../errors";
 import { newId } from "../ids";
 import { logger, withCorrelationId } from "../logging/logger";
+import { CABECERA_FALLA_ENVIO, conCapturaDeFalla, fallaParaCabecera } from "./falla-envio";
 
 /**
  * Envoltorios estándar para rutas API de Next.js.
@@ -106,15 +107,21 @@ function errorResponse(error: unknown, correlationId: string): NextResponse {
 export function handler(fn: Handler): Handler {
   return async (request, context) => {
     const correlationId = request.headers.get("x-correlation-id") ?? newId();
-    return withCorrelationId(correlationId, async () => {
-      try {
-        const response = await fn(request, context);
-        response.headers.set("x-correlation-id", correlationId);
+    return conCapturaDeFalla(() =>
+      withCorrelationId(correlationId, async () => {
+        let response: NextResponse;
+        try {
+          response = await fn(request, context);
+          response.headers.set("x-correlation-id", correlationId);
+        } catch (error) {
+          response = errorResponse(error, correlationId);
+        }
+        // Un envío de mensajes que falló dentro de la petición: la pantalla abre el modal con la causa.
+        const falla = fallaParaCabecera();
+        if (falla !== undefined) response.headers.set(CABECERA_FALLA_ENVIO, falla);
         return response;
-      } catch (error) {
-        return errorResponse(error, correlationId);
-      }
-    });
+      }),
+    );
   };
 }
 

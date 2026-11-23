@@ -313,6 +313,7 @@ export default function TableroPage() {
           <h2 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.8rem" }}>
             ⚠️ Requiere atención
           </h2>
+          <LuzLineaMensajes />
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {data.sesionesSinMarcar.length > 0 && (
               <Aviso
@@ -439,6 +440,83 @@ const pastilla: CSSProperties = {
   fontSize: "0.76rem",
   fontWeight: 700,
 };
+
+interface EstadoLinea {
+  estado: "ACTIVA" | "CAIDA" | "SIMULADA";
+  causa: string | null;
+  numero: string | null;
+}
+
+/**
+ * La luz de la línea de mensajes (WhatsApp): verde si está activa; si está caída, avisa
+ * que hay que contactar a Servicio LGS. Solo INDICA: el número lo cambia Servicio LGS.
+ */
+function LuzLineaMensajes() {
+  const [linea, setLinea] = useState<EstadoLinea | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    const consultar = async () => {
+      try {
+        const res = await apiFetch("/api/notifications/linea");
+        if (res.ok && vigente) setLinea((await res.json()) as EstadoLinea);
+      } catch {
+        // sin respuesta: la luz queda como estaba
+      }
+    };
+    void consultar();
+    const t = window.setInterval(() => void consultar(), 60_000);
+    return () => {
+      vigente = false;
+      window.clearInterval(t);
+    };
+  }, []);
+  if (linea === null) return null;
+  const color =
+    linea.estado === "ACTIVA" ? "#2e9e4f" : linea.estado === "CAIDA" ? "#c62828" : "#9aa3b5";
+  const texto =
+    linea.estado === "ACTIVA"
+      ? "Línea de mensajes activa"
+      : linea.estado === "CAIDA"
+        ? "La línea de mensajes está caída: contacte a Servicio LGS"
+        : "Mensajes simulados (sin proveedor de WhatsApp)";
+  return (
+    <div
+      role="status"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "0.5rem",
+        marginBottom: "0.7rem",
+        fontSize: "0.84rem",
+        fontWeight: 600,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: "0.8rem",
+          height: "0.8rem",
+          marginTop: "0.2rem",
+          flexShrink: 0,
+          borderRadius: "50%",
+          background: color,
+          boxShadow: linea.estado === "SIMULADA" ? "none" : `0 0 0 3px ${color}33`,
+        }}
+      />
+      <span style={{ color: linea.estado === "CAIDA" ? "#c62828" : undefined }}>
+        {texto}
+        {linea.estado === "ACTIVA" && linea.numero !== null && (
+          <span style={{ fontWeight: 400, color: "var(--texto-suave)" }}> · {linea.numero}</span>
+        )}
+        {linea.estado === "CAIDA" && linea.causa !== null && (
+          <span style={{ display: "block", fontWeight: 400, color: "var(--texto-suave)" }}>
+            Causa: {linea.causa}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 function Aviso({ color, texto, detalle }: { color: string; texto: string; detalle?: string }) {
   return (

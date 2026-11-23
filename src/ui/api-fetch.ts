@@ -44,6 +44,23 @@ export async function irACambiarClaveSiCorresponde(res: Response): Promise<boole
   return true;
 }
 
+/** Evento que abre el modal de falla de envío (lo escucha `FallaWhatsApp` en el panel). */
+export const EVENTO_FALLA_ENVIO = "lgs:whatsapp-falla";
+
+/** Si el servidor dice que un envío de mensajes falló, avisa a la pantalla con la causa. */
+function avisarFallaDeEnvio(res: Response): void {
+  if (typeof window === "undefined") return;
+  const cabecera = res.headers.get("x-whatsapp-falla");
+  if (cabecera === null) return;
+  let causa = cabecera;
+  try {
+    causa = decodeURIComponent(cabecera);
+  } catch {
+    // cabecera mal codificada: se muestra tal cual
+  }
+  window.dispatchEvent(new CustomEvent(EVENTO_FALLA_ENVIO, { detail: { causa } }));
+}
+
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   let res = await fetch(input, init);
   if (res.status === 401) {
@@ -53,5 +70,6 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
     }
   }
   await irACambiarClaveSiCorresponde(res);
+  avisarFallaDeEnvio(res);
   return res;
 }

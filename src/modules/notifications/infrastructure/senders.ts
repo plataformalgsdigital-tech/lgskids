@@ -1,6 +1,8 @@
 import { env } from "@/platform/config/env";
+import { notificarFalla } from "@/platform/http/falla-envio";
 import { logger } from "@/platform/logging/logger";
 import type { MensajeSaliente, NotificationSenderPort } from "../application/ports";
+import { canalActual, estadoLinea, mensajeLineaCaida, olvidarEstadoLinea } from "./linea-whatsapp";
 
 /**
  * Desarrollo/CI: lo da por enviado y deja constancia en el log, SIN el texto:
@@ -59,18 +61,36 @@ export class WhatsAppCloudSender implements NotificationSenderPort {
  * dígitos. Un token es un canal (un número de WhatsApp).
  */
 export class WhapiSender implements NotificationSenderPort {
+  /** `token` es el de respaldo: sale por el canal que Contingencia de LGS elija (`canalActual`). */
   constructor(private readonly token: string) {}
 
   async enviar(mensaje: MensajeSaliente): Promise<{ ok: boolean; error?: string }> {
+    const r = await this.intentar(mensaje);
+    if (!r.ok) {
+      // La pantalla muestra la CAUSA en un modal (cabecera de la respuesta): si la línea
+      // está caída se dice a quién llamar; si no, el motivo que dio WhatsApp.
+      olvidarEstadoLinea();
+      const linea = await estadoLinea();
+      notificarFalla(
+        linea.estado === "CAIDA"
+          ? mensajeLineaCaida(linea)
+          : `No se pudo enviar el mensaje: ${r.error ?? "motivo desconocido"}`,
+      );
+    }
+    return r;
+  }
+
+  private async intentar(mensaje: MensajeSaliente): Promise<{ ok: boolean; error?: string }> {
     if (mensaje.canal !== "WHATSAPP") {
       return { ok: false, error: `Whapi solo envía WhatsApp, no ${mensaje.canal}.` };
     }
+    const token = (await canalActual())?.token ?? this.token;
     try {
       const res = await fetch("https://gate.whapi.cloud/messages/text", {
         method: "POST",
         headers: {
           accept: "application/json",
-          authorization: `Bearer ${this.token}`,
+          authorization: `Bearer ${token}`,
           "content-type": "application/json",
         },
         body: JSON.stringify({ typing_time: 0, to: mensaje.destinatario, body: mensaje.mensaje }),

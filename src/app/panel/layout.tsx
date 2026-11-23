@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { FallaWhatsApp } from "@/ui/FallaWhatsApp";
 import { cerrarSesion, useReinicioAlVolver } from "@/ui/sesion";
 import { MENU, PERMISO_SECCION, SECCIONES } from "./menu";
 
@@ -440,6 +441,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
         )}
         <div style={{ flex: 1 }}>{children}</div>
       </div>
+      <FallaWhatsApp />
     </div>
   );
 }

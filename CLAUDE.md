@@ -1870,7 +1870,11 @@ solo servía para completar la ficha.
   `20261014100000`. **Usuarios sin perfil creado**, `/panel/servicio/sin-perfil`
   → `GET /api/contracts/ninos/sin-perfil` → `ninosSinPerfil`: niños con contrato
   APROBADO sin `perfil_completado_en`, con el estado de su último enlace y los
-  botones "Con Welcome" / "Sin Welcome", que usan la MISMA ruta de la ficha) ·
+  botones "Con Welcome" / "Sin Welcome", que usan la MISMA ruta de la ficha; desde 2026-11-23 la columna
+  Enlace lleva "▸ N envíos · último <fecha>" que despliega, bajo el MISMO niño, cada envío con fecha y hora
+  de Bogotá, tipo y estado Enviado/Falló + motivo: sale de `notifications_outbox` filtrado por las dos
+  plantillas del enlace de perfil —no hay tabla aparte, y los intentos fallidos también cuentan—; el CSV suma
+  `envios` y `ultimo_envio`) ·
   **Administración** (Usuarios y roles, Reportes, Auditoría, Aviso de login,
   **Mantenimiento** — cargas masivas, hoy el catálogo Curso por CSV —, **Mensajes**) ·
   **Guía** (Mis clases, Mis salones, Mis niños).
@@ -2306,6 +2310,20 @@ avisa). Migración `20261007000000_mensajes`.
   texto guardado no lleva la clave). Una plantilla con `{{clave}}` NO se puede
   enviar en masa: dejaría las claves de un salón en la cola en texto plano. Sin
   copia en la bóveda (cuentas anteriores, `SIN_COPIA`) pide restablecer primero.
+- **La LÍNEA de WhatsApp: qué número y si está viva (2026-11-23)**. Lo de KIDS ya no sale por un
+  token fijo: es el tipo **"Mensajes de KIDS"** de LGS › Mantenimiento › Contingencia (por defecto canal B).
+  `canalActual()` (`notifications/infrastructure/linea-whatsapp.ts`) le pregunta a LGS
+  `GET /api/kids-sync/whatsapp` (clave de servicio; devuelve canal, número, estado y el token) y lo recuerda
+  60 s: cambiar de número allá se refleja aquí en ≤1 min, sin desplegar. Si LGS no responde, se usa
+  `WHAPI_TOKEN` (15 s y se vuelve a preguntar). `estadoLinea()` mira `gate.whapi.cloud/health` (código 4 =
+  autenticada; "QR" = desconectada) y lo recuerda 30 s. **KIDS solo INDICA**: en el Tablero, dentro de
+  "Requiere atención", una luz **verde** "Línea de mensajes activa" o, si está caída, "La línea de mensajes
+  está caída: contacte a Servicio LGS" con la causa (`GET /api/notifications/linea`, `panel.tablero`; se
+  refresca cada 60 s). **Falla al enviar → modal con la causa**: `WhapiSender` anota la falla
+  (`platform/http/falla-envio.ts`, AsyncLocalStorage por petición), `handler()` la devuelve en la cabecera
+  `x-whatsapp-falla`, `apiFetch` dispara el evento y `FallaWhatsApp` (montado en el layout del panel) abre el
+  modal desde CUALQUIER pantalla que envíe; con la línea caída dice a quién llamar. El **envío masivo** no
+  encola nada con la línea caída (`LineaWhatsAppCaidaError`, 503). Pruebas: `linea-whatsapp.test.ts`.
 - **`LogSender` no escribe el texto en el log** (solo destinatario y largo): en modo
   simulado escribía la clave del niño en el registro del servidor.
 - Permisos (`mensajes.enviar`, `mensajes.plantillas`, `menu.mensajes`): los concede

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { apiFetch } from "@/ui/api-fetch";
 import { descargarCsv } from "@/ui/csv";
 import { numeroContrato } from "@/ui/numero-contrato";
@@ -34,6 +34,7 @@ interface Nino {
     exigeWelcome: boolean;
   } | null;
   tieneWelcome: boolean;
+  envios: { en: string; sinWelcome: boolean; ok: boolean; error: string | null }[];
 }
 
 interface Campania {
@@ -69,6 +70,18 @@ function hoyLocal(): string {
   return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Fecha y hora de un envío, en hora de Bogotá (la de la plataforma para estos registros). */
+function fechaHora(iso: string): string {
+  return new Date(iso).toLocaleString("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function estadoEnlace(n: Nino): { texto: string; color: string } {
   if (n.enlace === null) return { texto: "Nunca enviado", color: "#c62828" };
   const fecha = new Date(n.enlace.creadoEn).toLocaleDateString("es", {
@@ -99,6 +112,8 @@ function exportar(ninos: Nino[]) {
       "apoderado",
       "enlace",
       "enlace_enviado",
+      "envios",
+      "ultimo_envio",
       "welcome_agendado",
     ],
     ninos.map((n) => [
@@ -118,6 +133,8 @@ function exportar(ninos: Nino[]) {
           ? `Enviado sin usar${n.enlace.exigeWelcome ? "" : " (sin Welcome)"}`
           : "Revocado",
       n.enlace?.creadoEn.slice(0, 10) ?? "",
+      n.envios.length,
+      n.envios[0] !== undefined ? fechaHora(n.envios[0].en) : "",
       n.tieneWelcome,
     ]),
   );
@@ -133,6 +150,14 @@ export default function SinPerfilPage() {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<string | null>(null);
+  /** Niños con la lista de envíos desplegada. */
+  const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(new Set());
+  const alternar = (id: string) =>
+    setAbiertos((prev) => {
+      const sig = new Set(prev);
+      if (!sig.delete(id)) sig.add(id);
+      return sig;
+    });
 
   const cargar = useCallback(async () => {
     setError(null);
@@ -314,71 +339,131 @@ export default function SinPerfilPage() {
                 const num = numeroContrato({ externalRef: n.externalRef, numero: n.numero });
                 const enMarcha = n.inicioCurso !== null && n.inicioCurso <= hoy;
                 const est = estadoEnlace(n);
+                const abierto = abiertos.has(n.childPersonId);
+                const columnas = puedeEnviar ? 6 : 5;
                 return (
-                  <tr key={n.childPersonId}>
-                    <td style={celda}>
-                      <Link href={`/panel/personas/${n.childPersonId}`} style={{ fontWeight: 700 }}>
-                        {n.nombre}
-                      </Link>
-                      <div style={{ color: "var(--texto-suave)", fontSize: "0.78rem" }}>
-                        {n.documento} · {n.username ?? "sin usuario"} · {n.pais}
-                      </div>
-                    </td>
-                    <td style={celda}>
-                      <Link href={`/panel/contratos/${n.contractId}`}>{num.numero}</Link>
-                    </td>
-                    <td style={celda}>
-                      {n.campania ?? "Sin matrícula"}
-                      {n.salon !== null && (
-                        <div style={{ color: "var(--texto-suave)", fontSize: "0.78rem" }}>
-                          {n.salon}
-                          {n.inicioCurso !== null &&
-                            ` · ${enMarcha ? "en curso desde" : "inicia"} ${n.inicioCurso}`}
-                        </div>
-                      )}
-                      {n.tieneWelcome && (
-                        <div style={{ color: "#1b5e20", fontSize: "0.78rem" }}>
-                          👋 Welcome agendado
-                        </div>
-                      )}
-                    </td>
-                    <td style={celda}>{n.apoderado ?? "—"}</td>
-                    <td style={{ ...celda, color: est.color, fontWeight: 600 }}>{est.texto}</td>
-                    {puedeEnviar && (
+                  <Fragment key={n.childPersonId}>
+                    <tr>
                       <td style={celda}>
-                        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
-                          <button
-                            type="button"
-                            style={{
-                              ...boton,
-                              // Con el curso andando ya no hay Welcome que agendar.
-                              borderColor: enMarcha ? "#e3e7f0" : "var(--lgs-azul)",
-                            }}
-                            disabled={enviando !== null}
-                            onClick={() => void enviar(n, false)}
-                          >
-                            🔗 Con Welcome
-                          </button>
-                          <button
-                            type="button"
-                            style={{
-                              ...boton,
-                              borderColor: enMarcha ? "var(--lgs-azul)" : "#e3e7f0",
-                            }}
-                            disabled={enviando !== null}
-                            onClick={() => void enviar(n, true)}
-                          >
-                            🔗 Sin Welcome
-                          </button>
+                        <Link
+                          href={`/panel/personas/${n.childPersonId}`}
+                          style={{ fontWeight: 700 }}
+                        >
+                          {n.nombre}
+                        </Link>
+                        <div style={{ color: "var(--texto-suave)", fontSize: "0.78rem" }}>
+                          {n.documento} · {n.username ?? "sin usuario"} · {n.pais}
                         </div>
-                        {enviando === n.childPersonId && (
-                          <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
-                            Enviando…
-                          </span>
+                      </td>
+                      <td style={celda}>
+                        <Link href={`/panel/contratos/${n.contractId}`}>{num.numero}</Link>
+                      </td>
+                      <td style={celda}>
+                        {n.campania ?? "Sin matrícula"}
+                        {n.salon !== null && (
+                          <div style={{ color: "var(--texto-suave)", fontSize: "0.78rem" }}>
+                            {n.salon}
+                            {n.inicioCurso !== null &&
+                              ` · ${enMarcha ? "en curso desde" : "inicia"} ${n.inicioCurso}`}
+                          </div>
+                        )}
+                        {n.tieneWelcome && (
+                          <div style={{ color: "#1b5e20", fontSize: "0.78rem" }}>
+                            👋 Welcome agendado
+                          </div>
                         )}
                       </td>
+                      <td style={celda}>{n.apoderado ?? "—"}</td>
+                      <td style={{ ...celda, color: est.color, fontWeight: 600 }}>
+                        {est.texto}
+                        {n.envios.length > 0 && (
+                          <div>
+                            <button
+                              type="button"
+                              aria-expanded={abierto}
+                              onClick={() => alternar(n.childPersonId)}
+                              style={{
+                                border: "none",
+                                background: "none",
+                                padding: 0,
+                                cursor: "pointer",
+                                color: "var(--lgs-azul)",
+                                fontWeight: 600,
+                                fontSize: "0.78rem",
+                              }}
+                            >
+                              {abierto ? "▾" : "▸"} {n.envios.length}{" "}
+                              {n.envios.length === 1 ? "envío" : "envíos"} · último{" "}
+                              {fechaHora(n.envios[0]?.en ?? "")}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      {puedeEnviar && (
+                        <td style={celda}>
+                          <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              style={{
+                                ...boton,
+                                // Con el curso andando ya no hay Welcome que agendar.
+                                borderColor: enMarcha ? "#e3e7f0" : "var(--lgs-azul)",
+                              }}
+                              disabled={enviando !== null}
+                              onClick={() => void enviar(n, false)}
+                            >
+                              🔗 Con Welcome
+                            </button>
+                            <button
+                              type="button"
+                              style={{
+                                ...boton,
+                                borderColor: enMarcha ? "var(--lgs-azul)" : "#e3e7f0",
+                              }}
+                              disabled={enviando !== null}
+                              onClick={() => void enviar(n, true)}
+                            >
+                              🔗 Sin Welcome
+                            </button>
+                          </div>
+                          {enviando === n.childPersonId && (
+                            <span style={{ fontSize: "0.75rem", color: "var(--texto-suave)" }}>
+                              Enviando…
+                            </span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                    {abierto && (
+                      <tr>
+                        <td colSpan={columnas} style={{ ...celda, background: "#f8faff" }}>
+                          <strong style={{ fontSize: "0.8rem" }}>
+                            Envíos del enlace a {n.apoderado ?? "su apoderado"}
+                          </strong>
+                          <ul
+                            style={{
+                              margin: "0.3rem 0 0",
+                              paddingLeft: "1.1rem",
+                              fontSize: "0.82rem",
+                            }}
+                          >
+                            {n.envios.map((e, i) => (
+                              <li key={`${e.en}-${String(i)}`}>
+                                {fechaHora(e.en)} · {e.sinWelcome ? "Sin Welcome" : "Con Welcome"} ·{" "}
+                                <span
+                                  style={{ color: e.ok ? "#1b5e20" : "#c62828", fontWeight: 600 }}
+                                >
+                                  {e.ok
+                                    ? "Enviado"
+                                    : `Falló${e.error !== null ? `: ${e.error}` : ""}`}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </Fragment>
                 );
               })}
             </tbody>

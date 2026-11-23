@@ -761,7 +761,23 @@ export interface NinoSinPerfil {
   enlace: { estado: EstadoEnlacePerfil; creadoEn: string; exigeWelcome: boolean } | null;
   /** ¿Tiene ya un Welcome agendado (por coordinación)? */
   tieneWelcome: boolean;
+  /**
+   * Cada vez que se mandó el enlace por WhatsApp (el más reciente primero), con los
+   * intentos que fallaron: sale del historial de mensajes, no de una tabla aparte.
+   */
+  envios: EnvioDeEnlace[];
 }
+
+export interface EnvioDeEnlace {
+  /** Instante del envío (el de la entrega si salió; si no, el del intento). */
+  en: string;
+  sinWelcome: boolean;
+  ok: boolean;
+  error: string | null;
+}
+
+/** Tope de envíos que se listan por niño. */
+const MAX_ENVIOS_POR_NINO = 30;
 
 /** Tope de filas: la lista es de trabajo, no un reporte. */
 const MAX_SIN_PERFIL = 500;
@@ -793,7 +809,8 @@ export async function ninosSinPerfil(filtros: {
   }
   values.push(MAX_SIN_PERFIL);
   const filas = await queryRows<
-    Omit<NinoSinPerfil, "enlace"> & {
+    Omit<NinoSinPerfil, "enlace" | "envios"> & {
+      enviosRaw: { en: string; sinWelcome: boolean; estado: string; error: string | null }[];
       enlaceCreadoEn: string | null;
       enlaceUsadoEn: string | null;
       enlaceRevocadoEn: string | null;
@@ -813,7 +830,16 @@ export async function ninosSinPerfil(filtros: {
               ep.creado_en AS "enlaceCreadoEn", ep.usado_en AS "enlaceUsadoEn",
               ep.revocado_en AS "enlaceRevocadoEn", ep.exige_welcome AS "enlaceExigeWelcome",
               EXISTS (SELECT 1 FROM scheduling_welcome_reserva r
-                       WHERE r.child_person_id = b.id AND r.estado = 'ACTIVA') AS "tieneWelcome"
+                       WHERE r.child_person_id = b.id AND r.estado = 'ACTIVA') AS "tieneWelcome",
+              (SELECT COALESCE(json_agg(json_build_object(
+                        'en', COALESCE(o.enviada_en, o.created_at),
+                        'sinWelcome', o.plantilla_slug = 'creacion-perfil-kids-sin-welcome',
+                        'estado', o.estado::text,
+                        'error', o.ultimo_error) ORDER BY o.created_at DESC), '[]'::json)
+                 FROM notifications_outbox o
+                WHERE o.child_person_id = b.id
+                  AND o.plantilla_slug IN ('creacion-perfil-kids', 'creacion-perfil-kids-sin-welcome')
+              ) AS "enviosRaw"
          FROM contracts_contract c
          JOIN people_person b ON b.id = c.beneficiario_id
          LEFT JOIN identity_user u ON u.id = b.user_id
@@ -838,8 +864,14 @@ export async function ninosSinPerfil(filtros: {
     values,
   );
   return filas.map(
-    ({ enlaceCreadoEn, enlaceUsadoEn, enlaceRevocadoEn, enlaceExigeWelcome, ...f }) => ({
+    ({ enlaceCreadoEn, enlaceUsadoEn, enlaceRevocadoEn, enlaceExigeWelcome, enviosRaw, ...f }) => ({
       ...f,
+      envios: enviosRaw.slice(0, MAX_ENVIOS_POR_NINO).map((e) => ({
+        en: e.en,
+        sinWelcome: e.sinWelcome,
+        ok: e.estado === "ENVIADA",
+        error: e.error,
+      })),
       enlace:
         enlaceCreadoEn === null
           ? null

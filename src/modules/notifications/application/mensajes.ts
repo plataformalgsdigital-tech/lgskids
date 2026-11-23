@@ -2,6 +2,7 @@ import { registrarAuditoria } from "@/modules/audit";
 import { consultarClave } from "@/modules/identity";
 import { execute, queryOne, queryRows } from "@/platform/db/query";
 import { ConflictError, NotFoundError, ValidationError } from "@/platform/errors";
+import { notificarFalla } from "@/platform/http/falla-envio";
 import { newId } from "@/platform/ids";
 import {
   LARGO_MAXIMO_CONTENIDO,
@@ -19,6 +20,8 @@ import {
   type ContextoMensaje,
 } from "../domain/plantilla";
 import { telefonoWhatsApp } from "../domain/telefono";
+import { LineaWhatsAppCaidaError } from "../domain/errores";
+import { estadoLinea, mensajeLineaCaida } from "../infrastructure/linea-whatsapp";
 import { getSender } from "../infrastructure/senders";
 import { MAX_INTENTOS, encolarNotificacion } from "./outbox";
 
@@ -416,6 +419,13 @@ export async function encolarEnvio(input: {
     throw new ValidationError(
       "Esta plantilla lleva {{clave}} o {{enlace}}: esos datos se envían solo de a un niño, para que no queden escritos en el historial.",
     );
+  }
+  // Con la línea caída no se encola nada: 300 mensajes que fallan uno por uno no ayudan a nadie.
+  const linea = await estadoLinea();
+  if (linea.estado === "CAIDA") {
+    const aviso = mensajeLineaCaida(linea);
+    notificarFalla(aviso);
+    throw new LineaWhatsAppCaidaError(aviso);
   }
   const ids = [...new Set(input.childPersonIds)];
   if (ids.length === 0) throw new ValidationError("Elige al menos un destinatario.");
