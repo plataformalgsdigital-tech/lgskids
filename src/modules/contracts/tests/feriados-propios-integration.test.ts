@@ -6,6 +6,7 @@ import {
   crearFeriadoPropio,
   crearSalon,
   feriadosDelMes,
+  feriadosDelPais,
   previoFeriadoPropio,
   quitarFeriadoPropio,
   regenerarSalonPendiente,
@@ -27,7 +28,10 @@ import { aprobarContrato, crearContrato } from "../application/gestion-contratos
  *    PENDIENTE (derivado); al ampliar el contrato, "Regenerar" lo aplica;
  *  - quitar el feriado devuelve las sesiones; solo se quitan los propios y futuros.
  *
- * Se usa un DOMINGO: ningún salón real dicta ese día, así que un feriado de prueba no
+ * Se usa ECUADOR y un DOMINGO: ningún salón real es de Ecuador ni dicta ese día, y ninguna
+ * otra prueba inserta feriados de Ecuador (la de Gestión Festivos pone uno chileno en
+ * hoy+20 días, que según el día del calendario cae en domingo y se colaba en el calendario
+ * de estos salones). Así un feriado de prueba no
  * mueve nada de los demás datos de la base.
  */
 const RUN = env().INTEGRATION_TESTS === "1" && env().DATABASE_URL !== undefined;
@@ -61,6 +65,10 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
     for (let i = 0; i < 40 && fecha === ""; i++) {
       const d = sumar(base, i);
       if (d.getUTCDay() !== 0) continue;
+      // Ni un feriado oficial de Ecuador: la generación lo respetaría y el día no cambiaría.
+      if (feriadosDelPais("EC", d.getUTCFullYear()).some((x) => x.fecha === iso(d))) {
+        continue;
+      }
       const hay = await queryOne<{ n: number }>(
         `SELECT count(*)::int AS n FROM scheduling_holiday WHERE fecha = $1::date`,
         [iso(d)],
@@ -90,8 +98,8 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
           courseId: curso,
           nombre,
           cupo: 5,
-          timezone: "America/Santiago",
-          holidayCountry: "CL",
+          timezone: "America/Guayaquil",
+          holidayCountry: "EC",
           slots: [{ tipo: "SESION", diaSemana: 0, horaLocal: hora, duracionMin: 60 }],
         })
       ).id;
@@ -171,7 +179,7 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
     const p = await previoFeriadoPropio({
       accion: "AGREGAR",
       fecha,
-      paises: ["CL"],
+      paises: ["EC"],
       countryScope: null,
     });
     const vacio = p.salones.find((s) => s.id === salonVacio);
@@ -182,11 +190,11 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
     expect((vacio?.finNuevo ?? "") > (vacio?.finActual ?? "")).toBe(true);
     expect(conNino?.aplicable).toBe(false);
     expect(conNino?.conflictos).toHaveLength(1);
-    expect(p.ninosOtroPais).toBe(1); // el niño colombiano en un salón chileno
+    expect(p.ninosOtroPais).toBe(1); // el niño colombiano en un salón ecuatoriano
   });
 
   it("exige nombre, fecha futura y un país válido", async () => {
-    const base = { actorUserId: SISTEMA, countryScope: null, fecha, paises: ["CL"] };
+    const base = { actorUserId: SISTEMA, countryScope: null, fecha, paises: ["EC"] };
     await expect(crearFeriadoPropio({ ...base, nombre: "  " })).rejects.toThrow(ValidationError);
     await expect(
       crearFeriadoPropio({ ...base, nombre: "Pasado", fecha: iso(sumar(new Date(), -3)) }),
@@ -205,7 +213,7 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
       countryScope: null,
       fecha,
       nombre: `Feriado de prueba ${marca}`,
-      paises: ["CL"],
+      paises: ["EC"],
     });
     expect(r.regenerados.map((s) => s.id)).toContain(salonVacio);
     expect(r.pendientes.map((s) => s.id)).toContain(salonConNino);
@@ -227,7 +235,7 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
 
     // El feriado queda como PROPIO y el pendiente se deriva.
     const delMes = await feriadosDelMes(fecha.slice(0, 7));
-    const f = delMes.find((x) => x.fecha === fecha && x.pais === "CL");
+    const f = delMes.find((x) => x.fecha === fecha && x.pais === "EC");
     expect(f?.propio).toBe(true);
     expect(f?.nombre).toContain(marca);
     const pend = await salonesPendientesDeFeriados(null);
@@ -242,7 +250,7 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
         countryScope: null,
         fecha,
         nombre: "Otra vez",
-        paises: ["CL"],
+        paises: ["EC"],
       }),
     ).rejects.toThrow(ConflictError);
   });
@@ -285,7 +293,7 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
       actorUserId: SISTEMA,
       countryScope: null,
       fecha,
-      paises: ["CL"],
+      paises: ["EC"],
     });
     expect(r.regenerados.map((s) => s.id)).toEqual(
       expect.arrayContaining([salonVacio, salonConNino]),
@@ -294,7 +302,7 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
       expect((await sesiones(id)).some((s) => s.fecha === fecha)).toBe(true);
     }
     const f = (await feriadosDelMes(fecha.slice(0, 7))).find(
-      (x) => x.fecha === fecha && x.pais === "CL",
+      (x) => x.fecha === fecha && x.pais === "EC",
     );
     expect(f).toBeUndefined();
   });
@@ -304,7 +312,7 @@ describe.runIf(RUN)("feriados propios (integración)", { timeout: 30_000 }, () =
       previoFeriadoPropio({
         accion: "AGREGAR",
         fecha,
-        paises: ["CL"],
+        paises: ["EC"],
         countryScope: ["CO"],
       }),
     ).rejects.toThrow();

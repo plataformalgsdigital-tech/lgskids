@@ -24,7 +24,9 @@ const ACTOR = "00000000-0000-0000-0000-000000000000";
 const marca = randomUUID().slice(0, 6);
 const hoy = new Date().toISOString().slice(0, 10);
 
-describe.runIf(RUN)("agregar un salón desde el catálogo (integración)", () => {
+// "Generar" crea y regenera salones de todo el catálogo: bajo la carga de la suite en
+// paralelo pasaba de los 5 s por defecto sin que nada estuviera mal.
+describe.runIf(RUN)("agregar un salón desde el catálogo (integración)", { timeout: 30_000 }, () => {
   let campaniaId: string;
   let horarioId: string;
   let classroomId: string;
