@@ -45,6 +45,10 @@ export interface SessionInfo {
   leccionNivel: string | null;
   /** La fila del catálogo Curso de esa lección (de ahí cuelga el Material Guía). */
   leccionRefId: string | null;
+  /** Unidad, clase y temario de esa lección (columnas del catálogo Curso). */
+  leccionUnidad: string | null;
+  leccionClase: string | null;
+  leccionContenido: string | null;
   /**
    * Puesto de la sesión entre las CLASES regulares del salón (sin clubes,
    * eventos ni refuerzos). Es el "Sesión N" que se muestra y el que elige la
@@ -120,6 +124,8 @@ export async function getSessionInfo(sessionId: string): Promise<SessionInfo | n
             s.cerrada_por AS "cerradaPor", s.cerrada_en::text AS "cerradaEn",
             ca.nombre AS campania, co.tipo::text AS "cursoTipo",
             sec.leccion, sec.nivel AS "leccionNivel", sec.id AS "leccionRefId",
+            sec.unidad AS "leccionUnidad", sec.clase AS "leccionClase",
+            sec.contenido AS "leccionContenido",
             ord.n::int AS "claseNumero",
             (s.slot_id IS NULL) AS "esEvento", s.duracion_min AS "duracionMin", s.nivel,
             s.observaciones, s.limite_usuarios AS "limiteUsuarios", cl.timezone,

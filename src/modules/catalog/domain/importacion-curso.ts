@@ -31,6 +31,7 @@ export interface FilaCsvCurso {
   orden?: number | undefined;
   contenido?: string | null | undefined;
   video?: string | null | undefined;
+  clase?: string | null | undefined;
   materialGuia?: unknown[] | undefined;
   materialUsuario?: unknown[] | undefined;
   actividades?: unknown[] | undefined;
@@ -43,6 +44,7 @@ export interface LeccionGuardada {
   orden: number;
   contenido: string | null;
   video: string | null;
+  clase: string | null;
   quiz: unknown;
   materialGuia: unknown[];
   materialUsuario: unknown[];
@@ -115,6 +117,7 @@ const VACIA: LeccionGuardada = {
   orden: 0,
   contenido: null,
   video: null,
+  clase: null,
   quiz: null,
   materialGuia: [],
   materialUsuario: [],
@@ -142,6 +145,7 @@ export function planificarFila(fila: FilaCsvCurso, actual: LeccionGuardada | nul
     orden: fila.orden ?? base.orden,
     contenido: fila.contenido !== undefined ? fila.contenido : base.contenido,
     video: fila.video !== undefined ? fila.video : base.video,
+    clase: fila.clase !== undefined ? fila.clase : base.clase,
     // El CSV no trae cuestionarios: nunca los pisa.
     quiz: base.quiz,
     materialGuia: fila.materialGuia ?? base.materialGuia,
@@ -166,6 +170,7 @@ export function planificarFila(fila: FilaCsvCurso, actual: LeccionGuardada | nul
   if (resultado.orden !== actual.orden) cambios.push("orden");
   if ((resultado.contenido ?? "") !== (actual.contenido ?? "")) cambios.push("contenido");
   if ((resultado.video ?? "") !== (actual.video ?? "")) cambios.push("video");
+  if ((resultado.clase ?? "") !== (actual.clase ?? "")) cambios.push("clase");
   for (const [campo, etiqueta] of LISTAS) {
     if (firma(resultado[campo]) !== firma(actual[campo])) cambios.push(etiqueta);
   }

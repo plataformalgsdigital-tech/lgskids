@@ -173,6 +173,8 @@ export interface CursoReferenciaInput {
   orden: number;
   contenido: string | null;
   video: string | null;
+  /** La clase a la que pertenece la lección (texto libre, opcional). */
+  clase: string | null;
   clubes: unknown[];
   materialUsuario: unknown[];
   materialGuia: unknown[];
@@ -185,7 +187,7 @@ export interface CursoReferenciaRow extends CursoReferenciaInput {
 }
 
 const SELECT_CURSO = `SELECT id, curso::text AS curso, nivel, unidad, quiz, leccion, orden,
-    contenido, video,
+    contenido, video, clase,
     COALESCE(clubes, '[]'::jsonb) AS clubes,
     COALESCE(material_usuario, '[]'::jsonb) AS "materialUsuario",
     COALESCE(material_guia, '[]'::jsonb) AS "materialGuia",
@@ -274,6 +276,7 @@ function cursoParams(input: CursoReferenciaInput): unknown[] {
     JSON.stringify(input.materialGuia),
     JSON.stringify(input.actividades),
     JSON.stringify(input.recursos),
+    input.clase,
   ];
 }
 
@@ -285,9 +288,9 @@ export async function insertCursoReferencia(
   await execute(
     `INSERT INTO catalog_curso
        (id, curso, nivel, unidad, quiz, leccion, orden, contenido, video,
-        clubes, material_usuario, material_guia, actividades, recursos, updated_at)
+        clubes, material_usuario, material_guia, actividades, recursos, clase, updated_at)
      VALUES ($1, $2::catalog_course_tipo, $3, $4, $5::jsonb, $6, $7, $8, $9,
-             $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, now())`,
+             $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15, now())`,
     [id, ...cursoParams(input)],
     client,
   );
@@ -303,7 +306,7 @@ export async function updateCursoReferencia(
         SET curso = $2::catalog_course_tipo, nivel = $3, unidad = $4, quiz = $5::jsonb,
             leccion = $6, orden = $7, contenido = $8, video = $9,
             clubes = $10::jsonb, material_usuario = $11::jsonb, material_guia = $12::jsonb,
-            actividades = $13::jsonb, recursos = $14::jsonb, updated_at = now()
+            actividades = $13::jsonb, recursos = $14::jsonb, clase = $15, updated_at = now()
       WHERE id = $1`,
     [id, ...cursoParams(input)],
     client,

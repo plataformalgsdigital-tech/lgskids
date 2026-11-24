@@ -23,6 +23,7 @@ const CURSOS = ["JUNIOR", "YOUNGSTER"];
 const NIVELES = ["ROOKIE", "CHAMPION", "ELITE", "LEGENDARY", "ULTIMATE"];
 const OBLIGATORIAS = ["curso", "nivel", "unidad", "leccion", "orden"];
 const OPCIONALES = [
+  "clase",
   "contenido",
   "video",
   "materialguia",
@@ -42,11 +43,11 @@ const sinBom = (t: string) => (t.startsWith(BOM) ? t.slice(1) : t);
 // con las tildes bien. Las listas van entre comillas porque `;` separa ítems.
 const PLANTILLA =
   BOM +
-  "curso;nivel;unidad;leccion;orden;contenido;video;materialguia;materialusuario;actividades;recursos;clubes\n" +
-  'JUNIOR;ROOKIE;Unidad 0;Leccion 1;1;"Welcome: greetings and classroom rules";https://www.youtube.com/watch?v=XXXX;"Guía Welcome|https://drive.google.com/guia.pdf";"Ficha Welcome|https://drive.google.com/ficha.pdf";"Hello song|https://wordwall.net/play/1;Name quiz|https://wordwall.net/play/2";;\n' +
-  'JUNIOR;ROOKIE;Unidad 1;Leccion 2;2;"All about me";;;;;;\n' +
-  'JUNIOR;ROOKIE;Repaso 1;Leccion 3;3;"Review units 0 and 1";;;;;;\n' +
-  'JUNIOR;ROOKIE;Evaluacion 1;Leccion 4;4;"Level Up Rookie";;;;;;\n';
+  "curso;nivel;unidad;leccion;orden;clase;contenido;video;materialguia;materialusuario;actividades;recursos;clubes\n" +
+  'JUNIOR;ROOKIE;Unidad 0;Leccion 1;1;Class 1;"Welcome: greetings and classroom rules";https://www.youtube.com/watch?v=XXXX;"Guía Welcome|https://drive.google.com/guia.pdf";"Ficha Welcome|https://drive.google.com/ficha.pdf";"Hello song|https://wordwall.net/play/1;Name quiz|https://wordwall.net/play/2";;\n' +
+  'JUNIOR;ROOKIE;Unidad 1;Leccion 2;2;Class 2;"All about me";;;;;;\n' +
+  'JUNIOR;ROOKIE;Repaso 1;Leccion 3;3;Class 3;"Review units 0 and 1";;;;;;\n' +
+  'JUNIOR;ROOKIE;Evaluacion 1;Leccion 4;4;Class 4;"Level Up Rookie";;;;;;\n';
 
 interface Item {
   nombre: string;
@@ -61,6 +62,7 @@ interface FilaEnvio {
   unidad: string;
   leccion: string;
   orden: number;
+  clase?: string | null;
   contenido?: string | null;
   video?: string | null;
   materialGuia?: Item[];
@@ -204,6 +206,7 @@ function leerArchivo(
       unidad,
       leccion,
       orden: Number(orden),
+      ...(tiene("clase") && { clase: get("clase") || null }),
       ...(tiene("contenido") && { contenido: get("contenido") || null }),
       ...(tiene("video") && { video: get("video") || null }),
       ...(tiene("materialguia") && { materialGuia: parseItems(get("materialguia"), "url") }),

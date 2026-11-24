@@ -42,6 +42,7 @@ interface Fila {
   orden: number;
   contenido: string | null;
   video: string | null;
+  clase: string | null;
   actividades: LinkItem[];
   quiz: unknown;
 }
@@ -262,6 +263,7 @@ function LeccionCard(props: { row: Fila; parte: "contenido" | "evaluacion"; onSa
   const [orden, setOrden] = useState(String(row.orden));
   const [contenido, setContenido] = useState(row.contenido ?? "");
   const [video, setVideo] = useState(row.video ?? "");
+  const [clase, setClase] = useState(row.clase ?? "");
   const [cuestionarios, setCuestionarios] = useState<Cuestionario[]>(() =>
     normalizarQuiz(row.quiz),
   );
@@ -283,7 +285,7 @@ function LeccionCard(props: { row: Fila; parte: "contenido" | "evaluacion"; onSa
           leccion: parte === "contenido" ? leccion : row.leccion,
           orden: parte === "contenido" ? Number(orden) || 0 : row.orden,
           ...(parte === "contenido"
-            ? { contenido: contenido || null, video: video || null }
+            ? { contenido: contenido || null, video: video || null, clase: clase || null }
             : { quiz: cuestionarios.length > 0 ? { cuestionarios } : null }),
         }),
       });
@@ -383,6 +385,16 @@ function LeccionCard(props: { row: Fila; parte: "contenido" | "evaluacion"; onSa
                 style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
               />
             )}
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+            <span style={label}>Clase (p. ej. Class 1 · Welcome)</span>
+            <input
+              value={clase}
+              onChange={(e) => setClase(e.target.value)}
+              placeholder="Class 1"
+              style={input}
+            />
           </label>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
@@ -493,7 +505,7 @@ const SECCIONES: { id: Seccion; icono: string; titulo: string; texto: string }[]
     id: "contenido",
     icono: "📖",
     titulo: "Contenido del curso",
-    texto: "Lecciones: título, unidad, orden, temario y video.",
+    texto: "Lecciones: título, unidad, clase, orden, temario y video.",
   },
   {
     id: "evaluacion",

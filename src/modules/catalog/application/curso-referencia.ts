@@ -45,6 +45,7 @@ interface DatosCurso {
   orden?: number | undefined;
   contenido?: string | null | undefined;
   video?: string | null | undefined;
+  clase?: string | null | undefined;
   clubes?: unknown[] | undefined;
   materialUsuario?: unknown[] | undefined;
   materialGuia?: unknown[] | undefined;
@@ -71,6 +72,7 @@ function normalizar(d: DatosCurso): CursoReferenciaInput {
     orden: d.orden ?? 0,
     contenido: d.contenido ?? null,
     video: d.video ?? null,
+    clase: d.clase?.trim() || null,
     clubes: d.clubes ?? [],
     materialUsuario: d.materialUsuario ?? [],
     materialGuia: d.materialGuia ?? [],
@@ -145,6 +147,7 @@ export async function actualizarCursoReferencia(
       orden: input.orden,
       contenido: input.contenido,
       video: input.video,
+      clase: input.clase === undefined ? undefined : input.clase?.trim() || null,
       materialGuia: input.materialGuia,
       materialUsuario: input.materialUsuario,
       actividades: input.actividades,
@@ -221,6 +224,7 @@ function filaDelCsv(d: DatosCurso): FilaCsvCurso {
     orden: d.orden,
     contenido: d.contenido,
     video: d.video,
+    clase: d.clase === undefined ? undefined : d.clase?.trim() || null,
     materialGuia: d.materialGuia,
     materialUsuario: d.materialUsuario,
     actividades: d.actividades,

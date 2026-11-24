@@ -32,6 +32,7 @@ interface Fila {
   orden: number;
   contenido: string | null;
   video: string | null;
+  clase: string | null;
   clubes: Item[];
   materialUsuario: Item[];
   materialGuia: Item[];
@@ -48,6 +49,7 @@ interface FormState {
   orden: string;
   contenido: string;
   video: string;
+  clase: string;
   materialGuia: Item[];
   materialUsuario: Item[];
   actividades: Item[];
@@ -65,6 +67,7 @@ const vacio = (): FormState => ({
   orden: "0",
   contenido: "",
   video: "",
+  clase: "",
   materialGuia: [],
   materialUsuario: [],
   actividades: [],
@@ -269,6 +272,7 @@ function ReferenciaCursosPageContenido() {
       orden: String(f.orden),
       contenido: f.contenido ?? "",
       video: f.video ?? "",
+      clase: f.clase ?? "",
       materialGuia: f.materialGuia ?? [],
       materialUsuario: f.materialUsuario ?? [],
       actividades: f.actividades ?? [],
@@ -293,6 +297,7 @@ function ReferenciaCursosPageContenido() {
         orden: Number(form.orden) || 0,
         contenido: form.contenido || null,
         video: form.video || null,
+        clase: form.clase || null,
         materialGuia: form.materialGuia,
         materialUsuario: form.materialUsuario,
         actividades: form.actividades,
@@ -530,6 +535,16 @@ function ReferenciaCursosPageContenido() {
               onChange={(e) => setForm({ ...form, contenido: e.target.value })}
               rows={4}
               style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
+            />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+            <span style={label}>Clase (p. ej. Class 1 · Welcome)</span>
+            <input
+              value={form.clase}
+              onChange={(e) => setForm({ ...form, clase: e.target.value })}
+              placeholder="Class 1"
+              style={input}
             />
           </label>
 

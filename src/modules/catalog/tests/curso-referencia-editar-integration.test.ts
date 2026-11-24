@@ -23,6 +23,7 @@ const leer = (id: string) =>
   queryOne<{
     contenido: string | null;
     video: string | null;
+    clase: string | null;
     quiz: unknown;
     material_guia: unknown;
     material_usuario: unknown;
@@ -30,7 +31,7 @@ const leer = (id: string) =>
     clubes: unknown;
     actividades: unknown;
   }>(
-    `SELECT contenido, video, quiz, material_guia, material_usuario, recursos, clubes, actividades
+    `SELECT contenido, video, clase, quiz, material_guia, material_usuario, recursos, clubes, actividades
        FROM catalog_curso WHERE id = $1`,
     [id],
   );
@@ -53,6 +54,7 @@ describe.runIf(RUN)("editar una lección del catálogo Curso (integración)", ()
       orden: 950,
       contenido: "Temario viejo",
       video: "https://v/1",
+      clase: "Class 7",
       materialGuia: [{ nombre: "Guía", url: "g.pdf" }],
       materialUsuario: [{ nombre: "Ficha", url: "f.pdf" }],
       recursos: [{ nombre: "Flashcards", link: "https://r/1" }],
@@ -86,6 +88,8 @@ describe.runIf(RUN)("editar una lección del catálogo Curso (integración)", ()
 
     const fila = await leer(id);
     expect(fila?.contenido).toBe("Temario nuevo");
+    // La CLASE tampoco se borra si el editor no la manda.
+    expect(fila?.clase).toBe("Class 7");
     expect(fila?.quiz).toEqual(quiz);
     expect(fila?.material_guia).toEqual([{ nombre: "Guía", url: "g.pdf" }]);
     expect(fila?.material_usuario).toEqual([{ nombre: "Ficha", url: "f.pdf" }]);
@@ -94,6 +98,21 @@ describe.runIf(RUN)("editar una lección del catálogo Curso (integración)", ()
     expect(fila?.actividades).toEqual([
       { nombre: "Juego renombrado", link: "https://w/1", x: 30, y: 40, w: 10, h: 6 },
     ]);
+  });
+
+  it("la clase se cambia y, vacía, se borra", async () => {
+    const base = {
+      actorUserId: ACTOR,
+      id,
+      curso: "YOUNGSTER" as const,
+      nivel: "ULTIMATE" as const,
+      unidad: "Unidad 3",
+      leccion,
+    };
+    await actualizarCursoReferencia({ ...base, clase: "  Class 8  " });
+    expect((await leer(id))?.clase).toBe("Class 8");
+    await actualizarCursoReferencia({ ...base, clase: "" });
+    expect((await leer(id))?.clase).toBeNull();
   });
 
   it("lo que viene VACÍO sí borra: es lo que pidió quien editó", async () => {

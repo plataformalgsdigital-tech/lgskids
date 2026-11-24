@@ -2000,7 +2000,16 @@ solo servía para completar la ficha.
   **Encabezado (2026-10-02)**: a la izquierda `CAMPAÑA · CURSO · Salón NN`, a la
   derecha `Nivel X · Sesión N · Lección N` en una sola línea. "Información del evento" lleva
   fecha, hora, cupo e inscritos, guía (con "Cambiar guía") y enlace; la caja
-  aparte del guía se retiró.
+  aparte del guía se retiró. **Dos cajas en la misma línea (2026-11-23)**: junto a esa va
+  **"Información Sesión"** (`InfoSesion` en `SesionModal.tsx`): **Nivel · Unidad · Clase**, debajo
+  **Sesión · Lección** y debajo el **Contenido** (el temario `catalog_curso.contenido`, en letra más grande
+  que el resto). El encabezado pasó a `Nivel X · Unidad U · Sesión N · Lección L` (la unidad solo en clases
+  del horario). Todo sale de la fila del catálogo que `SQL_SECUENCIA_LECCIONES` ya deriva (ahora trae
+  `unidad`, `clase` y `contenido`; `getSessionInfo` los da como `leccionUnidad|Clase|Contenido`). Un club,
+  taller o sesión extra no lleva lección y la caja lo dice. **`catalog_curso.clase`** (migración
+  `20261123000000`, TEXT opcional, p. ej. "Class 1") se carga en Gestión de Contenido (caja "Contenido del
+  curso"), Referencia curricular y el CSV (columna opcional `clase`); sigue la misma regla de
+  `planificarFila`: ausente = se conserva, vacía = se borra.
   **La LECCIÓN de la sesión se DERIVA, no se guarda** (`getSessionInfo`): la clase
   N del salón es la N-ésima lección del catálogo Curso de ese tipo, recorrido en el
   orden de los niveles (Rookie → Ultimate) y luego por `orden`. Dos fragmentos SQL

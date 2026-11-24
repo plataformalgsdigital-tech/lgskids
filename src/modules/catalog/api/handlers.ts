@@ -190,6 +190,7 @@ const cursoBaseSchema = {
   orden: z.number().int().min(0).max(999).optional(),
   contenido: z.string().max(20000).nullish(),
   video: z.string().max(1000).nullish(),
+  clase: z.string().max(200).nullish(),
   clubes: z.array(actividadItem).max(50).optional(),
   materialUsuario: z.array(materialItem).max(50).optional(),
   materialGuia: z.array(materialItem).max(50).optional(),

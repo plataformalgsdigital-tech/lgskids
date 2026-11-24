@@ -15,11 +15,12 @@
  *     ON sec.curso = <tipo del curso> AND sec.n = s.numero AND s.numero > 0
  *
  * Columnas: `id` (la fila del catálogo), `curso` (enum), `nivel` (código), `leccion` (texto del catálogo),
+ * `unidad`, `clase` y `contenido` (temario) de esa fila,
  * `n` (posición global en el curso), `pos` (posición dentro del nivel) y
  * `total` (lecciones del nivel).
  */
 export const SQL_SECUENCIA_LECCIONES = `(
-  SELECT cc.id, cc.curso, cc.nivel, cc.leccion,
+  SELECT cc.id, cc.curso, cc.nivel, cc.leccion, cc.unidad, cc.clase, cc.contenido,
          ROW_NUMBER() OVER (
            PARTITION BY cc.curso
            ORDER BY array_position(ARRAY['ROOKIE','CHAMPION','ELITE','LEGENDARY','ULTIMATE']::text[], cc.nivel),

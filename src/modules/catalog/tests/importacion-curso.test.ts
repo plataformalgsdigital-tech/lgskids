@@ -10,6 +10,7 @@ const guardada = (extra: Partial<LeccionGuardada> = {}): LeccionGuardada => ({
   orden: 3,
   contenido: "Colors",
   video: "https://v/1",
+  clase: "Class 3",
   quiz: { cuestionarios: [{ titulo: "Quiz 1", preguntas: [] }] },
   materialGuia: [{ nombre: "Guía", url: "g.pdf" }],
   materialUsuario: [],
@@ -32,6 +33,18 @@ describe("importación del catálogo Curso", () => {
     expect(p.accion).toBe("CREAR");
     expect(p.resultado.contenido).toBe("Colors");
     expect(p.resultado.quiz).toBeNull();
+  });
+
+  it("la CLASE: ausente se conserva, distinta actualiza, vacía borra", () => {
+    const igual = planificarFila({ ...fila, orden: 3 }, guardada());
+    expect(igual.resultado.clase).toBe("Class 3");
+    expect(igual.accion).toBe("SIN_CAMBIOS");
+    const cambia = planificarFila({ ...fila, orden: 3, clase: "Class 4" }, guardada());
+    expect(cambia.accion).toBe("ACTUALIZAR");
+    expect(cambia.cambios).toContain("clase");
+    const borra = planificarFila({ ...fila, orden: 3, clase: null }, guardada());
+    expect(borra.resultado.clase).toBeNull();
+    expect(borra.cambios).toContain("clase");
   });
 
   it("actualizar NUNCA borra los cuestionarios", () => {

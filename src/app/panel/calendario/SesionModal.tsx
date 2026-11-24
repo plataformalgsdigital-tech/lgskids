@@ -90,6 +90,10 @@ interface Sesion {
   leccionNivel: string | null;
   /** Fila del catálogo de esa lección: de ahí cuelga el Material Guía. */
   leccionRefId: string | null;
+  /** Unidad, clase y temario de esa lección (columnas del catálogo Curso). */
+  leccionUnidad: string | null;
+  leccionClase: string | null;
+  leccionContenido: string | null;
   /** Puesto entre las clases regulares del salón (sin clubes ni extras). */
   claseNumero: number | null;
   /** Creado a mano en el calendario (sin slot): se puede editar. */
@@ -164,16 +168,101 @@ export async function cargarEventoEditable(sessionId: string): Promise<EventoEdi
   };
 }
 
-/** "Sesión 3 · Lección 3": el catálogo escribe "Leccion 3", sin tilde. */
+/** "Lección 3": el catálogo escribe "Leccion 3", sin tilde. */
+function textoLeccion(s: Sesion): string {
+  const n = s.leccion?.match(/\d+/)?.[0];
+  return s.leccion === null ? "Lección por asignar" : n !== undefined ? `Lección ${n}` : s.leccion;
+}
+
+/** "Sesión 3 · Lección 3". */
 function tituloSesion(s: Sesion): string {
   if (s.tipo === "CLUB") return "Club";
   if (s.tipo === "TALLER") return "Taller";
   // Fuera de las clases regulares (refuerzo, sesión suelta): no lleva lección.
   if (s.claseNumero === null) return "Sesión extra";
-  const n = s.leccion?.match(/\d+/)?.[0];
-  const leccion =
-    s.leccion === null ? "Lección por asignar" : n !== undefined ? `Lección ${n}` : s.leccion;
-  return `Sesión ${String(s.claseNumero)} · ${leccion}`;
+  return `Sesión ${String(s.claseNumero)} · ${textoLeccion(s)}`;
+}
+
+/** Arriba a la derecha: "Nivel Rookie · Unidad 1 · Sesión 6 · Lección 5". */
+function encabezadoSesion(s: Sesion): string {
+  const partes: string[] = [];
+  if (s.leccionNivel !== null) partes.push(`Nivel ${NIVEL_UI[s.leccionNivel] ?? s.leccionNivel}`);
+  if (s.claseNumero !== null && s.leccionUnidad !== null) partes.push(s.leccionUnidad);
+  partes.push(tituloSesion(s));
+  return partes.join(" · ");
+}
+
+/**
+ * "Información Sesión": qué se ve en esta clase según el catálogo Curso —nivel, unidad y
+ * clase—, su puesto (sesión y lección) y el contenido (temario). Una clase del horario
+ * lleva todo; un club, un taller o una sesión extra no tiene lección y lo dice.
+ */
+function InfoSesion({ sesion }: { sesion: Sesion }) {
+  const regular = sesion.claseNumero !== null && sesion.tipo === "SESION";
+  const dato = (etiqueta: string, valor: string | null) => (
+    <span>
+      <strong>{etiqueta}:</strong> {valor ?? "—"}
+    </span>
+  );
+  return (
+    <section style={caja}>
+      <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>
+        Información Sesión
+      </h3>
+      {!regular ? (
+        <p style={{ fontSize: "0.88rem", color: "var(--texto-suave)", margin: 0 }}>
+          Esta sesión no es una clase del horario: no lleva unidad, clase ni lección del catálogo.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.25rem 1.1rem",
+              fontSize: "0.88rem",
+            }}
+          >
+            {dato(
+              "Nivel",
+              sesion.leccionNivel === null
+                ? null
+                : (NIVEL_UI[sesion.leccionNivel] ?? sesion.leccionNivel),
+            )}
+            {dato("Unidad", sesion.leccionUnidad)}
+            {dato("Clase", sesion.leccionClase)}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.25rem 1.1rem",
+              fontSize: "0.88rem",
+            }}
+          >
+            {dato("Sesión", String(sesion.claseNumero))}
+            {dato("Lección", textoLeccion(sesion).replace(/^Lección /, ""))}
+          </div>
+          <div>
+            <div style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.2rem" }}>
+              Contenido
+            </div>
+            <div
+              style={{
+                fontSize: "1.05rem",
+                lineHeight: 1.45,
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
+                color: sesion.leccionContenido === null ? "var(--texto-suave)" : undefined,
+              }}
+            >
+              {sesion.leccionContenido ?? "Sin contenido cargado para esta lección."}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 interface Enlace {
   nombre?: string;
@@ -679,11 +768,7 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
             }}
           >
             {sesion !== null && (
-              <div style={{ fontSize: "1.05rem", fontWeight: 800 }}>
-                {sesion.leccionNivel !== null &&
-                  `Nivel ${NIVEL_UI[sesion.leccionNivel] ?? sesion.leccionNivel} · `}
-                {tituloSesion(sesion)}
-              </div>
+              <div style={{ fontSize: "1.05rem", fontWeight: 800 }}>{encabezadoSesion(sesion)}</div>
             )}
             {cerrada && (
               <span
@@ -750,116 +835,131 @@ export function SesionModal({ sessionId, onCerrar }: { sessionId: string; onCerr
           )}
 
           {/* ── Información del evento (con el guía) ────────────── */}
-          <section style={caja}>
-            <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>
-              Información del evento
-            </h3>
-            {sesion !== null && (
-              <div
-                style={{
-                  fontSize: "0.88rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.25rem",
-                }}
-              >
-                <span>
-                  📅 <strong>Fecha:</strong>{" "}
-                  {new Date(`${sesion.fecha}T12:00:00`).toLocaleDateString("es", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-                <HoraDosPaises startsAt={sesion.startsAt} timezone={sesion.timezone} />
-                <span>
-                  👥 <strong>Cupo:</strong> {sesion.cupo} · <strong>Inscritos:</strong>{" "}
-                  {lista.length}
-                </span>
-                {/* El NOMBRE COMPLETO siempre se ve; cambiarlo es de coordinación. */}
-                <span
-                  style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(20rem, 1fr))",
+              gap: "0.9rem",
+              alignItems: "start",
+            }}
+          >
+            <section style={caja}>
+              <h3 style={{ fontSize: "0.96rem", fontWeight: 800, marginBottom: "0.5rem" }}>
+                Información del evento
+              </h3>
+              {sesion !== null && (
+                <div
+                  style={{
+                    fontSize: "0.88rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.25rem",
+                  }}
                 >
                   <span>
-                    🧑‍🏫 <strong>Guía:</strong> {sesion.guia ?? "Sin guía asignado"}
-                    {sesion.guiaSoloEstaSesion && (
-                      <span style={{ fontSize: "0.78rem", color: "#8a6d00" }}>
-                        {" "}
-                        (reemplazo solo de esta sesión)
-                      </span>
-                    )}
+                    📅 <strong>Fecha:</strong>{" "}
+                    {new Date(`${sesion.fecha}T12:00:00`).toLocaleDateString("es", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
                   </span>
-                  {puede("op.calendario.cambiar_guia") && (
-                    <button
-                      type="button"
-                      style={{ ...boton, padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
-                      disabled={ocupado}
-                      onClick={() => void abrirCambioGuia()}
-                    >
-                      🔀 Cambiar guía
-                    </button>
-                  )}
-                </span>
-                <span style={{ overflowWrap: "anywhere" }}>
-                  🔗 <strong>Enlace:</strong> {sesion.meetingUrl ?? "Sin enlace configurado"}
-                </span>
-              </div>
-            )}
-            {puede("op.calendario.cambiar_guia") && (
-              <>
-                {cambiandoGuia && (
-                  <div
+                  <HoraDosPaises startsAt={sesion.startsAt} timezone={sesion.timezone} />
+                  <span>
+                    👥 <strong>Cupo:</strong> {sesion.cupo} · <strong>Inscritos:</strong>{" "}
+                    {lista.length}
+                  </span>
+                  {/* El NOMBRE COMPLETO siempre se ve; cambiarlo es de coordinación. */}
+                  <span
                     style={{
-                      marginTop: "0.6rem",
                       display: "flex",
-                      gap: "0.4rem",
+                      alignItems: "center",
+                      gap: "0.5rem",
                       flexWrap: "wrap",
                     }}
                   >
-                    <select
-                      value={nuevoGuia}
-                      onChange={(e) => setNuevoGuia(e.target.value)}
+                    <span>
+                      🧑‍🏫 <strong>Guía:</strong> {sesion.guia ?? "Sin guía asignado"}
+                      {sesion.guiaSoloEstaSesion && (
+                        <span style={{ fontSize: "0.78rem", color: "#8a6d00" }}>
+                          {" "}
+                          (reemplazo solo de esta sesión)
+                        </span>
+                      )}
+                    </span>
+                    {puede("op.calendario.cambiar_guia") && (
+                      <button
+                        type="button"
+                        style={{ ...boton, padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
+                        disabled={ocupado}
+                        onClick={() => void abrirCambioGuia()}
+                      >
+                        🔀 Cambiar guía
+                      </button>
+                    )}
+                  </span>
+                  <span style={{ overflowWrap: "anywhere" }}>
+                    🔗 <strong>Enlace:</strong> {sesion.meetingUrl ?? "Sin enlace configurado"}
+                  </span>
+                </div>
+              )}
+              {puede("op.calendario.cambiar_guia") && (
+                <>
+                  {cambiandoGuia && (
+                    <div
                       style={{
-                        flex: 1,
-                        minWidth: "9rem",
-                        padding: "0.45rem",
-                        borderRadius: "0.5rem",
-                        border: "1.5px solid #d8dce6",
+                        marginTop: "0.6rem",
+                        display: "flex",
+                        gap: "0.4rem",
+                        flexWrap: "wrap",
                       }}
                     >
-                      <option value="">— El guía del salón —</option>
-                      {guias.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.nombre ?? g.username}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      style={botonPrimario}
-                      disabled={ocupado}
-                      onClick={() => void cambiarGuia()}
-                    >
-                      Guardar
-                    </button>
-                    <p
-                      style={{
-                        width: "100%",
-                        fontSize: "0.78rem",
-                        color: "var(--texto-suave)",
-                        margin: 0,
-                      }}
-                    >
-                      Cambia el guía <strong>solo de esta sesión</strong>: las anteriores y las
-                      siguientes siguen con el guía del salón. Para cambiarlo en el curso, entra al
-                      salón.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </section>
+                      <select
+                        value={nuevoGuia}
+                        onChange={(e) => setNuevoGuia(e.target.value)}
+                        style={{
+                          flex: 1,
+                          minWidth: "9rem",
+                          padding: "0.45rem",
+                          borderRadius: "0.5rem",
+                          border: "1.5px solid #d8dce6",
+                        }}
+                      >
+                        <option value="">— El guía del salón —</option>
+                        {guias.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.nombre ?? g.username}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        style={botonPrimario}
+                        disabled={ocupado}
+                        onClick={() => void cambiarGuia()}
+                      >
+                        Guardar
+                      </button>
+                      <p
+                        style={{
+                          width: "100%",
+                          fontSize: "0.78rem",
+                          color: "var(--texto-suave)",
+                          margin: 0,
+                        }}
+                      >
+                        Cambia el guía <strong>solo de esta sesión</strong>: las anteriores y las
+                        siguientes siguen con el guía del salón. Para cambiarlo en el curso, entra
+                        al salón.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+            {sesion !== null && <InfoSesion sesion={sesion} />}
+          </div>
 
           {/* ── Cancelación del guía (aviso y decisión de administración) ── */}
           {sesion !== null && (
